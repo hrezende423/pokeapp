@@ -26,9 +26,24 @@ GitHub Pages. No Pokémon data or features yet.
 src/components/   shared presentational components
 src/modules/      per-domain feature modules (pokedex, team-builder, ...)
 src/pwa.ts        service worker registration
-data/             generated data-layer output (empty for now)
+scripts/          build-time tooling (data ingestion)
+data/             generated data-layer output -- see data/README.md
 public/           static assets, PWA icons
 ```
+
+## Data layer
+
+`scripts/build-data.ts` ingests PokeAPI's static JSON snapshot and writes a
+normalized Gen 1-4 bundle (national dex 1-493, 14 version groups) to `data/`. The
+bundle is committed, so a normal `npm run build` needs no network access.
+
+It is normalized by design: entities reference each other by integer id, nothing is
+embedded, and reverse indices are omitted as derivable. The build fails if any
+emitted `*_id` fails to resolve. Historical data (`past_types`, `past_stats`,
+`past_abilities`, per-generation type matchups) is preserved because current-gen
+PokeAPI values are wrong for the Gen 1-4 era.
+
+`data/README.md` documents the shapes, invariants and the generation-accuracy rules.
 
 ## PWA
 

@@ -25,3 +25,6 @@ dist-ssr
 
 # vite-plugin-pwa dev output
 dev-dist
+
+# Local cache of the PokeAPI static snapshot (see scripts/build-data.ts)
+.cache
