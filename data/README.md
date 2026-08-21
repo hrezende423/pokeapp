@@ -47,19 +47,52 @@ These are enforced by the build; it exits non-zero if any is violated.
 | `types.json`            | `{ [id]: Type }`             | 20 types, with per-generation damage relations       |
 | `egg-groups.json`       | `{ [id]: EggGroup }`         | 15 egg groups                                        |
 | `evolution-chains.json` | `{ [id]: EvolutionChain }`   | 246 chains, pruned to in-scope species and methods   |
-| `learnsets.json`        | `LearnRow[]`                 | 202,707 rows                                         |
-| `encounters.json`       | `EncounterRow[]`             | 47,790 rows                                          |
 | `locations.json`        | `{ locations, areas }`       | 315 locations / 609 areas referenced by encounters   |
-| `version-groups.json`   | `{ [id]: VersionGroup }`     | the 14 in-scope version groups                       |
-| `meta.json`             | build manifest               | source hash, scope, counts, file sizes               |
+| `version-groups.json`   | `{ [id]: VersionGroup }`     | index of the 14 version groups + partition paths     |
+| `meta.json`             | build manifest               | source hash, scope, counts, raw + gzip file sizes    |
+| `learnsets/<vg>.json`   | `LearnRow[]`                 | 14 files, 202,707 rows total                         |
+| `encounters/<vg>.json`  | `EncounterRow[]`             | 14 files, 47,790 rows total                          |
 
 `LearnRow` is `{ species_id, pokemon_id, move_id, version_group, method, level, order }`.
 `EncounterRow` is `{ species_id, pokemon_id, location_id, location_area_id, version,
-method, chance, level_min, level_max, conditions }`.
+version_group, method, chance, level_min, level_max, conditions }`.
 
 `pokemon_id` appears alongside `species_id` because a species can have several
 battle-relevant forms (Deoxys, Rotom, Giratina, Shaymin). Keying only on `species_id`
 would collapse form-specific movesets into one.
+
+## Partitioned files
+
+`learnsets` and `encounters` dwarf everything else and no screen needs more than one
+game at a time, so they are split **one file per version group** — 14 each, including
+empty-but-present files so the index never points at a missing path. Every other file
+stays a single eagerly-loaded document.
+
+Rows keep their `version_group` field, so each partition is self-describing and the
+split is verifiable by inspection. Encounters carry both `version` (the specific game,
+e.g. `heartgold`) and `version_group` (the file it lives in, e.g.
+`heartgold-soulsilver`).
+
+`version-groups.json` is the index a runtime loader reads to discover what exists and
+what it costs before fetching:
+
+```json
+{
+  "8": {
+    "id": 8,
+    "name": "diamond-pearl",
+    "generation_id": 4,
+    "order": 12,
+    "versions": ["diamond", "pearl"],
+    "learnsets_path": "learnsets/diamond-pearl.json",
+    "encounters_path": "encounters/diamond-pearl.json",
+    "learnset_rows": 26301,
+    "encounter_rows": 8776
+  }
+}
+```
+
+Paths are relative to this directory. The loader itself is not built yet.
 
 ## Generation accuracy
 
@@ -94,8 +127,26 @@ and XD are in scope, so they are kept.
 
 ## Size
 
-34.28 MiB raw, **1.40 MiB gzipped** — the row-oriented files are highly repetitive.
-`learnsets.json` (24 MiB raw / 803 KiB gz) and `encounters.json` (8.3 MiB raw / 248 KiB
-gz) are the bulk. They are not currently copied into `dist/` or precached by the
-service worker; whichever module consumes them should split or index them per version
-group rather than shipping the whole array to the client.
+35.77 MiB raw, **1.41 MiB gzipped** in total, but the total is no longer the number
+that matters — nothing needs to load all of it. The eagerly-loaded files are 2.70 MiB
+raw / 388 KiB gz combined, and a single version group adds:
+
+| Version group          | Gen | learnsets + encounters (raw) | gzip     |
+| ---------------------- | --- | ---------------------------- | -------- |
+| `blue-japan`           | 1   | 481.5 KiB                    | 16.4 KiB |
+| `yellow`               | 1   | 633.1 KiB                    | 22.6 KiB |
+| `red-blue`             | 1   | 809.6 KiB                    | 26.9 KiB |
+| `red-green-japan`      | 1   | 857.3 KiB                    | 26.4 KiB |
+| `crystal`              | 2   | 1694.7 KiB                   | 55.2 KiB |
+| `gold-silver`          | 2   | 2200.1 KiB                   | 63.7 KiB |
+| `colosseum`            | 3   | 1530.5 KiB                   | 53.3 KiB |
+| `xd`                   | 3   | 1740.0 KiB                   | 65.2 KiB |
+| `ruby-sapphire`        | 3   | 2283.0 KiB                   | 72.1 KiB |
+| `emerald`              | 3   | 2515.7 KiB                   | 86.5 KiB |
+| `firered-leafgreen`    | 3   | 2899.1 KiB                   | 89.0 KiB |
+| `platinum`             | 4   | 4415.1 KiB                   | 146.0 KiB |
+| `diamond-pearl`        | 4   | 4967.2 KiB                   | 144.7 KiB |
+| `heartgold-soulsilver` | 4   | 6834.8 KiB                   | 191.7 KiB |
+
+Worst case is HeartGold/SoulSilver at 192 KiB gzipped. `data/` is still not copied
+into `dist/` or precached by the service worker.

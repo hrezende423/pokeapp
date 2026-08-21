@@ -22,9 +22,10 @@
  */
 
 import { createHash } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -248,8 +249,14 @@ async function main() {
   )
   const vgNames = new Set<string>(gen14VersionGroups.map((vg) => vg.name))
   const versionNames = new Set<string>()
+  // Encounters are recorded per version, but partitioned per version group, so the
+  // version -> version group mapping is needed when writing them out.
+  const versionToVersionGroup = new Map<string, string>()
   for (const vg of gen14VersionGroups) {
-    for (const v of vg.versions) versionNames.add(v.name)
+    for (const v of vg.versions) {
+      versionNames.add(v.name)
+      versionToVersionGroup.set(v.name, vg.name)
+    }
   }
   log(`scope: ${vgNames.size} version groups, ${versionNames.size} versions`)
   log(`  ${[...vgNames].sort().join(', ')}`)
@@ -873,6 +880,7 @@ async function main() {
     location_id: number
     location_area_id: number
     version: string
+    version_group: string
     method: string
     chance: number
     level_min: number
@@ -910,6 +918,7 @@ async function main() {
             location_id: locId,
             location_area_id: areaId,
             version,
+            version_group: versionToVersionGroup.get(version)!,
             method: refName(det.method)!,
             chance: det.chance ?? 0,
             level_min: det.min_level ?? 0,
@@ -1092,7 +1101,27 @@ async function main() {
     }
   }
 
-  // -- Version groups (reference data for interpreting learnset rows) ------
+  // -- Partition the row-oriented files by version group -------------------
+  // learnsets and encounters dwarf everything else, and no screen ever needs more
+  // than one version group at a time. Split them so a consumer fetches one game's
+  // rows instead of all fourteen. Every in-scope version group gets a file even
+  // when it has no rows, so the index never points at a missing path.
+  const learnsetsByVg = new Map<string, LearnRow[]>()
+  const encountersByVg = new Map<string, EncounterRow[]>()
+  for (const name of vgNames) {
+    learnsetsByVg.set(name, [])
+    encountersByVg.set(name, [])
+  }
+  for (const row of learnsets) learnsetsByVg.get(row.version_group)!.push(row)
+  for (const row of encounters) encountersByVg.get(row.version_group)!.push(row)
+
+  const LEARNSET_DIR = 'learnsets'
+  const ENCOUNTER_DIR = 'encounters'
+  const partitionPath = (dir: string, vg: string) => `${dir}/${vg}.json`
+
+  // -- Version groups index -------------------------------------------------
+  // This is what the runtime loader will read to discover which partitions exist
+  // and how much each one costs before fetching it.
   const versionGroups: Record<number, Json> = {}
   for (const vg of gen14VersionGroups) {
     versionGroups[vg.id] = {
@@ -1101,8 +1130,13 @@ async function main() {
       generation_id: genId(vg.generation),
       order: vg.order ?? null,
       versions: vg.versions.map((v: NamedRef) => refName(v)),
+      learnsets_path: partitionPath(LEARNSET_DIR, vg.name),
+      encounters_path: partitionPath(ENCOUNTER_DIR, vg.name),
+      learnset_rows: learnsetsByVg.get(vg.name)!.length,
+      encounter_rows: encountersByVg.get(vg.name)!.length,
     }
   }
+  log(`partitions: ${learnsetsByVg.size} learnset files, ${encountersByVg.size} encounter files`)
 
   // -----------------------------------------------------------------------
   // Validation
@@ -1184,8 +1218,12 @@ async function main() {
     'types.json': types,
     'egg-groups.json': eggGroups,
     'evolution-chains.json': evolutionChains,
-    'learnsets.json': learnsets,
-    'encounters.json': encounters,
+    ...Object.fromEntries(
+      [...learnsetsByVg].map(([vg, rows]) => [partitionPath(LEARNSET_DIR, vg), rows]),
+    ),
+    ...Object.fromEntries(
+      [...encountersByVg].map(([vg, rows]) => [partitionPath(ENCOUNTER_DIR, vg), rows]),
+    ),
     'locations.json': { locations, areas: locationAreas },
     'version-groups.json': versionGroups,
   }
@@ -1237,15 +1275,65 @@ async function main() {
     }
   }
 
+  // Partition integrity: one file per in-scope version group, every row in the
+  // right file, and no row lost or duplicated by the split.
+  if (learnsetsByVg.size !== vgNames.size) {
+    problems.push(`learnset partitions: ${learnsetsByVg.size}, expected ${vgNames.size}`)
+  }
+  if (encountersByVg.size !== vgNames.size) {
+    problems.push(`encounter partitions: ${encountersByVg.size}, expected ${vgNames.size}`)
+  }
+  let learnsetPartitioned = 0
+  for (const [vg, rows] of learnsetsByVg) {
+    learnsetPartitioned += rows.length
+    const wrong = rows.filter((r) => r.version_group !== vg).length
+    if (wrong) problems.push(`learnsets/${vg}.json: ${wrong} rows with a different version_group`)
+  }
+  let encounterPartitioned = 0
+  for (const [vg, rows] of encountersByVg) {
+    encounterPartitioned += rows.length
+    const wrong = rows.filter((r) => r.version_group !== vg).length
+    if (wrong) problems.push(`encounters/${vg}.json: ${wrong} rows with a different version_group`)
+    const badVersion = rows.filter((r) => versionToVersionGroup.get(r.version) !== vg).length
+    if (badVersion) {
+      problems.push(`encounters/${vg}.json: ${badVersion} rows whose version maps elsewhere`)
+    }
+  }
+  if (learnsetPartitioned !== learnsets.length) {
+    problems.push(`learnset rows after split: ${learnsetPartitioned}, expected ${learnsets.length}`)
+  }
+  if (encounterPartitioned !== encounters.length) {
+    problems.push(
+      `encounter rows after split: ${encounterPartitioned}, expected ${encounters.length}`,
+    )
+  }
+  // The index must point only at files that were actually written.
+  for (const vg of Object.values(versionGroups) as Json[]) {
+    if (!outputs[vg.learnsets_path]) problems.push(`index points at missing ${vg.learnsets_path}`)
+    if (!outputs[vg.encounters_path]) problems.push(`index points at missing ${vg.encounters_path}`)
+  }
+
   // -----------------------------------------------------------------------
   // Write
   // -----------------------------------------------------------------------
   await mkdir(OUT_DIR, { recursive: true })
+  await mkdir(join(OUT_DIR, LEARNSET_DIR), { recursive: true })
+  await mkdir(join(OUT_DIR, ENCOUNTER_DIR), { recursive: true })
+
+  // The monolithic files these partitions replace would otherwise linger as stale
+  // copies of the same data.
+  for (const legacy of ['learnsets.json', 'encounters.json']) {
+    await rm(join(OUT_DIR, legacy), { force: true })
+  }
+
   const sizes: Record<string, number> = {}
+  const gzipSizes: Record<string, number> = {}
   for (const [file, payload] of Object.entries(outputs)) {
     const text = stableStringify(payload) + '\n'
     await writeFile(join(OUT_DIR, file), text)
-    sizes[file] = Buffer.byteLength(text)
+    const buf = Buffer.from(text)
+    sizes[file] = buf.length
+    gzipSizes[file] = gzipSync(buf, { level: 9 }).length
   }
 
   const counts = {
@@ -1261,7 +1349,9 @@ async function main() {
     egg_groups: Object.keys(eggGroups).length,
     evolution_chains: Object.keys(evolutionChains).length,
     learnset_rows: learnsets.length,
+    learnset_partitions: learnsetsByVg.size,
     encounter_rows: encounters.length,
+    encounter_partitions: encountersByVg.size,
     locations: Object.keys(locations).length,
     location_areas: Object.keys(locationAreas).length,
     version_groups: Object.keys(versionGroups).length,
@@ -1278,6 +1368,7 @@ async function main() {
     },
     counts,
     file_bytes: sizes,
+    file_bytes_gzip: gzipSizes,
     validation: { references_checked: refsChecked, dangling_references: dangling.length },
     notes: [
       'Normalized: entities reference each other by id; nothing is embedded.',
@@ -1286,12 +1377,17 @@ async function main() {
       'species.varieties[].past_types / past_abilities / past_stats preserve Gen 1-4 accuracy where current-gen data differs.',
       'moves.past_values are kept verbatim; no resolution rule is inferred.',
       'learnsets carry pokemon_id alongside species_id so form-specific movesets are not collapsed.',
+      'learnsets and encounters are partitioned per version group under learnsets/ and encounters/; version-groups.json indexes the paths and row counts. Every other file is a single eagerly-loaded document.',
       'Fairy (type 18) is retained because current-gen species data references it; generation_id marks it out-of-era and it never appears in gen 1-4 relation blocks.',
     ],
   }
+  // meta.json is written last because it reports on the other files, so its own
+  // sizes are recorded after the fact rather than in the loop above.
   const metaText = stableStringify(meta) + '\n'
   await writeFile(join(OUT_DIR, 'meta.json'), metaText)
-  sizes['meta.json'] = Buffer.byteLength(metaText)
+  const metaBuf = Buffer.from(metaText)
+  sizes['meta.json'] = metaBuf.length
+  gzipSizes['meta.json'] = gzipSync(metaBuf, { level: 9 }).length
 
   // -----------------------------------------------------------------------
   // Report
@@ -1299,14 +1395,46 @@ async function main() {
   log('')
   log('=== counts ===')
   for (const [k, v] of Object.entries(counts)) log(`  ${k.padEnd(20)} ${v}`)
-  log('')
-  log('=== output files ===')
+  const kib = (b: number) => (b / 1024).toFixed(1).padStart(9)
+  const row = (label: string, b: number, g: number) =>
+    `  ${label.padEnd(34)} ${kib(b)} KiB ${kib(g)} KiB gz`
+
+  const isPartition = (f: string) =>
+    f.startsWith(`${LEARNSET_DIR}/`) || f.startsWith(`${ENCOUNTER_DIR}/`)
   let total = 0
-  for (const [f, b] of Object.entries(sizes).sort()) {
+  let totalGz = 0
+  for (const [f, b] of Object.entries(sizes)) {
     total += b
-    log(`  ${f.padEnd(24)} ${(b / 1024).toFixed(1).padStart(10)} KiB`)
+    totalGz += gzipSizes[f]
   }
-  log(`  ${'TOTAL'.padEnd(24)} ${(total / 1024 / 1024).toFixed(2).padStart(10)} MiB`)
+
+  log('')
+  log('=== eagerly-loaded files ===')
+  for (const [f, b] of Object.entries(sizes)
+    .filter(([f]) => !isPartition(f))
+    .sort()) {
+    log(row(f, b, gzipSizes[f]))
+  }
+
+  for (const dir of [LEARNSET_DIR, ENCOUNTER_DIR]) {
+    log('')
+    log(`=== ${dir}/ partitions (per version group) ===`)
+    let dr = 0
+    let dg = 0
+    for (const vg of (Object.values(versionGroups) as Json[]).sort(
+      (a, b) => (a.generation_id ?? 0) - (b.generation_id ?? 0) || (a.order ?? 0) - (b.order ?? 0),
+    )) {
+      const f = dir === LEARNSET_DIR ? vg.learnsets_path : vg.encounters_path
+      const rows = dir === LEARNSET_DIR ? vg.learnset_rows : vg.encounter_rows
+      dr += sizes[f]
+      dg += gzipSizes[f]
+      log(`${row(f, sizes[f], gzipSizes[f])}  gen${vg.generation_id}  ${rows} rows`)
+    }
+    log(row(`${dir}/ SUBTOTAL`, dr, dg))
+  }
+
+  log('')
+  log(row('TOTAL', total, totalGz))
   log('')
   log('=== validation ===')
   log(`  references checked   ${refsChecked}`)

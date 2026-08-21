@@ -43,6 +43,11 @@ emitted `*_id` fails to resolve. Historical data (`past_types`, `past_stats`,
 `past_abilities`, per-generation type matchups) is preserved because current-gen
 PokeAPI values are wrong for the Gen 1-4 era.
 
+The two large row-oriented files are partitioned per version group into
+`data/learnsets/` and `data/encounters/` (14 files each), indexed by
+`data/version-groups.json`. Loading one game costs 16-192 KiB gzipped instead of the
+full 1.4 MiB. Everything else is a single eagerly-loaded file.
+
 `data/README.md` documents the shapes, invariants and the generation-accuracy rules.
 
 ## PWA
