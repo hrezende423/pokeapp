@@ -6,9 +6,12 @@
  * assumptions:
  *
  *   1. the eager bundle is fetched once at boot (bytes + timing)
- *   2. selecting a version group fetches exactly its two partition files
- *   3. re-selecting it fetches nothing (in-memory cache)
- *   4. offline reload still boots and still resolves that group (service worker)
+ *   2. opening a species fetches exactly that version group's two partitions
+ *   3. returning to an already-loaded version group fetches nothing
+ *   4. offline reload still boots and still resolves a previously visited group
+ *
+ * Scenario-level checks for the Pokedex UI itself live in verify-pokedex.mjs;
+ * this file stays focused on the data layer and the service worker.
  *
  * Usage: node scripts/verify-app.mjs
  */
@@ -36,8 +39,10 @@ const EAGER = [
   'version-groups.json',
 ]
 
-const GROUP_A = 'heartgold-soulsilver' // largest partitions
+const GROUP_A = 'heartgold-soulsilver' // largest partitions, and the app default
 const GROUP_B = 'red-blue'
+const NEVER_VISITED = 'emerald'
+const SPECIES = 80 // Slowbro: present in every generation
 
 const failures = []
 const log = (...a) => console.log(...a)
@@ -77,10 +82,9 @@ async function waitForServer(url, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url, { redirect: 'follow' })
-      if (res.ok) return
+      if ((await fetch(url, { redirect: 'follow' })).ok) return
     } catch {
-      // server not up yet
+      /* server not up yet */
     }
     await new Promise((r) => setTimeout(r, 250))
   }
@@ -132,6 +136,24 @@ try {
     requests.filter((r) => r.url.includes(needle) && r.method === 'GET')
   const mark = () => requests.length
 
+  const selectGroup = async (name) => {
+    await page.selectOption('[data-testid="vg-select"]', name)
+    await page.waitForFunction(
+      (n) => document.querySelector('[data-testid="scope-note"]')?.textContent?.includes(n),
+      name,
+      { timeout: 30000 },
+    )
+  }
+  /** Wait for any in-flight partition load to finish rendering. */
+  const settle = () =>
+    page.waitForFunction(
+      () =>
+        !document.querySelector('[data-testid="learnset-loading"]') &&
+        !document.querySelector('[data-testid="encounters-loading"]'),
+      undefined,
+      { timeout: 60000 },
+    )
+
   // ---------------------------------------------------------------- STEP 1
   hr('STEP 1 — first load: eager bundle')
   const navStart = Date.now()
@@ -139,9 +161,8 @@ try {
   await page.waitForSelector('[data-testid="boot-ms"]', { timeout: 60000 })
   const wallMs = Date.now() - navStart
 
-  const bootMs = await page.textContent('[data-testid="boot-ms"]')
-  const bootBytes = await page.textContent('[data-testid="boot-bytes"]')
-  log(`  app-reported boot   : ${bootMs} / ${bootBytes} decoded`)
+  log(`  app-reported boot    : ${await page.textContent('[data-testid="boot-ms"]')}`)
+  log(`  decoded bytes        : ${await page.textContent('[data-testid="boot-bytes"]')}`)
   log(`  wall clock nav->ready: ${wallMs} ms`)
 
   let eagerTransferred = 0
@@ -166,17 +187,11 @@ try {
     `(${partitionsAtBoot.length} seen)`,
   )
 
-  const counts = await page.$$eval('.stats li', (els) =>
-    Object.fromEntries(
-      els.map((el) => [
-        el.querySelector('span').textContent,
-        el.querySelector('strong').textContent,
-      ]),
-    ),
-  )
+  await selectGroup(GROUP_A)
+  const listCount = (await page.textContent('[data-testid="list-count"]')).trim()
   log('')
-  log(`  indexed counts: ${JSON.stringify(counts)}`)
-  check('species index has 493 entries', counts.species === '493', `(got ${counts.species})`)
+  log(`  species listed under ${GROUP_A}: ${listCount}`)
+  check('full dex of 493 species is indexed', listCount.startsWith('493'), listCount)
 
   // ---------------------------------------------------------------- STEP 2
   hr('STEP 2 — service worker activation')
@@ -209,33 +224,25 @@ try {
   check('service worker controls the page', swState.controlled === true)
 
   // ---------------------------------------------------------------- STEP 3
-  hr(`STEP 3 — select "${GROUP_A}": expect exactly 1 fetch per partition file`)
+  hr(`STEP 3 — open a species under "${GROUP_A}": expect exactly 1 fetch per partition`)
   let before = mark()
-  await page.click(`[data-testid="vg-${GROUP_A}"]`)
-  await page.waitForSelector('[data-testid="group-view"]', { timeout: 60000 })
-  await page.waitForFunction(
-    (g) => document.querySelector('[data-testid="group-name"]')?.textContent === g,
-    GROUP_A,
-    { timeout: 60000 },
-  )
+  await page.click(`[data-testid="species-row-${SPECIES}"]`)
+  await page.waitForSelector('[data-testid="species-detail"]', { timeout: 30000 })
+  await settle()
   let newReqs = requests.slice(before)
   const aLearn = newReqs.filter((r) => r.url.includes(`/data/learnsets/${GROUP_A}.json`))
   const aEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_A}.json`))
   const learnWire = await wireBytes(`${ORIGIN}/pokeapp/data/learnsets/${GROUP_A}.json`)
   const encWire = await wireBytes(`${ORIGIN}/pokeapp/data/encounters/${GROUP_A}.json`)
   log(
-    `  learnsets/${GROUP_A}.json  requests=${aLearn.length}  ` +
-      `wire=${kib(learnWire.bytes)} (${learnWire.enc})`,
+    `  learnsets/${GROUP_A}.json  requests=${aLearn.length}  wire=${kib(learnWire.bytes)} (${learnWire.enc})`,
   )
   log(
-    `  encounters/${GROUP_A}.json requests=${aEnc.length}  ` +
-      `wire=${kib(encWire.bytes)} (${encWire.enc})`,
+    `  encounters/${GROUP_A}.json requests=${aEnc.length}  wire=${kib(encWire.bytes)} (${encWire.enc})`,
   )
   log(`  combined wire cost for this group: ${kib(learnWire.bytes + encWire.bytes)}`)
-  log(`  group stats in UI: ${await page.textContent('[data-testid="group-stats"]')}`)
   log(
-    `  rows: learnsets=${await page.textContent('[data-testid="learnset-count"]')} ` +
-      `encounters=${await page.textContent('[data-testid="encounter-count"]')}`,
+    `  learnset rows rendered: ${await page.getAttribute('[data-testid="learnset"]', 'data-total-rows')}`,
   )
   check(`exactly 1 fetch for learnsets/${GROUP_A}.json`, aLearn.length === 1, `(${aLearn.length})`)
   check(`exactly 1 fetch for encounters/${GROUP_A}.json`, aEnc.length === 1, `(${aEnc.length})`)
@@ -245,14 +252,10 @@ try {
   check('no other partition files fetched', otherPartitions.length === 0)
 
   // ---------------------------------------------------------------- STEP 4
-  hr(`STEP 4 — select "${GROUP_B}", then back to "${GROUP_A}": expect 0 refetches`)
+  hr(`STEP 4 — switch to "${GROUP_B}" then back: expect 0 refetches for ${GROUP_A}`)
   before = mark()
-  await page.click(`[data-testid="vg-${GROUP_B}"]`)
-  await page.waitForFunction(
-    (g) => document.querySelector('[data-testid="group-name"]')?.textContent === g,
-    GROUP_B,
-    { timeout: 60000 },
-  )
+  await selectGroup(GROUP_B)
+  await settle()
   newReqs = requests.slice(before)
   const bLearn = newReqs.filter((r) => r.url.includes(`/data/learnsets/${GROUP_B}.json`))
   const bEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_B}.json`))
@@ -261,20 +264,13 @@ try {
   check(`exactly 1 fetch for encounters/${GROUP_B}.json`, bEnc.length === 1)
 
   before = mark()
-  await page.click(`[data-testid="vg-${GROUP_A}"]`)
-  await page.waitForFunction(
-    (g) => document.querySelector('[data-testid="group-name"]')?.textContent === g,
-    GROUP_A,
-    { timeout: 60000 },
-  )
+  await selectGroup(GROUP_A)
+  await settle()
   newReqs = requests.slice(before)
   const refetch = newReqs.filter((r) => /\/data\//.test(r.url))
-  log(
-    `  re-selecting ${GROUP_A}: ${refetch.length} data request(s) — ${await page.textContent('[data-testid="group-stats"]')}`,
-  )
-  if (refetch.length) refetch.forEach((r) => log(`    unexpected: ${r.url}`))
-  check(`re-selecting ${GROUP_A} triggers 0 data fetches`, refetch.length === 0)
-  log(`  in memory: ${await page.textContent('[data-testid="loaded-groups"]')}`)
+  log(`  returning to ${GROUP_A}: ${refetch.length} data request(s)`)
+  refetch.forEach((r) => log(`    unexpected: ${r.url}`))
+  check(`returning to ${GROUP_A} triggers 0 data fetches`, refetch.length === 0)
 
   // ---------------------------------------------------------------- STEP 5
   hr('STEP 5 — offline reload')
@@ -282,91 +278,50 @@ try {
     const out = {}
     for (const name of await caches.keys()) {
       const keys = await (await caches.open(name)).keys()
-      out[name] = keys.map((k) => new URL(k.url).pathname).sort()
+      out[name] = {
+        total: keys.length,
+        partitions: keys.filter((k) => /\/data\/(learnsets|encounters)\//.test(k.url)).length,
+      }
     }
     return out
   })
-  for (const [name, keys] of Object.entries(cacheReport)) {
-    const partitions = keys.filter((k) => /\/data\/(learnsets|encounters)\//.test(k))
-    log(`  cache "${name}": ${keys.length} entries, ${partitions.length} partition file(s)`)
-    partitions.forEach((p) => log(`    ${p}`))
+  for (const [name, info] of Object.entries(cacheReport)) {
+    log(`  cache "${name}": ${info.total} entries, ${info.partitions} partition file(s)`)
   }
 
   await context.setOffline(true)
   log('  context is now OFFLINE')
 
-  const offlineFailures = []
-  page.on('requestfailed', (req) =>
-    offlineFailures.push(`${req.url()} :: ${req.failure()?.errorText}`),
-  )
-
-  before = mark()
   await page.reload({ waitUntil: 'load' })
   await page.waitForSelector('[data-testid="boot-ms"]', { timeout: 60000 })
-  const offlineBoot = await page.textContent('[data-testid="boot-ms"]')
-  const offlineBytes = await page.textContent('[data-testid="boot-bytes"]')
-  log(`  booted OFFLINE in ${offlineBoot} / ${offlineBytes} decoded`)
+  log(`  booted OFFLINE in ${await page.textContent('[data-testid="boot-ms"]')}`)
   check('app boots offline', true)
 
-  const offlineCounts = await page.$$eval('.stats li', (els) =>
-    Object.fromEntries(
-      els.map((el) => [
-        el.querySelector('span').textContent,
-        el.querySelector('strong').textContent,
-      ]),
-    ),
-  )
-  check(
-    'eager bundle resolves offline (493 species)',
-    offlineCounts.species === '493',
-    `(got ${offlineCounts.species})`,
-  )
+  await selectGroup(GROUP_A)
+  const offlineCount = (await page.textContent('[data-testid="list-count"]')).trim()
+  check('eager bundle resolves offline (493 species)', offlineCount.startsWith('493'), offlineCount)
 
-  await page.click(`[data-testid="vg-${GROUP_A}"]`)
-  await page.waitForFunction(
-    (g) => document.querySelector('[data-testid="group-name"]')?.textContent === g,
-    GROUP_A,
-    { timeout: 60000 },
-  )
-  const offLearn = await page.textContent('[data-testid="learnset-count"]')
-  const offEnc = await page.textContent('[data-testid="encounter-count"]')
-  log(`  offline ${GROUP_A}: learnsets=${offLearn} rows, encounters=${offEnc} rows`)
-  check(`${GROUP_A} learnsets resolve offline`, Number(offLearn) > 0, `(${offLearn} rows)`)
-  check(`${GROUP_A} encounters resolve offline`, Number(offEnc) > 0, `(${offEnc} rows)`)
+  await page.click(`[data-testid="species-row-${SPECIES}"]`)
+  await page.waitForSelector('[data-testid="species-detail"]', { timeout: 30000 })
+  await settle()
+  const offlineRows = await page.getAttribute('[data-testid="learnset"]', 'data-total-rows')
+  log(`  offline ${GROUP_A} learnset rows for #${SPECIES}: ${offlineRows}`)
+  check(`${GROUP_A} partitions resolve offline`, Number(offlineRows) > 0, `(${offlineRows} rows)`)
 
   // A group never visited online must NOT be available offline — proves the
   // partitions really are cache-on-first-use rather than precached.
-  const NEVER_VISITED = 'emerald'
-  await page.click(`[data-testid="vg-${NEVER_VISITED}"]`)
-  await page.waitForTimeout(2500)
-  const neverState = await page.evaluate(
-    (g) => ({
-      name: document.querySelector('[data-testid="group-name"]')?.textContent ?? null,
-      loading: !!document.querySelector('[data-testid="group-loading"]'),
-      target: g,
-    }),
-    NEVER_VISITED,
-  )
-  log(
-    `  offline "${NEVER_VISITED}" (never visited online): resolved=${neverState.name === NEVER_VISITED}, still loading=${neverState.loading}`,
-  )
+  await selectGroup(NEVER_VISITED)
+  await page.waitForSelector('[data-testid="species-detail"] [role="alert"]', { timeout: 30000 })
+  const alert = await page.textContent('[data-testid="species-detail"] [role="alert"]')
+  log(`  offline "${NEVER_VISITED}" (never visited online) -> ${JSON.stringify(alert)}`)
   check(
     `un-visited group "${NEVER_VISITED}" is NOT available offline (confirms on-demand caching)`,
-    neverState.name !== NEVER_VISITED,
+    (alert ?? '').length > 0,
   )
 
-  if (offlineFailures.length) {
-    log('')
-    log(
-      `  network failures while offline (${offlineFailures.length}) — expected for un-cached files:`,
-    )
-    offlineFailures.slice(0, 8).forEach((f) => log(`    ${f}`))
-  }
-
   hr('SUMMARY')
-  if (failures.length === 0) {
-    log('  ALL CHECKS PASSED')
-  } else {
+  if (failures.length === 0) log('  ALL CHECKS PASSED')
+  else {
     log(`  ${failures.length} FAILED:`)
     failures.forEach((f) => log(`    - ${f}`))
   }

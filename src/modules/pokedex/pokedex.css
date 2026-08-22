@@ -1,0 +1,368 @@
+/* Pokedex module styles. Uses the theme tokens from index.css
+   (--text, --text-h, --bg, --border, --code-bg, --accent, --accent-bg). */
+
+.pokedex {
+  text-align: left;
+}
+
+.pokedex-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pokedex-head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-h);
+}
+
+.vg-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.vg-selector select {
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+}
+
+.pokedex-body {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .pokedex-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------- list */
+
+.species-list {
+  position: sticky;
+  top: 0;
+  max-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 1rem;
+}
+
+.list-controls input[type='search'] {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  box-sizing: border-box;
+}
+
+.type-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.6rem 0 0.35rem;
+}
+
+.tf {
+  padding: 0.15rem 0.4rem;
+  font: inherit;
+  font-size: 0.7rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.tf:hover {
+  border-color: var(--accent);
+}
+
+.tf-on {
+  color: var(--text-h);
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.tf-clear {
+  font-style: italic;
+}
+
+.species-rows {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.species-row {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.4rem 0.35rem;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  color: var(--text-h);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.species-row:hover {
+  background: var(--code-bg);
+}
+
+.species-row-active {
+  background: var(--accent-bg);
+}
+
+.dex-no {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+}
+
+.species-rows .empty {
+  padding: 1rem 0.35rem;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------- badges */
+
+.type-badge {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.7rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: #fff;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.type-badge-sm {
+  padding: 0.05rem 0.35rem;
+  font-size: 0.62rem;
+}
+
+.row-types {
+  display: flex;
+  gap: 0.2rem;
+}
+
+/* ---------------------------------------------------------------- detail */
+
+.pokedex-detail {
+  padding-top: 1rem;
+  min-width: 0;
+}
+
+.detail h2 {
+  margin: 0.1rem 0;
+  font-size: 1.6rem;
+  color: var(--text-h);
+}
+
+.detail h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.detail h4 {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-h);
+}
+
+.detail section {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+/* artwork */
+
+.artwork {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.artwork-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12rem;
+  height: 12rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.artwork-frame img {
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+}
+
+.artwork-toggles {
+  display: flex;
+  gap: 0.35rem;
+}
+
+/* stats */
+
+.stat-bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stat-bars li {
+  display: grid;
+  grid-template-columns: 5rem 1fr 2.5rem;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.15rem 0;
+  font-size: 0.8rem;
+}
+
+.stat-name {
+  color: var(--text);
+}
+
+.stat-track {
+  height: 0.5rem;
+  background: var(--code-bg);
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.stat-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.stat-value {
+  text-align: right;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+/* abilities */
+
+.ability-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ability-list li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.ability-list p {
+  margin: 0.15rem 0 0;
+}
+
+/* matchups */
+
+.matchups {
+  margin: 0;
+}
+
+.matchups > div {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.2rem 0;
+}
+
+.matchups dt {
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.matchups dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+/* evolution */
+
+.evo-root,
+.evo-branch,
+.evo-methods {
+  margin: 0;
+  padding-left: 1rem;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.evo-branch {
+  border-left: 1px solid var(--border);
+}
+
+.evo-methods {
+  color: var(--text);
+  font-size: 0.75rem;
+}
+
+.evo-self {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+/* learnset / encounters share .rows from App.css */
+
+.learn-group table {
+  margin-top: 0.25rem;
+}

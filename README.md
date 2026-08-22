@@ -11,23 +11,26 @@ GitHub Pages. No Pokémon data or features yet.
 
 ## Scripts
 
-| Script                 | What it does                                  |
-| ---------------------- | --------------------------------------------- |
-| `npm run dev`          | Vite dev server                               |
-| `npm run build`        | Type-check (`tsc -b`) then production build   |
-| `npm run build:data`   | Regenerate the data bundle in `public/data/`  |
-| `npm run lint`         | ESLint over the repo                          |
-| `npm run format`       | Prettier, writing changes                     |
-| `npm run format:check` | Prettier in check-only mode (useful in CI)    |
-| `npm run preview`      | Serve the production build locally            |
-| `npm run verify:app`   | Drive the built app in Chrome, assert caching |
+| Script                   | What it does                                      |
+| ------------------------ | ------------------------------------------------- |
+| `npm run dev`            | Vite dev server                                   |
+| `npm run build`          | Type-check (`tsc -b`) then production build       |
+| `npm run build:data`     | Regenerate the data bundle in `public/data/`      |
+| `npm run lint`           | ESLint over the repo                              |
+| `npm run format`         | Prettier, writing changes                         |
+| `npm run format:check`   | Prettier in check-only mode (useful in CI)        |
+| `npm run preview`        | Serve the production build locally                |
+| `npm run verify:app`     | Drive the built app in Chrome, assert caching     |
+| `npm run verify:pokedex` | Drive the Pokedex in Chrome, assert each scenario |
 
 ## Layout
 
 ```
 src/components/   shared presentational components
-src/modules/      per-domain feature modules (pokedex, team-builder, ...)
-src/data/         runtime data loader, indices and types
+src/modules/      per-domain feature modules
+  pokedex/        species list + detail view
+  version-group/  the app-wide "which game" selection
+src/data/         runtime data loader, indices, era resolution and types
 src/pwa.ts        service worker registration
 scripts/          build-time tooling (data ingestion, browser verification)
 public/data/      generated data bundle -- see public/data/README.md
@@ -74,6 +77,37 @@ the partitions use a Workbox `CacheFirst` route so each is stored on first use. 
 version group never opened online is genuinely unavailable offline. `npm run
 verify:app` asserts all of this against a real browser network log, including an
 offline reload.
+
+## Pokédex
+
+`src/modules/pokedex/` is the first feature module: a filterable species list and a
+full detail view, both driven by the version group selected in
+`src/modules/version-group/`. Changing the game updates an open detail view in
+place.
+
+The detail view is generation-accurate rather than showing current-gen values:
+
+- **Abilities** are resolved for the selected generation only. Resolution is
+  per-slot, because a species can have several `past_abilities` entries each
+  covering a different slot. Under a Gen 1-2 selection no abilities are shown at
+  all, since abilities did not exist yet.
+- **Types** use `past_types` where it applies, so Clefairy is Normal in Gen 1-4,
+  not Fairy.
+- **Type effectiveness** uses the per-generation damage relations from the data
+  bundle: 15 attacking types under Gen 1 (no Dark or Steel), 17 under Gen 2-4.
+- **Learnsets and encounters** come from the selected version group's partition
+  only, loaded on demand. TM vs HM is resolved from the machine item's name.
+
+### Known gap
+
+`getGenerationForSpecies()` maps a species to the generation it was _introduced_
+in, by national dex id range, and the list shows everything up to the selected
+generation. It does **not** model regional dex availability — Ruby/Sapphire's
+Hoenn dex excludes Johto species until the National Dex is unlocked, and
+Colosseum/XD have small rosters, but all of them list the full cumulative dex
+here. Doing this properly needs the `pokedex` endpoint's per-regional-dex species
+lists, which the bundle does not currently carry. This is a documented
+simplification, not a bug.
 
 ## PWA
 

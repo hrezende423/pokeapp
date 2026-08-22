@@ -238,6 +238,10 @@ export const getBootStats = (): BootStats => requireBundle().stats
 export const listSpecies = (): Species[] =>
   [...requireBundle().species.values()].sort((a, b) => a.id - b.id)
 
+/** All types, ascending by id (includes PokeAPI's pseudo-types). */
+export const listTypes = (): PokemonType[] =>
+  [...requireBundle().types.values()].sort((a, b) => a.id - b.id)
+
 /** All version groups, oldest generation first. */
 export const listVersionGroups = (): VersionGroup[] =>
   [...requireBundle().versionGroups.values()].sort(

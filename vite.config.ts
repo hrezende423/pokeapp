@@ -60,6 +60,22 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
+            // Artwork lives on other origins: PokeAPI's sprite repo for the static
+            // images, and GitHub releases (which redirect to objects.*) for the
+            // animated WebP. Cross-origin responses are opaque, so status 0 has to
+            // be treated as cacheable alongside 200.
+            urlPattern: ({ url }) =>
+              url.hostname === 'raw.githubusercontent.com' ||
+              url.hostname === 'objects.githubusercontent.com' ||
+              (url.hostname === 'github.com' && url.pathname.includes('/releases/download/')),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pokeapp-artwork',
+              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             urlPattern: PARTITION_PATTERN,
             handler: 'CacheFirst',
             options: {

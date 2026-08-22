@@ -23,6 +23,7 @@ export {
   initDataLayer,
   isDataLayerReady,
   listSpecies,
+  listTypes,
   listVersionGroups,
   __resetDataLayer,
 } from './loader'
@@ -39,6 +40,29 @@ export {
   __resetVersionGroupCache,
 } from './versionGroupData'
 export type { VersionGroupData, VersionGroupLoadStats } from './versionGroupData'
+
+export {
+  ABILITIES_INTRODUCED_IN_GENERATION,
+  captureRatePercent,
+  damageRelationsFor,
+  genderRatio,
+  resolveAbilitiesForGeneration,
+  resolveTypesForGeneration,
+  typeEffectivenessAgainst,
+  typesInGeneration,
+} from './era'
+export type { Effectiveness, ResolvedAbility } from './era'
+
+export {
+  GENERATION_RANGES,
+  generationTag,
+  getGenerationForSpecies,
+  isSpeciesInGeneration,
+} from './generations'
+export type { GenerationRange } from './generations'
+
+export { availableSpriteGenders, getSpriteUrl, usesUnsuffixedMaleSprite } from './sprites'
+export type { SpriteGender, SpriteOptions } from './sprites'
 
 export { DATA_DIR, EAGER_DATA_FILES, PARTITION_DIRS } from './manifest'
 export type { EagerDataFile } from './manifest'

@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview": "vite preview",
-    "verify:app": "node scripts/verify-app.mjs"
+    "verify:app": "node scripts/verify-app.mjs",
+    "verify:pokedex": "node scripts/verify-pokedex.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",
