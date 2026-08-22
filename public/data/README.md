@@ -1,6 +1,8 @@
 # Data layer (generated)
 
-Everything in this directory is **generated output** — do not hand-edit. Regenerate with:
+Everything in this directory is **generated output** — do not hand-edit. It lives under
+`public/` so Vite copies it into `dist/data/` verbatim; at runtime the app fetches it
+from `<base>data/...` (i.e. `/pokeapp/data/...` in production). Regenerate with:
 
 ```
 npm run build:data              # reuses the cached snapshot
@@ -148,5 +150,22 @@ raw / 388 KiB gz combined, and a single version group adds:
 | `diamond-pearl`        | 4   | 4967.2 KiB                   | 144.7 KiB |
 | `heartgold-soulsilver` | 4   | 6834.8 KiB                   | 191.7 KiB |
 
-Worst case is HeartGold/SoulSilver at 192 KiB gzipped. `data/` is still not copied
-into `dist/` or precached by the service worker.
+Worst case is HeartGold/SoulSilver at 192 KiB gzipped.
+
+## Caching
+
+The two tiers are cached differently (see `vite.config.ts`):
+
+- **The 12 eager files are precached** at service-worker install, by explicit name
+  rather than a `data/*.json` wildcard, so a stray file cannot slip into the install
+  payload. That makes the install ~2.99 MiB / ~388 KiB over the wire, and the app
+  boots offline from the very first reload.
+- **The 28 partition files are not precached.** A Workbox `CacheFirst` route
+  (`pokeapp-version-group-data`) stores each one the first time it is requested.
+  A version group you have never opened online is genuinely unavailable offline —
+  verified, not assumed.
+
+`src/data/loader.ts` loads the eager tier and indexes it into Maps;
+`src/data/versionGroupData.ts` loads partitions on demand, keyed by version group,
+and de-duplicates concurrent requests for the same group. Run
+`npm run verify:app` to re-check all of this against a real browser.

@@ -19,6 +19,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # scripts/verify-app.mjs drives the system Chrome via Playwright's `channel`
+    # option, so the runner never needs Playwright's bundled browsers.
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
 

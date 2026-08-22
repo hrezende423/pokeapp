@@ -1,7 +1,7 @@
 dist
 dev-dist
 node_modules
-data
+public/data
 package-lock.json
 public/sw.js
 public/workbox-*.js

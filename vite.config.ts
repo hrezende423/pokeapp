@@ -1,10 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { DATA_DIR, EAGER_DATA_FILES, PARTITION_DIRS } from './src/data/manifest.ts'
 
 // Repo is served from https://<user>.github.io/pokeapp/, so every asset URL
 // must be prefixed with the repo name.
 const BASE = '/pokeapp/'
+
+// Precache the eager bundle by name rather than with a `data/*.json` wildcard, so a
+// stray file landing in data/ can never be silently added to the install payload.
+const EAGER_DATA_GLOB = `${DATA_DIR}/{${EAGER_DATA_FILES.join(',')}}`
+
+// The per-version-group partitions are ~34 MiB raw in total, so they are fetched on
+// demand and cached on first use instead. CacheFirst is right because the files are
+// immutable for a given build: a rebuild produces new content under the same name,
+// and cleanupOutdatedCaches plus a new SW revision handles that.
+const PARTITION_PATTERN = new RegExp(`/${DATA_DIR}/(${PARTITION_DIRS.join('|')})/[^/]+\\.json$`)
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,7 +26,6 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // Registration is done explicitly from src/pwa.ts.
       injectRegister: null,
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Pokeapp',
         short_name: 'Pokeapp',
@@ -37,10 +47,29 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // App shell only. Pokémon data caching gets wired up with the data layer.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // No includeAssets and no `webmanifest` here: the plugin already precaches
+        // manifest.webmanifest, and favicon/apple-touch-icon are matched by the svg
+        // and png globs. Listing them twice inflated the manifest with duplicate
+        // entries for the same revision.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}', EAGER_DATA_GLOB],
+        // species.json is the largest precached file at ~1.6 MiB; the Workbox default
+        // is 2 MiB, which would silently drop it if the bundle grew.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: `${BASE}index.html`,
+        navigateFallbackDenylist: [PARTITION_PATTERN],
         cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: PARTITION_PATTERN,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pokeapp-version-group-data',
+              // 14 version groups x 2 files, with headroom for a build transition.
+              expiration: { maxEntries: 40 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
       },
     }),
   ],

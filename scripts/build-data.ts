@@ -38,7 +38,9 @@ const ROOT = resolve(HERE, '..')
 const CACHE_DIR = join(ROOT, '.cache')
 const SNAPSHOT_DIR = join(CACHE_DIR, 'api-data')
 const TARBALL = join(CACHE_DIR, 'api-data.tar.gz')
-const OUT_DIR = join(ROOT, 'data')
+// Lives under public/ so Vite copies the bundle into dist/data/ verbatim and the
+// app can fetch it at <base>data/... at runtime.
+const OUT_DIR = join(ROOT, 'public', 'data')
 
 const SNAPSHOT_URL = 'https://codeload.github.com/PokeAPI/api-data/tar.gz/refs/heads/master'
 const SNAPSHOT_SUBTREE = 'api-data-master/data/api/v2'
