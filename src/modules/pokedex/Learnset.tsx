@@ -1,3 +1,4 @@
+import { IconEgg } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { TypeBadge } from '../../components/TypeBadge'
 import { getItem, getMove } from '../../data'
@@ -102,7 +103,23 @@ export function Learnset({ rows, versionGroup }: { rows: LearnRow[]; versionGrou
                     data-level={row.level}
                   >
                     <td>{lead}</td>
-                    <td>{move?.display_name ?? `#${row.move_id}`}</td>
+                    <td>
+                      {/* Placeholder affordance for the breeding view: the egg
+                          marker is deliberately non-interactive until that
+                          destination exists, rather than a link to nowhere. */}
+                      {group.method === 'egg' && (
+                        <IconEgg
+                          size={13}
+                          stroke={1.8}
+                          className="egg-move-icon"
+                          data-testid={`egg-move-icon-${row.move_id}`}
+                          data-icon="IconEgg"
+                          aria-hidden
+                          focusable="false"
+                        />
+                      )}
+                      {move?.display_name ?? `#${row.move_id}`}
+                    </td>
                     <td>{move?.type_id != null && <TypeBadge typeId={move.type_id} small />}</td>
                     <td>{move?.damage_class ?? '—'}</td>
                     <td>{move?.power ?? '—'}</td>

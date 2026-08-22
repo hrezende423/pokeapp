@@ -6,7 +6,9 @@
 .panel {
   flex: 1;
   width: 100%;
-  max-width: 60rem;
+  /* Was 60rem, when this panel held prose. It now holds the Pokedex grid, which
+     manages its own column widths, so the panel just fills #root. */
+  max-width: 100%;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
   text-align: left;

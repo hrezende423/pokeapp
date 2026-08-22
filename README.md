@@ -22,6 +22,7 @@ GitHub Pages. No Pokémon data or features yet.
 | `npm run preview`        | Serve the production build locally                |
 | `npm run verify:app`     | Drive the built app in Chrome, assert caching     |
 | `npm run verify:pokedex` | Drive the Pokedex in Chrome, assert each scenario |
+| `npm run verify:ux`      | Assert the artwork/layout/evolution UX batch      |
 
 ## Layout
 
@@ -97,6 +98,48 @@ The detail view is generation-accurate rather than showing current-gen values:
   bundle: 15 attacking types under Gen 1 (no Dark or Steel), 17 under Gen 2-4.
 - **Learnsets and encounters** come from the selected version group's partition
   only, loaded on demand. TM vs HM is resolved from the machine item's name.
+
+The game picker also offers **All**, which drops the era filter and lists the whole
+national dex. Its ceiling and its era fallback are both derived from
+`GENERATION_RANGES`, so adding a generation is a one-line change. Learnsets and
+encounters have no answer under All -- they are per version group -- so those cards
+ask for a specific game instead of quietly showing one.
+
+### Artwork
+
+Four independent choices drive the image, but only three combinations exist, because
+animation exists only for the custom artwork:
+
+| Source  | Motion   | Comes from                              | Gendered?      |
+| ------- | -------- | --------------------------------------- | -------------- |
+| In-game | static   | `sprites.front_default` / `front_shiny` | 94/493 species |
+| Artwork | static   | `sprites.other["official-artwork"]`     | never          |
+| Artwork | animated | `pokeapp-sprites` release assets        | 94/493 species |
+
+The Motion switch is disabled (and forced to Static) under the in-game source.
+
+Gender availability is checked **per combination against the real data**, never as a
+blanket rule: the in-game sprites carry `front_female`/`front_shiny_female` for
+exactly the 94 species flagged `has_gender_differences`; official artwork exposes no
+female field for any species (audited across all 508 varieties); and the animated
+assets ship a `-f` file for the same 94. When the current combination has no gendered
+image the switch is disabled with a stated reason, rather than serving the male image
+under a "Female" label. `npm run verify:ux` reports the per-mode counts.
+
+### Evolution tree
+
+Rendered as a real tree: each node is the species' official artwork, with children
+stacked vertically to the right of their parent and the same rule applied recursively,
+so linear chains are one row and Eevee's seven branches are seven rows -- no special
+case. Each arrow is labelled with a Tabler icon plus the distinguishing detail
+(`IconTrendingUp` + level, `IconDiamond` + stone, `IconSwords` + move,
+`IconArrowsExchange` alone for trade, `IconGift` + item for trade-while-holding,
+`IconMapPin` + location, `IconHeart` + friendship, `IconHandGrab` + held item,
+`IconGhost` for Shedinja); the full compound clause stays available as the title.
+No Poké Ball motif is used anywhere here -- that is reserved for caught status.
+
+Node artwork follows the shiny switch but deliberately stays static and
+default-gender, so viewing a shiny chain does not pull a row of animated WebPs.
 
 ### Known gap
 

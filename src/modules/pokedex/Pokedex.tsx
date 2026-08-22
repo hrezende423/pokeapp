@@ -6,7 +6,7 @@ import { SpeciesList } from './SpeciesList'
 import './pokedex.css'
 
 /**
- * Pokedex shell: master list on the left, detail on the right.
+ * Pokedex shell: a fixed-width species list on the left, detail on the right.
  *
  * The selected species is plain component state rather than a route. Deep links
  * need a router, which is not worth pulling in for one view yet; the selection
@@ -15,7 +15,7 @@ import './pokedex.css'
  */
 export function Pokedex() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const { versionGroup, generation } = useVersionGroup()
+  const { versionGroup, generation, isAll } = useVersionGroup()
 
   return (
     <div className="pokedex">
@@ -23,7 +23,9 @@ export function Pokedex() {
         <div>
           <h1>Pokédex</h1>
           <p className="subtitle" data-testid="scope-note">
-            Generation {generation} · {versionGroup.name}
+            {isAll
+              ? 'All generations · national dex'
+              : `Generation ${generation} · ${versionGroup?.name ?? ''}`}
           </p>
         </div>
         <VersionGroupSelector />
@@ -37,7 +39,14 @@ export function Pokedex() {
               Select a species to see its details.
             </p>
           ) : (
-            <SpeciesDetail speciesId={selectedId} />
+            /* Keyed by species so the artwork toggles remount: each species
+               opens on regular static artwork rather than inheriting the
+               previous one's source/colour/motion/gender state. */
+            <SpeciesDetail
+              key={selectedId}
+              speciesId={selectedId}
+              onSelectSpecies={setSelectedId}
+            />
           )}
         </div>
       </div>

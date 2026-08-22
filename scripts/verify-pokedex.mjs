@@ -131,7 +131,13 @@ try {
   )
   log(`  selector options : ${optionCount}`)
   log(`  option groups    : ${optgroups.join(', ')}`)
-  check('selector offers all 14 version groups', optionCount === 14, `(${optionCount})`)
+  const groupedOptions = await page.$$eval(
+    '[data-testid="vg-select"] optgroup option',
+    (o) => o.length,
+  )
+  log(`  options inside optgroups: ${groupedOptions} (+1 ungrouped "All")`)
+  check('selector offers all 14 version groups', groupedOptions === 14, `(${groupedOptions})`)
+  check('plus one ungrouped "All" option', optionCount === 15, `(${optionCount} total)`)
   check('grouped by generation (4 optgroups)', optgroups.length === 4, `(${optgroups.length})`)
 
   await selectVersionGroup('heartgold-soulsilver')
@@ -377,15 +383,25 @@ try {
   await page.fill('[data-testid="species-search"]', 'bulbasaur')
   await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 15000 })
   await openSpecies(1)
-  const bulbaGender = await page.$$('[data-testid="toggle-gender"]')
-  const bulbaShiny = await page.$$('[data-testid="toggle-shiny"]')
-  const bulbaAnimated = await page.$$('[data-testid="toggle-animated"]')
-  log(
-    `  Bulbasaur toggles -> shiny:${bulbaShiny.length} animated:${bulbaAnimated.length} gender:${bulbaGender.length}`,
+  // The switch is now always rendered and DISABLED when unavailable, which is
+  // the batch-2 behaviour: a greyed control with a stated reason beats a control
+  // that silently disappears.
+  const bulbaSwitches = await page.$$eval('[data-testid^="toggle-"][role="switch"]', (els) =>
+    els.map((e) => ({
+      id: e.getAttribute('data-testid'),
+      disabled: e.getAttribute('data-disabled') === 'true',
+      value: e.getAttribute('data-value'),
+    })),
   )
-  check('gender toggle absent for Bulbasaur', bulbaGender.length === 0)
-  check('shiny toggle present', bulbaShiny.length === 1)
-  check('animated toggle present', bulbaAnimated.length === 1)
+  log(`  Bulbasaur switches: ${JSON.stringify(bulbaSwitches)}`)
+  const findSwitch = (id) => bulbaSwitches.find((s) => s.id === `toggle-${id}`)
+  check('all four switches render', bulbaSwitches.length === 4, `(${bulbaSwitches.length})`)
+  check('gender switch disabled for Bulbasaur', findSwitch('gender')?.disabled === true)
+  check('shiny switch present and enabled', findSwitch('shiny')?.disabled === false)
+  check(
+    'motion switch present and enabled (artwork source)',
+    findSwitch('motion')?.disabled === false,
+  )
 
   // ------------------------------------------------------------ SCENARIO G
   hr('SCENARIO G — shiny artwork fetched once, cached thereafter')
@@ -466,10 +482,19 @@ try {
   await page.fill('[data-testid="species-search"]', 'murkrow')
   await page.waitForSelector('[data-testid="species-row-198"]', { timeout: 15000 })
   await openSpecies(198)
-  const murkrowGender = await page.$$('[data-testid="toggle-gender"]')
-  check('gender toggle present for Murkrow', murkrowGender.length === 1)
+  // Murkrow opens on artwork+static, where no gendered image exists, so the
+  // gender switch is disabled until motion is switched to animated.
+  const murkrowGenderBefore = await page.getAttribute(
+    '[data-testid="toggle-gender"]',
+    'data-disabled',
+  )
+  check(
+    'gender disabled while viewing static official artwork',
+    murkrowGenderBefore === 'true',
+    `(data-disabled=${murkrowGenderBefore})`,
+  )
 
-  await page.click('[data-testid="toggle-animated"]')
+  await page.click('[data-testid="toggle-motion"]')
   await page.waitForFunction(
     () =>
       document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-src-kind') ===
@@ -497,6 +522,15 @@ try {
   check('male sprite actually rendered (naturalWidth > 0)', male.naturalWidth > 0)
   const noError = await page.$$('[data-testid="artwork-error"]')
   check('no broken-image error shown', noError.length === 0)
+  const murkrowGenderAfter = await page.getAttribute(
+    '[data-testid="toggle-gender"]',
+    'data-disabled',
+  )
+  check(
+    'gender enabled once motion is animated',
+    murkrowGenderAfter === 'false',
+    `(data-disabled=${murkrowGenderAfter})`,
+  )
 
   await page.click('[data-testid="toggle-gender"]')
   await page.waitForFunction(
@@ -545,8 +579,10 @@ try {
     check(`${label} rendered`, el != null)
   }
   const branches = await page.getAttribute('[data-testid="evolution-tree"]', 'data-root-branches')
-  const methods = await page.$$eval('[data-testid="evolution-tree"] .evo-methods li', (els) =>
-    els.map((e) => e.textContent.trim()),
+  // The tree is now a visual layout, so trigger clauses live on .evo-trigger
+  // rather than the old .evo-methods list.
+  const methods = await page.$$eval('[data-testid="evolution-tree"] .evo-trigger', (els) =>
+    els.map((e) => e.getAttribute('title') ?? e.textContent.trim()),
   )
   log(`  Eevee evolution branches : ${branches}`)
   methods.forEach((m) => log(`    ${m}`))

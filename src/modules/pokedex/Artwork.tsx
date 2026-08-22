@@ -1,56 +1,65 @@
 import { useState } from 'react'
-import { availableSpriteGenders, getSpriteUrl, type SpriteGender } from '../../data/sprites'
-import type { Species, Variety } from '../../data'
+import { ToggleSwitch } from '../../components/ToggleSwitch'
+import { artworkMode, genderAvailable, motionAvailable, resolveArtworkUrl } from '../../data'
+import type { ArtworkView, Species, Variety } from '../../data'
 
 interface Props {
   species: Species
   variety: Variety
+  view: ArtworkView
+  onChange: (next: ArtworkView) => void
 }
 
+/** Why a control is greyed out, so the UI never just silently drops it. */
+const NO_MOTION = 'Animation exists only for the custom artwork; in-game sprites are static.'
+const NO_GENDER_ARTWORK = 'Official artwork has no gender-specific version.'
+const NO_GENDER_SPECIES = 'This species has no gender-specific image in this view.'
+
 /**
- * Artwork panel with three independent toggles.
+ * The artwork panel and the four switches that drive it.
  *
- * Static art comes from the PokeAPI sprite URLs already in the bundle
- * (front_default / front_shiny). Animated art comes from the pokeapp-sprites
- * release assets, which are the only source with gendered variants — the bundle
- * carries no gendered *static* sprite, so the gender toggle only changes the
- * animated view. That is a data limitation, not an oversight.
+ * State is owned by the caller so the evolution tree can follow the colour
+ * choice. Availability is resolved per combination against the real data (see
+ * data/artwork.ts) rather than a blanket rule, so an unavailable gender is
+ * disabled instead of falling back to the male image under a "Female" label.
  *
- * Nothing here is preloaded: each variant is fetched the first time it is shown
- * and then served from the browser/service-worker cache, so toggling back and
- * forth issues no further requests.
+ * Nothing is preloaded: each variant is fetched the first time it is shown and
+ * then served from the browser/service-worker cache, so toggling back and forth
+ * issues no further requests.
  */
-export function Artwork({ species, variety }: Props) {
-  const [shiny, setShiny] = useState(false)
-  const [animated, setAnimated] = useState(false)
-  const [gender, setGender] = useState<SpriteGender>('male')
+export function Artwork({ species, variety, view, onChange }: Props) {
   const [failed, setFailed] = useState<string | null>(null)
 
-  const genders = availableSpriteGenders(species.has_gender_differences)
-  const hasGenderToggle = genders.length > 0
+  const mode = artworkMode(view)
+  const canMotion = motionAvailable(view)
+  const canGender = genderAvailable(species, variety, view)
+  const src = resolveArtworkUrl(species, variety, view)
 
-  const animatedUrl = getSpriteUrl(species.id, {
-    shiny,
-    gender: hasGenderToggle ? gender : undefined,
-    hasGenderDifference: species.has_gender_differences,
-  })
-  const staticUrl = shiny ? variety.sprites.front_shiny : variety.sprites.front_default
-  const src = animated ? animatedUrl : staticUrl
+  // A disabled gender switch must also stop *claiming* female: the switch reads
+  // its position from the effective gender, not the stored one.
+  const effectiveGender = canGender ? view.gender : 'male'
+
+  const genderReason =
+    view.source === 'artwork' && view.motion === 'static' ? NO_GENDER_ARTWORK : NO_GENDER_SPECIES
 
   return (
     <div className="artwork">
-      <div className="artwork-frame">
+      <div className="artwork-frame" data-mode={mode}>
         {src ? (
           <img
             key={src}
             src={src}
-            alt={`${species.display_name}${shiny ? ' (shiny)' : ''}${
-              animated ? ', animated' : ''
-            }${hasGenderToggle ? `, ${gender}` : ''}`}
+            alt={`${species.display_name}${view.shiny ? ' (shiny)' : ''}, ${
+              mode === 'in-game-static' ? 'in-game sprite' : 'official artwork'
+            }${view.motion === 'animated' && canMotion ? ', animated' : ''}${
+              canGender ? `, ${effectiveGender}` : ''
+            }`}
             data-testid="artwork-img"
-            data-src-kind={animated ? 'animated' : 'static'}
-            data-shiny={shiny}
-            data-gender={hasGenderToggle ? gender : 'n/a'}
+            data-mode={mode}
+            data-source={view.source}
+            data-src-kind={canMotion ? view.motion : 'static'}
+            data-shiny={view.shiny}
+            data-gender={canGender ? effectiveGender : 'n/a'}
             onError={() => setFailed(src)}
             onLoad={() => setFailed(null)}
           />
@@ -66,43 +75,46 @@ export function Artwork({ species, variety }: Props) {
         )}
       </div>
 
-      <div className="artwork-toggles">
-        <button
-          type="button"
-          data-testid="toggle-shiny"
-          aria-pressed={shiny}
-          className={shiny ? 'chip chip-active' : 'chip'}
-          onClick={() => setShiny((v) => !v)}
-        >
-          {shiny ? 'Shiny' : 'Regular'}
-        </button>
-        <button
-          type="button"
-          data-testid="toggle-animated"
-          aria-pressed={animated}
-          className={animated ? 'chip chip-active' : 'chip'}
-          onClick={() => setAnimated((v) => !v)}
-        >
-          {animated ? 'Animated' : 'Static'}
-        </button>
-        {hasGenderToggle && (
-          <button
-            type="button"
-            data-testid="toggle-gender"
-            aria-pressed={gender === 'female'}
-            className={gender === 'female' ? 'chip chip-active' : 'chip'}
-            onClick={() => setGender((g) => (g === 'male' ? 'female' : 'male'))}
-            title="Gendered artwork exists only for the animated sprites"
-          >
-            {gender === 'male' ? 'Male' : 'Female'}
-          </button>
-        )}
+      <div className="artwork-toggles" data-testid="artwork-toggles">
+        <ToggleSwitch
+          id="source"
+          label="Source"
+          offLabel="In-game"
+          onLabel="Artwork"
+          checked={view.source === 'artwork'}
+          onChange={(on) => onChange({ ...view, source: on ? 'artwork' : 'in-game' })}
+        />
+        <ToggleSwitch
+          id="shiny"
+          label="Color"
+          offLabel="Regular"
+          onLabel="Shiny"
+          checked={view.shiny}
+          onChange={(on) => onChange({ ...view, shiny: on })}
+        />
+        <ToggleSwitch
+          id="motion"
+          label="Motion"
+          offLabel="Static"
+          onLabel="Animated"
+          // Forced to Static when the source has no animation, rather than
+          // remembering a choice the current view cannot honour.
+          checked={canMotion && view.motion === 'animated'}
+          disabled={!canMotion}
+          disabledReason={NO_MOTION}
+          onChange={(on) => onChange({ ...view, motion: on ? 'animated' : 'static' })}
+        />
+        <ToggleSwitch
+          id="gender"
+          label="Gender"
+          offLabel="Male"
+          onLabel="Female"
+          checked={effectiveGender === 'female'}
+          disabled={!canGender}
+          disabledReason={genderReason}
+          onChange={(on) => onChange({ ...view, gender: on ? 'female' : 'male' })}
+        />
       </div>
-      {hasGenderToggle && !animated && (
-        <p className="subtitle" data-testid="gender-static-note">
-          Gendered artwork is animated-only.
-        </p>
-      )}
     </div>
   )
 }

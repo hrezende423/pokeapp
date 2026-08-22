@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { useVersionGroup } from './context'
+import { MAX_SPECIES_ID } from '../../data'
+import { ALL_VERSION_GROUPS, useVersionGroup } from './context'
 
 const GENERATION_LABELS: Record<number, string> = {
   1: 'Generation I',
@@ -17,13 +18,15 @@ function label(name: string): string {
 }
 
 /**
- * Minimal version-group picker: a native select, grouped by generation.
+ * Version-group picker: a native select, grouped by generation, with "All" on
+ * top for the unfiltered dex.
  *
- * Intentionally plain. The polished settings surface is deferred; this exists so
- * the selection that drives the whole Pokedex is changeable.
+ * The "All" caption reads its ceiling from MAX_SPECIES_ID, which is derived from
+ * the generation ranges -- adding a generation there updates this label too
+ * instead of leaving a stale 493 behind.
  */
 export function VersionGroupSelector() {
-  const { versionGroup, setVersionGroup, available } = useVersionGroup()
+  const { selection, setVersionGroup, available } = useVersionGroup()
 
   const byGeneration = useMemo(() => {
     const groups = new Map<number, typeof available>()
@@ -41,9 +44,10 @@ export function VersionGroupSelector() {
       <span>Game</span>
       <select
         data-testid="vg-select"
-        value={versionGroup.name}
+        value={selection}
         onChange={(e) => setVersionGroup(e.target.value)}
       >
+        <option value={ALL_VERSION_GROUPS}>All (#1-{MAX_SPECIES_ID})</option>
         {byGeneration.map(([generation, groups]) => (
           <optgroup
             key={generation}

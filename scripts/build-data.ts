@@ -1051,10 +1051,18 @@ async function main() {
               (h: Json) =>
                 h.item_id != null && retainedItemIds.has(h.item_id) && h.versions.length > 0,
             ),
+          // Four independent artwork axes are carried, because the UI offers
+          // in-game vs official-artwork and regular vs shiny as separate
+          // choices. Gendered variants exist ONLY for the in-game sprites --
+          // other['official-artwork'] has no female field for any species in
+          // scope, which is why the artwork view offers no gender choice.
           sprites: {
             front_default: p.sprites?.front_default ?? null,
             front_shiny: p.sprites?.front_shiny ?? null,
+            front_female: p.sprites?.front_female ?? null,
+            front_shiny_female: p.sprites?.front_shiny_female ?? null,
             official_artwork: p.sprites?.other?.['official-artwork']?.front_default ?? null,
+            official_artwork_shiny: p.sprites?.other?.['official-artwork']?.front_shiny ?? null,
           },
         }
       })

@@ -63,8 +63,13 @@ export function getSpriteUrl(id: number, options: SpriteOptions = {}): string | 
   const paddedId = String(id).padStart(3, '0')
   const shinyPart = shiny ? 's' : 'n'
 
+  // A gendered species has NO unsuffixed file, so the suffix is mandatory once
+  // hasGenderDifference is set -- an omitted `gender` must still resolve to the
+  // male file rather than falling through to a 404. File census of the 1174
+  // assets: 400 unsuffixed (399 non-gendered species + Murkrow), 93 `-m`,
+  // 94 `-f`.
   let genderPart = ''
-  if (hasGenderDifference && gender) {
+  if (hasGenderDifference) {
     if (gender === 'female') {
       genderPart = '-f'
     } else if (!usesUnsuffixedMaleSprite(id)) {

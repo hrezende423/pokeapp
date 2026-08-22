@@ -19,7 +19,7 @@
  */
 
 export interface GenerationRange {
-  generation: 1 | 2 | 3 | 4
+  generation: number
   first: number
   last: number
 }
@@ -31,8 +31,13 @@ export const GENERATION_RANGES: readonly GenerationRange[] = [
   { generation: 4, first: 387, last: 493 },
 ] as const
 
-/** Highest national dex id the bundle covers. */
-export const MAX_SPECIES_ID = 493
+/**
+ * Scope of the app, both DERIVED from GENERATION_RANGES so that supporting a new
+ * generation is a one-line change: append its range above and the dex ceiling,
+ * the "All" option and the latest-era fallback all follow.
+ */
+export const MAX_SPECIES_ID = GENERATION_RANGES[GENERATION_RANGES.length - 1].last
+export const LATEST_GENERATION = GENERATION_RANGES[GENERATION_RANGES.length - 1].generation
 
 /**
  * Generation a species was introduced in, from its national dex id.
@@ -40,7 +45,7 @@ export const MAX_SPECIES_ID = 493
  * Returns null for ids outside 1..493 rather than guessing, so a caller passing
  * a Gen 5+ id gets an explicit miss instead of a silently wrong 4.
  */
-export function getGenerationForSpecies(id: number): 1 | 2 | 3 | 4 | null {
+export function getGenerationForSpecies(id: number): number | null {
   for (const range of GENERATION_RANGES) {
     if (id >= range.first && id <= range.last) return range.generation
   }

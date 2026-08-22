@@ -48,9 +48,11 @@
   }
 }
 
+/* Widened from the starter template's fixed 1126px: the Pokedex is a 240px rail
+   plus a detail column of side-by-side cards, which needs the room. */
 #root {
-  width: 1126px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 1600px;
   margin: 0 auto;
   text-align: center;
   border-inline: 1px solid var(--border);

@@ -55,11 +55,31 @@ export type { Effectiveness, ResolvedAbility } from './era'
 
 export {
   GENERATION_RANGES,
+  LATEST_GENERATION,
+  MAX_SPECIES_ID,
   generationTag,
   getGenerationForSpecies,
   isSpeciesInGeneration,
 } from './generations'
 export type { GenerationRange } from './generations'
+
+export {
+  ARTWORK_MODES,
+  DEFAULT_ARTWORK_VIEW,
+  artworkMode,
+  evolutionThumbUrl,
+  genderAvailable,
+  genderAvailableIn,
+  motionAvailable,
+  resolveArtworkUrl,
+} from './artwork'
+export type {
+  ArtworkGender,
+  ArtworkMode,
+  ArtworkMotion,
+  ArtworkSource,
+  ArtworkView,
+} from './artwork'
 
 export { availableSpriteGenders, getSpriteUrl, usesUnsuffixedMaleSprite } from './sprites'
 export type { SpriteGender, SpriteOptions } from './sprites'

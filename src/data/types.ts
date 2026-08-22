@@ -55,9 +55,19 @@ export interface HeldItem {
 }
 
 export interface Sprites {
+  /** In-game front sprite for the newest version group that has one. */
   front_default: string | null
   front_shiny: string | null
+  /**
+   * In-game gendered sprites. Non-null for exactly the 94 in-scope species that
+   * carry has_gender_differences; null everywhere else. Verified against the
+   * snapshot: the two sets are identical.
+   */
+  front_female: string | null
+  front_shiny_female: string | null
+  /** Official (Sugimori-style) artwork. Never gendered -- see build-data.ts. */
   official_artwork: string | null
+  official_artwork_shiny: string | null
 }
 
 export interface DamageRelations {

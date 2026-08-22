@@ -42,16 +42,19 @@
   border-radius: 0.35rem;
 }
 
+/* The list is a fixed 240px rail: it must not grow with the viewport, so the
+   detail area absorbs all remaining width. minmax(0, 1fr) rather than 1fr so a
+   wide table inside a card can scroll instead of stretching the grid. */
 .pokedex-body {
   display: grid;
-  grid-template-columns: minmax(16rem, 22rem) 1fr;
-  gap: 1.5rem;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 1.25rem;
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .pokedex-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -60,10 +63,13 @@
 .species-list {
   position: sticky;
   top: 0;
+  width: 240px;
+  max-width: 100%;
   max-height: 100svh;
   display: flex;
   flex-direction: column;
   padding-top: 1rem;
+  box-sizing: border-box;
 }
 
 .list-controls input[type='search'] {
@@ -81,33 +87,36 @@
 .type-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.2rem;
   margin: 0.6rem 0 0.35rem;
 }
 
 .tf {
   padding: 0.15rem 0.4rem;
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 0.25rem;
   cursor: pointer;
+  text-transform: capitalize;
 }
 
 .tf:hover {
   border-color: var(--accent);
 }
 
+/* Type buttons get their own colour inline when selected; this covers the
+   generic on-state (the "Any" button, which has no type colour). */
 .tf-on {
   color: var(--text-h);
   background: var(--accent-bg);
   border-color: var(--accent);
 }
 
-.tf-clear {
-  font-style: italic;
+.tf-any {
+  font-weight: 600;
 }
 
 .species-rows {
@@ -121,19 +130,35 @@
 
 .species-row {
   display: grid;
-  grid-template-columns: 3.2rem 1fr auto;
-  gap: 0.5rem;
+  grid-template-columns: 2.9rem minmax(0, 1fr);
+  grid-template-areas: 'dex name' 'dex types';
+  gap: 0 0.4rem;
   align-items: center;
   width: 100%;
-  padding: 0.4rem 0.35rem;
+  padding: 0.35rem 0.3rem;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   text-align: left;
   color: var(--text-h);
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
+}
+
+.species-row .dex-no {
+  grid-area: dex;
+}
+
+.species-row .species-name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.species-row .row-types {
+  grid-area: types;
 }
 
 .species-row:hover {
@@ -147,7 +172,7 @@
 .dex-no {
   color: var(--text);
   font-variant-numeric: tabular-nums;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
 }
 
 .species-rows .empty {
@@ -171,19 +196,64 @@
 
 .type-badge-sm {
   padding: 0.05rem 0.35rem;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
 }
 
 .row-types {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.2rem;
 }
 
-/* ---------------------------------------------------------------- detail */
+/* ---------------------------------------------------------------- cards */
 
 .pokedex-detail {
   padding-top: 1rem;
   min-width: 0;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.card {
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  box-sizing: border-box;
+}
+
+/* Two cards abreast; collapses to one column when the detail area gets narrow.
+   Container queries keep this tied to the detail column rather than the
+   viewport, which matters because the 240px rail is fixed. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.detail-ident {
+  min-width: 12rem;
 }
 
 .detail h2 {
@@ -193,66 +263,141 @@
 }
 
 .detail h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.78rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text);
 }
 
 .detail h4 {
-  margin: 1rem 0 0.35rem;
-  font-size: 0.85rem;
+  margin: 1.1rem 0 0.4rem;
+  font-size: 0.8rem;
   color: var(--text-h);
 }
 
-.detail section {
-  margin-top: 1.75rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-}
-
-.detail-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-/* artwork */
+/* ---------------------------------------------------------------- artwork */
 
 .artwork {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .artwork-frame {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 12rem;
-  height: 12rem;
+  width: 11rem;
+  height: 11rem;
   background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   overflow: hidden;
+  flex: none;
 }
 
 .artwork-frame img {
   max-width: 100%;
   max-height: 100%;
+}
+
+/* Only the in-game sprites are low-resolution pixel art; official artwork and
+   the animated WebPs must not be nearest-neighbour scaled. */
+.artwork-frame[data-mode='in-game-static'] img {
   image-rendering: pixelated;
 }
 
 .artwork-toggles {
-  display: flex;
-  gap: 0.35rem;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
 }
 
-/* stats */
+/* switches */
+
+.toggle {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.7rem;
+}
+
+.toggle-label {
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.62rem;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.toggle-side {
+  color: var(--text);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.toggle-side-on {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.toggle-track {
+  position: relative;
+  flex: none;
+  width: 2.1rem;
+  height: 1.05rem;
+  padding: 0;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.toggle-track[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 50%;
+  left: 0.12rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  background: var(--bg);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  transition: left 120ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.toggle-track[aria-checked='true'] .toggle-knob {
+  left: calc(100% - 0.87rem);
+}
+
+.toggle-disabled {
+  opacity: 0.45;
+}
+
+.toggle-track:disabled {
+  cursor: not-allowed;
+}
+
+.toggle-reason {
+  max-width: 13rem;
+  color: var(--text);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+/* ---------------------------------------------------------------- stats */
 
 .stat-bars {
   margin: 0;
@@ -262,11 +407,11 @@
 
 .stat-bars li {
   display: grid;
-  grid-template-columns: 5rem 1fr 2.5rem;
-  gap: 0.6rem;
+  grid-template-columns: 4.2rem minmax(0, 1fr) 2.2rem;
+  gap: 0.5rem;
   align-items: center;
   padding: 0.15rem 0;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .stat-name {
@@ -275,6 +420,7 @@
 
 .stat-track {
   height: 0.5rem;
+  min-width: 0;
   background: var(--code-bg);
   border-radius: 0.25rem;
   overflow: hidden;
@@ -306,6 +452,10 @@
   font-size: 0.85rem;
 }
 
+.ability-list li:last-child {
+  border-bottom: 0;
+}
+
 .ability-list p {
   margin: 0.15rem 0 0;
 }
@@ -318,7 +468,7 @@
 
 .matchups > div {
   display: grid;
-  grid-template-columns: 9rem 1fr;
+  grid-template-columns: 9rem minmax(0, 1fr);
   gap: 0.5rem;
   align-items: baseline;
   padding: 0.2rem 0;
@@ -336,33 +486,166 @@
   margin: 0;
 }
 
-/* evolution */
+/* ---------------------------------------------------------------- evolution */
 
-.evo-root,
-.evo-branch,
-.evo-methods {
+/* A chain can be wider than the card (Eevee, three-stage lines), so the tree
+   scrolls inside its own card rather than stretching the grid. */
+.evo-tree {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.evo-subtree {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Children stack vertically to the right of their parent; the same rule applies
+   recursively at every depth, so linear chains render as one row and branching
+   ones fan out without any special case for Eevee's eight. */
+.evo-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
   margin: 0;
-  padding-left: 1rem;
+  padding: 0;
   list-style: none;
-  font-size: 0.85rem;
 }
 
-.evo-branch {
-  border-left: 1px solid var(--border);
+.evo-child {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.evo-methods {
+.evo-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+  flex: none;
+  width: 5.6rem;
+  padding: 0.35rem 0.2rem;
+  font: inherit;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.evo-card:disabled {
+  cursor: default;
+}
+
+.evo-card:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.evo-card-current {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.evo-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.evo-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.evo-thumb-missing {
   color: var(--text);
+  font-size: 1.4rem;
+}
+
+.evo-dex {
+  color: var(--text);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.evo-name {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* The labelled arrow. The ::after chevron is pure decoration; the icon + caption
+   inside .evo-trigger carry the meaning. */
+.evo-arrow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: none;
+  min-width: 5.5rem;
+  padding: 0 0.15rem;
+  position: relative;
+}
+
+.evo-arrow::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+  z-index: 0;
+}
+
+.evo-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  position: relative;
+  z-index: 1;
+  padding: 0.1rem 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  color: var(--text-h);
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.trigger-icon {
+  flex: none;
+  color: var(--accent);
+}
+
+.evo-trigger-vg {
+  color: var(--text);
+  font-size: 0.55rem;
+}
+
+/* ---------------------------------------------------------------- tables */
+
+/* learnset / encounters share .rows from App.css; both live in cards that can be
+   narrower than the table, so each scrolls on its own. */
+.card-grid .rows,
+[data-testid='card-learnset'] .rows,
+[data-testid='card-encounters'] .rows {
   font-size: 0.75rem;
 }
 
-.evo-self {
-  color: var(--text-h);
-  font-weight: 600;
+[data-testid='card-learnset'],
+[data-testid='card-encounters'] {
+  overflow-x: auto;
 }
-
-/* learnset / encounters share .rows from App.css */
 
 .learn-group table {
   margin-top: 0.25rem;
+}
+
+.egg-move-icon {
+  vertical-align: -2px;
+  margin-right: 0.25rem;
+  color: var(--accent);
 }
