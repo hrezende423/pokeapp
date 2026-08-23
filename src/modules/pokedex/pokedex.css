@@ -716,3 +716,83 @@
 .retry-btn:hover {
   border-color: var(--accent);
 }
+
+/* ------------------------------------------------------- top-level nav */
+
+.app-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+}
+
+.dex-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.dex-tab {
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.dex-tab:hover {
+  border-color: var(--accent);
+}
+
+.dex-tab-active {
+  color: var(--text-h);
+  font-weight: 600;
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+/* ------------------------------------------------------- shared dex bits */
+
+/* The generic dex rows are two columns, not the Pokedex's three: no type badges,
+   but an optional short meta suffix (item category, berry firmness, stat pair). */
+.species-row .row-meta {
+  grid-area: types;
+  color: var(--text);
+  font-size: 0.65rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-sprite {
+  display: block;
+  margin-top: 0.5rem;
+  image-rendering: pixelated;
+}
+
+.holder-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.1rem 0.6rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.holder-name {
+  color: var(--text-h);
+}
+
+.stat-up {
+  color: #3fa129;
+}
+
+.stat-down {
+  color: #e62829;
+}

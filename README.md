@@ -80,6 +80,52 @@ version group never opened online is genuinely unavailable offline. `npm run
 verify:app` asserts all of this against a real browser network log, including an
 offline reload.
 
+## Dex modules
+
+`src/modules/nav/registry.ts` is the whole registration mechanism: an array of
+`{ id, label, Component }`. The switcher and the app shell both render from it, so
+adding a sixth dex means appending one entry and nothing else. The version-group
+picker sits beside the switcher rather than inside any one module, because it gates
+four of the five.
+
+All four secondary dexes share `src/modules/dex/DexShell.tsx` — the same 240px
+sidebar and card layout as the Pokédex, reusing its CSS classes so a layout fix
+lands once.
+
+| Dex        | Entries | Detail                                     | Generation gating                      |
+| ---------- | ------- | ------------------------------------------ | -------------------------------------- |
+| Itemdex    | 563     | category, effect, price, fling, attributes | `generation_ids` membership            |
+| Abilitydex | 161     | effect + reverse lookup of every carrier   | `generation_id <= G`; empty in Gen 1-2 |
+| Naturedex  | 25      | increased/decreased stat pair, flavours    | whole list, Gen 3+                     |
+| Berrydex   | 64      | firmness, growth, Natural Gift, flavours   | derived from the linked item           |
+
+### What the generation signals actually are
+
+Audited rather than assumed, because the four files differ (see
+`src/data/availability.ts`):
+
+- **Abilities** carry a clean `generation_id` on all 161 entries. Cumulative.
+- **Items** carry `generation_ids`, an array built from PokeAPI's `game_indices` —
+  a real per-generation index table, non-empty for all 563 items. It is treated as
+  a **set, not a range**: 61 items have genuine gaps and the gaps are historically
+  right. Safari Ball is `[1,3,4,…]`, absent from Gen 2 which had no Safari Zone
+  ball; TM51-55 are `[1,4,…]`. `min <= G` would put a Safari Ball in Gold/Silver.
+- **Berries** have **no generation field of their own**. All 64 have an `item_id`
+  that resolves, so availability is _derived_ from the linked item and labelled as
+  derived in the UI. Counts: 0 / 10 / 43 / 64 across Gens 1-4.
+- **Natures** have no per-entry signal, correctly — all 25 arrived together in
+  Gen 3 and none has been added or removed. Gated as one rule, not per entry.
+
+### Ability reverse lookup
+
+`speciesWithAbility(id, generation)` joins over species.json's ability references
+and goes through the same `resolveAbilitiesForGeneration` the species detail view
+uses, so the two can never disagree. That matters: a naive `variety.abilities` scan
+would **miss Gengar** under Levitate (its modern ability is Cursed Body, restored
+for Gen ≤6 by `past_abilities`) and would **wrongly include Bulbasaur** under
+Chlorophyll (a Gen 5 hidden ability). Alternate forms are scanned too, and results
+are deduplicated per species.
+
 ## Pokédex
 
 `src/modules/pokedex/` is the first feature module: a filterable species list and a

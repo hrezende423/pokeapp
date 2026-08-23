@@ -820,6 +820,25 @@ try {
 
   // -------------------------------------------------------------- ITEM 7
   hr('ITEM 7 (DOM) — evolution tree renders artwork nodes, nested layout, labelled arrows')
+  // Evolution thumbnails are loading="lazy": a node below the fold legitimately
+  // has not loaded yet. Scroll the card into view and wait, so the assertion
+  // tests "the thumbnail loads" and not "it loads while off-screen".
+  const settleEvolutionThumbs = async () => {
+    await page.$eval('[data-testid="card-evolution"]', (el) =>
+      el.scrollIntoView({ block: 'center' }),
+    )
+    await page.waitForFunction(
+      () => {
+        const imgs = [...document.querySelectorAll('[data-testid="evolution-tree"] img')]
+        return imgs.length > 0 && imgs.every((i) => i.complete && i.naturalWidth > 0)
+      },
+      undefined,
+      { timeout: 30000 },
+    )
+  }
+
+  await settleEvolutionThumbs()
+
   const eeveeTree = await page.evaluate(() => {
     const root = document.querySelector('[data-testid="evolution-tree"]')
     const nodes = [...root.querySelectorAll('[data-testid^="evo-node-"]')].map((e) => ({
@@ -963,14 +982,7 @@ try {
     undefined,
     { timeout: 10000 },
   )
-  await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll('[data-testid="evolution-tree"] img')].every(
-        (i) => i.complete && i.naturalWidth > 0,
-      ),
-    undefined,
-    { timeout: 30000 },
-  )
+  await settleEvolutionThumbs()
   const shinyNodes = await page.$$eval('[data-testid="evolution-tree"] img', (els) =>
     els.map((e) => ({ src: e.getAttribute('src'), loaded: e.naturalWidth > 0 })),
   )

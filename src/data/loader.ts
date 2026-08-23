@@ -242,6 +242,22 @@ export const listSpecies = (): Species[] =>
 export const listTypes = (): PokemonType[] =>
   [...requireBundle().types.values()].sort((a, b) => a.id - b.id)
 
+/** All items, ascending by id. */
+export const listItems = (): Item[] =>
+  [...requireBundle().items.values()].sort((a, b) => a.id - b.id)
+
+/** All abilities, ascending by id. */
+export const listAbilities = (): Ability[] =>
+  [...requireBundle().abilities.values()].sort((a, b) => a.id - b.id)
+
+/** All natures, ascending by id. */
+export const listNatures = (): Nature[] =>
+  [...requireBundle().natures.values()].sort((a, b) => a.id - b.id)
+
+/** All berries, ascending by id. */
+export const listBerries = (): Berry[] =>
+  [...requireBundle().berries.values()].sort((a, b) => a.id - b.id)
+
 /** All version groups, oldest generation first. */
 export const listVersionGroups = (): VersionGroup[] =>
   [...requireBundle().versionGroups.values()].sort(

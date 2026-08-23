@@ -22,6 +22,10 @@ export {
   getVersionGroupByName,
   initDataLayer,
   isDataLayerReady,
+  listAbilities,
+  listBerries,
+  listItems,
+  listNatures,
   listSpecies,
   listTypes,
   listVersionGroups,
@@ -86,6 +90,17 @@ export type {
   ArtworkSource,
   ArtworkView,
 } from './artwork'
+
+export {
+  NATURES_INTRODUCED_IN_GENERATION,
+  abilityExistsInGeneration,
+  berryExistsInGeneration,
+  itemExistsInGeneration,
+  naturesExistInGeneration,
+} from './availability'
+
+export { speciesWithAbility } from './abilityHolders'
+export type { AbilityHolder } from './abilityHolders'
 
 export { availableSpriteGenders, getSpriteUrl, usesUnsuffixedMaleSprite } from './sprites'
 export type { SpriteGender, SpriteOptions } from './sprites'

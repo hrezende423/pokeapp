@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { VersionGroupSelector } from '../version-group/VersionGroupSelector'
 import { useVersionGroup } from '../version-group/context'
 import { SpeciesDetail } from './SpeciesDetail'
 import { SpeciesList } from './SpeciesList'
@@ -28,7 +27,6 @@ export function Pokedex() {
               : `Generation ${generation} · ${versionGroup?.name ?? ''}`}
           </p>
         </div>
-        <VersionGroupSelector />
       </header>
 
       <div className="pokedex-body">
