@@ -242,6 +242,10 @@ export const listSpecies = (): Species[] =>
 export const listTypes = (): PokemonType[] =>
   [...requireBundle().types.values()].sort((a, b) => a.id - b.id)
 
+/** All moves, ascending by id. */
+export const listMoves = (): Move[] =>
+  [...requireBundle().moves.values()].sort((a, b) => a.id - b.id)
+
 /** All items, ascending by id. */
 export const listItems = (): Item[] =>
   [...requireBundle().items.values()].sort((a, b) => a.id - b.id)

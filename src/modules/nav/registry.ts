@@ -3,6 +3,7 @@ import { Pokedex } from '../pokedex/Pokedex'
 import { Abilitydex } from '../dex/Abilitydex'
 import { Berrydex } from '../dex/Berrydex'
 import { Itemdex } from '../dex/Itemdex'
+import { Movedex } from '../dex/Movedex'
 import { Naturedex } from '../dex/Naturedex'
 
 export interface DexModule {
@@ -23,6 +24,7 @@ export interface DexModule {
 export const DEX_MODULES: readonly DexModule[] = [
   { id: 'pokedex', label: 'Pokédex', Component: Pokedex },
   { id: 'itemdex', label: 'Itemdex', Component: Itemdex },
+  { id: 'movedex', label: 'Movedex', Component: Movedex },
   { id: 'abilitydex', label: 'Abilitydex', Component: Abilitydex },
   { id: 'naturedex', label: 'Naturedex', Component: Naturedex },
   { id: 'berrydex', label: 'Berrydex', Component: Berrydex },

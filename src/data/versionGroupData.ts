@@ -227,6 +227,44 @@ export function peekLearnsetsForSpecies(
   return learnsetStore.cache.get(versionGroup)?.bySpecies.get(speciesId)
 }
 
+/** Every learnset row for one version group, loading the file if needed. */
+export async function learnsetRowsForVersionGroup(versionGroup: string): Promise<LearnRow[]> {
+  return (await loadLearnsets(versionGroup)).rows
+}
+
+/**
+ * Load every version group's learnset partition.
+ *
+ * Only the Movedex's "All" reverse lookup needs this, and it is expensive: 14
+ * files, 23.5 MiB raw / ~906 KiB gzipped, 202,707 rows. It is therefore never
+ * called eagerly -- a caller asks for it when a move detail is opened under an
+ * "All" selection, and every partition already in memory is reused, so switching
+ * between moves costs nothing after the first.
+ *
+ * Partitions that fail are reported rather than silently dropped, so a partial
+ * answer is never presented as complete.
+ */
+export async function loadAllLearnsets(): Promise<{
+  partitions: { versionGroup: string; rows: LearnRow[] }[]
+  failed: string[]
+}> {
+  const groups = listVersionGroups().map((v) => v.name)
+  const settled = await Promise.allSettled(
+    groups.map(async (vg) => ({ versionGroup: vg, rows: (await loadLearnsets(vg)).rows })),
+  )
+  const partitions: { versionGroup: string; rows: LearnRow[] }[] = []
+  const failed: string[] = []
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') partitions.push(r.value)
+    else failed.push(groups[i])
+  })
+  return { partitions, failed }
+}
+
+/** True when every version group's learnset partition is already in memory. */
+export const areAllLearnsetsLoaded = (): boolean =>
+  listVersionGroups().every((v) => learnsetStore.cache.has(v.name))
+
 /** Test seam: forget every cached partition. */
 export function __resetVersionGroupCache(): void {
   learnsetStore.cache.clear()

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { TypeBadge } from '../../components/TypeBadge'
-import { typeColor } from '../../components/typeColors'
+import { TypeFilter } from '../../components/TypeFilter'
 import { listSpecies, resolveTypesForGeneration, typesInGeneration } from '../../data'
 import type { Species } from '../../data'
 import { isSpeciesInGeneration } from '../../data/generations'
@@ -50,11 +50,6 @@ export function SpeciesList({ selectedId, onSelect }: Props) {
       })
   }, [generation, search, activeTypeFilter])
 
-  const toggleType = (id: number) =>
-    setTypeFilter((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
-
-  const unfiltered = activeTypeFilter.length === 0
-
   return (
     <div className="species-list">
       <div className="list-controls">
@@ -66,42 +61,11 @@ export function SpeciesList({ selectedId, onSelect }: Props) {
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search species by name"
         />
-        <div className="type-filter" role="group" aria-label="Filter by type">
-          {/* "Any" is the cleared state, shown pressed while nothing is selected
-              so the filter always has a visibly active option. */}
-          <button
-            type="button"
-            data-testid="type-filter-any"
-            aria-pressed={unfiltered}
-            className={unfiltered ? 'tf tf-any tf-on' : 'tf tf-any'}
-            onClick={() => setTypeFilter([])}
-          >
-            Any
-          </button>
-          {availableTypes.map((type) => {
-            const on = activeTypeFilter.includes(type.id)
-            const color = typeColor(type.name)
-            return (
-              <button
-                key={type.id}
-                type="button"
-                data-testid={`type-filter-${type.name}`}
-                data-type={type.name}
-                data-color={color}
-                aria-pressed={on}
-                className={on ? 'tf tf-on' : 'tf'}
-                // Selected buttons take the type's own colour; unselected ones
-                // keep the neutral chrome so the selection stays readable.
-                style={
-                  on ? { backgroundColor: color, borderColor: color, color: '#fff' } : undefined
-                }
-                onClick={() => toggleType(type.id)}
-              >
-                {type.name}
-              </button>
-            )
-          })}
-        </div>
+        <TypeFilter
+          available={availableTypes}
+          selected={activeTypeFilter}
+          onChange={setTypeFilter}
+        />
         <p className="subtitle" data-testid="list-count">
           {rows.length} species
         </p>

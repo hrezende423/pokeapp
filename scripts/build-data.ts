@@ -465,6 +465,36 @@ async function main() {
   // Retained = referenced by a Gen 1-4 learnset or evolution requirement, UNION
   // every move that exists in Gen 1-4 (generation <= 4), so the Movedex is complete
   // rather than only covering moves something happens to learn.
+  // Contest effects, loaded once and resolved onto each move below. Both endpoints
+  // are tiny and fully enumerable, so they are read in full rather than per move.
+  const contestEffects = new Map<number, Json>(
+    (await readAll('contest-effect')).map((c) => [c.id, c]),
+  )
+  const superContestEffects = new Map<number, Json>(
+    (await readAll('super-contest-effect')).map((c) => [c.id, c]),
+  )
+  const contestEffect = (ref: Json): Json | null => {
+    const id = refId(ref)
+    if (id == null) return null
+    const row = contestEffects.get(id)
+    if (!row) return null
+    return {
+      appeal: row.appeal ?? null,
+      jam: row.jam ?? null,
+      flavor_text: cleanText(english(row.flavor_text_entries)?.flavor_text),
+    }
+  }
+  const superContestEffect = (ref: Json): Json | null => {
+    const id = refId(ref)
+    if (id == null) return null
+    const row = superContestEffects.get(id)
+    if (!row) return null
+    return {
+      appeal: row.appeal ?? null,
+      flavor_text: cleanText(english(row.flavor_text_entries)?.flavor_text),
+    }
+  }
+
   const allMoves = await readAll('move')
   const movesById = new Map<number, Json>(allMoves.map((m) => [m.id, m]))
   const retainedMoveIds = new Set<number>()
@@ -836,6 +866,15 @@ async function main() {
         change: s.change,
       })),
       contest_type: refName(m.contest_type),
+      // Contest appeal/jam live on separate `contest-effect` and
+      // `super-contest-effect` entities that the move only REFERENCES, so
+      // `contest_type` alone is not "contest data". Both are tiny (33 and 22 rows,
+      // two integers plus flavour text each) and nothing else in the bundle points
+      // at them, so they are resolved and inlined here rather than emitted as two
+      // more entity files. This is a deliberate, documented exception to the
+      // reference-by-id rule -- an entity with no identity beyond two scalars.
+      contest_effect: contestEffect(m.contest_effect),
+      super_contest_effect: superContestEffect(m.super_contest_effect),
       // Historical stat lines kept verbatim. PokeAPI keys each entry by a version
       // group; no resolution rule is inferred here.
       past_values: (m.past_values ?? []).map((p: Json) => {

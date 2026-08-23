@@ -198,17 +198,20 @@ try {
     })),
   )
   log(`  tabs: ${tabs.map((t) => t.label).join(' | ')}`)
-  check('five registered modules render as tabs', tabs.length === 5, `(${tabs.length})`)
+  // Derived from the registry source, not hardcoded: registering another dex must
+  // not require editing this assertion, which is the whole point of the array.
+  const registrySrc = readFileSync('src/modules/nav/registry.ts', 'utf8')
+  const registryIds = [...registrySrc.matchAll(/\{\s*id:\s*'([a-z]+)'/g)].map((m) => m[1])
+  log(`  registry declares: ${registryIds.join(', ')}`)
+  check('registry is non-empty', registryIds.length > 0)
   check(
-    'tab ids come from the registry',
-    JSON.stringify(tabs.map((t) => t.id)) ===
-      JSON.stringify([
-        'nav-pokedex',
-        'nav-itemdex',
-        'nav-abilitydex',
-        'nav-naturedex',
-        'nav-berrydex',
-      ]),
+    'every registered module renders as a tab',
+    tabs.length === registryIds.length,
+    `(${tabs.length} tabs vs ${registryIds.length} registered)`,
+  )
+  check(
+    'tab ids and order come from the registry',
+    JSON.stringify(tabs.map((t) => t.id)) === JSON.stringify(registryIds.map((id) => `nav-${id}`)),
     tabs.map((t) => t.id).join(','),
   )
   check('Pokedex is the default active tab', tabs[0].current === 'page')

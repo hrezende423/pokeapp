@@ -24,6 +24,8 @@ GitHub Pages. No Pokémon data or features yet.
 | `npm run verify:pokedex`  | Drive the Pokedex in Chrome, assert each scenario |
 | `npm run verify:ux`       | Assert the artwork/layout/evolution UX batch      |
 | `npm run verify:eggmoves` | Egg moves + partition failure isolation           |
+| `npm run verify:dexes`    | The four secondary dexes + navigation             |
+| `npm run verify:movedex`  | Movedex list, detail and move reverse lookup      |
 
 ## Layout
 
@@ -92,12 +94,52 @@ All four secondary dexes share `src/modules/dex/DexShell.tsx` — the same 240px
 sidebar and card layout as the Pokédex, reusing its CSS classes so a layout fix
 lands once.
 
-| Dex        | Entries    | Detail                                     | Generation gating                                          |
-| ---------- | ---------- | ------------------------------------------ | ---------------------------------------------------------- |
-| Itemdex    | 563        | category, effect, price, fling, attributes | `generation_ids` membership                                |
-| Abilitydex | 123 of 161 | effect + reverse lookup of every carrier   | `generation_id <= G`, clamped to Gen 1-4; empty in Gen 1-2 |
-| Naturedex  | 25         | increased/decreased stat pair, flavours    | whole list, Gen 3+                                         |
-| Berrydex   | 64         | firmness, growth, Natural Gift, flavours   | derived from the linked item                               |
+| Dex        | Entries    | Detail                                                           | Generation gating                                          |
+| ---------- | ---------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| Itemdex    | 563        | category, effect, price, fling, attributes                       | `generation_ids` membership                                |
+| Movedex    | 485        | power/accuracy/PP, type, damage class, effect, contest, learners | `generation_id <= G`                                       |
+| Abilitydex | 123 of 161 | effect + reverse lookup of every carrier                         | `generation_id <= G`, clamped to Gen 1-4; empty in Gen 1-2 |
+| Naturedex  | 25         | increased/decreased stat pair, flavours                          | whole list, Gen 3+                                         |
+| Berrydex   | 64         | firmness, growth, Natural Gift, flavours                         | derived from the linked item                               |
+
+### Movedex
+
+The list adds a type filter, which is the **same** `src/components/TypeFilter.tsx`
+the Pokedex species list uses -- extracted rather than duplicated, so the palette,
+the OR semantics and the "Any" clear behaviour cannot drift between the two.
+
+Two fields are easy to confuse and are shown separately:
+
+- **`damage_class`** is physical / special / status (196 / 113 / 176 moves).
+- **`meta.category`** is a different axis -- damage, ailment, net-good-stats, ohko,
+  field-effect and eleven more -- describing what the move does. It is labelled
+  "effect kind", never "category".
+
+Contest data needed a small additive ingestion change: the bundle carried
+`contest_type` (the cool/tough/... category) but **not** appeal or jam, which live
+on separate `contest-effect` and `super-contest-effect` entities that a move only
+references. Both are now resolved and inlined on the move (354 and 467 of 485
+moves have one). They are inlined rather than emitted as two more entity files --
+a deliberate, documented exception to the reference-by-id rule, since neither has
+any identity beyond two integers and nothing else points at them.
+
+#### Move reverse lookup
+
+"Which species learn this move" reads the same learnset partitions as the Pokedex
+learnset card, so the two can never disagree:
+
+- **One game** -- that partition only, one entry per species, with its methods and
+  lowest level-up level.
+- **All** -- the union across all fourteen groups, **deduplicated by species**
+  rather than one row per game, since the question is "can this be learned at all
+  in Gen 1-4". Each entry records how many games contributed, so the dedup never
+  hides that a species learns it in only one obscure version group.
+
+The "All" path loads all fourteen partitions: 23.5 MiB raw / ~906 KiB gzipped,
+202,707 rows. It is therefore lazy -- nothing loads until a move detail is opened
+in that mode -- and every partition is reused afterwards, so later moves cost
+nothing. A partition that fails is reported rather than silently dropped, so a
+partial answer is never presented as complete.
 
 ### What the generation signals actually are
 

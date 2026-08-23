@@ -32,7 +32,7 @@
  */
 
 import { getItem } from './loader'
-import type { Ability, Berry, Item } from './types'
+import type { Ability, Berry, Item, Move } from './types'
 
 /** Natures were introduced wholesale in Gen 3. */
 export const NATURES_INTRODUCED_IN_GENERATION = 3
@@ -49,6 +49,15 @@ export function naturesExistInGeneration(generation: number): boolean {
  */
 export function abilityExistsInGeneration(ability: Ability, generation: number): boolean {
   return (ability.generation_id ?? 99) <= generation
+}
+
+/**
+ * Moves are cumulative, like abilities: one introduced in Gen 4 exists in Gen 4
+ * onward. `generation_id` is present on all 485 in-scope moves. A missing value is
+ * treated as later-than-scope so an unknown never leaks into an early-game list.
+ */
+export function moveExistsInGeneration(move: Move, generation: number): boolean {
+  return (move.generation_id ?? 99) <= generation
 }
 
 /** Membership, not a range -- see the note above about Safari Ball and TM51-55. */

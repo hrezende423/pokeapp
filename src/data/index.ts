@@ -25,6 +25,7 @@ export {
   listAbilities,
   listBerries,
   listItems,
+  listMoves,
   listNatures,
   listSpecies,
   listTypes,
@@ -38,6 +39,9 @@ export {
   getLearnsetsForSpecies,
   getVersionGroupStats,
   isVersionGroupLoaded,
+  areAllLearnsetsLoaded,
+  learnsetRowsForVersionGroup,
+  loadAllLearnsets,
   loadEncounters,
   loadLearnsets,
   loadVersionGroupData,
@@ -96,8 +100,12 @@ export {
   abilityExistsInGeneration,
   berryExistsInGeneration,
   itemExistsInGeneration,
+  moveExistsInGeneration,
   naturesExistInGeneration,
 } from './availability'
+
+export { learnersAcrossVersionGroups, learnersInVersionGroup } from './moveLearners'
+export type { MoveLearner } from './moveLearners'
 
 export { speciesWithAbility } from './abilityHolders'
 export type { AbilityHolder } from './abilityHolders'

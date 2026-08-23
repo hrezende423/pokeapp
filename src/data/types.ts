@@ -162,7 +162,15 @@ export interface Move {
   short_effect: string | null
   meta: MoveMeta | null
   stat_changes: { stat: string | null; change: number }[]
+  /**
+   * Contest type only names the category (cool/tough/...). The numeric appeal and
+   * jam live on separate PokeAPI entities the move merely references, resolved and
+   * inlined at build time -- see build-data.ts for why these two are not their own
+   * entity files. Null where PokeAPI has no reference.
+   */
   contest_type: string | null
+  contest_effect: { appeal: number | null; jam: number | null; flavor_text: string | null } | null
+  super_contest_effect: { appeal: number | null; flavor_text: string | null } | null
   /** Kept verbatim from PokeAPI; no per-generation resolution is inferred. */
   past_values: {
     version_group: string | null

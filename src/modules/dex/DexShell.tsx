@@ -21,6 +21,8 @@ interface Props<T> {
   searchable?: boolean
   /** Line under the title, e.g. what the current gating is doing. */
   note?: ReactNode
+  /** Extra sidebar controls under the search box, e.g. a type filter. */
+  controls?: ReactNode
 }
 
 /**
@@ -46,6 +48,7 @@ export function DexShell<T>({
   gatedMessage,
   searchable = true,
   note,
+  controls,
 }: Props<T>) {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -91,6 +94,7 @@ export function DexShell<T>({
                 aria-label={`Search ${title} by name`}
               />
             )}
+            {controls}
             <p className="subtitle" data-testid={`${dexId}-count`}>
               {rows.length} {rows.length === 1 ? 'entry' : 'entries'}
             </p>
