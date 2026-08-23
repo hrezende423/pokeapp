@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import { TypeBadge } from '../../components/TypeBadge'
-import { berryExistsInGeneration, getItem, listBerries } from '../../data'
+import { getItem, listBerries } from '../../data'
 import type { Berry } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexCard, DexFacts, DexShell } from './DexShell'
+import { berryEntries } from './entrySources'
 
 /**
  * Berries carry only a bare `name` ("cheri"); the display name lives on the
@@ -26,11 +27,7 @@ export function Berrydex() {
 
   // Availability is derived from the linked item's generation table -- berries
   // have no generation field of their own. See data/availability.ts.
-  const entries = useMemo(
-    () =>
-      isAll ? listBerries() : listBerries().filter((b) => berryExistsInGeneration(b, generation)),
-    [generation, isAll],
-  )
+  const entries = useMemo(() => berryEntries({ generation, isAll }), [generation, isAll])
 
   const total = listBerries().length
 

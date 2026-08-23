@@ -16,7 +16,8 @@
     "verify:ux": "node scripts/verify-ux.mjs",
     "verify:eggmoves": "node scripts/verify-eggmoves.mjs",
     "verify:dexes": "node scripts/verify-dexes.mjs",
-    "verify:movedex": "node scripts/verify-movedex.mjs"
+    "verify:movedex": "node scripts/verify-movedex.mjs",
+    "verify:search": "node scripts/verify-search.mjs"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.46.0",

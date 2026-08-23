@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useDexSelection } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { SpeciesDetail } from './SpeciesDetail'
 import { SpeciesList } from './SpeciesList'
@@ -7,13 +7,14 @@ import './pokedex.css'
 /**
  * Pokedex shell: a fixed-width species list on the left, detail on the right.
  *
- * The selected species is plain component state rather than a route. Deep links
- * need a router, which is not worth pulling in for one view yet; the selection
- * intentionally survives a version-group change so switching games updates an
- * open detail view in place.
+ * The selected species lives in the nav context rather than in a route: deep
+ * links need a router, which is not worth pulling in yet, but the global search
+ * has to be able to open a species from another tab, which local state cannot
+ * serve. The selection intentionally survives a version-group change so switching
+ * games updates an open detail view in place.
  */
 export function Pokedex() {
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useDexSelection('pokedex')
   const { versionGroup, generation, isAll } = useVersionGroup()
 
   return (

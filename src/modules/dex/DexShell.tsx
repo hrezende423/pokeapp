@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { useDexSelection } from '../nav/navContext'
+import type { DexModuleId } from '../nav/registry'
 
 export interface DexRow {
   id: number
@@ -9,8 +11,12 @@ export interface DexRow {
 }
 
 interface Props<T> {
-  /** Stable slug, used for every test id in this shell. */
-  dexId: string
+  /**
+   * The dex's registered module id: used for every test id in this shell, and as
+   * the key its selection is stored under, so global-search navigation and this
+   * shell cannot disagree about which dex they mean.
+   */
+  dexId: DexModuleId
   title: string
   /** Entries after generation gating, in display order. */
   entries: T[]
@@ -51,7 +57,10 @@ export function DexShell<T>({
   controls,
 }: Props<T>) {
   const [search, setSearch] = useState('')
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  // Selection lives in the nav context, not here, so the global search can open an
+  // entry in a dex that is not mounted yet -- and so switching tabs and back
+  // returns to what was open.
+  const [selectedId, setSelectedId] = useDexSelection(dexId)
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -63,9 +72,14 @@ export function DexShell<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, search])
 
+  // Resolved against the full gated list, NOT the search-filtered rows: typing in
+  // the search box narrows the list without closing an open detail, and the global
+  // search can open an entry the local box happens to be hiding.
   const selected = useMemo(
-    () => rows.find(({ row: r }) => r.id === selectedId)?.entry,
-    [rows, selectedId],
+    () => entries.find((entry) => row(entry).id === selectedId),
+    // `row` is a render-time formatter recreated every render; see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, selectedId],
   )
 
   return (

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { TypeBadge } from '../../components/TypeBadge'
 import { TypeFilter } from '../../components/TypeFilter'
-import { listSpecies, resolveTypesForGeneration, typesInGeneration } from '../../data'
+import { resolveTypesForGeneration, typesInGeneration } from '../../data'
 import type { Species } from '../../data'
-import { isSpeciesInGeneration } from '../../data/generations'
+import { speciesEntries } from '../dex/entrySources'
 import { useVersionGroup } from '../version-group/context'
 
 interface Props {
@@ -17,7 +17,7 @@ function defaultVariety(species: Species) {
 }
 
 export function SpeciesList({ selectedId, onSelect }: Props) {
-  const { generation } = useVersionGroup()
+  const { generation, isAll } = useVersionGroup()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<number[]>([])
 
@@ -31,8 +31,9 @@ export function SpeciesList({ selectedId, onSelect }: Props) {
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase()
-    return listSpecies()
-      .filter((s) => isSpeciesInGeneration(s.id, generation))
+    // The one source for "which species does this dex list" -- the global search
+    // calls the same function, so the two cannot disagree about scope.
+    return speciesEntries({ generation, isAll })
       .map((s) => {
         const variety = defaultVariety(s)
         return {
@@ -48,7 +49,7 @@ export function SpeciesList({ selectedId, onSelect }: Props) {
         }
         return true
       })
-  }, [generation, search, activeTypeFilter])
+  }, [generation, isAll, search, activeTypeFilter])
 
   return (
     <div className="species-list">

@@ -21,17 +21,23 @@ export interface DexModule {
  * looks the active module up in it, so neither has to be touched again. Nothing
  * else in the app hardcodes a module name.
  */
-export const DEX_MODULES: readonly DexModule[] = [
+export const DEX_MODULES = [
   { id: 'pokedex', label: 'Pokédex', Component: Pokedex },
   { id: 'itemdex', label: 'Itemdex', Component: Itemdex },
   { id: 'movedex', label: 'Movedex', Component: Movedex },
   { id: 'abilitydex', label: 'Abilitydex', Component: Abilitydex },
   { id: 'naturedex', label: 'Naturedex', Component: Naturedex },
   { id: 'berrydex', label: 'Berrydex', Component: Berrydex },
-] as const
+] as const satisfies readonly DexModule[]
 
-export const DEFAULT_MODULE_ID = DEX_MODULES[0].id
+/** Union of the registered ids, so a reference to an unregistered module fails to compile. */
+export type DexModuleId = (typeof DEX_MODULES)[number]['id']
 
-export function findModule(id: string): DexModule {
+export const DEFAULT_MODULE_ID: DexModuleId = DEX_MODULES[0].id
+
+/** One registered entry, with its id kept literal. */
+export type RegisteredModule = (typeof DEX_MODULES)[number]
+
+export function findModule(id: DexModuleId): RegisteredModule {
   return DEX_MODULES.find((m) => m.id === id) ?? DEX_MODULES[0]
 }

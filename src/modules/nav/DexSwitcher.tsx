@@ -1,4 +1,4 @@
-import { DEX_MODULES } from './registry'
+import { DEX_MODULES, type DexModuleId } from './registry'
 
 /**
  * Top-level switcher between registered dex modules.
@@ -10,8 +10,8 @@ export function DexSwitcher({
   activeId,
   onSelect,
 }: {
-  activeId: string
-  onSelect: (id: string) => void
+  activeId: DexModuleId
+  onSelect: (id: DexModuleId) => void
 }) {
   return (
     <nav className="dex-switcher" aria-label="Dex modules" data-testid="dex-switcher">

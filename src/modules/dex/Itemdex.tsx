@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { itemExistsInGeneration, listItems } from '../../data'
+import { listItems } from '../../data'
 import type { Item } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexCard, DexFacts, DexShell } from './DexShell'
+import { itemEntries } from './entrySources'
 
 function titleCase(value: string | null): string {
   if (!value) return '—'
@@ -31,10 +32,7 @@ export function Itemdex() {
   const vgName = versionGroup?.name ?? null
 
   // Under "All" nothing is filtered out: there is no single era to filter by.
-  const entries = useMemo(
-    () => (isAll ? listItems() : listItems().filter((i) => itemExistsInGeneration(i, generation))),
-    [generation, isAll],
-  )
+  const entries = useMemo(() => itemEntries({ generation, isAll }), [generation, isAll])
 
   const total = listItems().length
 

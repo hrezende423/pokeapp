@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { TypeBadge } from '../../components/TypeBadge'
 import { TypeFilter } from '../../components/TypeFilter'
-import { listMoves, moveExistsInGeneration, typesInGeneration } from '../../data'
+import { listMoves, typesInGeneration } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexCard, DexFacts, DexShell } from './DexShell'
+import { moveEntries } from './entrySources'
 import { MoveLearners } from './MoveLearners'
 
 function titleCase(value: string | null): string {
@@ -33,10 +34,7 @@ export function Movedex() {
     [typeFilter, availableTypes],
   )
 
-  const gated = useMemo(
-    () => (isAll ? listMoves() : listMoves().filter((m) => moveExistsInGeneration(m, generation))),
-    [generation, isAll],
-  )
+  const gated = useMemo(() => moveEntries({ generation, isAll }), [generation, isAll])
 
   const entries = useMemo(
     () =>

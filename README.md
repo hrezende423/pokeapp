@@ -26,6 +26,7 @@ GitHub Pages. No Pokémon data or features yet.
 | `npm run verify:eggmoves` | Egg moves + partition failure isolation           |
 | `npm run verify:dexes`    | The four secondary dexes + navigation             |
 | `npm run verify:movedex`  | Movedex list, detail and move reverse lookup      |
+| `npm run verify:search`   | Global search: grouping, scope reuse, navigation  |
 
 ## Layout
 
@@ -33,6 +34,9 @@ GitHub Pages. No Pokémon data or features yet.
 src/components/   shared presentational components
 src/modules/      per-domain feature modules
   pokedex/        species list + detail view
+  dex/            the shared list+detail shell, and the five secondary dexes
+  nav/            module registry, tab switcher, and the active tab + selection
+  search/         the global search over four dexes
   version-group/  the app-wide "which game" selection
 src/data/         runtime data loader, indices, era resolution and types
 src/pwa.ts        service worker registration
@@ -86,9 +90,10 @@ offline reload.
 
 `src/modules/nav/registry.ts` is the whole registration mechanism: an array of
 `{ id, label, Component }`. The switcher and the app shell both render from it, so
-adding a sixth dex means appending one entry and nothing else. The version-group
-picker sits beside the switcher rather than inside any one module, because it gates
-four of the five.
+adding another dex means appending one entry and nothing else. The version-group
+picker and the global search sit beside the switcher rather than inside any one
+module: the picker gates five of the six dexes, and the search reaches four of
+them.
 
 All four secondary dexes share `src/modules/dex/DexShell.tsx` — the same 240px
 sidebar and card layout as the Pokédex, reusing its CSS classes so a layout fix
@@ -199,6 +204,60 @@ would **miss Gengar** under Levitate (its modern ability is Cursed Body, restore
 for Gen ≤6 by `past_abilities`) and would **wrongly include Bulbasaur** under
 Chlorophyll (a Gen 5 hidden ability). Alternate forms are scanned too, and results
 are deduplicated per species.
+
+## Global search
+
+One input in the app bar, reachable from every tab, searching species, moves,
+items and abilities at once. Results are grouped under those four headings, and a
+group with no match is absent rather than rendered empty.
+
+### It reuses each dex list, and cannot do otherwise
+
+`src/modules/dex/entrySources.ts` holds exactly one function per category —
+`speciesEntries`, `moveEntries`, `itemEntries`, `abilityEntries` — and **both** the
+dex module and the search call it. The search's own files (`searchCategories.ts`,
+`GlobalSearch.tsx`) never import a bundle list (`listSpecies`, `listMoves`, …) or a
+generation predicate at all, so they have nothing to re-derive scope from.
+
+That is a hard rule rather than a preference, because the failure it prevents
+already happened once: the Abilitydex list was clamped to the 123 abilities with a
+Gen 1-4 presence while a second code path still saw all 161, so its own search box
+surfaced entries the list refused to show. A global search built the naive way
+would reproduce that leak across four entity types instead of one.
+
+A category also names its destination as a `DexModuleId` — the union of ids the
+registry actually declares — so a result pointing at an unregistered module is a
+compile error, not a click that silently lands on the Pokédex.
+
+### Navigating to a result
+
+Clicking a result switches tab and opens that entry in one update. That needs the
+selection to outlive the module, so it lives in `src/modules/nav/navContext.ts`
+keyed per dex, not in each list component. Two consequences worth knowing:
+switching tabs and back returns to what was open, and a detail view stays open
+while the dex's own search box narrows the list underneath it — the open entry is
+resolved against the full gated list, not the filtered rows.
+
+Each group shows at most 8 rows and states the true total (`Species 8 of 271`), so
+the cap is visible rather than a silent truncation. Escape closes the panel and
+clears the query, which is what Chrome does natively with `input type="search"`.
+
+### What `verify:search` proves
+
+183 checks, two of them the ones that matter most:
+
+- Under Gen 1-2, searching a genuinely Gen 3-introduced ability (`Overgrow`,
+  `generation_id` 3) returns **nothing**, and the Abilitydex list agrees at 0. The
+  Gen 3-4 positive control finds it, so the zero is the clamp working rather than a
+  broken search.
+- `cursed` returns **nothing** under all four games and under "All", matching the
+  assertion already proven for the Abilitydex's own box, while Cursed Body remains
+  in the bundle.
+
+Plus, for every (game × term × category) probe, the count the search reports, the
+count that dex's own list reports, and the count computed from the bundle must all
+three agree — a leak in either path shows up as a mismatch instead of a plausible
+number.
 
 ## Pokédex
 

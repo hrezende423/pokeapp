@@ -2,13 +2,12 @@ import { useMemo } from 'react'
 import {
   ABILITIES_INTRODUCED_IN_GENERATION,
   LATEST_GENERATION,
-  abilityExistsInGeneration,
-  listAbilities,
   speciesWithAbility,
 } from '../../data'
 import type { Ability } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexCard, DexFacts, DexShell } from './DexShell'
+import { abilitiesHiddenFromList, abilitiesInList, abilityEntries } from './entrySources'
 
 /** The reverse lookup, rendered as a dex-ordered list of carriers. */
 function Holders({ ability, generation }: { ability: Ability; generation: number }) {
@@ -53,17 +52,14 @@ export function Abilitydex() {
   // instance -- and listing them in a Gen 1-4 dex would offer the user entries no
   // in-scope game has. This clamps the LIST only; resolveAbilitiesForGeneration
   // still sees all 161, which is what keeps the species view correct.
-  const inScope = useMemo(
-    () => listAbilities().filter((a) => abilityExistsInGeneration(a, LATEST_GENERATION)),
-    [],
-  )
-  const hidden = listAbilities().length - inScope.length
+  // The clamp itself lives in entrySources.ts, where the global search reads it
+  // too: the list and a search over it were once scoped differently, which is the
+  // leak that has to stay impossible.
+  const inScope = useMemo(() => abilitiesInList(), [])
+  const hidden = abilitiesHiddenFromList().length
 
   // "All" means every in-scope generation at once, not every row in the file.
-  const entries = useMemo(
-    () => (isAll ? inScope : inScope.filter((a) => abilityExistsInGeneration(a, generation))),
-    [inScope, generation, isAll],
-  )
+  const entries = useMemo(() => abilityEntries({ generation, isAll }), [generation, isAll])
 
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 

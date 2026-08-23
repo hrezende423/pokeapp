@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import { NATURES_INTRODUCED_IN_GENERATION, listNatures, naturesExistInGeneration } from '../../data'
+import { NATURES_INTRODUCED_IN_GENERATION, naturesExistInGeneration } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexCard, DexFacts, DexShell } from './DexShell'
+import { natureEntries } from './entrySources'
 
 const STAT_LABELS: Record<string, string> = {
   attack: 'Attack',
@@ -25,7 +26,7 @@ export function Naturedex() {
   // and none has been added or removed since, so there is no per-entry signal to
   // consult and inventing one would be fiction.
   const available = isAll || naturesExistInGeneration(generation)
-  const entries = useMemo(() => (available ? listNatures() : []), [available])
+  const entries = useMemo(() => natureEntries({ generation, isAll }), [generation, isAll])
 
   return (
     <DexShell

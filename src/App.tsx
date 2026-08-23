@@ -3,17 +3,45 @@ import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
 import type { BootStats } from './data'
 import { DexSwitcher } from './modules/nav/DexSwitcher'
-import { DEFAULT_MODULE_ID, findModule } from './modules/nav/registry'
+import { NavProvider } from './modules/nav/NavProvider'
+import { useNav } from './modules/nav/navContext'
+import { findModule } from './modules/nav/registry'
+import { GlobalSearch } from './modules/search/GlobalSearch'
 import { VersionGroupProvider } from './modules/version-group/VersionGroupProvider'
 import { VersionGroupSelector } from './modules/version-group/VersionGroupSelector'
 import './modules/pokedex/pokedex.css'
 
 const kib = (bytes: number) => `${(bytes / 1024).toFixed(1)} KiB`
 
+/**
+ * The app bar plus the active module.
+ *
+ * Split out from App because it consumes the nav context that App provides: the
+ * active module id and the search's navigation target are the same state, so both
+ * the switcher and the global search read it from one place.
+ */
+function Shell() {
+  const nav = useNav()
+  const active = findModule(nav.moduleId)
+
+  return (
+    <>
+      {/* Both of these are app-wide, not module-local: the version group gates
+          five of the six dexes, and the search reaches all four searchable ones,
+          so they sit beside the switcher rather than inside any one header. */}
+      <div className="app-bar">
+        <DexSwitcher activeId={active.id} onSelect={nav.setModule} />
+        <GlobalSearch />
+        <VersionGroupSelector />
+      </div>
+      <active.Component />
+    </>
+  )
+}
+
 export default function App() {
   const [boot, setBoot] = useState<BootStats | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
-  const [moduleId, setModuleId] = useState(DEFAULT_MODULE_ID)
 
   useEffect(() => {
     initDataLayer()
@@ -43,19 +71,13 @@ export default function App() {
 
   const meta = getBundleMeta()
   const counts = getIndexCounts()
-  const active = findModule(moduleId)
 
   return (
     <main className="panel">
       <VersionGroupProvider>
-        {/* The version group is app-wide state: it gates four of the five dexes,
-            so the picker lives beside the switcher rather than inside any one
-            module's header. */}
-        <div className="app-bar">
-          <DexSwitcher activeId={active.id} onSelect={setModuleId} />
-          <VersionGroupSelector />
-        </div>
-        <active.Component />
+        <NavProvider>
+          <Shell />
+        </NavProvider>
       </VersionGroupProvider>
 
       <footer className="app-footer">

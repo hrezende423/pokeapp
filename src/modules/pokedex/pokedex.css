@@ -876,3 +876,98 @@
 .learner-forms {
   font-size: 0.6rem;
 }
+
+/* ------------------------------------------------------- global search */
+
+/* The panel is absolutely positioned so opening it never reflows the dex below:
+   the layout suites measure the sidebar and detail widths, and a dropdown that
+   pushes the page down would move every element they check. */
+.global-search {
+  position: relative;
+  flex: 1 1 16rem;
+  max-width: 26rem;
+}
+
+.global-search-input {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  box-sizing: border-box;
+}
+
+.global-search-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  max-height: 60svh;
+  overflow-y: auto;
+  padding: 0.5rem 0.6rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 0.4rem;
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 25%);
+}
+
+.gs-group + .gs-group {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.gs-group-head {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-h);
+}
+
+.gs-group-head .subtitle {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: normal;
+}
+
+.gs-hits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gs-hit {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  color: var(--text-h);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.gs-hit:hover,
+.gs-hit:focus-visible {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.gs-hit-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
