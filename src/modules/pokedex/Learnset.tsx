@@ -1,8 +1,8 @@
-import { IconEgg } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { TypeBadge } from '../../components/TypeBadge'
 import { getItem, getMove } from '../../data'
 import type { LearnRow } from '../../data'
+import { EggMoveMarker } from './EggMoveMarker'
 
 /**
  * Display order for learn methods. Anything not listed (Colosseum purification,
@@ -104,18 +104,10 @@ export function Learnset({ rows, versionGroup }: { rows: LearnRow[]; versionGrou
                   >
                     <td>{lead}</td>
                     <td>
-                      {/* Placeholder affordance for the breeding view: the egg
-                          marker is deliberately non-interactive until that
-                          destination exists, rather than a link to nowhere. */}
                       {group.method === 'egg' && (
-                        <IconEgg
-                          size={13}
-                          stroke={1.8}
-                          className="egg-move-icon"
-                          data-testid={`egg-move-icon-${row.move_id}`}
-                          data-icon="IconEgg"
-                          aria-hidden
-                          focusable="false"
+                        <EggMoveMarker
+                          moveId={row.move_id}
+                          moveName={move?.display_name ?? `#${row.move_id}`}
                         />
                       )}
                       {move?.display_name ?? `#${row.move_id}`}

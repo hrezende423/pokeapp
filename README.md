@@ -11,18 +11,19 @@ GitHub Pages. No Pokémon data or features yet.
 
 ## Scripts
 
-| Script                   | What it does                                      |
-| ------------------------ | ------------------------------------------------- |
-| `npm run dev`            | Vite dev server                                   |
-| `npm run build`          | Type-check (`tsc -b`) then production build       |
-| `npm run build:data`     | Regenerate the data bundle in `public/data/`      |
-| `npm run lint`           | ESLint over the repo                              |
-| `npm run format`         | Prettier, writing changes                         |
-| `npm run format:check`   | Prettier in check-only mode (useful in CI)        |
-| `npm run preview`        | Serve the production build locally                |
-| `npm run verify:app`     | Drive the built app in Chrome, assert caching     |
-| `npm run verify:pokedex` | Drive the Pokedex in Chrome, assert each scenario |
-| `npm run verify:ux`      | Assert the artwork/layout/evolution UX batch      |
+| Script                    | What it does                                      |
+| ------------------------- | ------------------------------------------------- |
+| `npm run dev`             | Vite dev server                                   |
+| `npm run build`           | Type-check (`tsc -b`) then production build       |
+| `npm run build:data`      | Regenerate the data bundle in `public/data/`      |
+| `npm run lint`            | ESLint over the repo                              |
+| `npm run format`          | Prettier, writing changes                         |
+| `npm run format:check`    | Prettier in check-only mode (useful in CI)        |
+| `npm run preview`         | Serve the production build locally                |
+| `npm run verify:app`      | Drive the built app in Chrome, assert caching     |
+| `npm run verify:pokedex`  | Drive the Pokedex in Chrome, assert each scenario |
+| `npm run verify:ux`       | Assert the artwork/layout/evolution UX batch      |
+| `npm run verify:eggmoves` | Egg moves + partition failure isolation           |
 
 ## Layout
 

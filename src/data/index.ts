@@ -34,12 +34,18 @@ export {
   getLearnsetsForSpecies,
   getVersionGroupStats,
   isVersionGroupLoaded,
+  loadEncounters,
+  loadLearnsets,
   loadVersionGroupData,
   loadedVersionGroups,
   peekLearnsetsForSpecies,
   __resetVersionGroupCache,
 } from './versionGroupData'
-export type { VersionGroupData, VersionGroupLoadStats } from './versionGroupData'
+export type {
+  PartitionLoadStats,
+  VersionGroupData,
+  VersionGroupLoadStats,
+} from './versionGroupData'
 
 export {
   ABILITIES_INTRODUCED_IN_GENERATION,

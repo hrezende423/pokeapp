@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "verify:app": "node scripts/verify-app.mjs",
     "verify:pokedex": "node scripts/verify-pokedex.mjs",
-    "verify:ux": "node scripts/verify-ux.mjs"
+    "verify:ux": "node scripts/verify-ux.mjs",
+    "verify:eggmoves": "node scripts/verify-eggmoves.mjs"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.46.0",

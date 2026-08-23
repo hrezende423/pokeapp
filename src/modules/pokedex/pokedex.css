@@ -649,3 +649,70 @@
   margin-right: 0.25rem;
   color: var(--accent);
 }
+
+/* ------------------------------------------------------------- egg marker */
+
+/* A real button rather than a bare glyph: the breeding destination is undecided,
+   but the marker still has to acknowledge a click instead of swallowing it. */
+.egg-marker {
+  position: relative;
+  display: inline-block;
+}
+
+.egg-marker-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin-right: 0.25rem;
+  background: none;
+  border: 0;
+  border-radius: 0.2rem;
+  color: var(--accent);
+  cursor: pointer;
+  vertical-align: -2px;
+}
+
+.egg-marker-btn:hover .egg-move-icon,
+.egg-marker-btn:focus-visible .egg-move-icon {
+  color: var(--text-h);
+}
+
+.egg-marker-note {
+  position: absolute;
+  bottom: calc(100% + 0.3rem);
+  left: -0.4rem;
+  z-index: 5;
+  width: max-content;
+  max-width: 13rem;
+  padding: 0.3rem 0.45rem;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 0.35rem;
+  box-shadow: var(--shadow);
+  font-size: 0.68rem;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.egg-move-icon {
+  color: inherit;
+}
+
+/* -------------------------------------------------------------- retry */
+
+.retry-btn {
+  margin-top: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.retry-btn:hover {
+  border-color: var(--accent);
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { TypeBadge } from '../../components/TypeBadge'
 import {
   captureRatePercent,
@@ -21,6 +21,7 @@ import { Encounters } from './Encounters'
 import { EvolutionTree } from './EvolutionTree'
 import { Learnset } from './Learnset'
 import { TypeEffectiveness } from './TypeEffectiveness'
+import { usePartitionRows, type LoadState } from './usePartitionRows'
 
 const STAT_LABELS: Record<string, string> = {
   hp: 'HP',
@@ -40,6 +41,60 @@ function titleCase(value: string | null): string {
   return value.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+/**
+ * Renders one on-demand dataset's card body across all four load states.
+ *
+ * The point of routing every state through here is that `error` can never fall
+ * through to the `ready` branch: a failed fetch shows the failure and a retry, and
+ * only a genuinely loaded-and-empty dataset gets to say "no data". Each card owns
+ * its own state, so a failure in one leaves the other untouched.
+ */
+function PartitionSection<T>({
+  state,
+  retry,
+  label,
+  testIdPrefix,
+  children,
+}: {
+  state: LoadState<T>
+  retry: () => void
+  label: string
+  testIdPrefix: string
+  children: (rows: T[]) => ReactNode
+}) {
+  switch (state.status) {
+    case 'idle':
+      return (
+        <p className="subtitle" data-testid="needs-version-group">
+          Select a specific game to see this — it differs per version group.
+        </p>
+      )
+    case 'loading':
+      return (
+        <p className="subtitle" data-testid={`${testIdPrefix}-loading`}>
+          Loading {label}…
+        </p>
+      )
+    case 'error':
+      return (
+        <div data-testid={`${testIdPrefix}-error`}>
+          <p role="alert">Could not load the {label} for this game.</p>
+          <p className="subtitle">{state.message}</p>
+          <button
+            type="button"
+            className="retry-btn"
+            data-testid={`${testIdPrefix}-retry`}
+            onClick={retry}
+          >
+            Try again
+          </button>
+        </div>
+      )
+    case 'ready':
+      return <>{children(state.rows)}</>
+  }
+}
+
 export function SpeciesDetail({
   speciesId,
   onSelectSpecies,
@@ -55,16 +110,11 @@ export function SpeciesDetail({
   // follows the colour choice. Reset per species by the key in <Pokedex>.
   const [view, setView] = useState<ArtworkView>(DEFAULT_ARTWORK_VIEW)
 
-  // Partition loads are tagged with the request they belong to, so readiness is
-  // derived rather than reset. Clearing state synchronously in the effect would
-  // cascade an extra render and briefly show the previous game's rows.
-  const requestKey = `${speciesId}|${vgName ?? 'all'}`
-  const [loaded, setLoaded] = useState<{
-    key: string
-    learnsets: LearnRow[]
-    encounters: EncounterRow[]
-  } | null>(null)
-  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null)
+  // Two independent loads. Either can fail on its own without touching the other,
+  // and both re-fetch when the species or the version group changes -- which is
+  // what makes an already-open detail view follow a version-group switch.
+  const learnsets = usePartitionRows<LearnRow>(getLearnsetsForSpecies, speciesId, vgName)
+  const encounters = usePartitionRows<EncounterRow>(getEncountersForSpecies, speciesId, vgName)
 
   const variety = useMemo(
     () => species?.varieties.find((v) => v.is_default) ?? species?.varieties[0],
@@ -73,29 +123,6 @@ export function SpeciesDetail({
 
   // Must be computed before the early return below: hooks cannot run conditionally.
   const breedingPartners = useBreedingPartners(species, generation)
-
-  // Re-fetches whenever the species OR the version group changes, which is what
-  // makes an already-open detail view follow a version-group switch. Under "All"
-  // there is no partition to fetch, so nothing is requested.
-  useEffect(() => {
-    if (vgName == null) return
-    let cancelled = false
-    Promise.all([
-      getLearnsetsForSpecies(speciesId, vgName),
-      getEncountersForSpecies(speciesId, vgName),
-    ])
-      .then(([learn, enc]) => {
-        if (!cancelled) setLoaded({ key: requestKey, learnsets: learn, encounters: enc })
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setFailure({ key: requestKey, message: err instanceof Error ? err.message : String(err) })
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [speciesId, vgName, requestKey])
 
   if (!species || !variety) {
     return <p role="alert">Unknown species #{speciesId}.</p>
@@ -107,22 +134,12 @@ export function SpeciesDetail({
   const chain =
     species.evolution_chain_id != null ? getEvolutionChain(species.evolution_chain_id) : undefined
 
-  const ready = loaded?.key === requestKey ? loaded : null
-  const loadError = failure?.key === requestKey ? failure.message : null
-
-  // Only rows for the default form, so a multi-form species does not show the
-  // same move several times over.
-  const formRows = ready?.learnsets.filter((r) => r.pokemon_id === variety.pokemon_id) ?? []
-  const formEncounters = ready?.encounters.filter((r) => r.pokemon_id === variety.pokemon_id) ?? []
+  // Only rows for the default form, so a multi-form species does not show the same
+  // move several times over.
+  const forThisForm = <T extends { pokemon_id: number }>(rows: T[]) =>
+    rows.filter((r) => r.pokemon_id === variety.pokemon_id)
 
   const eggGroups = species.egg_group_ids.map((id) => getEggGroup(id)).filter((g) => g != null)
-
-  /** Learnsets and encounters are per version group, so "All" has no answer. */
-  const perGameNote = (
-    <p className="subtitle" data-testid="needs-version-group">
-      Select a specific game to see this — it differs per version group.
-    </p>
-  )
 
   return (
     <article className="detail" data-testid="species-detail" data-species-id={species.id}>
@@ -262,31 +279,32 @@ export function SpeciesDetail({
       <div className="card-grid">
         <section className="card" data-testid="card-learnset">
           <h3>Learnset{vgName ? ` · ${vgName}` : ''}</h3>
-          {isAll ? (
-            perGameNote
-          ) : !ready && !loadError ? (
-            <p className="subtitle" data-testid="learnset-loading">
-              Loading learnset…
-            </p>
-          ) : (
-            <Learnset rows={formRows} versionGroup={vgName ?? ''} />
-          )}
+          <PartitionSection
+            state={learnsets.state}
+            retry={learnsets.retry}
+            label="learnset"
+            testIdPrefix="learnset"
+          >
+            {(rows) => <Learnset rows={forThisForm(rows)} versionGroup={vgName ?? ''} />}
+          </PartitionSection>
         </section>
 
         <section className="card" data-testid="card-encounters">
           <h3>Encounters{vgName ? ` · ${vgName}` : ''}</h3>
-          {loadError && <p role="alert">{loadError}</p>}
-          {isAll ? (
-            perGameNote
-          ) : !ready && !loadError ? (
-            <p className="subtitle" data-testid="encounters-loading">
-              Loading encounters…
-            </p>
-          ) : (
-            <Encounters rows={formEncounters} versionGroup={vgName ?? ''} />
-          )}
+          <PartitionSection
+            state={encounters.state}
+            retry={encounters.retry}
+            label="encounters"
+            testIdPrefix="encounters"
+          >
+            {(rows) => <Encounters rows={forThisForm(rows)} versionGroup={vgName ?? ''} />}
+          </PartitionSection>
         </section>
       </div>
+
+      {/* `isAll` is what drives both sections to their idle state; asserting it here
+          keeps the intent visible even though the state machine carries it. */}
+      {isAll && <span hidden data-testid="all-games-selected" />}
     </article>
   )
 }
