@@ -536,6 +536,78 @@ try {
   log(`  gen 1 message: "${berryMsg.trim().slice(0, 90)}"`)
   check('Gen 1 Berrydex explains the empty list', /No berry/i.test(berryMsg))
 
+  // ------------------------------------------------- "All" scope reconciliation
+  hr('SCOPE UNDER "All" — which dexes really contain out-of-era entries')
+  // The ingestion filter kept an item if it had a Gen 1-4 game_index OR was
+  // referenced by an in-scope species/move. This asserts what that actually
+  // produced, per entity, so an "All shows Gen 5+ rows" claim cannot be made
+  // about the wrong module again.
+  const itemsOutOfScope = items.filter((i) => !i.generation_ids.some((g) => g >= 1 && g <= 4))
+  const abilitiesOutOfScope = abilities.filter((a) => (a.generation_id ?? 99) > 4)
+  const berriesOutOfScope = berries.filter(
+    (b) => !itemsById[b.item_id]?.generation_ids.some((g) => g >= 1 && g <= 4),
+  )
+  log(`  items      : ${items.length} total, ${itemsOutOfScope.length} with no Gen 1-4 index`)
+  log(
+    `  abilities  : ${abilities.length} total, ${abilitiesOutOfScope.length} introduced after Gen 4`,
+  )
+  log(
+    `  berries    : ${berries.length} total, ${berriesOutOfScope.length} with no Gen 1-4 availability`,
+  )
+  log(`  natures    : ${natures.length} total, 0 out of scope (all Gen 3)`)
+  check(
+    'NO item is Gen 5+-exclusive (the ingestion filter held)',
+    itemsOutOfScope.length === 0,
+    `(${itemsOutOfScope.length})`,
+  )
+  check(
+    'no item has a minimum generation >= 5',
+    items.every((i) => Math.min(...i.generation_ids) <= 4),
+  )
+  for (const known of ['eviolite', 'air-balloon', 'rocky-helmet']) {
+    check(
+      `known Gen 5 item "${known}" is absent from the bundle`,
+      !items.some((i) => i.name === known),
+    )
+  }
+  check('no berry is out of scope', berriesOutOfScope.length === 0)
+  check(
+    'abilities ARE the entity with out-of-era entries',
+    abilitiesOutOfScope.length > 0,
+    `(${abilitiesOutOfScope.length}: gens ${[...new Set(abilitiesOutOfScope.map((a) => a.generation_id))].sort().join(',')})`,
+  )
+
+  // The header notes must say this truthfully.
+  await selectGame('all')
+  await page.waitForTimeout(200)
+  await goTo('abilitydex')
+  const abilityNote = (await page.textContent('[data-testid="abilitydex-note"]')).trim()
+  const abilityAllCount = await countOf('abilitydex')
+  log(`  Abilitydex under All: ${abilityAllCount} rows | note: "${abilityNote}"`)
+  check('Abilitydex under All lists every ability', abilityAllCount === abilities.length)
+  check(
+    'its note admits the out-of-era rows and counts them correctly',
+    abilityNote.includes(String(abilitiesOutOfScope.length)),
+    abilityNote,
+  )
+  check('its note does not claim everything is in scope', !/in scope/i.test(abilityNote))
+
+  await goTo('itemdex')
+  const itemNote = (await page.textContent('[data-testid="itemdex-note"]')).trim()
+  const itemAllCount = await countOf('itemdex')
+  log(`  Itemdex under All: ${itemAllCount} rows | note: "${itemNote}"`)
+  check('Itemdex under All lists all items', itemAllCount === items.length, `(${itemAllCount})`)
+  check(
+    'its note truthfully says every item is indexed in Gen 1-4',
+    /Generations 1-4/.test(itemNote),
+    itemNote,
+  )
+
+  await goTo('berrydex')
+  const berryNote = (await page.textContent('[data-testid="berrydex-note"]')).trim()
+  log(`  Berrydex under All: note: "${berryNote}"`)
+  check('Berrydex note truthfully claims full Gen 1-4 coverage', /Generations 1-4/.test(berryNote))
+
   // ------------------------------------------------------------ errors
   hr('CONSOLE / PAGE / HTTP ERRORS')
   log(`  console errors : ${consoleErrors.length}`)

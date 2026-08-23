@@ -46,7 +46,7 @@ export function Itemdex() {
       gatedMessage={`No item in the bundle is indexed in Generation ${generation}.`}
       note={
         isAll
-          ? `All ${total} items in scope (no era filter under "All")`
+          ? `All ${total} items — every one is indexed in at least one of Generations 1-4`
           : `${entries.length} of ${total} items exist in Generation ${generation}`
       }
       row={(item) => ({

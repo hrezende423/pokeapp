@@ -116,6 +116,29 @@ Audited rather than assumed, because the four files differ (see
 - **Natures** have no per-entry signal, correctly — all 25 arrived together in
   Gen 3 and none has been added or removed. Gated as one rule, not per entry.
 
+### Scope under "All"
+
+`All` drops the era filter. What that exposes differs per entity, and the header
+note now states it per module rather than claiming a blanket "in scope":
+
+| Dex        | Entries | Out of Gen 1-4 scope                                                   |
+| ---------- | ------- | ---------------------------------------------------------------------- |
+| Itemdex    | 563     | **0** — every item is indexed in at least one of Gens 1-4              |
+| Abilitydex | 161     | **38** (Gens 5/6/8/9), kept only so species ability references resolve |
+| Naturedex  | 25      | 0 — all Gen 3                                                          |
+| Berrydex   | 64      | 0 — every berry exists in at least one of Gens 1-4                     |
+
+The ingestion filter (Gen 1-4 `game_index` ∪ referenced by an in-scope
+species/move) held for items: there are **no** Gen 5+-exclusive items in the
+bundle — `eviolite`, `air-balloon` and `rocky-helmet` are all absent, and no
+item has a minimum generation above 4. Abilities are the one entity where
+out-of-era rows genuinely survive, because dropping them would dangle a species
+reference. `verify:dexes` asserts all of this.
+
+Note that 563 (total) and 514 (present in Gen 4) are different quantities: 49
+items are Gen 1-3 retirees — the Hoenn bikes, the FRLG tickets, Gen 3 mail —
+that never appear in a Gen 4 game.
+
 ### Ability reverse lookup
 
 `speciesWithAbility(id, generation)` joins over species.json's ability references

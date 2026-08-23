@@ -42,7 +42,7 @@ export function Berrydex() {
       gatedMessage={`No berry in the bundle exists in Generation ${generation}. Berries arrived with Generation 2 and the modern berry system with Generation 3 — pick a later game to browse them.`}
       note={
         isAll
-          ? `All ${total} berries in scope (no era filter under "All")`
+          ? `All ${total} berries — every one exists in at least one of Generations 1-4`
           : `${entries.length} of ${total} berries exist in Generation ${generation} (derived from each berry's item)`
       }
       row={(berry) => ({

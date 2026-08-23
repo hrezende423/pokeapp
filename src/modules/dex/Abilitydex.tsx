@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import {
   ABILITIES_INTRODUCED_IN_GENERATION,
+  LATEST_GENERATION,
   abilityExistsInGeneration,
   listAbilities,
   speciesWithAbility,
@@ -57,6 +58,13 @@ export function Abilitydex() {
   )
 
   const total = listAbilities().length
+  // Abilities are the one entity where "All" really does show out-of-era rows:
+  // 38 of the 161 were introduced in Gen 5-9 and are kept only so species
+  // ability references never dangle. Counted, not hardcoded.
+  const outOfScope = useMemo(
+    () => listAbilities().filter((ab) => !abilityExistsInGeneration(ab, LATEST_GENERATION)).length,
+    [],
+  )
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 
   return (
@@ -71,7 +79,7 @@ export function Abilitydex() {
       }
       note={
         isAll
-          ? `All ${total} abilities in scope (no era filter under "All")`
+          ? `All ${total} abilities, including ${outOfScope} introduced after Generation ${LATEST_GENERATION} and kept only so species references resolve`
           : preAbilityEra
             ? `Abilities did not exist in Generation ${generation}`
             : `${entries.length} of ${total} abilities exist in Generation ${generation}`
