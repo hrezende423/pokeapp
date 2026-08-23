@@ -47,24 +47,24 @@ function Holders({ ability, generation }: { ability: Ability; generation: number
 export function Abilitydex() {
   const { generation, isAll } = useVersionGroup()
 
-  // Same "doesn't exist yet" rule as the species detail view: under a Gen 1-2
-  // selection this resolves to an empty list, not a full one.
-  const entries = useMemo(
-    () =>
-      isAll
-        ? listAbilities()
-        : listAbilities().filter((a) => abilityExistsInGeneration(a, generation)),
-    [generation, isAll],
-  )
-
-  const total = listAbilities().length
-  // Abilities are the one entity where "All" really does show out-of-era rows:
-  // 38 of the 161 were introduced in Gen 5-9 and are kept only so species
-  // ability references never dangle. Counted, not hardcoded.
-  const outOfScope = useMemo(
-    () => listAbilities().filter((ab) => !abilityExistsInGeneration(ab, LATEST_GENERATION)).length,
+  // The dex lists only abilities with a Generation 1-4 presence: 123 of the 161
+  // in the bundle. The other 38 (Gens 5/6/8/9) are retained in the data purely so
+  // species ability references never dangle -- Gengar's modern Cursed Body, for
+  // instance -- and listing them in a Gen 1-4 dex would offer the user entries no
+  // in-scope game has. This clamps the LIST only; resolveAbilitiesForGeneration
+  // still sees all 161, which is what keeps the species view correct.
+  const inScope = useMemo(
+    () => listAbilities().filter((a) => abilityExistsInGeneration(a, LATEST_GENERATION)),
     [],
   )
+  const hidden = listAbilities().length - inScope.length
+
+  // "All" means every in-scope generation at once, not every row in the file.
+  const entries = useMemo(
+    () => (isAll ? inScope : inScope.filter((a) => abilityExistsInGeneration(a, generation))),
+    [inScope, generation, isAll],
+  )
+
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 
   return (
@@ -79,10 +79,10 @@ export function Abilitydex() {
       }
       note={
         isAll
-          ? `All ${total} abilities, including ${outOfScope} introduced after Generation ${LATEST_GENERATION} and kept only so species references resolve`
+          ? `All ${inScope.length} abilities that existed by Generation ${LATEST_GENERATION} (${hidden} later additions are in the data but not listed here)`
           : preAbilityEra
             ? `Abilities did not exist in Generation ${generation}`
-            : `${entries.length} of ${total} abilities exist in Generation ${generation}`
+            : `${entries.length} of ${inScope.length} abilities exist in Generation ${generation}`
       }
       row={(ability) => ({ id: ability.id, label: ability.display_name })}
       detail={(ability) => (

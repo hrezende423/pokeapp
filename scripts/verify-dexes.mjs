@@ -577,20 +577,65 @@ try {
     `(${abilitiesOutOfScope.length}: gens ${[...new Set(abilitiesOutOfScope.map((a) => a.generation_id))].sort().join(',')})`,
   )
 
-  // The header notes must say this truthfully.
+  // Abilitydex clamps its LIST to abilities with a Gen 1-4 presence (123 of 161).
+  // The 38 later additions stay in the bundle for dangling-reference safety, so
+  // this asserts the list is clamped while the data is not.
+  const inScopeAbilities = abilities.filter((a) => (a.generation_id ?? 99) <= 4)
   await selectGame('all')
   await page.waitForTimeout(200)
   await goTo('abilitydex')
   const abilityNote = (await page.textContent('[data-testid="abilitydex-note"]')).trim()
   const abilityAllCount = await countOf('abilitydex')
-  log(`  Abilitydex under All: ${abilityAllCount} rows | note: "${abilityNote}"`)
-  check('Abilitydex under All lists every ability', abilityAllCount === abilities.length)
+  log(
+    `  Abilitydex under All: ${abilityAllCount} rows (in-scope ${inScopeAbilities.length} of ${abilities.length})`,
+  )
+  log(`  note: "${abilityNote}"`)
   check(
-    'its note admits the out-of-era rows and counts them correctly',
+    'Abilitydex under All lists only the 123 in-scope abilities',
+    abilityAllCount === inScopeAbilities.length,
+    `(${abilityAllCount} vs ${inScopeAbilities.length})`,
+  )
+  check(
+    'it does NOT list all 161',
+    abilityAllCount !== abilities.length,
+    `(${abilityAllCount} vs ${abilities.length})`,
+  )
+  check(
+    'its note states the clamped total',
+    abilityNote.includes(String(inScopeAbilities.length)),
+    abilityNote,
+  )
+  check(
+    'its note says how many are hidden',
     abilityNote.includes(String(abilitiesOutOfScope.length)),
     abilityNote,
   )
-  check('its note does not claim everything is in scope', !/in scope/i.test(abilityNote))
+
+  // Every listed row must be in scope, and named Gen 5 abilities must be absent.
+  const listedAbilities = await page.$$eval(
+    '[data-testid="abilitydex-rows"] .species-name',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
+  const outOfScopeNames = new Set(abilitiesOutOfScope.map((a) => a.display_name))
+  const leaked = listedAbilities.filter((n) => outOfScopeNames.has(n))
+  log(`  listed rows: ${listedAbilities.length}, out-of-era rows leaked: ${leaked.length}`)
+  check('no out-of-era ability appears in the list', leaked.length === 0, leaked.join(','))
+  for (const gen5 of ['Cursed Body', 'Contrary', 'Sheer Force', 'Multiscale']) {
+    check(`Gen 5 ability "${gen5}" is not listed`, !listedAbilities.includes(gen5))
+  }
+  // ...but the data still has it, which is what the species view depends on.
+  for (const gen5 of ['Cursed Body', 'Contrary']) {
+    check(
+      `"${gen5}" is still present in the bundle (dangling-reference safety)`,
+      abilities.some((a) => a.display_name === gen5),
+    )
+  }
+  // A search for a hidden ability must come up empty rather than surfacing it.
+  await page.fill('[data-testid="abilitydex-search"]', 'cursed')
+  await page.waitForTimeout(150)
+  const cursedCount = await countOf('abilitydex')
+  check('searching for a hidden ability finds nothing', cursedCount === 0, `(${cursedCount})`)
+  await page.fill('[data-testid="abilitydex-search"]', '')
 
   await goTo('itemdex')
   const itemNote = (await page.textContent('[data-testid="itemdex-note"]')).trim()

@@ -92,12 +92,12 @@ All four secondary dexes share `src/modules/dex/DexShell.tsx` — the same 240px
 sidebar and card layout as the Pokédex, reusing its CSS classes so a layout fix
 lands once.
 
-| Dex        | Entries | Detail                                     | Generation gating                      |
-| ---------- | ------- | ------------------------------------------ | -------------------------------------- |
-| Itemdex    | 563     | category, effect, price, fling, attributes | `generation_ids` membership            |
-| Abilitydex | 161     | effect + reverse lookup of every carrier   | `generation_id <= G`; empty in Gen 1-2 |
-| Naturedex  | 25      | increased/decreased stat pair, flavours    | whole list, Gen 3+                     |
-| Berrydex   | 64      | firmness, growth, Natural Gift, flavours   | derived from the linked item           |
+| Dex        | Entries    | Detail                                     | Generation gating                                          |
+| ---------- | ---------- | ------------------------------------------ | ---------------------------------------------------------- |
+| Itemdex    | 563        | category, effect, price, fling, attributes | `generation_ids` membership                                |
+| Abilitydex | 123 of 161 | effect + reverse lookup of every carrier   | `generation_id <= G`, clamped to Gen 1-4; empty in Gen 1-2 |
+| Naturedex  | 25         | increased/decreased stat pair, flavours    | whole list, Gen 3+                                         |
+| Berrydex   | 64         | firmness, growth, Natural Gift, flavours   | derived from the linked item                               |
 
 ### What the generation signals actually are
 
@@ -121,19 +121,28 @@ Audited rather than assumed, because the four files differ (see
 `All` drops the era filter. What that exposes differs per entity, and the header
 note now states it per module rather than claiming a blanket "in scope":
 
-| Dex        | Entries | Out of Gen 1-4 scope                                                   |
-| ---------- | ------- | ---------------------------------------------------------------------- |
-| Itemdex    | 563     | **0** — every item is indexed in at least one of Gens 1-4              |
-| Abilitydex | 161     | **38** (Gens 5/6/8/9), kept only so species ability references resolve |
-| Naturedex  | 25      | 0 — all Gen 3                                                          |
-| Berrydex   | 64      | 0 — every berry exists in at least one of Gens 1-4                     |
+| Dex        | Entries                             | Out of Gen 1-4 scope                                      |
+| ---------- | ----------------------------------- | --------------------------------------------------------- |
+| Itemdex    | 563                                 | **0** — every item is indexed in at least one of Gens 1-4 |
+| Abilitydex | **123 listed** of 161 in the bundle | the 38 introduced in Gens 5/6/8/9 are **not listed**      |
+| Naturedex  | 25                                  | 0 — all Gen 3                                             |
+| Berrydex   | 64                                  | 0 — every berry exists in at least one of Gens 1-4        |
 
 The ingestion filter (Gen 1-4 `game_index` ∪ referenced by an in-scope
 species/move) held for items: there are **no** Gen 5+-exclusive items in the
 bundle — `eviolite`, `air-balloon` and `rocky-helmet` are all absent, and no
-item has a minimum generation above 4. Abilities are the one entity where
-out-of-era rows genuinely survive, because dropping them would dangle a species
-reference. `verify:dexes` asserts all of this.
+item has a minimum generation above 4.
+
+Abilities are the one entity where out-of-era rows survive in the _data_, because
+dropping them would dangle a species reference. **The Abilitydex list clamps them
+out**: it shows the 123 abilities with a Gen 1-4 presence and never the other 38,
+under "All" as much as under a specific game. The clamp is on the list only --
+`resolveAbilitiesForGeneration` still sees all 161, which is what lets a species
+page resolve Gengar back to Levitate for Gen 3-4 (its modern ability is the Gen 5
+Cursed Body) and lets the reverse lookup include Gengar under Levitate.
+
+`verify:dexes` asserts all of this, including that no hidden ability leaks into
+the list or its search while remaining present in the bundle.
 
 Note that 563 (total) and 514 (present in Gen 4) are different quantities: 49
 items are Gen 1-3 retirees — the Hoenn bikes, the FRLG tickets, Gen 3 mail —
