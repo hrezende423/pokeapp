@@ -197,7 +197,16 @@ try {
     els.map((e) => e.getAttribute('data-testid')),
   )
   log(`  tabs: ${tabs.join(', ')}`)
-  check('six modules now registered', tabs.length === 6, `(${tabs.length})`)
+  // Derived from the registry rather than hardcoded: registering another module
+  // must not break this assertion, which is the whole point of the array.
+  const registryCount = [
+    ...readFileSync('src/modules/nav/registry.ts', 'utf8').matchAll(/\{\s*id:\s*'([a-z]+)'/g),
+  ].length
+  check(
+    `all ${registryCount} registered modules render as tabs`,
+    tabs.length === registryCount,
+    `(${tabs.length} tabs vs ${registryCount} registered)`,
+  )
   check('Movedex has a tab', tabs.includes('nav-movedex'))
   await goTo('movedex')
   check('Movedex mounts', (await page.$$('[data-testid="dex-movedex"]')).length === 1)

@@ -1,0 +1,46 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Form field states — built</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,sans-serif; background:#fafafa; color:#141414; padding:44px 32px 90px; }
+.page { max-width: 780px; margin:0 auto; }
+h1 { font-size: 22px; font-weight: 700; margin: 0 0 6px; }
+.subtitle { color:#777; font-size:13px; margin:0 0 36px; }
+.row { display:flex; gap:32px; margin-bottom:36px; align-items:flex-start; }
+.field-demo { flex: 1; }
+.state-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #999; margin-bottom: 10px; display:block; }
+.field { display: flex; flex-direction: column; gap: 5px; width: 220px; }
+.field label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #888; }
+.field input { border: none; border-bottom: 1px solid #ddd; background: transparent; font-size: 14px; padding: 7px 2px; font-family: inherit; color: #141414; }
+.field.focus input { border-bottom: 2px solid #d91c2c; padding-bottom: 6px; }
+.field.disabled input, .field.disabled label { opacity: 0.4; }
+.field.disabled input { cursor: not-allowed; }
+.field.error input { border-bottom: 1px solid #d91c2c; }
+.error-msg { font-size: 11px; color: #d91c2c; margin-top: 2px; }
+.helper-msg { font-size: 11px; color: #999; margin-top: 2px; }
+</style></head><body><div class="page">
+<h1>Form field states</h1>
+<p class="subtitle">Default, focus, disabled, and error — the four states specified in tokens, now actually built as a component rather than just described.</p>
+
+<div class="row">
+  <div class="field-demo">
+    <span class="state-label">Default</span>
+    <div class="field"><label>Nickname</label><input placeholder="Charizard"><span class="helper-msg">Optional</span></div>
+  </div>
+  <div class="field-demo">
+    <span class="state-label">Focus</span>
+    <div class="field focus"><label>Nickname</label><input value="Char" placeholder="Charizard"><span class="helper-msg">Optional</span></div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="field-demo">
+    <span class="state-label">Disabled</span>
+    <div class="field disabled"><label>Nickname</label><input value="Charizard" disabled><span class="helper-msg">Locked while battling</span></div>
+  </div>
+  <div class="field-demo">
+    <span class="state-label">Error</span>
+    <div class="field error"><label>Nickname</label><input value="Charizarddddddddd"><span class="error-msg">Max 12 characters</span></div>
+  </div>
+</div>
+
+</div></body></html>

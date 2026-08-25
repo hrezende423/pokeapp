@@ -1,0 +1,1974 @@
+{
+  "001": {
+    "bg_dark": "#214533",
+    "bg_light": "#7ebe9d"
+  },
+  "002": {
+    "bg_dark": "#203432",
+    "bg_light": "#5e928c"
+  },
+  "003": {
+    "bg_dark": "#243a38",
+    "bg_light": "#6aa19c"
+  },
+  "004": {
+    "bg_dark": "#5a2f0c",
+    "bg_light": "#e2975a"
+  },
+  "005": {
+    "bg_dark": "#471e17",
+    "bg_light": "#be5e4f"
+  },
+  "006": {
+    "bg_dark": "#5a2f0c",
+    "bg_light": "#e1985b"
+  },
+  "007": {
+    "bg_dark": "#203941",
+    "bg_light": "#669dae"
+  },
+  "008": {
+    "bg_dark": "#263040",
+    "bg_light": "#8799b5"
+  },
+  "009": {
+    "bg_dark": "#213045",
+    "bg_light": "#7b97bc"
+  },
+  "010": {
+    "bg_dark": "#2c4620",
+    "bg_light": "#87b971"
+  },
+  "011": {
+    "bg_dark": "#2f3c1c",
+    "bg_light": "#85a854"
+  },
+  "012": {
+    "bg_dark": "#293547",
+    "bg_light": "#dfe4ec"
+  },
+  "013": {
+    "bg_dark": "#3d2d1d",
+    "bg_light": "#a98058"
+  },
+  "014": {
+    "bg_dark": "#5d4d09",
+    "bg_light": "#e7cb55"
+  },
+  "015": {
+    "bg_dark": "#544212",
+    "bg_light": "#d4b259"
+  },
+  "016": {
+    "bg_dark": "#5a4f0c",
+    "bg_light": "#e1cf5b"
+  },
+  "017": {
+    "bg_dark": "#544812",
+    "bg_light": "#d6c366"
+  },
+  "018": {
+    "bg_dark": "#554611",
+    "bg_light": "#d9be63"
+  },
+  "019": {
+    "bg_dark": "#3a2b40",
+    "bg_light": "#a084ab"
+  },
+  "020": {
+    "bg_dark": "#5a3d0c",
+    "bg_light": "#e1af5b"
+  },
+  "021": {
+    "bg_dark": "#311d19",
+    "bg_light": "#8a564a"
+  },
+  "022": {
+    "bg_dark": "#402a1a",
+    "bg_light": "#b07a51"
+  },
+  "023": {
+    "bg_dark": "#2b1e26",
+    "bg_light": "#79576d"
+  },
+  "024": {
+    "bg_dark": "#332b3b",
+    "bg_light": "#9e91ac"
+  },
+  "025": {
+    "bg_dark": "#624b04",
+    "bg_light": "#efc84d"
+  },
+  "026": {
+    "bg_dark": "#5d4209",
+    "bg_light": "#e6b856"
+  },
+  "027": {
+    "bg_dark": "#59440d",
+    "bg_light": "#e0bb5c"
+  },
+  "028": {
+    "bg_dark": "#26190d",
+    "bg_light": "#805933"
+  },
+  "029": {
+    "bg_dark": "#192b4d",
+    "bg_light": "#7191cb"
+  },
+  "030": {
+    "bg_dark": "#233c43",
+    "bg_light": "#82aeba"
+  },
+  "031": {
+    "bg_dark": "#20303d",
+    "bg_light": "#6388a7"
+  },
+  "032": {
+    "bg_dark": "#392739",
+    "bg_light": "#9e749f"
+  },
+  "033": {
+    "bg_dark": "#3d2442",
+    "bg_light": "#af85b8"
+  },
+  "034": {
+    "bg_dark": "#392839",
+    "bg_light": "#9e799d"
+  },
+  "035": {
+    "bg_dark": "#45212d",
+    "bg_light": "#bd7f94"
+  },
+  "036": {
+    "bg_dark": "#412825",
+    "bg_light": "#b68b86"
+  },
+  "037": {
+    "bg_dark": "#58270e",
+    "bg_light": "#dd8557"
+  },
+  "038": {
+    "bg_dark": "#5d5009",
+    "bg_light": "#e6cf56"
+  },
+  "039": {
+    "bg_dark": "#42242b",
+    "bg_light": "#b88490"
+  },
+  "040": {
+    "bg_dark": "#5c1421",
+    "bg_light": "#f4d2d8"
+  },
+  "041": {
+    "bg_dark": "#3f2640",
+    "bg_light": "#aa7bad"
+  },
+  "042": {
+    "bg_dark": "#3f2340",
+    "bg_light": "#aa6eab"
+  },
+  "043": {
+    "bg_dark": "#1c3b17",
+    "bg_light": "#54a347"
+  },
+  "044": {
+    "bg_dark": "#361e18",
+    "bg_light": "#975949"
+  },
+  "045": {
+    "bg_dark": "#51151f",
+    "bg_light": "#d16b7b"
+  },
+  "046": {
+    "bg_dark": "#5a2d0c",
+    "bg_light": "#e1945b"
+  },
+  "047": {
+    "bg_dark": "#563210",
+    "bg_light": "#d89452"
+  },
+  "048": {
+    "bg_dark": "#201d2f",
+    "bg_light": "#5e5685"
+  },
+  "049": {
+    "bg_dark": "#332640",
+    "bg_light": "#9e88b4"
+  },
+  "050": {
+    "bg_dark": "#402f26",
+    "bg_light": "#ae8e7c"
+  },
+  "051": {
+    "bg_dark": "#3a2d25",
+    "bg_light": "#a08371"
+  },
+  "052": {
+    "bg_dark": "#3f3020",
+    "bg_light": "#ab8963"
+  },
+  "053": {
+    "bg_dark": "#5a410c",
+    "bg_light": "#e2b65a"
+  },
+  "054": {
+    "bg_dark": "#513b15",
+    "bg_light": "#d1ac6b"
+  },
+  "055": {
+    "bg_dark": "#1d2e3c",
+    "bg_light": "#5683a6"
+  },
+  "056": {
+    "bg_dark": "#3e3028",
+    "bg_light": "#b1998b"
+  },
+  "057": {
+    "bg_dark": "#2f2622",
+    "bg_light": "#866d64"
+  },
+  "058": {
+    "bg_dark": "#532f13",
+    "bg_light": "#d69767"
+  },
+  "059": {
+    "bg_dark": "#5b360b",
+    "bg_light": "#e3a359"
+  },
+  "060": {
+    "bg_dark": "#223144",
+    "bg_light": "#819bbc"
+  },
+  "061": {
+    "bg_dark": "#1e2c3c",
+    "bg_light": "#5c7ea7"
+  },
+  "062": {
+    "bg_dark": "#1e2b3b",
+    "bg_light": "#597ca5"
+  },
+  "063": {
+    "bg_dark": "#605106",
+    "bg_light": "#ebd251"
+  },
+  "064": {
+    "bg_dark": "#615005",
+    "bg_light": "#edd14f"
+  },
+  "065": {
+    "bg_dark": "#5c4d0a",
+    "bg_light": "#e5cc57"
+  },
+  "066": {
+    "bg_dark": "#223b44",
+    "bg_light": "#81adbb"
+  },
+  "067": {
+    "bg_dark": "#252a41",
+    "bg_light": "#868eb6"
+  },
+  "068": {
+    "bg_dark": "#263440",
+    "bg_light": "#88a0b4"
+  },
+  "069": {
+    "bg_dark": "#5c5a0a",
+    "bg_light": "#e4e258"
+  },
+  "070": {
+    "bg_dark": "#58570e",
+    "bg_light": "#dfdc5d"
+  },
+  "071": {
+    "bg_dark": "#59580d",
+    "bg_light": "#dfdd5d"
+  },
+  "072": {
+    "bg_dark": "#134053",
+    "bg_light": "#64b3d5"
+  },
+  "073": {
+    "bg_dark": "#0d4359",
+    "bg_light": "#5dbadf"
+  },
+  "074": {
+    "bg_dark": "#363530",
+    "bg_light": "#a3a299"
+  },
+  "075": {
+    "bg_dark": "#38362e",
+    "bg_light": "#a6a496"
+  },
+  "076": {
+    "bg_dark": "#392d2d",
+    "bg_light": "#a89494"
+  },
+  "077": {
+    "bg_dark": "#614700",
+    "bg_light": "#f5bd20"
+  },
+  "078": {
+    "bg_dark": "#514515",
+    "bg_light": "#d2be6b"
+  },
+  "079": {
+    "bg_dark": "#4f1727",
+    "bg_light": "#cf6e89"
+  },
+  "080": {
+    "bg_dark": "#4e1823",
+    "bg_light": "#cd6f82"
+  },
+  "081": {
+    "bg_dark": "#263a40",
+    "bg_light": "#88abb4"
+  },
+  "082": {
+    "bg_dark": "#27393f",
+    "bg_light": "#89a8b3"
+  },
+  "083": {
+    "bg_dark": "#503f10",
+    "bg_light": "#d0ab43"
+  },
+  "084": {
+    "bg_dark": "#4c2e1a",
+    "bg_light": "#c99573"
+  },
+  "085": {
+    "bg_dark": "#432e23",
+    "bg_light": "#b58f7c"
+  },
+  "086": {
+    "bg_dark": "#203651",
+    "bg_light": "#dde6f1"
+  },
+  "087": {
+    "bg_dark": "#21354f",
+    "bg_light": "#e6ecf4"
+  },
+  "088": {
+    "bg_dark": "#362640",
+    "bg_light": "#a387b5"
+  },
+  "089": {
+    "bg_dark": "#352a3c",
+    "bg_light": "#a18fad"
+  },
+  "090": {
+    "bg_dark": "#282541",
+    "bg_light": "#8580b2"
+  },
+  "091": {
+    "bg_dark": "#2e2b39",
+    "bg_light": "#87809d"
+  },
+  "092": {
+    "bg_dark": "#322832",
+    "bg_light": "#8e738d"
+  },
+  "093": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "094": {
+    "bg_dark": "#2a283a",
+    "bg_light": "#7d78a0"
+  },
+  "095": {
+    "bg_dark": "#2c2e3a",
+    "bg_light": "#9295aa"
+  },
+  "096": {
+    "bg_dark": "#614a05",
+    "bg_light": "#eec64f"
+  },
+  "097": {
+    "bg_dark": "#645202",
+    "bg_light": "#f3d349"
+  },
+  "098": {
+    "bg_dark": "#612505",
+    "bg_light": "#ee854f"
+  },
+  "099": {
+    "bg_dark": "#5e2508",
+    "bg_light": "#e88754"
+  },
+  "100": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "101": {
+    "bg_dark": "#3f272d",
+    "bg_light": "#ab7d88"
+  },
+  "102": {
+    "bg_dark": "#3f272a",
+    "bg_light": "#b3898e"
+  },
+  "103": {
+    "bg_dark": "#224128",
+    "bg_light": "#6dae79"
+  },
+  "104": {
+    "bg_dark": "#413525",
+    "bg_light": "#b29d7f"
+  },
+  "105": {
+    "bg_dark": "#4c361a",
+    "bg_light": "#caa373"
+  },
+  "106": {
+    "bg_dark": "#403526",
+    "bg_light": "#b5a287"
+  },
+  "107": {
+    "bg_dark": "#541712",
+    "bg_light": "#d76e65"
+  },
+  "108": {
+    "bg_dark": "#570f1b",
+    "bg_light": "#dc6074"
+  },
+  "109": {
+    "bg_dark": "#232244",
+    "bg_light": "#8381bb"
+  },
+  "110": {
+    "bg_dark": "#322a3c",
+    "bg_light": "#9d8fad"
+  },
+  "111": {
+    "bg_dark": "#2c343a",
+    "bg_light": "#929fab"
+  },
+  "112": {
+    "bg_dark": "#2d3139",
+    "bg_light": "#9298a6"
+  },
+  "113": {
+    "bg_dark": "#54121c",
+    "bg_light": "#d76577"
+  },
+  "114": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "115": {
+    "bg_dark": "#514315",
+    "bg_light": "#d2b96a"
+  },
+  "116": {
+    "bg_dark": "#0a485c",
+    "bg_light": "#57c2e5"
+  },
+  "117": {
+    "bg_dark": "#0b475b",
+    "bg_light": "#5ac0e2"
+  },
+  "118": {
+    "bg_dark": "#40211b",
+    "bg_light": "#b06352"
+  },
+  "119": {
+    "bg_dark": "#512015",
+    "bg_light": "#cc6c57"
+  },
+  "120": {
+    "bg_dark": "#59470d",
+    "bg_light": "#e0c15c"
+  },
+  "121": {
+    "bg_dark": "#322a3c",
+    "bg_light": "#9d8fad"
+  },
+  "122": {
+    "bg_dark": "#5b0b1e",
+    "bg_light": "#e3597a"
+  },
+  "123": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "124": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "125": {
+    "bg_dark": "#654901",
+    "bg_light": "#f5c447"
+  },
+  "126": {
+    "bg_dark": "#5d2109",
+    "bg_light": "#e46f41"
+  },
+  "127": {
+    "bg_dark": "#262221",
+    "bg_light": "#6c6160"
+  },
+  "128": {
+    "bg_dark": "#513415",
+    "bg_light": "#d3a069"
+  },
+  "129": {
+    "bg_dark": "#5d1a09",
+    "bg_light": "#e77355"
+  },
+  "130": {
+    "bg_dark": "#13313f",
+    "bg_light": "#3c8bae"
+  },
+  "131": {
+    "bg_dark": "#143e50",
+    "bg_light": "#54a7cc"
+  },
+  "132": {
+    "bg_dark": "#342145",
+    "bg_light": "#9f80bd"
+  },
+  "133": {
+    "bg_dark": "#47311b",
+    "bg_light": "#bb8c5e"
+  },
+  "134": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "135": {
+    "bg_dark": "#664b00",
+    "bg_light": "#f7c745"
+  },
+  "136": {
+    "bg_dark": "#57250e",
+    "bg_light": "#d97647"
+  },
+  "137": {
+    "bg_dark": "#47191f",
+    "bg_light": "#bc5763"
+  },
+  "138": {
+    "bg_dark": "#463f20",
+    "bg_light": "#c0b37d"
+  },
+  "139": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "140": {
+    "bg_dark": "#58290e",
+    "bg_light": "#df8d5d"
+  },
+  "141": {
+    "bg_dark": "#3f2e1e",
+    "bg_light": "#ac845e"
+  },
+  "142": {
+    "bg_dark": "#32273f",
+    "bg_light": "#9c8ab3"
+  },
+  "143": {
+    "bg_dark": "#413225",
+    "bg_light": "#b69d86"
+  },
+  "144": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "145": {
+    "bg_dark": "#664a00",
+    "bg_light": "#fbc842"
+  },
+  "146": {
+    "bg_dark": "#664000",
+    "bg_light": "#f7b446"
+  },
+  "147": {
+    "bg_dark": "#192d4d",
+    "bg_light": "#7093cc"
+  },
+  "148": {
+    "bg_dark": "#113555",
+    "bg_light": "#64a2d8"
+  },
+  "149": {
+    "bg_dark": "#5e3709",
+    "bg_light": "#e8a555"
+  },
+  "150": {
+    "bg_dark": "#342933",
+    "bg_light": "#91778f"
+  },
+  "151": {
+    "bg_dark": "#4c1a27",
+    "bg_light": "#c97389"
+  },
+  "152": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "153": {
+    "bg_dark": "#645202",
+    "bg_light": "#f3d349"
+  },
+  "154": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "155": {
+    "bg_dark": "#59440d",
+    "bg_light": "#e0bb5c"
+  },
+  "156": {
+    "bg_dark": "#664a00",
+    "bg_light": "#fbc842"
+  },
+  "157": {
+    "bg_dark": "#664a00",
+    "bg_light": "#fbc842"
+  },
+  "158": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "159": {
+    "bg_dark": "#5d4d09",
+    "bg_light": "#e7cb55"
+  },
+  "160": {
+    "bg_dark": "#0b475b",
+    "bg_light": "#5ac0e2"
+  },
+  "161": {
+    "bg_dark": "#402f26",
+    "bg_light": "#ae8e7c"
+  },
+  "162": {
+    "bg_dark": "#5b360b",
+    "bg_light": "#e3a359"
+  },
+  "163": {
+    "bg_dark": "#413225",
+    "bg_light": "#b69d86"
+  },
+  "164": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "165": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "166": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "167": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "168": {
+    "bg_dark": "#5a3d0c",
+    "bg_light": "#e1af5b"
+  },
+  "169": {
+    "bg_dark": "#2a283a",
+    "bg_light": "#7d78a0"
+  },
+  "170": {
+    "bg_dark": "#544812",
+    "bg_light": "#d6c366"
+  },
+  "171": {
+    "bg_dark": "#2a283a",
+    "bg_light": "#7d78a0"
+  },
+  "172": {
+    "bg_dark": "#645202",
+    "bg_light": "#f3d349"
+  },
+  "173": {
+    "bg_dark": "#412825",
+    "bg_light": "#b68b86"
+  },
+  "174": {
+    "bg_dark": "#3f272a",
+    "bg_light": "#b3898e"
+  },
+  "175": {
+    "bg_dark": "#554611",
+    "bg_light": "#d9be63"
+  },
+  "176": {
+    "bg_dark": "#38362e",
+    "bg_light": "#a6a496"
+  },
+  "177": {
+    "bg_dark": "#59470d",
+    "bg_light": "#e0c15c"
+  },
+  "178": {
+    "bg_dark": "#5d1a09",
+    "bg_light": "#e77355"
+  },
+  "179": {
+    "bg_dark": "#403526",
+    "bg_light": "#b5a287"
+  },
+  "180": {
+    "bg_dark": "#4f1727",
+    "bg_light": "#cf6e89"
+  },
+  "181": {
+    "bg_dark": "#624b04",
+    "bg_light": "#efc84d"
+  },
+  "182": {
+    "bg_dark": "#544812",
+    "bg_light": "#d6c366"
+  },
+  "183": {
+    "bg_dark": "#0a485c",
+    "bg_light": "#57c2e5"
+  },
+  "184": {
+    "bg_dark": "#143e50",
+    "bg_light": "#54a7cc"
+  },
+  "185": {
+    "bg_dark": "#3a2d25",
+    "bg_light": "#a08371"
+  },
+  "186": {
+    "bg_dark": "#615005",
+    "bg_light": "#edd14f"
+  },
+  "187": {
+    "bg_dark": "#5b0b1e",
+    "bg_light": "#e3597a"
+  },
+  "188": {
+    "bg_dark": "#605106",
+    "bg_light": "#ebd251"
+  },
+  "189": {
+    "bg_dark": "#192b4d",
+    "bg_light": "#7191cb"
+  },
+  "190": {
+    "bg_dark": "#59440d",
+    "bg_light": "#e0bb5c"
+  },
+  "191": {
+    "bg_dark": "#5d5009",
+    "bg_light": "#e6cf56"
+  },
+  "192": {
+    "bg_dark": "#645202",
+    "bg_light": "#f3d349"
+  },
+  "193": {
+    "bg_dark": "#5d2109",
+    "bg_light": "#e46f41"
+  },
+  "194": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "195": {
+    "bg_dark": "#134053",
+    "bg_light": "#64b3d5"
+  },
+  "196": {
+    "bg_dark": "#45212d",
+    "bg_light": "#bd7f94"
+  },
+  "197": {
+    "bg_dark": "#101a23",
+    "bg_light": "#3c5a76"
+  },
+  "198": {
+    "bg_dark": "#101a23",
+    "bg_light": "#3c5a76"
+  },
+  "199": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "200": {
+    "bg_dark": "#14212a",
+    "bg_light": "#3c5e77"
+  },
+  "201": {
+    "bg_dark": "#0e1b25",
+    "bg_light": "#365c7d"
+  },
+  "202": {
+    "bg_dark": "#134053",
+    "bg_light": "#64b3d5"
+  },
+  "203": {
+    "bg_dark": "#664000",
+    "bg_light": "#f7b446"
+  },
+  "204": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "205": {
+    "bg_dark": "#250e0e",
+    "bg_light": "#7f3633"
+  },
+  "206": {
+    "bg_dark": "#645202",
+    "bg_light": "#f3d349"
+  },
+  "207": {
+    "bg_dark": "#45212d",
+    "bg_light": "#bd7f94"
+  },
+  "208": {
+    "bg_dark": "#201d2f",
+    "bg_light": "#5e5685"
+  },
+  "209": {
+    "bg_dark": "#5b0b1e",
+    "bg_light": "#e3597a"
+  },
+  "210": {
+    "bg_dark": "#3d2442",
+    "bg_light": "#af85b8"
+  },
+  "211": {
+    "bg_dark": "#463f20",
+    "bg_light": "#c0b37d"
+  },
+  "212": {
+    "bg_dark": "#361e18",
+    "bg_light": "#975949"
+  },
+  "213": {
+    "bg_dark": "#624b04",
+    "bg_light": "#efc84d"
+  },
+  "214": {
+    "bg_dark": "#142330",
+    "bg_light": "#3c6385"
+  },
+  "215": {
+    "bg_dark": "#1d2e3c",
+    "bg_light": "#5683a6"
+  },
+  "216": {
+    "bg_dark": "#5a2d0c",
+    "bg_light": "#e1945b"
+  },
+  "217": {
+    "bg_dark": "#2f2622",
+    "bg_light": "#866d64"
+  },
+  "218": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "219": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "220": {
+    "bg_dark": "#432e23",
+    "bg_light": "#b58f7c"
+  },
+  "221": {
+    "bg_dark": "#3a2d25",
+    "bg_light": "#a08371"
+  },
+  "222": {
+    "bg_dark": "#5b0b1e",
+    "bg_light": "#e3597a"
+  },
+  "223": {
+    "bg_dark": "#214533",
+    "bg_light": "#7ebe9d"
+  },
+  "224": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "225": {
+    "bg_dark": "#361e18",
+    "bg_light": "#975949"
+  },
+  "226": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "227": {
+    "bg_dark": "#203651",
+    "bg_light": "#dde6f1"
+  },
+  "228": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "229": {
+    "bg_dark": "#2f2622",
+    "bg_light": "#866d64"
+  },
+  "230": {
+    "bg_dark": "#134053",
+    "bg_light": "#64b3d5"
+  },
+  "231": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "232": {
+    "bg_dark": "#263440",
+    "bg_light": "#88a0b4"
+  },
+  "233": {
+    "bg_dark": "#54121c",
+    "bg_light": "#d76577"
+  },
+  "234": {
+    "bg_dark": "#432e23",
+    "bg_light": "#b58f7c"
+  },
+  "235": {
+    "bg_dark": "#26190d",
+    "bg_light": "#805933"
+  },
+  "236": {
+    "bg_dark": "#26190d",
+    "bg_light": "#805933"
+  },
+  "237": {
+    "bg_dark": "#20303d",
+    "bg_light": "#6388a7"
+  },
+  "238": {
+    "bg_dark": "#5d5009",
+    "bg_light": "#e6cf56"
+  },
+  "239": {
+    "bg_dark": "#624b04",
+    "bg_light": "#efc84d"
+  },
+  "240": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "241": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "242": {
+    "bg_dark": "#5b0b1e",
+    "bg_light": "#e3597a"
+  },
+  "243": {
+    "bg_dark": "#614a05",
+    "bg_light": "#eec64f"
+  },
+  "244": {
+    "bg_dark": "#26190d",
+    "bg_light": "#805933"
+  },
+  "245": {
+    "bg_dark": "#233c43",
+    "bg_light": "#82aeba"
+  },
+  "246": {
+    "bg_dark": "#38362e",
+    "bg_light": "#a6a496"
+  },
+  "247": {
+    "bg_dark": "#213045",
+    "bg_light": "#7b97bc"
+  },
+  "248": {
+    "bg_dark": "#38362e",
+    "bg_light": "#a6a496"
+  },
+  "249": {
+    "bg_dark": "#203651",
+    "bg_light": "#dde6f1"
+  },
+  "250": {
+    "bg_dark": "#52150c",
+    "bg_light": "#d74a36"
+  },
+  "251": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "252": {
+    "bg_dark": "#544812",
+    "bg_light": "#d6c366"
+  },
+  "253": {
+    "bg_dark": "#1c3b17",
+    "bg_light": "#54a347"
+  },
+  "254": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "255": {
+    "bg_dark": "#5e3709",
+    "bg_light": "#e8a555"
+  },
+  "256": {
+    "bg_dark": "#624b04",
+    "bg_light": "#efc84d"
+  },
+  "257": {
+    "bg_dark": "#513415",
+    "bg_light": "#d3a069"
+  },
+  "258": {
+    "bg_dark": "#143e50",
+    "bg_light": "#54a7cc"
+  },
+  "259": {
+    "bg_dark": "#58290e",
+    "bg_light": "#df8d5d"
+  },
+  "260": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "261": {
+    "bg_dark": "#322832",
+    "bg_light": "#8e738d"
+  },
+  "262": {
+    "bg_dark": "#363530",
+    "bg_light": "#a3a299"
+  },
+  "263": {
+    "bg_dark": "#3e3028",
+    "bg_light": "#b1998b"
+  },
+  "264": {
+    "bg_dark": "#392d2d",
+    "bg_light": "#a89494"
+  },
+  "265": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "266": {
+    "bg_dark": "#203651",
+    "bg_light": "#dde6f1"
+  },
+  "267": {
+    "bg_dark": "#5d4209",
+    "bg_light": "#e6b856"
+  },
+  "268": {
+    "bg_dark": "#362640",
+    "bg_light": "#a387b5"
+  },
+  "269": {
+    "bg_dark": "#5d4d09",
+    "bg_light": "#e7cb55"
+  },
+  "270": {
+    "bg_dark": "#214533",
+    "bg_light": "#7ebe9d"
+  },
+  "271": {
+    "bg_dark": "#1c3b17",
+    "bg_light": "#54a347"
+  },
+  "272": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "273": {
+    "bg_dark": "#514315",
+    "bg_light": "#d2b96a"
+  },
+  "274": {
+    "bg_dark": "#3e3028",
+    "bg_light": "#b1998b"
+  },
+  "275": {
+    "bg_dark": "#432e23",
+    "bg_light": "#b58f7c"
+  },
+  "276": {
+    "bg_dark": "#51151f",
+    "bg_light": "#d16b7b"
+  },
+  "277": {
+    "bg_dark": "#4e1823",
+    "bg_light": "#cd6f82"
+  },
+  "278": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "279": {
+    "bg_dark": "#664a00",
+    "bg_light": "#fbc842"
+  },
+  "280": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "281": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "282": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "283": {
+    "bg_dark": "#0a485c",
+    "bg_light": "#57c2e5"
+  },
+  "284": {
+    "bg_dark": "#612505",
+    "bg_light": "#ee854f"
+  },
+  "285": {
+    "bg_dark": "#4c361a",
+    "bg_light": "#caa373"
+  },
+  "286": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "287": {
+    "bg_dark": "#403526",
+    "bg_light": "#b5a287"
+  },
+  "288": {
+    "bg_dark": "#2f2622",
+    "bg_light": "#866d64"
+  },
+  "289": {
+    "bg_dark": "#413225",
+    "bg_light": "#b69d86"
+  },
+  "290": {
+    "bg_dark": "#203651",
+    "bg_light": "#dde6f1"
+  },
+  "291": {
+    "bg_dark": "#463f20",
+    "bg_light": "#c0b37d"
+  },
+  "292": {
+    "bg_dark": "#413525",
+    "bg_light": "#b29d7f"
+  },
+  "293": {
+    "bg_dark": "#614a05",
+    "bg_light": "#eec64f"
+  },
+  "294": {
+    "bg_dark": "#554611",
+    "bg_light": "#d9be63"
+  },
+  "295": {
+    "bg_dark": "#59440d",
+    "bg_light": "#e0bb5c"
+  },
+  "296": {
+    "bg_dark": "#624b04",
+    "bg_light": "#efc84d"
+  },
+  "297": {
+    "bg_dark": "#664000",
+    "bg_light": "#f7b446"
+  },
+  "298": {
+    "bg_dark": "#143e50",
+    "bg_light": "#54a7cc"
+  },
+  "299": {
+    "bg_dark": "#322a3c",
+    "bg_light": "#9d8fad"
+  },
+  "300": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "301": {
+    "bg_dark": "#5a3d0c",
+    "bg_light": "#e1af5b"
+  },
+  "302": {
+    "bg_dark": "#2a283a",
+    "bg_light": "#7d78a0"
+  },
+  "303": {
+    "bg_dark": "#645202",
+    "bg_light": "#f3d349"
+  },
+  "304": {
+    "bg_dark": "#363530",
+    "bg_light": "#a3a299"
+  },
+  "305": {
+    "bg_dark": "#363530",
+    "bg_light": "#a3a299"
+  },
+  "306": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "307": {
+    "bg_dark": "#0d4359",
+    "bg_light": "#5dbadf"
+  },
+  "308": {
+    "bg_dark": "#54121c",
+    "bg_light": "#d76577"
+  },
+  "309": {
+    "bg_dark": "#5d4209",
+    "bg_light": "#e6b856"
+  },
+  "310": {
+    "bg_dark": "#59470d",
+    "bg_light": "#e0c15c"
+  },
+  "311": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "312": {
+    "bg_dark": "#0d4359",
+    "bg_light": "#5dbadf"
+  },
+  "313": {
+    "bg_dark": "#512015",
+    "bg_light": "#cc6c57"
+  },
+  "314": {
+    "bg_dark": "#134053",
+    "bg_light": "#64b3d5"
+  },
+  "315": {
+    "bg_dark": "#243a38",
+    "bg_light": "#6aa19c"
+  },
+  "316": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "317": {
+    "bg_dark": "#282541",
+    "bg_light": "#8580b2"
+  },
+  "318": {
+    "bg_dark": "#514315",
+    "bg_light": "#d2b96a"
+  },
+  "319": {
+    "bg_dark": "#002033",
+    "bg_light": "#086faa"
+  },
+  "320": {
+    "bg_dark": "#0b2537",
+    "bg_light": "#266898"
+  },
+  "321": {
+    "bg_dark": "#13313f",
+    "bg_light": "#3c8bae"
+  },
+  "322": {
+    "bg_dark": "#654901",
+    "bg_light": "#f5c447"
+  },
+  "323": {
+    "bg_dark": "#58270e",
+    "bg_light": "#dd8557"
+  },
+  "324": {
+    "bg_dark": "#403526",
+    "bg_light": "#b5a287"
+  },
+  "325": {
+    "bg_dark": "#570f1b",
+    "bg_light": "#dc6074"
+  },
+  "326": {
+    "bg_dark": "#3f2640",
+    "bg_light": "#aa7bad"
+  },
+  "327": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "328": {
+    "bg_dark": "#612505",
+    "bg_light": "#ee854f"
+  },
+  "329": {
+    "bg_dark": "#224128",
+    "bg_light": "#6dae79"
+  },
+  "330": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "331": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "332": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "333": {
+    "bg_dark": "#0d4359",
+    "bg_light": "#5dbadf"
+  },
+  "334": {
+    "bg_dark": "#0d4359",
+    "bg_light": "#5dbadf"
+  },
+  "335": {
+    "bg_dark": "#47191f",
+    "bg_light": "#bc5763"
+  },
+  "336": {
+    "bg_dark": "#201d2f",
+    "bg_light": "#5e5685"
+  },
+  "337": {
+    "bg_dark": "#463f20",
+    "bg_light": "#c0b37d"
+  },
+  "338": {
+    "bg_dark": "#513b15",
+    "bg_light": "#d1ac6b"
+  },
+  "339": {
+    "bg_dark": "#134053",
+    "bg_light": "#64b3d5"
+  },
+  "340": {
+    "bg_dark": "#0e1425",
+    "bg_light": "#35467d"
+  },
+  "341": {
+    "bg_dark": "#5d1a09",
+    "bg_light": "#e77355"
+  },
+  "342": {
+    "bg_dark": "#471e17",
+    "bg_light": "#be5e4f"
+  },
+  "343": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "344": {
+    "bg_dark": "#4c2e1a",
+    "bg_light": "#c99573"
+  },
+  "345": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "346": {
+    "bg_dark": "#58290e",
+    "bg_light": "#df8d5d"
+  },
+  "347": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "348": {
+    "bg_dark": "#223144",
+    "bg_light": "#819bbc"
+  },
+  "349": {
+    "bg_dark": "#4c361a",
+    "bg_light": "#caa373"
+  },
+  "350": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "351": {
+    "bg_dark": "#2d3139",
+    "bg_light": "#9298a6"
+  },
+  "352": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "353": {
+    "bg_dark": "#282541",
+    "bg_light": "#8580b2"
+  },
+  "354": {
+    "bg_dark": "#363530",
+    "bg_light": "#a3a299"
+  },
+  "355": {
+    "bg_dark": "#403526",
+    "bg_light": "#b5a287"
+  },
+  "356": {
+    "bg_dark": "#3e3028",
+    "bg_light": "#b1998b"
+  },
+  "357": {
+    "bg_dark": "#224128",
+    "bg_light": "#6dae79"
+  },
+  "358": {
+    "bg_dark": "#4c1a27",
+    "bg_light": "#c97389"
+  },
+  "359": {
+    "bg_dark": "#201d2f",
+    "bg_light": "#5e5685"
+  },
+  "360": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "361": {
+    "bg_dark": "#5d4209",
+    "bg_light": "#e6b856"
+  },
+  "362": {
+    "bg_dark": "#203651",
+    "bg_light": "#dde6f1"
+  },
+  "363": {
+    "bg_dark": "#192b4d",
+    "bg_light": "#7191cb"
+  },
+  "364": {
+    "bg_dark": "#0d4359",
+    "bg_light": "#5dbadf"
+  },
+  "365": {
+    "bg_dark": "#13313f",
+    "bg_light": "#3c8bae"
+  },
+  "366": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "367": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "368": {
+    "bg_dark": "#4f1727",
+    "bg_light": "#cf6e89"
+  },
+  "369": {
+    "bg_dark": "#3e3028",
+    "bg_light": "#b1998b"
+  },
+  "370": {
+    "bg_dark": "#570f1b",
+    "bg_light": "#dc6074"
+  },
+  "371": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "372": {
+    "bg_dark": "#2d3139",
+    "bg_light": "#9298a6"
+  },
+  "373": {
+    "bg_dark": "#13313f",
+    "bg_light": "#3c8bae"
+  },
+  "374": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "375": {
+    "bg_dark": "#17262d",
+    "bg_light": "#446b7f"
+  },
+  "376": {
+    "bg_dark": "#223b44",
+    "bg_light": "#81adbb"
+  },
+  "377": {
+    "bg_dark": "#402f26",
+    "bg_light": "#ae8e7c"
+  },
+  "378": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "379": {
+    "bg_dark": "#363530",
+    "bg_light": "#a3a299"
+  },
+  "380": {
+    "bg_dark": "#47191f",
+    "bg_light": "#bc5763"
+  },
+  "381": {
+    "bg_dark": "#13313f",
+    "bg_light": "#3c8bae"
+  },
+  "382": {
+    "bg_dark": "#07233f",
+    "bg_light": "#1a65ac"
+  },
+  "383": {
+    "bg_dark": "#43110c",
+    "bg_light": "#b83729"
+  },
+  "384": {
+    "bg_dark": "#173022",
+    "bg_light": "#468762"
+  },
+  "385": {
+    "bg_dark": "#645202",
+    "bg_light": "#f3d349"
+  },
+  "386": {
+    "bg_dark": "#58290e",
+    "bg_light": "#df8d5d"
+  },
+  "387": {
+    "bg_dark": "#463f20",
+    "bg_light": "#c0b37d"
+  },
+  "388": {
+    "bg_dark": "#503f10",
+    "bg_light": "#d0ab43"
+  },
+  "389": {
+    "bg_dark": "#1a2c19",
+    "bg_light": "#4c7a4a"
+  },
+  "390": {
+    "bg_dark": "#57250e",
+    "bg_light": "#d97647"
+  },
+  "391": {
+    "bg_dark": "#5e3709",
+    "bg_light": "#e8a555"
+  },
+  "392": {
+    "bg_dark": "#512015",
+    "bg_light": "#cc6c57"
+  },
+  "393": {
+    "bg_dark": "#13313f",
+    "bg_light": "#3c8bae"
+  },
+  "394": {
+    "bg_dark": "#1e2c3c",
+    "bg_light": "#5c7ea7"
+  },
+  "395": {
+    "bg_dark": "#1e2c3c",
+    "bg_light": "#5c7ea7"
+  },
+  "396": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "397": {
+    "bg_dark": "#2f2622",
+    "bg_light": "#866d64"
+  },
+  "398": {
+    "bg_dark": "#58290e",
+    "bg_light": "#df8d5d"
+  },
+  "399": {
+    "bg_dark": "#402a1a",
+    "bg_light": "#b07a51"
+  },
+  "400": {
+    "bg_dark": "#402a1a",
+    "bg_light": "#b07a51"
+  },
+  "401": {
+    "bg_dark": "#512015",
+    "bg_light": "#cc6c57"
+  },
+  "402": {
+    "bg_dark": "#561310",
+    "bg_light": "#db6861"
+  },
+  "403": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "404": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "405": {
+    "bg_dark": "#2c343a",
+    "bg_light": "#929fab"
+  },
+  "406": {
+    "bg_dark": "#58570e",
+    "bg_light": "#dfdc5d"
+  },
+  "407": {
+    "bg_dark": "#224128",
+    "bg_light": "#6dae79"
+  },
+  "408": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "409": {
+    "bg_dark": "#1d2e3c",
+    "bg_light": "#5683a6"
+  },
+  "410": {
+    "bg_dark": "#513b15",
+    "bg_light": "#d1ac6b"
+  },
+  "411": {
+    "bg_dark": "#403526",
+    "bg_light": "#b5a287"
+  },
+  "412": {
+    "bg_dark": "#1c3b17",
+    "bg_light": "#54a347"
+  },
+  "413": {
+    "bg_dark": "#1c3b17",
+    "bg_light": "#54a347"
+  },
+  "414": {
+    "bg_dark": "#654901",
+    "bg_light": "#f5c447"
+  },
+  "415": {
+    "bg_dark": "#654901",
+    "bg_light": "#f5c447"
+  },
+  "416": {
+    "bg_dark": "#654901",
+    "bg_light": "#f5c447"
+  },
+  "417": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "418": {
+    "bg_dark": "#5e2508",
+    "bg_light": "#e88754"
+  },
+  "419": {
+    "bg_dark": "#5a2f0c",
+    "bg_light": "#e1985b"
+  },
+  "420": {
+    "bg_dark": "#570f1b",
+    "bg_light": "#dc6074"
+  },
+  "421": {
+    "bg_dark": "#1c3b17",
+    "bg_light": "#54a347"
+  },
+  "422": {
+    "bg_dark": "#4f1727",
+    "bg_light": "#cf6e89"
+  },
+  "423": {
+    "bg_dark": "#4f1727",
+    "bg_light": "#cf6e89"
+  },
+  "424": {
+    "bg_dark": "#614a05",
+    "bg_light": "#eec64f"
+  },
+  "425": {
+    "bg_dark": "#59470d",
+    "bg_light": "#e0c15c"
+  },
+  "426": {
+    "bg_dark": "#5d4d09",
+    "bg_light": "#e7cb55"
+  },
+  "427": {
+    "bg_dark": "#654901",
+    "bg_light": "#f5c447"
+  },
+  "428": {
+    "bg_dark": "#654901",
+    "bg_light": "#f5c447"
+  },
+  "429": {
+    "bg_dark": "#3f2640",
+    "bg_light": "#aa7bad"
+  },
+  "430": {
+    "bg_dark": "#111922",
+    "bg_light": "#3d5975"
+  },
+  "431": {
+    "bg_dark": "#2c343a",
+    "bg_light": "#929fab"
+  },
+  "432": {
+    "bg_dark": "#332b3b",
+    "bg_light": "#9e91ac"
+  },
+  "433": {
+    "bg_dark": "#605106",
+    "bg_light": "#ebd251"
+  },
+  "434": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "435": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "436": {
+    "bg_dark": "#15282f",
+    "bg_light": "#3f7182"
+  },
+  "437": {
+    "bg_dark": "#233c43",
+    "bg_light": "#82aeba"
+  },
+  "438": {
+    "bg_dark": "#3f3020",
+    "bg_light": "#ab8963"
+  },
+  "439": {
+    "bg_dark": "#3f272a",
+    "bg_light": "#b3898e"
+  },
+  "440": {
+    "bg_dark": "#42242b",
+    "bg_light": "#b88490"
+  },
+  "441": {
+    "bg_dark": "#413225",
+    "bg_light": "#b69d86"
+  },
+  "442": {
+    "bg_dark": "#4c1a27",
+    "bg_light": "#c97389"
+  },
+  "443": {
+    "bg_dark": "#203941",
+    "bg_light": "#669dae"
+  },
+  "444": {
+    "bg_dark": "#20303d",
+    "bg_light": "#6388a7"
+  },
+  "445": {
+    "bg_dark": "#20303d",
+    "bg_light": "#6388a7"
+  },
+  "446": {
+    "bg_dark": "#20303d",
+    "bg_light": "#6388a7"
+  },
+  "447": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "448": {
+    "bg_dark": "#213045",
+    "bg_light": "#7b97bc"
+  },
+  "449": {
+    "bg_dark": "#514315",
+    "bg_light": "#d2b96a"
+  },
+  "450": {
+    "bg_dark": "#514515",
+    "bg_light": "#d2be6b"
+  },
+  "451": {
+    "bg_dark": "#1e2b3b",
+    "bg_light": "#597ca5"
+  },
+  "452": {
+    "bg_dark": "#2b1e26",
+    "bg_light": "#79576d"
+  },
+  "453": {
+    "bg_dark": "#192b4d",
+    "bg_light": "#7191cb"
+  },
+  "454": {
+    "bg_dark": "#192d4d",
+    "bg_light": "#7093cc"
+  },
+  "455": {
+    "bg_dark": "#4a431c",
+    "bg_light": "#c6ba76"
+  },
+  "456": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "457": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "458": {
+    "bg_dark": "#13313f",
+    "bg_light": "#3c8bae"
+  },
+  "459": {
+    "bg_dark": "#262221",
+    "bg_light": "#6c6160"
+  },
+  "460": {
+    "bg_dark": "#243a38",
+    "bg_light": "#6aa19c"
+  },
+  "461": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "462": {
+    "bg_dark": "#2c343a",
+    "bg_light": "#929fab"
+  },
+  "463": {
+    "bg_dark": "#51151f",
+    "bg_light": "#d16b7b"
+  },
+  "464": {
+    "bg_dark": "#471e17",
+    "bg_light": "#be5e4f"
+  },
+  "465": {
+    "bg_dark": "#203941",
+    "bg_light": "#669dae"
+  },
+  "466": {
+    "bg_dark": "#59440d",
+    "bg_light": "#e0bb5c"
+  },
+  "467": {
+    "bg_dark": "#471e17",
+    "bg_light": "#be5e4f"
+  },
+  "468": {
+    "bg_dark": "#2c343a",
+    "bg_light": "#929fab"
+  },
+  "469": {
+    "bg_dark": "#224128",
+    "bg_light": "#6dae79"
+  },
+  "470": {
+    "bg_dark": "#27491d",
+    "bg_light": "#89c478"
+  },
+  "471": {
+    "bg_dark": "#233c43",
+    "bg_light": "#82aeba"
+  },
+  "472": {
+    "bg_dark": "#252a41",
+    "bg_light": "#868eb6"
+  },
+  "473": {
+    "bg_dark": "#26190d",
+    "bg_light": "#805933"
+  },
+  "474": {
+    "bg_dark": "#541612",
+    "bg_light": "#d76c66"
+  },
+  "475": {
+    "bg_dark": "#162919",
+    "bg_light": "#407248"
+  },
+  "476": {
+    "bg_dark": "#203941",
+    "bg_light": "#669dae"
+  },
+  "477": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "478": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "479": {
+    "bg_dark": "#612505",
+    "bg_light": "#ee854f"
+  },
+  "480": {
+    "bg_dark": "#5d4209",
+    "bg_light": "#e6b856"
+  },
+  "481": {
+    "bg_dark": "#153a51",
+    "bg_light": "#69abd3"
+  },
+  "482": {
+    "bg_dark": "#1d3849",
+    "bg_light": "#77a6c3"
+  },
+  "483": {
+    "bg_dark": "#1e2b3b",
+    "bg_light": "#597ca5"
+  },
+  "484": {
+    "bg_dark": "#2e2b39",
+    "bg_light": "#87809d"
+  },
+  "485": {
+    "bg_dark": "#26190d",
+    "bg_light": "#805933"
+  },
+  "486": {
+    "bg_dark": "#514315",
+    "bg_light": "#d2b96a"
+  },
+  "487": {
+    "bg_dark": "#403526",
+    "bg_light": "#b5a287"
+  },
+  "488": {
+    "bg_dark": "#5a3d0c",
+    "bg_light": "#e1af5b"
+  },
+  "489": {
+    "bg_dark": "#134053",
+    "bg_light": "#64b3d5"
+  },
+  "490": {
+    "bg_dark": "#114955",
+    "bg_light": "#63c4d9"
+  },
+  "491": {
+    "bg_dark": "#1d191f",
+    "bg_light": "#5b5162"
+  },
+  "492": {
+    "bg_dark": "#224128",
+    "bg_light": "#6dae79"
+  },
+  "493": {
+    "bg_dark": "#513b15",
+    "bg_light": "#d1ac6b"
+  }
+}

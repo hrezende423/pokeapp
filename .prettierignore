@@ -5,3 +5,7 @@ public/data
 package-lock.json
 public/sw.js
 public/workbox-*.js
+
+# The design-system handoff is reference material, kept byte-identical to what
+# was delivered. Reformatting it would silently edit the source of truth.
+design-system/

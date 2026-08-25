@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import { Pokedex } from '../pokedex/Pokedex'
+import { DesignSystemPage } from '../design-system/DesignSystemPage'
 import { Abilitydex } from '../dex/Abilitydex'
 import { Berrydex } from '../dex/Berrydex'
 import { Itemdex } from '../dex/Itemdex'
@@ -28,6 +29,11 @@ export const DEX_MODULES = [
   { id: 'abilitydex', label: 'Abilitydex', Component: Abilitydex },
   { id: 'naturedex', label: 'Naturedex', Component: Naturedex },
   { id: 'berrydex', label: 'Berrydex', Component: Berrydex },
+  // A live reference for the design-system components, not a product screen. It
+  // is registered rather than kept in a scratch file so the components are
+  // rendered by the real app, with the real data layer and the real token
+  // stylesheet, which is the only way the reference stays honest.
+  { id: 'designsystem', label: 'Design system', Component: DesignSystemPage },
 ] as const satisfies readonly DexModule[]
 
 /** Union of the registered ids, so a reference to an unregistered module fails to compile. */

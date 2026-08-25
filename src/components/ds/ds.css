@@ -1,0 +1,802 @@
+/*
+  Design-system component styles.
+
+  Every value here is either a token from design-tokens.css or a measurement taken
+  from DESIGN-SYSTEM.md §5 / the two component-library HTML files. Where those two
+  disagree numerically, the token wins -- the HTML demos render several components
+  compact on purpose (the hero card is labelled "shown compact", the grid card demo
+  uses a 16px radius and a 48px watermark), and design-tokens.json is the stated
+  source of truth. Divergences are called out inline where they occur.
+
+  NO box-shadow appears in this file, by design, not by omission: elevation is
+  --surface vs --surface-raised, a tone-step. See DESIGN-SYSTEM.md §2 and §8.
+*/
+
+/* Scopes the design system's own typography and surface. Needed because the app
+   shell sets an 18px system-font baseline and centres text; a DS surface has to
+   start from its own tokens instead of inheriting that. */
+.ds-root {
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.45;
+  color: var(--text-primary);
+  background: var(--surface);
+  text-align: left;
+}
+
+.ds-numeric {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.ds-btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  padding: 10px 20px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.ds-btn-primary {
+  background: var(--button-primary-fill);
+  color: var(--button-primary-text);
+  border: none;
+}
+
+/* §5: "--hairline-derived border". The demo HTML hardcodes #ddd / #3a3a3c; the
+   token is what ships. */
+.ds-btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--hairline);
+}
+
+.ds-btn:disabled {
+  opacity: var(--field-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------------- toggle */
+
+.ds-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ds-toggle-track {
+  position: relative;
+  display: block;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  /* Off is exactly --hairline in both modes, which is what the demo's
+     #e5e5e5 / #2c2c2e resolve to. */
+  background: var(--hairline);
+  transition: background 120ms ease;
+}
+
+.ds-toggle[aria-pressed='true'] .ds-toggle-track {
+  background: var(--accent);
+}
+
+.ds-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff; /* white in both modes, per the demo panels */
+  transition: left 120ms ease;
+}
+
+.ds-toggle[aria-pressed='true'] .ds-toggle-thumb {
+  left: 19px;
+}
+
+/* -------------------------------------------------------------- form fields */
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 220px;
+  max-width: 100%;
+}
+
+.ds-field-label {
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.ds-field-control {
+  font: inherit;
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  padding: 7px 2px;
+  width: 100%;
+}
+
+.ds-field-control::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Focus reuses the active-tab language: 2px accent underline. The padding drops
+   by the 1px the border gained so the field does not change height. */
+.ds-field-control:focus,
+.ds-field[data-state='focus'] .ds-field-control {
+  outline: none;
+  border-bottom: var(--field-focus-border-width) solid var(--field-focus-border);
+  padding-bottom: 6px;
+}
+
+.ds-field[data-state='disabled'] .ds-field-control,
+.ds-field[data-state='disabled'] .ds-field-label,
+.ds-field-control:disabled {
+  opacity: var(--field-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* Error keeps the 1px weight and only changes colour, per ds-form-field-states. */
+.ds-field[data-state='error'] .ds-field-control {
+  border-bottom: 1px solid var(--field-error-border);
+}
+
+.ds-field-helper {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.ds-field-error {
+  font-size: var(--font-size-label);
+  color: var(--accent);
+}
+
+/* Native select, minimally styled, with its own chevron. Not a custom overlay
+   menu -- that is a separate, undesigned component. */
+.ds-select-wrap {
+  position: relative;
+}
+
+.ds-select-wrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 18px;
+}
+
+.ds-select-chevron {
+  position: absolute;
+  right: 4px;
+  bottom: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.ds-section-label {
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------- stat rows */
+
+.ds-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-gap-md);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ds-stat-label {
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.ds-stat-value {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.ds-stat-list > .ds-stat-row:last-child {
+  border-bottom: none;
+}
+
+.ds-ev-input {
+  width: 46px;
+  text-align: right;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-bold);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.ds-ev-input:focus {
+  outline: none;
+  border-bottom: var(--field-focus-border-width) solid var(--field-focus-border);
+}
+
+/* Running total against the 510 cap: plain secondary text, never a bar. */
+.ds-ev-total {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  margin-top: var(--space-gap-sm);
+}
+
+.ds-ev-total[data-over='true'] {
+  color: var(--accent);
+}
+
+/* --------------------------------------------------------- move-slot tile */
+
+/* radius.control is assigned to "buttons, small tiles (e.g. move-slot cards)" in
+   design-tokens.json, so 8px -- the demo HTML's 12px is the compact rendering. */
+.ds-move-tile {
+  width: 150px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: transparent;
+}
+
+.ds-move-tile-label {
+  display: block;
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.ds-move-tile-value {
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.ds-move-grid {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: var(--space-gap-md);
+}
+
+/* --------------------------------------------------------------------- tabs */
+
+.ds-tabs {
+  display: flex;
+  gap: var(--space-gap-lg);
+  border-bottom: 1px solid var(--hairline);
+  font-size: 13px;
+}
+
+.ds-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0 0 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.ds-tab[aria-selected='true'] {
+  color: var(--accent);
+  font-weight: var(--font-weight-bold);
+  border-bottom-color: var(--accent);
+}
+
+/* ----------------------------------------------------------- search/filter */
+
+.ds-search {
+  display: block;
+  width: 220px;
+  max-width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  padding: 6px 2px;
+  margin-bottom: 12px;
+}
+
+.ds-search:focus {
+  outline: none;
+  border-bottom: var(--field-focus-border-width) solid var(--field-focus-border);
+  padding-bottom: 5px;
+}
+
+/* Plain text separated by a middot -- no chip, no pill container. */
+.ds-filters {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ds-filter {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ds-filter[aria-pressed='true'] {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.ds-filter-sep {
+  padding: 0 6px;
+  color: var(--text-secondary);
+}
+
+/* --------------------------------------------------------------- type label */
+
+/* Type is data, not decoration: colored text only. The solid-square badge is
+   also sanctioned by design-tokens.json but has no fill/text-colour spec, so it
+   is deliberately not implemented here -- see the note in TypeLabel.tsx. */
+.ds-type {
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ds-type-sm {
+  font-size: var(--font-size-caption);
+}
+
+.ds-type-row {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.ds-type-sep {
+  padding: 0 5px;
+  color: var(--text-secondary);
+}
+
+/* -------------------------------------------------------------- ledger row */
+
+.ds-ledger-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gap-md);
+  padding-block: var(--space-row-padding-block);
+  border-bottom: 1px solid var(--hairline);
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ds-ledger-list > .ds-ledger-row:last-child {
+  border-bottom: none;
+}
+
+/* §5 gives ~20px for this; there is no token for it. */
+.ds-ledger-num {
+  width: 38px;
+  flex: none;
+  text-align: right;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.ds-ledger-row[data-caught='true'] .ds-ledger-num {
+  opacity: var(--ledger-num-opacity-caught);
+}
+
+.ds-ledger-row[data-caught='false'] .ds-ledger-num {
+  opacity: var(--ledger-num-opacity-not-caught);
+}
+
+.ds-ledger-rule {
+  width: 1px;
+  align-self: stretch;
+  background: var(--hairline);
+  flex: none;
+}
+
+.ds-ledger-sprite {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--hairline);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.ds-ledger-sprite img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ds-ledger-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -------------------------------------------------------- ghost watermark */
+
+/* The signature element: an oversized dex number at 5% opacity, bleeding off the
+   top-right corner. Same colour and opacity rules at both scales. */
+.ds-ghost {
+  position: absolute;
+  z-index: 0;
+  font-family: var(--font-numeric);
+  font-weight: var(--font-weight-bold);
+  line-height: 0.8;
+  color: var(--ghost-watermark);
+  opacity: var(--ghost-watermark-opacity);
+  pointer-events: none;
+  user-select: none;
+}
+
+.ds-ghost-hero {
+  font-size: var(--font-size-ghost-watermark);
+  top: -46px;
+  right: -28px;
+}
+
+.ds-ghost-grid {
+  font-size: var(--font-size-ghost-watermark-grid);
+  top: -12px;
+  right: -8px;
+}
+
+/* ---------------------------------------------------------------- grid card */
+
+.ds-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-gap-lg);
+}
+
+/* Ghost card: no border, no background fill. The artwork carries the colour. */
+.ds-grid-card {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-gap-md);
+  border: none;
+  background: none;
+  border-radius: var(--radius-card);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ds-grid-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ds-grid-art {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+}
+
+.ds-grid-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-gap-sm);
+  margin-top: 6px;
+}
+
+.ds-grid-num {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.ds-grid-name {
+  font-size: 15px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.ds-grid-ability {
+  margin-top: 2px;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------- hero card */
+
+.ds-hero {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-card-padding);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: none;
+  max-width: 420px;
+}
+
+.ds-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Rotated micro-label, top-left, rotated from a left-top origin. */
+.ds-hero-era {
+  position: absolute;
+  top: var(--space-card-padding);
+  left: var(--space-card-padding);
+  transform-origin: left top;
+  transform: rotate(-90deg) translateX(-100%);
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  z-index: 1;
+}
+
+.ds-mini-badges {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-gap-sm);
+}
+
+.ds-mini-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--mini-badge-fill);
+  color: var(--mini-badge-text);
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* No shadow, no platform, no frame under the artwork. */
+.ds-hero-art {
+  display: block;
+  width: 220px;
+  height: 220px;
+  max-width: 100%;
+  object-fit: contain;
+  margin: var(--space-gap-sm) auto 0;
+}
+
+.ds-root .ds-hero-name {
+  margin: 0;
+  text-transform: none;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.ds-hero-type {
+  margin-top: 4px;
+  text-align: center;
+}
+
+.ds-hero-genus {
+  margin-top: 2px;
+  text-align: center;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.ds-hero-stats {
+  margin-top: var(--space-gap-lg);
+}
+
+.ds-hero-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-gap-sm);
+  margin-top: var(--space-gap-lg);
+}
+
+/* ------------------------------------------------------- species detail page */
+
+/* One shared background layer for the whole screen; the drawer is a separate
+   surface floating on top of it. Only the shared layer changes per species. */
+.ds-root .ds-detail {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  height: 560px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* Fixed, non-scrolling. */
+.ds-detail-art-panel {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: var(--space-card-padding);
+}
+
+.ds-detail-art {
+  width: min(100%, 340px);
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Persistent panel, not an overlay with a scrim. Rounded only on the exposed
+   left side; the right side meets the screen edge. */
+.ds-detail-drawer {
+  background: var(--surface-raised);
+  border-radius: var(--radius-drawer) 0 0 var(--radius-drawer);
+  padding: var(--space-drawer-padding);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ds-root .ds-detail-drawer-name {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.ds-detail-num {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.ds-detail-section {
+  margin-top: var(--space-gap-lg);
+}
+
+.ds-detail-flavor {
+  margin-top: var(--space-gap-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* --------------------------------------------------------------- reference */
+
+/* Layout for the reference page itself, not part of the system. */
+.ds-page {
+  padding-bottom: var(--space-gap-xl);
+}
+
+.ds-demo-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-gap-lg);
+}
+
+.ds-demo-panel {
+  padding: var(--space-gap-lg);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+}
+
+.ds-demo-panel-label {
+  display: block;
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-gap-md);
+}
+
+.ds-demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-gap-lg);
+}
+
+.ds-root .ds-comp {
+  margin-top: var(--space-gap-xl);
+  padding-top: 0;
+  border-top: none;
+}
+
+.ds-comp-name {
+  margin: 0 0 var(--space-gap-sm);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.ds-comp-note {
+  padding-left: 1.1em;
+  margin-top: var(--space-gap-sm);
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+.ds-cat {
+  margin-top: var(--space-gap-xl);
+  padding-top: var(--space-gap-lg);
+  border-top: 1px solid var(--hairline);
+}
+
+/* Scoped to .ds-root, i.e. (0,2,0), because App.css's `.panel h1` and `.panel h2`
+   are (0,1,1) and would otherwise win: the shell renders headings inside .panel at
+   0.8rem uppercase with its own letter-spacing. Only h1, h2 and section collide,
+   so only those three rules are scoped -- see also .ds-root .ds-hero-name,
+   .ds-root .ds-detail-drawer-name and .ds-root .ds-comp / .ds-root .ds-detail. */
+.ds-root .ds-cat-title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: normal;
+}

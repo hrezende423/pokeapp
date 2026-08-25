@@ -1,0 +1,278 @@
+{
+  "$description": "Pokeapp design tokens — consolidated v1. Platform-agnostic, W3C DTCG-flavored. Light/dark given as sibling values on each token rather than separate files, for simplicity at this scale. Extracted from and validated against: hero detail POC, Pokedex grid POC, species detail (two-panel) POC, team-build form POC.",
+
+  "color": {
+    "$type": "color",
+    "primitive": {
+      "ink": {
+        "900": { "$value": "#141414", "$description": "Primary ink, light mode text / dark mode surface" },
+        "800": { "$value": "#3a3a3a", "$description": "Dark-gray, used specifically for button-primary-fill in light mode — deliberately not full ink.900 black, reads a shade softer" },
+        "700": { "$value": "#6b6b6b", "$description": "Secondary text, light mode" },
+        "300": { "$value": "#e5e5e5", "$description": "Hairline borders, light mode" }
+      },
+      "paper": {
+        "900": { "$value": "#f5f5f5", "$description": "Primary text on dark surfaces / light-mode near-white" },
+        "700": { "$value": "#8f8f95", "$description": "Secondary text, dark mode" },
+        "300": { "$value": "#2c2c2e", "$description": "Hairline borders, dark mode" }
+      },
+      "surface": {
+        "light": { "$value": "#fafafa", "$description": "Base page surface, light" },
+        "dark": { "$value": "#141414", "$description": "Base page surface, dark" }
+      },
+      "surface-raised": {
+        "light": { "$value": "#ffffff", "$description": "Drawer / floating-panel surface, light — lighter than base surface" },
+        "dark": { "$value": "#1c1c1e", "$description": "Drawer / floating-panel surface, dark — lighter than base surface" }
+      },
+      "accent-red": {
+        "light": { "$value": "#d91c2c", "$description": "Signature accent, grounded in real Pokedex device red, not a generic palette pick" },
+        "dark": { "$value": "#ff3b4e", "$description": "Brightened for contrast against dark surface" }
+      },
+      "type-color": {
+        "$description": "Text-only by default; solid-square badge (see radius.badge-square) also sanctioned. Both this muted palette and type-color-community below are valid — which one a given context uses is a dev-time call, not a design decision left open. All 17 types in Gen 1-4 scope (Fairy excluded — Gen 6). Only 'dark' has a confirmed, tested dark-mode variant (see type-color-dark-mode below) — the rest are unverified placeholders inheriting the light value until checked against real dark-surface contrast.",
+        "normal":   { "$value": "#6b6a52" },
+        "fire":     { "$value": "#B85A0F" },
+        "water":    { "$value": "#2C6DA8" },
+        "electric": { "$value": "#8a6d0a" },
+        "grass":    { "$value": "#4d7c0f" },
+        "ice":      { "$value": "#3d7a86" },
+        "fighting": { "$value": "#8a3d2e" },
+        "poison":   { "$value": "#7c3f8f" },
+        "ground":   { "$value": "#7a5c3a" },
+        "flying":   { "$value": "#5b7a9c" },
+        "psychic":  { "$value": "#a8447a" },
+        "bug":      { "$value": "#78822f" },
+        "rock":     { "$value": "#6e5f47" },
+        "ghost":    { "$value": "#4a3d6b" },
+        "dragon":   { "$value": "#4a5a8a" },
+        "dark":     { "$value": "#6b5b52" },
+        "steel":    { "$value": "#6b7480" }
+      },
+      "type-color-community": {
+        "$description": "The de facto community-standard type hex set (originally from the games' own type-chart UI, widely paired with PokeAPI though not returned by it). More saturated than type-color above. Sanctioned as an equally valid option — dev-time choice, per context. 12 of 17 already clear a >=4:1 contrast floor against #141414 unmodified, thanks to being brighter/more saturated to begin with; the 5 listed in type-color-community-dark-mode-override needed the same computed-lightening treatment as the muted palette.",
+        "normal":   { "$value": "#A8A878" },
+        "fire":     { "$value": "#F08030" },
+        "water":    { "$value": "#6890F0" },
+        "electric": { "$value": "#F8D030" },
+        "grass":    { "$value": "#78C850" },
+        "ice":      { "$value": "#98D8D8" },
+        "fighting": { "$value": "#C03028" },
+        "poison":   { "$value": "#A040A0" },
+        "ground":   { "$value": "#E0C068" },
+        "flying":   { "$value": "#A890F0" },
+        "psychic":  { "$value": "#F85888" },
+        "bug":      { "$value": "#A8B820" },
+        "rock":     { "$value": "#B8A038" },
+        "ghost":    { "$value": "#705898" },
+        "dragon":   { "$value": "#7038F8" },
+        "dark":     { "$value": "#705848" },
+        "steel":    { "$value": "#B8B8D0" }
+      },
+      "type-color-community-dark-mode-override": {
+        "$description": "Only these 5 needed a computed dark-mode lift; the other 12 in type-color-community already clear the >=4:1 floor unmodified.",
+        "fighting": { "$value": "#c94f48" },
+        "poison":   { "$value": "#ab57ab" },
+        "ghost":    { "$value": "#836ea5" },
+        "dragon":   { "$value": "#8556f9" },
+        "dark":     { "$value": "#887467" }
+      },
+      "type-color-dark-mode-override": {
+        "$description": "Dark-mode variant for every type in type-color, now resolved (previously only 'dark' was tested). Computed via actual WCAG relative-luminance contrast against #141414, each lightened (mixed toward white) until reaching >=4:1 — a deliberate floor between 'no check at all' and full WCAG AA, consistent with the project's 'good contrast, not full compliance' bar. 'dark' keeps its earlier hand-picked value (#a89484, tested against real Umbreon artwork) rather than the computed one, since it already exceeds the floor. The other 16 are computed, not hand-art-directed — treat as verified-sufficient, not necessarily the most beautiful possible choice; further eyeballing is optional polish, not a blocker.",
+        "normal":   { "$value": "#7a7963" },
+        "fire":     { "$value": "#ba5f16" },
+        "water":    { "$value": "#417cb1" },
+        "electric": { "$value": "#907416" },
+        "grass":    { "$value": "#58841d" },
+        "ice":      { "$value": "#47818c" },
+        "fighting": { "$value": "#a4685c" },
+        "poison":   { "$value": "#9665a5" },
+        "ground":   { "$value": "#8d7356" },
+        "flying":   { "$value": "#5b7a9c", "$description": "Already met the contrast floor unlightened." },
+        "psychic":  { "$value": "#b25989" },
+        "bug":      { "$value": "#78822f", "$description": "Already met the contrast floor unlightened." },
+        "rock":     { "$value": "#847763" },
+        "ghost":    { "$value": "#7d7394", "$description": "Was the worst offender at 1.9:1 in light-mode-value-on-dark-bg — needed the largest correction." },
+        "dragon":   { "$value": "#69769e" },
+        "dark":     { "$value": "#a89484", "$description": "Hand-picked earlier, tested against real Umbreon artwork — kept as-is, exceeds the computed floor." },
+        "steel":    { "$value": "#6f7884" }
+      }
+    },
+    "semantic": {
+      "surface": {
+        "light": { "$value": "{color.primitive.surface.light}" },
+        "dark": { "$value": "{color.primitive.surface.dark}" }
+      },
+      "surface-raised": {
+        "light": { "$value": "{color.primitive.surface-raised.light}" },
+        "dark": { "$value": "{color.primitive.surface-raised.dark}" },
+        "$description": "Elevation without shadow: a lighter/darker tone-step instead of a drop shadow. Used for the detail-page drawer. This is the system's only elevation mechanism."
+      },
+      "surface-species-tint": {
+        "$description": "Data-driven, not a fixed value. Populated per species from a species_id -> {bg_light, bg_dark} lookup table (implementation task, not a design token). Falls back to semantic.surface when no per-species data exists yet. Applies to the detail page's artwork panel only — surface-raised (the drawer) never changes."
+      },
+      "text-primary": {
+        "light": { "$value": "{color.primitive.ink.900}" },
+        "dark": { "$value": "{color.primitive.paper.900}" }
+      },
+      "text-secondary": {
+        "light": { "$value": "{color.primitive.ink.700}" },
+        "dark": { "$value": "{color.primitive.paper.700}" }
+      },
+      "hairline": {
+        "light": { "$value": "{color.primitive.ink.300}" },
+        "dark": { "$value": "{color.primitive.paper.300}" }
+      },
+      "accent": {
+        "light": { "$value": "{color.primitive.accent-red.light}" },
+        "dark": { "$value": "{color.primitive.accent-red.dark}" },
+        "$description": "Reserved for exactly two functional uses: active tab/nav state, and binary state indicators (e.g. caught toggle). Never decoration, never more than one element type per screen."
+      },
+      "button-primary-fill": {
+        "light": { "$value": "{color.primitive.ink.800}" },
+        "dark": { "$value": "{color.primitive.paper.900}" },
+        "$description": "Inverts between modes rather than using the accent. Primary actions stay monochrome. Light mode deliberately uses ink.800 (dark gray), not full ink.900 black — a softer primary action fill."
+      },
+      "button-primary-text": {
+        "light": { "$value": "#ffffff" },
+        "dark": { "$value": "{color.primitive.ink.900}" }
+      },
+      "ghost-watermark": {
+        "light": { "$value": "{color.primitive.ink.900}" },
+        "dark": { "$value": "#ffffff" },
+        "$description": "The oversized background dex-number treatment. Always rendered at opacity.ghost-watermark regardless of mode or scale."
+      }
+    }
+  },
+
+  "opacity": {
+    "$type": "number",
+    "ghost-watermark": { "$value": 0.05, "$description": "Constant across hero (220px) and grid (64px) scale." },
+    "mini-badge-fill-dark": { "$value": 0.08 }
+  },
+
+  "typography": {
+    "font-family": {
+      "$type": "fontFamily",
+      "body": { "$value": ["IBM Plex Sans", "-apple-system", "Segoe UI", "Roboto", "sans-serif"], "$description": "Locked as of the font-alternatives review. Self-hosted webfont, not a system stack — requires bundling the actual .woff2 files (offline-first PWA, no CDN dependency). Fallbacks are the previous system-humanist pick, used only if the bundled font fails to load." },
+      "numeric": { "$value": ["SF Mono", "JetBrains Mono", "Consolas", "monospace"], "$description": "Dex numbers and stat/EV values only. Never names, labels, or body copy." }
+    },
+    "font-size": {
+      "$type": "dimension",
+      "display": { "$value": "38px", "$description": "Hero species name on the detail page. The one deliberately loud text element." },
+      "title": { "$value": "20px", "$description": "Secondary headings, e.g. species name in a form context." },
+      "body": { "$value": "14px" },
+      "label": { "$value": "11px", "$description": "Uppercase field labels, section labels, secondary metadata." },
+      "caption": { "$value": "10px", "$description": "Micro-labels, e.g. the rotated 'Gen 2' annotation." },
+      "ghost-watermark": { "$value": "220px", "$description": "Hero/detail scale." },
+      "ghost-watermark-grid": { "$value": "64px", "$description": "Grid-card scale." }
+    },
+    "font-weight": {
+      "$type": "fontWeight",
+      "regular": { "$value": 400 },
+      "medium": { "$value": 600 },
+      "bold": { "$value": 700 },
+      "$description": "Two weights in practice: 400 for body/inputs, 600-700 for names/labels/emphasis. No in-between weights used."
+    }
+  },
+
+  "radius": {
+    "$type": "dimension",
+    "card": { "$value": "20px", "$description": "Grid/list cards, hero card." },
+    "drawer": { "$value": "28px", "$description": "The detail-page info drawer. Deliberately more pronounced than radius.card." },
+    "control": { "$value": "8px", "$description": "Buttons, small tiles (e.g. move-slot cards)." },
+    "pill": { "$value": "12px", "$description": "Toggle tracks, small badges." },
+    "badge-square": { "$value": "5px", "$description": "The sanctioned solid-square type badge — deliberately smaller radius than radius.pill, closer to a device-button than a SaaS chip." },
+    "$description": "Soft/rounded throughout. No sharp corners anywhere in the validated POCs."
+  },
+
+  "spacing": {
+    "$type": "dimension",
+    "card-padding": { "$value": "28px" },
+    "drawer-padding": { "$value": "26px" },
+    "row-padding-block": { "$value": "9px" },
+    "gap-sm": { "$value": "8px" },
+    "gap-md": { "$value": "14px" },
+    "gap-lg": { "$value": "20px" },
+    "gap-xl": { "$value": "32px", "$description": "Wide gutters, e.g. the two-column form layout." }
+  },
+
+  "elevation": {
+    "$description": "No drop shadows anywhere, in either mode — validated across every POC including forms. The system's actual elevation mechanism is a tone-step (semantic.surface vs semantic.surface-raised), not a shadow. If a future component seems to need a shadow, treat that as a signal to reconsider the layout or reach for surface-raised, not a gap to fill with box-shadow."
+  },
+
+  "icon": {
+    "$description": "Base library: Tabler Icons (MIT, 5,900+, matches the previous pokeapp system's choice — reconsidered deliberately, not defaulted into). Grid and stroke locked after a direct visual comparison against tighter/looser alternatives.",
+    "grid": { "$value": "24px" },
+    "stroke-width": { "$value": "1.5px" },
+    "variant": { "$value": "outline (base) + filled/duotone (active/emphasis states)", "$description": "Outline matches the system's no-fill, hairline-driven language by default. Filled/duotone is reserved for active or emphasized states rather than relying on color change alone." },
+    "active-state-rule": {
+      "$value": "Swap to Tabler's filled variant of the same icon on active/emphasized state, instead of or in addition to a color change.",
+      "$description": "Fallback required: Tabler only ships a filled twin for a subset of icons, not all of them (unlike Material Symbols' continuous fill axis, which covers everything by construction — evaluated and not adopted, see design system notes). Where no filled variant exists for a given icon, fall back to a color/weight change instead. This means the active-state treatment will not be perfectly uniform across every icon — a known, accepted gap, not an oversight."
+    },
+    "color": { "$description": "Per-context — icons are not locked to ink/paper-only or accent-only. Decide per use the same way any other element's color is decided." },
+    "custom-icons-needed": {
+      "$description": "Domain-specific icons Tabler won't have, need hand-design in the same 24px/1.5px convention. Confirmed: type glyphs (17), caught/not-caught (Poke Ball motif), evolution indicator (DNA icon, rotated — continuity from the previous system's convention).",
+      "locked": {
+        "shiny-indicator": "Star-burst, filled, yellow — option A from the 12-category review.",
+        "gender-symbols": "Minimal circle+line pair (male/female) — option D.",
+        "nature-stat-boost": "Chevron up (red) / chevron down (blue) pair — option B.",
+        "egg-group-icon": "Nest-with-egg treatment — option C.",
+        "region-generation-badge": "Flag-shape badge with vertical internal fold lines — option C, modified per feedback (fold lines not yet drawn, follow-up needed)."
+      },
+      "still-searching": "Sprite view toggle, move category (Physical/Special/Status), contest conditions (Cool/Beautiful/Cute/Smart/Tough), item category icons, berry icon, type-effectiveness marker, held-item indicator — user is sourcing these from Tabler/Icones/game-icons.net rather than from the quick-sketch options reviewed."
+    }
+  },
+
+  "ledger-dim-rule": {
+    "$value": "Dex number opacity ties to caught/not-caught status, the app's only tracked binary state — not a separate 'seen' concept, since that isn't tracked anywhere else in the app.",
+    "caught": "100% opacity, --text-primary.",
+    "not-caught": "40% opacity of --text-primary.",
+    "$description": "Artwork/sprite itself is unaffected either way — no silhouette-until-caught system. That would be a real feature decision (spoiler-hiding unseen species), out of scope for this token, not an oversight."
+  },
+
+  "form-field-states": {
+    "focus": { "$value": "Bottom border becomes --accent, weight increases from 1px to 2px.", "$description": "Deliberately reuses the exact active-tab visual language (2px accent underline) rather than inventing a new focus treatment." },
+    "disabled": { "$value": "Label, value, and border all drop to 40% opacity. No pointer cursor." },
+    "error": { "$value": "Bottom border becomes --accent (red). Helper text slot switches to an error message in --accent.", "$description": "Resolves the open question from the full-95 pass: accent-red is now confirmed as a third sanctioned use (active tab/nav state, binary indicators, and error/validation emphasis) — still never used for plain decoration." },
+    "success": { "$value": "Not using a dedicated status-green. A checkmark icon in --text-primary is sufficient for form-level success; introducing a new semantic color for this one case isn't worth breaking the monochrome+one-accent discipline.", "$description": "The separate 'should there be a status-green for things like a synced indicator' question is different from form validation and remains open — not resolved by this decision." }
+  },
+
+  "species-background-extraction": {
+    "$description": "FINALIZED (3rd and final pass), all 493 Gen 1-4 species. See species-background-colors.json for the lookup table. This methodology went through real course-correction, documented honestly below rather than presenting only the final answer.",
+    "artwork-source": "PokeAPI/sprites repo, sprites/pokemon/other/official-artwork/{id}.png.",
+    "history": [
+      "1st pass: synthetic hue-average + fixed lightness/saturation target. Abandoned -- fought itself on hue-boundary perception (Gengar's real blue-violet read as plain blue once saturated) and one saturation number didn't fit every species' actual character.",
+      "2nd pass: real k-means color clustering (actual sampled pixels, not reconstructed), plus a 'prefer higher saturation' override that turned out to be a real bug -- it let tiny unrepresentative details (an eye pupil, a gem highlight) outrank the genuinely dominant body color, producing wrong picks (Venusaur came back reddish-pink, Wigglytuff came back dark blue-gray).",
+      "3rd pass: added explicit contrast-checking against the artwork's own colors, after feedback that automated picks were sometimes too close to blend into the character. This introduced two more real bugs (lightness wandering outside sane light/dark bounds, a stale flagging threshold) before landing correctly -- but the person rejected this entire direction as over-engineered and asked to revert.",
+      "FINAL: reverted to the simple 1-151 baseline (original real-cluster extraction, no contrast-solver), with species-by-species manual correction from direct human review -- either a fresh real-color pick, or explicitly reusing another species' exact color pair when two species genuinely look similar (e.g. #121 uses #110's colors, #197 uses #198's, plus 20+ more explicit reuse pairings). For #152-493, the same original simple approach was run, then automatically checked against the curated #1-151 palette for near-matches (RGB distance <35) to reuse rather than mint a new close-but-different color -- 326 of 342 matched. #375 was manually reverted back to its own distinct computed color after the automatic palette-match incorrectly reused a different species' hue for it."
+    ],
+    "final-method-summary": "K-means (k=8) on real opaque artwork pixels, excluding near-black/near-white. Predominant color = largest cluster covering >=6% of pixels with saturation >=0.10. No synthetic reconstruction, no automated saturation-boosting, no automated contrast-solver -- those were all tried and rejected. Final say on any individual species always belongs to direct human review, not the algorithm.",
+    "known-limitation": "Cannot fully automate cases where a species' 'identity' color is a small accent rather than the dominant body area (Umbreon's gold rings, Starmie's red gem) -- these needed manual identification.",
+    "manual-overrides-applied": {
+      "$description": "Every species individually confirmed or corrected by direct human review, either with its own real color or by explicit reuse of another species' pair.",
+      "own-color-corrections": ["003 (Venusaur)", "012 (Butterfree)", "019 (Rattata)", "032 (Nidoran-m)", "040 (Wigglytuff)", "086 (Seel)", "087 (Dewgong)", "094 (Gengar)", "375"],
+      "explicit-reuse-pairings": {
+        "121": "110", "197": "198", "227": "086", "246": "248", "249": "086", "266": "086",
+        "253": "271", "286": "280", "290": "086", "299": "121", "304": "305", "362": "086",
+        "373": "381", "394": "395", "407": "357", "435": "434", "445": "446", "444": "446",
+        "462": "468", "469": "357", "470": "280", "476": "465", "483": "451", "492": "357"
+      }
+    },
+    "review-status": "#1-151: every entry individually confirmed by direct human review (either its own color or an explicit reuse). #152-493: automated real-color extraction, cross-checked against the curated #1-151 palette for reuse, with 23 additional explicit human corrections layered on top. Not every one of the ~493 has been individually eyeballed, but the methodology and known failure modes are well documented, and the highest-visibility species have direct confirmation."
+  },
+
+
+  "open-items": {
+    "$description": "Explicitly deferred or unresolved — do not treat silence on these as a decision.",
+    "items": [
+      "species_id -> {bg_light, bg_dark} data table — DONE, all 493 species, now with real contrast-checking against the artwork's own colors (not just UI text legibility). 170 of 493 are flagged low-confidence (couldn't reach the contrast floor) and worth a closer look; 5 are individually human-confirmed; the rest are a verified-but-not-eyeballed first pass.",
+      "Bento grid and grain-texture techniques — parked for specific future occasions (charts, callout cards), not part of the base system.",
+      "Type-badge treatment: both plain colored text (default) and the solid-square badge are sanctioned, dev-time per-context call.",
+      "Type color source: both the muted custom palette and the community-standard hex set are sanctioned, dev-time per-context call.",
+      "IBM Plex Sans needs to be downloaded and self-hosted as .woff2 — not yet in the codebase.",
+      "Status-green for non-form indicators (e.g. a 'synced' status dot) — separate from the form-field success decision (which deliberately avoided a new color), still genuinely open.",
+      "Region/generation badge icon (#11) — option C locked with a 'vertical fold line' modification requested but not yet drawn.",
+      "7 domain icons (sprite toggle, move category, contest conditions, item categories, berry, type-effectiveness marker, held item) — user sourcing from Tabler/Icones/game-icons.net directly.",
+      "Retrofit strategy for pokeapp's existing built modules (old design system) — not yet decided whether/how they migrate to this one."
+    ]
+  }
+}

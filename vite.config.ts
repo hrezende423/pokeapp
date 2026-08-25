@@ -51,7 +51,10 @@ export default defineConfig({
         // manifest.webmanifest, and favicon/apple-touch-icon are matched by the svg
         // and png globs. Listing them twice inflated the manifest with duplicate
         // entries for the same revision.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}', EAGER_DATA_GLOB],
+        // woff2 is here because the design system's IBM Plex Sans is self-hosted:
+        // an offline-first PWA that fetched its own font over the network would fall
+        // back to the system stack the first time it opened offline.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}', EAGER_DATA_GLOB],
         // species.json is the largest precached file at ~1.6 MiB; the Workbox default
         // is 2 MiB, which would silently drop it if the bundle grew.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,

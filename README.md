@@ -27,16 +27,21 @@ GitHub Pages. No Pokémon data or features yet.
 | `npm run verify:dexes`    | The four secondary dexes + navigation             |
 | `npm run verify:movedex`  | Movedex list, detail and move reverse lookup      |
 | `npm run verify:search`   | Global search: grouping, scope reuse, navigation  |
+| `npm run verify:ds`       | Design-system tokens, fonts, and component specs  |
 
 ## Layout
 
 ```
 src/components/   shared presentational components
+  ds/             design-system components (§5 + §10 of DESIGN-SYSTEM.md)
+src/assets/fonts/ self-hosted IBM Plex Sans (woff2)
+design-system/    the design-system handoff: tokens, spec, component libraries
 src/modules/      per-domain feature modules
   pokedex/        species list + detail view
   dex/            the shared list+detail shell, and the five secondary dexes
   nav/            module registry, tab switcher, and the active tab + selection
   search/         the global search over four dexes
+  design-system/  live reference page for the design-system components
   version-group/  the app-wide "which game" selection
 src/data/         runtime data loader, indices, era resolution and types
 src/pwa.ts        service worker registration
@@ -334,10 +339,94 @@ simplification, not a bug.
 
 ## PWA
 
-`vite-plugin-pwa` runs in `generateSW` mode and precaches the app shell only.
-Pokémon data caching is deliberately not wired up yet — that lands with the data
-layer. The icons in `public/` are flat placeholders and should be replaced with
-real artwork.
+`vite-plugin-pwa` runs in `generateSW` mode. The install payload is the app shell,
+the eager data tier, and the two self-hosted IBM Plex Sans files — 26 entries,
+~3.3 MiB. `woff2` is in `globPatterns` on purpose: a font fetched over the network
+would fall back to the system stack the first time the app opened offline, which
+defeats the point of self-hosting it. Version-group partitions stay on the
+`CacheFirst` runtime route. The icons in `public/` are flat placeholders and should
+be replaced with real artwork.
+
+## Design system
+
+The handoff lives in `design-system/` — `design-tokens.json` (source of truth),
+`design-tokens.css`, `DESIGN-SYSTEM.md`, and three component-library HTML files.
+Those files are the reference and are not edited by the app.
+
+`src/design-tokens.css` is the shipped copy, imported from `main.tsx` after
+`index.css`. Token values are identical to the handoff — `verify:ds` asserts that
+declaration by declaration — with three deltas, all of them syncing the CSS to the
+JSON:
+
+- **`@font-face` rules added** for the bundled font (the file asked for them once
+  the assets existed).
+- **`--field-*` and `--ledger-num-opacity-*` moved out of `[data-theme="dark"]`**
+  into the mode-agnostic `:root` rule. They were defined only in the dark rule, so
+  in light mode the form-field states and the ledger dim rule resolved to nothing.
+  Both are mode-agnostic rules in the JSON and every value is either
+  `var(--accent)` or a plain number.
+- **`--radius-badge-square: 5px` added**, from `radius.badge-square` in the JSON.
+  Its absence left the sanctioned solid-square type badge unbuildable from tokens.
+
+### Theme
+
+The tokens key off `data-theme="light" | "dark"`, which is what the token file
+declares ("on `:root` or any ancestor"). `src/theme.ts` sets it on `<html>` from
+the OS preference at boot and keeps it in sync — without it, a dark-preferring OS
+would get the light palette. Because the attribute works on any ancestor, the
+reference page renders light and dark side by side in one document.
+
+### Font
+
+IBM Plex Sans is self-hosted in `src/assets/fonts/`, no CDN. Google Fonts now
+serves it **only as a variable font** (wght 100–700, wdth 75–100), so the three
+weight rules in their stylesheet all point at the same file: what is bundled is one
+variable woff2 per subset (latin, latin-ext, 75 KiB total) declared
+`font-weight: 100 700`, not three static instances. 400/600/700 all resolve from it,
+and 600 is a real master rather than an interpolation. Cyrillic, Greek and
+Vietnamese subsets are deliberately not bundled — the data is English, and every
+bundled subset is precached.
+
+### Components
+
+`src/components/ds/` implements the fourteen validated components from
+DESIGN-SYSTEM.md §5 plus the form-field states from §10, on the tokens. The
+`Design system` tab renders all of them against real bundle data and real artwork.
+
+Two structural notes:
+
+- Components must be rendered inside a `.ds-root` container: that is what
+  establishes the system's own font, surface and text alignment instead of
+  inheriting the app shell's. Five rules are additionally scoped as
+  `.ds-root .ds-*` because `App.css` styles bare `h1`/`h2`/`section` inside
+  `.panel` at (0,1,1), which outranks a plain component class — the hero name was
+  rendering at 14.4px uppercase before that fix.
+- The species-tinted detail background reads
+  `species-background-colors.json` from the **pokeapp-sprites** repo at runtime
+  (`raw.githubusercontent.com`, already covered by the artwork `CacheFirst` route)
+  rather than bundling a copy, so there is one source of truth for it. If the fetch
+  fails the page falls back to the standard background mode and says so.
+
+### Deliberately not built
+
+Flagged rather than guessed, per the handoff:
+
+- The **solid-square type badge**. Sanctioned, and it has a radius token, but no
+  fill or text colour is specified anywhere. The colored-text treatment (the
+  documented default) is what ships.
+- Anything needing a **status-green**: still genuinely open for non-form
+  indicators, so no component here uses one. Form-level success is a checkmark in
+  `--text-primary`, per the tokens.
+- The **custom icons** on the still-searching list, including the caught/not-caught
+  Poké Ball. The toggle uses its track and thumb only.
+- The 81 components of §7 (`ds-component-library-full95.html`), which that section
+  itself describes as consistent token application rather than validated design.
+- **Retrofitting the existing dex modules.** Still an open item. The tokens are
+  loaded app-wide and no existing screen was restyled — with one unavoidable
+  exception: the design system and the old stylesheet both define `--accent`, so
+  the old modules now draw their accent from the design system (Pokédex red
+  `#d91c2c`) instead of the previous purple. Making `--accent` available app-wide
+  and leaving the old value in place are mutually exclusive.
 
 ## Deployment
 

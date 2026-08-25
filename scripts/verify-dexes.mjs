@@ -232,6 +232,10 @@ try {
     check(`navigating to ${id} marks its tab current`, active)
     check(`navigating to ${id} mounts its module`, mounted)
   }
+  // Back to a dex first: the loop above ends on whatever module is last in the
+  // registry, and not every registered module is a DexShell (the design-system
+  // reference page is not), so this has to be asserted from a known dex.
+  await goTo('itemdex')
   const shellCount = await page.$$eval('.pokedex-body', (e) => e.length)
   check('exactly one dex is mounted at a time', shellCount === 1, `(${shellCount})`)
   await page.screenshot({ path: `${SHOTS}/dex-nav.png` })
