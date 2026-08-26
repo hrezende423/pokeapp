@@ -719,41 +719,108 @@
 
 /* ------------------------------------------------------- top-level nav */
 
+/*
+  The shared shell, retrofitted onto the design system: the app bar is the one
+  piece of chrome every module sits under, so it moves first. Structure follows
+  the full-95 "Navbar / top app bar" spec (brand, then tabs, one hairline rule
+  under the row) and the validated Tabs spec from DESIGN-SYSTEM.md §5.
+
+  BACKGROUND: --surface, not --surface-raised. Per the layering rule in §5, the
+  raised tone-step is for surfaces that float above the page -- the search
+  dropdown below is one. The bar is part of the page's base layer, so it takes
+  the base surface in both modes.
+
+  FONT: set explicitly. index.css puts `font: 18px/145% var(--sans)` on :root, so
+  everything in here inherited system-ui and would have silently ignored the
+  bundled IBM Plex Sans -- the same class of shadowing as the .panel h2 collision
+  found during the token wiring. text-align too: #root centres text.
+
+  The bar carries the hairline and the tab row overlaps it by 1px, so an active
+  tab's 2px accent underline lands ON the rule rather than above it.
+*/
 .app-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-gap-lg);
   align-items: flex-end;
   justify-content: space-between;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+/* Brand and tabs travel together on the left, so justify-content keeps spreading
+   just the three groups rather than four loose items. */
+.app-bar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-gap-lg);
+}
+
+/* 14px/700, first in the row -- straight from the navbar spec. */
+.app-brand {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: 10px;
 }
 
 .dex-switcher {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: var(--space-gap-lg);
+  margin-bottom: -1px;
 }
 
+/* No fill, no box: an underline tab. Same treatment as the validated Tabs
+   component in src/components/ds. */
 .dex-tab {
-  padding: 0.35rem 0.7rem;
-  font: inherit;
-  font-size: 0.85rem;
-  color: var(--text);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 0.35rem;
+  padding: 0 0 10px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   cursor: pointer;
 }
 
-.dex-tab:hover {
-  border-color: var(--accent);
+/* Excludes the active tab on purpose: (0,2,0) hover would otherwise outrank the
+   (0,1,0) active rule and repaint the current tab from --accent to ink whenever
+   the pointer happened to rest on it. */
+.dex-tab:not(.dex-tab-active):hover {
+  color: var(--text-primary);
 }
 
 .dex-tab-active {
-  color: var(--text-h);
-  font-weight: 600;
-  background: var(--accent-bg);
-  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: var(--font-weight-bold);
+  border-bottom-color: var(--accent);
+}
+
+/* The version-group picker lives in this same bar, so it would have been the one
+   control still drawn from the old palette. Tokens swapped, shape left alone --
+   the full §5 select treatment (label above, underline only) would restructure a
+   control that is not otherwise in scope for this pass. */
+.app-bar .vg-selector {
+  margin-bottom: 10px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.app-bar .vg-selector select {
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
 }
 
 /* ------------------------------------------------------- shared dex bits */
@@ -886,33 +953,60 @@
   position: relative;
   flex: 1 1 16rem;
   max-width: 26rem;
+  margin-bottom: 10px;
 }
 
 .global-search-input {
   width: 100%;
-  padding: 0.4rem 0.6rem;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--text-h);
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 0.35rem;
+  /* Left padding clears the 24px icon; the icon sits in the field rather than
+     beside it, so the whole control is one target. */
+  padding: 9px 10px 9px 40px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
   box-sizing: border-box;
 }
 
+.global-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Focus is the accent, at the same 2px weight the form-field focus state uses --
+   padding drops by the 1px the border gains so the field does not shift. */
+.global-search-input:focus {
+  outline: none;
+  border: var(--field-focus-border-width) solid var(--field-focus-border);
+  padding: 8px 9px 8px 39px;
+}
+
+.global-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+/* A floating panel, so this is where --surface-raised belongs -- and the reason
+   the box-shadow that used to be here is gone. The full-95 combobox note says it
+   outright: the suggestion panel uses surface-raised, not a shadow, to sit above
+   the field. */
 .global-search-panel {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 0.3rem);
+  top: calc(100% + var(--space-gap-sm));
   left: 0;
   right: 0;
   max-height: 60svh;
   overflow-y: auto;
-  padding: 0.5rem 0.6rem 0.6rem;
-  background: var(--bg);
-  border: 1px solid var(--accent);
-  border-radius: 0.4rem;
-  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 25%);
+  padding: var(--space-gap-sm) var(--space-gap-md) var(--space-gap-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
 }
 
 .gs-group + .gs-group {

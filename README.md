@@ -407,6 +407,27 @@ Two structural notes:
   rather than bundling a copy, so there is one source of truth for it. If the fetch
   fails the page falls back to the standard background mode and says so.
 
+### Retrofit: the shared shell
+
+First contained retrofit pass — the app bar only, since it is the one piece of
+chrome every module sits under. Structure follows the full-95 "Navbar / top app
+bar" spec (brand at 14px/700, then tabs, one hairline rule under the row) with the
+validated Tabs treatment: no fill on any tab, active in `--accent` with a 2px
+accent underline, inactive in `--text-secondary`.
+
+The bar takes `--surface`, not `--surface-raised`: per the layering rule the raised
+tone-step is for surfaces that float above the page, which is what the search
+dropdown is — that panel moved to `--surface-raised` and **lost its box-shadow**,
+the one no-shadow violation in the shell.
+
+Everything in the bar had to be told to use `--font-body`: `index.css` sets
+`font: 18px/145% var(--sans)` on `:root`, so the shell was silently rendering in
+system-ui and ignoring the bundled font — the same shadowing pattern as the
+`.panel h2` collision. `verify:ds` now asserts the resolved family in the bar, the
+brand, the tab labels and the search input, in both themes.
+
+The six modules’ own list and detail views are untouched; each gets its own pass.
+
 ### Deliberately not built
 
 Flagged rather than guessed, per the handoff:

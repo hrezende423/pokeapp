@@ -30,7 +30,14 @@ function Shell() {
           five of the six dexes, and the search reaches all four searchable ones,
           so they sit beside the switcher rather than inside any one header. */}
       <div className="app-bar">
-        <DexSwitcher activeId={active.id} onSelect={nav.setModule} />
+        {/* Brand then tabs, per the full-95 navbar spec; grouped so the bar keeps
+            spacing three clusters rather than four loose items. */}
+        <div className="app-bar-nav">
+          <span className="app-brand" data-testid="app-brand">
+            Pokeapp
+          </span>
+          <DexSwitcher activeId={active.id} onSelect={nav.setModule} />
+        </div>
         <GlobalSearch />
         <VersionGroupSelector />
       </div>

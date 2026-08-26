@@ -1017,6 +1017,227 @@ try {
     !requests.some((u) => u.includes('/pokeapp/data/species-background-colors.json')),
   )
 
+  // ---------------------------------------------------- the shared shell
+  hr('SHELL — the app bar, retrofitted: tabs, search, surface, type')
+  // Measured in both themes, because the bar is the one piece of chrome every
+  // module sits under and a token that only resolved in one mode would show here.
+  for (const theme of ['light', 'dark']) {
+    await setTheme(theme)
+    await page.click('[data-testid="nav-pokedex"]')
+    await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+    // page.click leaves the pointer parked on the tab it just clicked, so without
+    // this every reading below would be a :hover reading rather than the resting
+    // state -- which is exactly how the hover-beats-active bug first showed up.
+    await page.mouse.move(1200, 900)
+    await page.waitForTimeout(80)
+    const want = EXPECTED[theme]
+    const shell = await page.evaluate(() => {
+      const cs = (sel) => {
+        const el = document.querySelector(sel)
+        return el ? getComputedStyle(el) : null
+      }
+      const bar = cs('.app-bar')
+      const brand = cs('[data-testid="app-brand"]')
+      const active = cs('.dex-tab-active')
+      const idle = cs('.dex-tab:not(.dex-tab-active)')
+      const input = cs('[data-testid="global-search"]')
+      const icon = document.querySelector('[data-testid="global-search-icon"]')
+      const shadows = []
+      for (const el of document.querySelectorAll('.app-bar, .app-bar *')) {
+        const s = getComputedStyle(el)
+        if (s.boxShadow !== 'none' || s.textShadow !== 'none') {
+          shadows.push(el.tagName + '.' + String(el.className).split(' ')[0] + ': ' + s.boxShadow)
+        }
+      }
+      return {
+        elements: document.querySelectorAll('.app-bar *').length,
+        shadows,
+        bar: {
+          background: bar.backgroundColor,
+          borderBottom: bar.borderBottomWidth + ' ' + bar.borderBottomColor,
+          fontFamily: bar.fontFamily,
+          textAlign: bar.textAlign,
+        },
+        brand: {
+          fontSize: brand.fontSize,
+          weight: brand.fontWeight,
+          color: brand.color,
+          fontFamily: brand.fontFamily,
+        },
+        activeTab: {
+          color: active.color,
+          weight: active.fontWeight,
+          underline: active.borderBottomWidth + ' ' + active.borderBottomColor,
+          background: active.backgroundColor,
+          fontFamily: active.fontFamily,
+        },
+        idleTab: {
+          color: idle.color,
+          underline: idle.borderBottomColor,
+          background: idle.backgroundColor,
+        },
+        input: {
+          border: input.borderTopWidth + ' ' + input.borderTopColor,
+          radius: input.borderTopLeftRadius,
+          background: input.backgroundColor,
+          color: input.color,
+          fontFamily: input.fontFamily,
+          fontSize: input.fontSize,
+        },
+        icon: icon
+          ? {
+              tag: icon.tagName.toLowerCase(),
+              cls: icon.getAttribute('class'),
+              stroke: icon.getAttribute('stroke-width'),
+              width: icon.getAttribute('width'),
+              color: getComputedStyle(icon).color,
+            }
+          : null,
+      }
+    })
+    log('  [' + theme + '] bar: ' + JSON.stringify(shell.bar))
+    log('  [' + theme + '] active tab: ' + JSON.stringify(shell.activeTab))
+    log('  [' + theme + '] idle tab: ' + JSON.stringify(shell.idleTab))
+    log('  [' + theme + '] search: ' + JSON.stringify(shell.input))
+    log('  [' + theme + '] icon: ' + JSON.stringify(shell.icon))
+
+    check(
+      '[' + theme + '] the bar sits on --surface',
+      shell.bar.background === hexToRgb(want['--surface']),
+      shell.bar.background,
+    )
+    check(
+      '[' + theme + '] with a 1px hairline rule under the row',
+      shell.bar.borderBottom === '1px ' + hexToRgb(want['--hairline']),
+      shell.bar.borderBottom,
+    )
+    check(
+      '[' + theme + '] no shadow anywhere in the shell',
+      shell.shadows.length === 0,
+      shell.shadows.join(' | '),
+    )
+    check(
+      '[' + theme + '] and there were real elements to check',
+      shell.elements > 10,
+      '(' + shell.elements + ')',
+    )
+
+    // Typography: the point of item 4 -- the shell inherited system-ui from
+    // index.css, so it would have ignored the bundled font entirely.
+    for (const pair of [
+      ['bar', shell.bar.fontFamily],
+      ['brand', shell.brand.fontFamily],
+      ['tab labels', shell.activeTab.fontFamily],
+      ['search input', shell.input.fontFamily],
+    ]) {
+      check(
+        '[' + theme + '] ' + pair[0] + ' resolves to IBM Plex Sans, not the system stack',
+        /^"?IBM Plex Sans"?/.test(pair[1]),
+        pair[1],
+      )
+    }
+    check(
+      '[' + theme + '] the brand is 14px bold --text-primary',
+      shell.brand.fontSize === '14px' &&
+        shell.brand.weight === SCALE['--font-weight-bold'] &&
+        shell.brand.color === hexToRgb(want['--text-primary']),
+      shell.brand.fontSize + ' / ' + shell.brand.weight + ' / ' + shell.brand.color,
+    )
+
+    // Tabs, against the validated Tabs spec.
+    check(
+      '[' + theme + '] the active tab is --accent with a 2px accent underline',
+      shell.activeTab.color === hexToRgb(want['--accent']) &&
+        shell.activeTab.underline === '2px ' + hexToRgb(want['--accent']),
+      shell.activeTab.color + ' / ' + shell.activeTab.underline,
+    )
+    check('[' + theme + '] and bold', shell.activeTab.weight === SCALE['--font-weight-bold'])
+    check(
+      '[' + theme + '] no tab carries a background fill',
+      shell.activeTab.background === 'rgba(0, 0, 0, 0)' &&
+        shell.idleTab.background === 'rgba(0, 0, 0, 0)',
+      shell.activeTab.background + ' / ' + shell.idleTab.background,
+    )
+    check(
+      '[' + theme + '] inactive tabs are --text-secondary with no underline',
+      shell.idleTab.color === hexToRgb(want['--text-secondary']) &&
+        shell.idleTab.underline === 'rgba(0, 0, 0, 0)',
+      shell.idleTab.color + ' / ' + shell.idleTab.underline,
+    )
+
+    // Search field.
+    check(
+      '[' + theme + '] the search input has a 1px hairline border',
+      shell.input.border === '1px ' + hexToRgb(want['--hairline']),
+      shell.input.border,
+    )
+    check(
+      '[' + theme + '] at --radius-control',
+      shell.input.radius === SCALE['--radius-control'],
+      shell.input.radius,
+    )
+    check(
+      '[' + theme + '] on --surface, no other fill',
+      shell.input.background === hexToRgb(want['--surface']),
+      shell.input.background,
+    )
+    check(
+      '[' + theme + "] the icon is Tabler's IconSearch at 24px / 1.5 stroke in --text-secondary",
+      shell.icon?.tag === 'svg' &&
+        /tabler-icon-search/.test(shell.icon.cls ?? '') &&
+        shell.icon.width === '24' &&
+        shell.icon.stroke === '1.5' &&
+        shell.icon.color === hexToRgb(want['--text-secondary']),
+      JSON.stringify(shell.icon),
+    )
+
+    // Focus: accent, at the form-field focus weight.
+    await page.focus('[data-testid="global-search"]')
+    await page.waitForTimeout(120)
+    const focused = await page.evaluate(() => {
+      const cs = getComputedStyle(document.querySelector('[data-testid="global-search"]'))
+      return { border: cs.borderTopWidth + ' ' + cs.borderTopColor, outline: cs.outlineStyle }
+    })
+    log('  [' + theme + '] focused search: ' + JSON.stringify(focused))
+    check(
+      '[' + theme + '] focus turns the border 2px --accent',
+      focused.border === '2px ' + hexToRgb(want['--accent']),
+      focused.border,
+    )
+    check(
+      '[' + theme + '] and drops the default outline',
+      focused.outline === 'none',
+      focused.outline,
+    )
+
+    // The dropdown is a floating panel: --surface-raised, hairline, no shadow.
+    await page.fill('[data-testid="global-search"]', 'sand')
+    await page.waitForSelector('[data-testid="global-search-results"]', { timeout: 15000 })
+    const panel = await page.evaluate(() => {
+      const cs = getComputedStyle(document.querySelector('[data-testid="global-search-results"]'))
+      return {
+        background: cs.backgroundColor,
+        border: cs.borderTopWidth + ' ' + cs.borderTopColor,
+        radius: cs.borderTopLeftRadius,
+        shadow: cs.boxShadow,
+      }
+    })
+    log('  [' + theme + '] results panel: ' + JSON.stringify(panel))
+    check(
+      '[' + theme + '] the results panel floats on --surface-raised',
+      panel.background === hexToRgb(want['--surface-raised']),
+      panel.background,
+    )
+    check(
+      '[' + theme + '] with a hairline border and no shadow',
+      panel.border === '1px ' + hexToRgb(want['--hairline']) && panel.shadow === 'none',
+      panel.border + ' / ' + panel.shadow,
+    )
+    await page.screenshot({ path: SHOTS + '/shell-' + theme + '.png' })
+    await page.fill('[data-testid="global-search"]', '')
+  }
+  await setTheme('light')
+
   // ------------------------------------------- existing modules untouched
   hr('SCOPE — the existing dex modules are not restyled')
   await page.click('[data-testid="nav-pokedex"]')
