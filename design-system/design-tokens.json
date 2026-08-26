@@ -124,7 +124,7 @@
       "accent": {
         "light": { "$value": "{color.primitive.accent-red.light}" },
         "dark": { "$value": "{color.primitive.accent-red.dark}" },
-        "$description": "Reserved for exactly two functional uses: active tab/nav state, and binary state indicators (e.g. caught toggle). Never decoration, never more than one element type per screen."
+        "$description": "Reserved for exactly three functional uses: active tab/nav state, binary state indicators (e.g. caught toggle), and error/validation emphasis (confirmed in the form-field-states work, see DESIGN-SYSTEM.md section 8). Never decoration, never more than one element type per screen. CONFIRMED app-wide, not namespaced: this red now also affects the old (pre-redesign) modules that share the --accent variable, replacing their previous purple. Deliberate — those modules are getting replaced eventually, and the color clash is a reasonable 'not yet migrated' signal rather than a bug worth engineering around."
       },
       "button-primary-fill": {
         "light": { "$value": "{color.primitive.ink.800}" },
@@ -152,7 +152,7 @@
   "typography": {
     "font-family": {
       "$type": "fontFamily",
-      "body": { "$value": ["IBM Plex Sans", "-apple-system", "Segoe UI", "Roboto", "sans-serif"], "$description": "Locked as of the font-alternatives review. Self-hosted webfont, not a system stack — requires bundling the actual .woff2 files (offline-first PWA, no CDN dependency). Fallbacks are the previous system-humanist pick, used only if the bundled font fails to load." },
+      "body": { "$value": ["IBM Plex Sans", "-apple-system", "Segoe UI", "Roboto", "sans-serif"], "$description": "Locked as of the font-alternatives review. Self-hosted webfont, not a system stack — requires bundling the actual .woff2 files (offline-first PWA, no CDN dependency). Fallbacks are the previous system-humanist pick, used only if the bundled font fails to load. IMPLEMENTATION CONFIRMED: variable font file (one .woff2 per subset, ~75 KiB total, wght 100-700), not static per-weight instances from @fontsource. Verified during implementation that weight 600 is a genuine design master within the variable file, not an interpolation — so nothing is lost by choosing the variable file over static instances, and it's simpler to maintain." },
       "numeric": { "$value": ["SF Mono", "JetBrains Mono", "Consolas", "monospace"], "$description": "Dex numbers and stat/EV values only. Never names, labels, or body copy." }
     },
     "font-size": {
@@ -264,7 +264,7 @@
   "open-items": {
     "$description": "Explicitly deferred or unresolved — do not treat silence on these as a decision.",
     "items": [
-      "species_id -> {bg_light, bg_dark} data table — DONE, all 493 species, now with real contrast-checking against the artwork's own colors (not just UI text legibility). 170 of 493 are flagged low-confidence (couldn't reach the contrast floor) and worth a closer look; 5 are individually human-confirmed; the rest are a verified-but-not-eyeballed first pass.",
+      "species_id -> {bg_light, bg_dark} data table — DONE, all 493 species, published to hrezende423/pokeapp-sprites. See species-background-extraction for the full methodology and revision history — the automated contrast-solver direction was tried and explicitly rejected/reverted, not the final approach.",
       "Bento grid and grain-texture techniques — parked for specific future occasions (charts, callout cards), not part of the base system.",
       "Type-badge treatment: both plain colored text (default) and the solid-square badge are sanctioned, dev-time per-context call.",
       "Type color source: both the muted custom palette and the community-standard hex set are sanctioned, dev-time per-context call.",

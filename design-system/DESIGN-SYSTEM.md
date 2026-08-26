@@ -77,22 +77,18 @@ intentional and is what lets the artwork read as the focal point.
 
 ---
 
-## 3. One decision to confirm — type indicator, list vs. detail
+## 3. Locked — type indicator, list vs. detail
 
-Two rounds produced two different treatments and this doc has resolved it
-one way — flagging so it can be overridden if that's not what you intended:
-
-- **Detail/hero screens** (latest, locked round): colored text label only —
-  `Fire` in `--type-fire`, no icon, no fill.
-- **List/ledger rows** (earlier round, `ds-full-screen-poc-v2.html`): a small
-  monochrome geometric glyph (triangle/droplet/leaf shape) + label, no color
-  at all.
-
-This doc applies the **colored text label** treatment everywhere (list and
-detail) for consistency, since it's the more recent, more-referenced-informed
-decision. If you specifically wanted list rows to keep the monochrome glyph
-system as a deliberate list-vs-detail distinction, say so and I'll split the
-spec back into two variants.
+Two earlier rounds produced two different treatments; **colored text label
+only** (`Fire` in `--type-fire`, no icon, no fill) is now confirmed as the
+answer for both list/ledger rows and detail/hero screens, not just the
+detail screen. The alternative — a monochrome geometric glyph for list
+rows specifically (`ds-full-screen-poc-v2.html`) — is superseded, not a
+live option. Confirmed deliberately: this is the choice most consistent
+with the system's core restraint (color carries meaning, shape doesn't
+duplicate it), and introducing a glyph-based split between contexts would
+reintroduce exactly the kind of extra visual machinery this system has
+repeatedly stripped out elsewhere.
 
 ---
 
