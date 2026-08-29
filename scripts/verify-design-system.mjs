@@ -1018,18 +1018,31 @@ try {
   )
 
   // ---------------------------------------------------- the shared shell
-  hr('SHELL — the app bar, retrofitted: tabs, search, surface, type')
+  //
+  // Expected values here come from the Figma frames MainPage-Light (9:143) and
+  // MainPage-Dark (12:248), whose geometry is byte-identical, read out of
+  // get_metadata. Where those frames contradict the prose component specs, the
+  // frames win -- so the §5 Tabs underline and the full95 bordered search box are
+  // both asserted ABSENT below.
+  //
+  // Figma raw -> CSS uses 2.23, the scale at which the frames' text widths land on
+  // the locked token type sizes (card name 14.4px and dex number 14.3px against
+  // --font-size-body 14px; type and ability rows near 11px against
+  // --font-size-label). Ratios rather than raw px are asserted wherever a ratio is
+  // what the design actually fixes.
+  hr('SHELL — the app bar against MainPage: tabs, borderless search, type')
   // Measured in both themes, because the bar is the one piece of chrome every
   // module sits under and a token that only resolved in one mode would show here.
   for (const theme of ['light', 'dark']) {
+    // Both halves of the theme, not just the attribute: index.css still paints the
+    // page from its own prefers-color-scheme block, so forcing data-theme alone
+    // would screenshot a dark bar on a light page -- a state no real user is in.
+    await page.emulateMedia({ colorScheme: theme })
     await setTheme(theme)
     await page.click('[data-testid="nav-pokedex"]')
     await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
-    // page.click leaves the pointer parked on the tab it just clicked, so without
-    // this every reading below would be a :hover reading rather than the resting
-    // state -- which is exactly how the hover-beats-active bug first showed up.
+    // A hovered tab repaints, so park the pointer clear of the bar first.
     await page.mouse.move(1200, 900)
-    await page.waitForTimeout(80)
     const want = EXPECTED[theme]
     const shell = await page.evaluate(() => {
       const cs = (sel) => {
@@ -1041,7 +1054,6 @@ try {
       const active = cs('.dex-tab-active')
       const idle = cs('.dex-tab:not(.dex-tab-active)')
       const input = cs('[data-testid="global-search"]')
-      const icon = document.querySelector('[data-testid="global-search-icon"]')
       const shadows = []
       for (const el of document.querySelectorAll('.app-bar, .app-bar *')) {
         const s = getComputedStyle(el)
@@ -1049,9 +1061,25 @@ try {
           shadows.push(el.tagName + '.' + String(el.className).split(' ')[0] + ': ' + s.boxShadow)
         }
       }
+      // Gap between the brand and the first tab, and between two tabs, measured
+      // from the rendered boxes rather than read off the stylesheet.
+      const brandEl = document.querySelector('[data-testid="app-brand"]')
+      const tabs = [...document.querySelectorAll('.dex-tab')]
+      const gapAfterBrand =
+        tabs.length > 0
+          ? Math.round(tabs[0].getBoundingClientRect().left - brandEl.getBoundingClientRect().right)
+          : null
+      const gapBetweenTabs =
+        tabs.length > 1
+          ? Math.round(tabs[1].getBoundingClientRect().left - tabs[0].getBoundingClientRect().right)
+          : null
       return {
         elements: document.querySelectorAll('.app-bar *').length,
         shadows,
+        gapAfterBrand,
+        gapBetweenTabs,
+        iconPresent: document.querySelector('[data-testid="global-search-icon"]') != null,
+        anyBarSvg: document.querySelectorAll('.app-bar svg').length,
         bar: {
           background: bar.backgroundColor,
           borderBottom: bar.borderBottomWidth + ' ' + bar.borderBottomColor,
@@ -1067,39 +1095,48 @@ try {
         activeTab: {
           color: active.color,
           weight: active.fontWeight,
-          underline: active.borderBottomWidth + ' ' + active.borderBottomColor,
+          fontSize: active.fontSize,
+          borderBottomWidth: active.borderBottomWidth,
+          borderTopWidth: active.borderTopWidth,
           background: active.backgroundColor,
           fontFamily: active.fontFamily,
         },
         idleTab: {
           color: idle.color,
-          underline: idle.borderBottomColor,
+          fontSize: idle.fontSize,
+          borderBottomWidth: idle.borderBottomWidth,
           background: idle.backgroundColor,
         },
         input: {
-          border: input.borderTopWidth + ' ' + input.borderTopColor,
-          radius: input.borderTopLeftRadius,
+          borderTopWidth: input.borderTopWidth,
+          borderRightWidth: input.borderRightWidth,
+          borderLeftWidth: input.borderLeftWidth,
+          borderBottomWidth: input.borderBottomWidth,
+          borderBottomColor: input.borderBottomColor,
           background: input.backgroundColor,
           color: input.color,
+          textAlign: input.textAlign,
           fontFamily: input.fontFamily,
           fontSize: input.fontSize,
+          height: Math.round(
+            document.querySelector('[data-testid="global-search"]').getBoundingClientRect().height,
+          ),
         },
-        icon: icon
-          ? {
-              tag: icon.tagName.toLowerCase(),
-              cls: icon.getAttribute('class'),
-              stroke: icon.getAttribute('stroke-width'),
-              width: icon.getAttribute('width'),
-              color: getComputedStyle(icon).color,
-            }
-          : null,
       }
     })
     log('  [' + theme + '] bar: ' + JSON.stringify(shell.bar))
     log('  [' + theme + '] active tab: ' + JSON.stringify(shell.activeTab))
     log('  [' + theme + '] idle tab: ' + JSON.stringify(shell.idleTab))
     log('  [' + theme + '] search: ' + JSON.stringify(shell.input))
-    log('  [' + theme + '] icon: ' + JSON.stringify(shell.icon))
+    log(
+      '  [' +
+        theme +
+        '] gaps: brand->tab ' +
+        shell.gapAfterBrand +
+        'px, tab->tab ' +
+        shell.gapBetweenTabs +
+        'px',
+    )
 
     check(
       '[' + theme + '] the bar sits on --surface',
@@ -1122,8 +1159,8 @@ try {
       '(' + shell.elements + ')',
     )
 
-    // Typography: the point of item 4 -- the shell inherited system-ui from
-    // index.css, so it would have ignored the bundled font entirely.
+    // Typography: the shell inherits system-ui from index.css, so this is what
+    // proves the bundled font is not being shadowed.
     for (const pair of [
       ['bar', shell.bar.fontFamily],
       ['brand', shell.brand.fontFamily],
@@ -1136,78 +1173,122 @@ try {
         pair[1],
       )
     }
+
+    // FIGMA: all five nav labels imply the same size -- 14.2-14.5px by glyph
+    // advance -- so brand and tabs share --font-size-body and differ by colour.
     check(
-      '[' + theme + '] the brand is 14px bold --text-primary',
-      shell.brand.fontSize === '14px' &&
-        shell.brand.weight === SCALE['--font-weight-bold'] &&
-        shell.brand.color === hexToRgb(want['--text-primary']),
-      shell.brand.fontSize + ' / ' + shell.brand.weight + ' / ' + shell.brand.color,
+      '[' + theme + '] brand and tabs share --font-size-body',
+      shell.brand.fontSize === SCALE['--font-size-body'] &&
+        shell.activeTab.fontSize === SCALE['--font-size-body'] &&
+        shell.idleTab.fontSize === SCALE['--font-size-body'],
+      shell.brand.fontSize + ' / ' + shell.activeTab.fontSize + ' / ' + shell.idleTab.fontSize,
+    )
+    check(
+      '[' + theme + '] the brand is --text-primary',
+      shell.brand.color === hexToRgb(want['--text-primary']),
+      shell.brand.color,
     )
 
-    // Tabs, against the validated Tabs spec.
+    // FIGMA: tab gaps are a uniform 20 raw (9px at 2.23), and the brand sits in
+    // the same rhythm -- 154-134 for brand->tab, 306-286 / 409-389 / 519-499
+    // between tabs.
     check(
-      '[' + theme + '] the active tab is --accent with a 2px accent underline',
-      shell.activeTab.color === hexToRgb(want['--accent']) &&
-        shell.activeTab.underline === '2px ' + hexToRgb(want['--accent']),
-      shell.activeTab.color + ' / ' + shell.activeTab.underline,
+      '[' + theme + "] the brand-to-tab gap is Figma's 9px",
+      shell.gapAfterBrand === 9,
+      '(' + shell.gapAfterBrand + 'px)',
     )
-    check('[' + theme + '] and bold', shell.activeTab.weight === SCALE['--font-weight-bold'])
+    check(
+      '[' + theme + '] and so is the gap between tabs',
+      shell.gapBetweenTabs === 9,
+      '(' + shell.gapBetweenTabs + 'px)',
+    )
+
+    // FIGMA, against the §5 Tabs spec: the nav-bar frame holds a Tabs frame of
+    // five bare text nodes plus the search text, and nothing else -- no
+    // rectangle, line or vector -- so the active tab carries no underline.
+    check(
+      '[' + theme + '] the active tab is --accent',
+      shell.activeTab.color === hexToRgb(want['--accent']),
+      shell.activeTab.color,
+    )
+    check(
+      '[' + theme + '] and carries NO underline (Figma has no such node)',
+      shell.activeTab.borderBottomWidth === '0px' && shell.activeTab.borderTopWidth === '0px',
+      'bottom=' + shell.activeTab.borderBottomWidth + ' top=' + shell.activeTab.borderTopWidth,
+    )
+    check(
+      '[' + theme + '] inactive tabs are --text-secondary, also with no underline',
+      shell.idleTab.color === hexToRgb(want['--text-secondary']) &&
+        shell.idleTab.borderBottomWidth === '0px',
+      shell.idleTab.color + ' / ' + shell.idleTab.borderBottomWidth,
+    )
     check(
       '[' + theme + '] no tab carries a background fill',
       shell.activeTab.background === 'rgba(0, 0, 0, 0)' &&
         shell.idleTab.background === 'rgba(0, 0, 0, 0)',
       shell.activeTab.background + ' / ' + shell.idleTab.background,
     )
-    check(
-      '[' + theme + '] inactive tabs are --text-secondary with no underline',
-      shell.idleTab.color === hexToRgb(want['--text-secondary']) &&
-        shell.idleTab.underline === 'rgba(0, 0, 0, 0)',
-      shell.idleTab.color + ' / ' + shell.idleTab.underline,
-    )
 
-    // Search field.
+    // FIGMA, against the full95 "Global search bar": the search is a bare text
+    // node, right-aligned, with no rect, no stroke, no fill and no icon.
     check(
-      '[' + theme + '] the search input has a 1px hairline border',
-      shell.input.border === '1px ' + hexToRgb(want['--hairline']),
-      shell.input.border,
+      '[' + theme + '] the search field has no border box at rest',
+      shell.input.borderTopWidth === '0px' &&
+        shell.input.borderRightWidth === '0px' &&
+        shell.input.borderLeftWidth === '0px',
+      'top=' +
+        shell.input.borderTopWidth +
+        ' right=' +
+        shell.input.borderRightWidth +
+        ' left=' +
+        shell.input.borderLeftWidth,
     )
     check(
-      '[' + theme + '] at --radius-control',
-      shell.input.radius === SCALE['--radius-control'],
-      shell.input.radius,
-    )
-    check(
-      '[' + theme + '] on --surface, no other fill',
-      shell.input.background === hexToRgb(want['--surface']),
+      '[' + theme + '] and no fill of its own',
+      shell.input.background === 'rgba(0, 0, 0, 0)',
       shell.input.background,
     )
     check(
-      '[' + theme + "] the icon is Tabler's IconSearch at 24px / 1.5 stroke in --text-secondary",
-      shell.icon?.tag === 'svg' &&
-        /tabler-icon-search/.test(shell.icon.cls ?? '') &&
-        shell.icon.width === '24' &&
-        shell.icon.stroke === '1.5' &&
-        shell.icon.color === hexToRgb(want['--text-secondary']),
-      JSON.stringify(shell.icon),
+      '[' + theme + '] its text is right-aligned, as the reference shows',
+      shell.input.textAlign === 'right',
+      shell.input.textAlign,
+    )
+    check(
+      '[' + theme + '] the Tabler magnifier is gone (no icon node in either frame)',
+      !shell.iconPresent && shell.anyBarSvg === 0,
+      'icon=' + shell.iconPresent + ' svgs=' + shell.anyBarSvg,
     )
 
-    // Focus: accent, at the form-field focus weight.
+    // Focus: Figma has no focus state for a borderless field, so the accent lands
+    // on the hairline underline every full95 input already uses. The underline is
+    // present-but-transparent at rest, so nothing shifts.
     await page.focus('[data-testid="global-search"]')
     await page.waitForTimeout(120)
     const focused = await page.evaluate(() => {
       const cs = getComputedStyle(document.querySelector('[data-testid="global-search"]'))
-      return { border: cs.borderTopWidth + ' ' + cs.borderTopColor, outline: cs.outlineStyle }
+      return {
+        borderBottom: cs.borderBottomWidth + ' ' + cs.borderBottomColor,
+        outline: cs.outlineStyle,
+        boxHeight: Math.round(
+          document.querySelector('[data-testid="global-search"]').getBoundingClientRect().height,
+        ),
+      }
     })
     log('  [' + theme + '] focused search: ' + JSON.stringify(focused))
     check(
-      '[' + theme + '] focus turns the border 2px --accent',
-      focused.border === '2px ' + hexToRgb(want['--accent']),
-      focused.border,
+      '[' + theme + '] focus turns the underline --accent',
+      focused.borderBottom === '1px ' + hexToRgb(want['--accent']),
+      focused.borderBottom,
     )
     check(
       '[' + theme + '] and drops the default outline',
       focused.outline === 'none',
       focused.outline,
+    )
+    check(
+      '[' + theme + '] focusing does not resize the field',
+      focused.boxHeight === shell.input.height,
+      'rest=' + shell.input.height + ' focused=' + focused.boxHeight,
     )
 
     // The dropdown is a floating panel: --surface-raised, hairline, no shadow.
@@ -1236,29 +1317,484 @@ try {
     await page.screenshot({ path: SHOTS + '/shell-' + theme + '.png' })
     await page.fill('[data-testid="global-search"]', '')
   }
+  await page.emulateMedia({ colorScheme: 'light' })
   await setTheme('light')
 
-  // ------------------------------------------- existing modules untouched
-  hr('SCOPE — the existing dex modules are not restyled')
+  // ------------------------------------------------------- the browse grid
+  hr('GRID — the Pokedex browse grid against MainPage-Light / MainPage-Dark')
+  //
+  // Figma raw geometry, card 9:173 inside container-dex-row 9:163:
+  //   card           497 x 467
+  //   shadow-number  x 68  y 0    w 370 h 198
+  //   poke-artwork   x 156 y 98   199 x 199
+  //   number-name    x 128 y 319  h 39
+  //   Types          x 127 y 368  h 29
+  //   Ability        x 128 y 407  h 29
+  //   column pitch   518 (497 + 21) | row pitch 507 (467 + 40)
+  //
+  // Asserted as ratios of the rendered card, so the checks survive a re-scale.
+  const GHOST_OPACITY = tokens.opacity['ghost-watermark'].$value
+  const FIG = {
+    card: { w: 497, h: 467 },
+    ghost: { x: 68, y: 0, w: 370, h: 198 },
+    art: { x: 156, y: 98, w: 199, h: 199 },
+    line: { x: 128, y: 319, h: 39 },
+    types: { x: 127, y: 368 },
+    ability: { x: 128, y: 407 },
+    colPitch: 518,
+    rowPitch: 507,
+  }
+  // Tolerances: 1.5% of the card box for positions derived from a 2.23x scale
+  // read off glyph advances, and 2px absolute for gaps.
+  const nearRatio = (got, want, span, tolPct = 1.5) =>
+    Math.abs(got - want * span) <= (tolPct / 100) * span
+
+  for (const theme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: theme })
+    await setTheme(theme)
+    await page.click('[data-testid="nav-pokedex"]')
+    await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+    await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 30000 })
+    await page.mouse.move(1200, 900)
+    const want = EXPECTED[theme]
+
+    const grid = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.species-card')]
+      const first = cards[0]
+      const box = first.getBoundingClientRect()
+      const rel = (sel) => {
+        const el = first.querySelector(sel)
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        return {
+          x: r.left - box.left,
+          y: r.top - box.top,
+          w: r.width,
+          h: r.height,
+        }
+      }
+      const csOf = (sel) => {
+        const el = first.querySelector(sel)
+        return el ? getComputedStyle(el) : null
+      }
+      const ghostCs = csOf('.species-card-ghost')
+      const numCs = csOf('.dex-no')
+      const nameCs = csOf('.species-name')
+      const abilityCs = csOf('.species-card-ability')
+
+      // Shadows across every card in the grid, not just the first.
+      const shadows = []
+      for (const el of document.querySelectorAll('.pokedex-grid, .pokedex-grid *')) {
+        const s = getComputedStyle(el)
+        if (s.boxShadow !== 'none' || s.textShadow !== 'none') shadows.push(el.className)
+      }
+
+      // Column/row pitch from the first row's cards and the card below.
+      const tops = [...new Set(cards.map((c) => Math.round(c.getBoundingClientRect().top)))].sort(
+        (a, b) => a - b,
+      )
+      const firstRow = cards.filter((c) => Math.round(c.getBoundingClientRect().top) === tops[0])
+      const colPitch =
+        firstRow.length > 1
+          ? firstRow[1].getBoundingClientRect().left - firstRow[0].getBoundingClientRect().left
+          : null
+      const rowPitch = tops.length > 1 ? tops[1] - tops[0] : null
+
+      // Content order, read from the DOM as it actually renders.
+      const order = [
+        ...first.querySelectorAll(
+          '.species-card-ghost, .species-card-art, .dex-no, .species-name, .species-card-types, .species-card-ability',
+        ),
+      ].map((el) => el.className.replace('species-card-', '').replace('ds-', ''))
+
+      return {
+        cardCount: cards.length,
+        columnsInFirstRow: firstRow.length,
+        card: { w: box.width, h: box.height },
+        ghost: rel('.species-card-ghost'),
+        art: rel('.species-card-art'),
+        line: rel('.species-card-line'),
+        num: rel('.dex-no'),
+        nameBox: rel('.species-name'),
+        types: rel('.species-card-types'),
+        ability: rel('.species-card-ability'),
+        colPitch,
+        rowPitch,
+        order,
+        shadows,
+        style: {
+          cardBackground: getComputedStyle(first).backgroundColor,
+          cardBorder: getComputedStyle(first).borderTopWidth,
+          ghostColor: ghostCs.color,
+          ghostOpacity: ghostCs.opacity,
+          ghostFontSize: ghostCs.fontSize,
+          ghostFontFamily: ghostCs.fontFamily,
+          numColor: numCs.color,
+          numFontSize: numCs.fontSize,
+          numText: first.querySelector('.dex-no').textContent,
+          nameColor: nameCs.color,
+          nameFontSize: nameCs.fontSize,
+          nameWeight: nameCs.fontWeight,
+          abilityColor: abilityCs ? abilityCs.color : null,
+          abilityFontSize: abilityCs ? abilityCs.fontSize : null,
+        },
+        ghostText: first.querySelector('.species-card-ghost').textContent,
+        typeText: first.querySelector('.species-card-types').textContent,
+        abilityText: first.querySelector('.species-card-ability')?.textContent ?? null,
+      }
+    })
+
+    log('  [' + theme + '] cards=' + grid.cardCount + ' columns=' + grid.columnsInFirstRow)
+    log('  [' + theme + '] card box: ' + JSON.stringify(grid.card))
+    log('  [' + theme + '] ghost: ' + JSON.stringify(grid.ghost))
+    log('  [' + theme + '] art:   ' + JSON.stringify(grid.art))
+    log('  [' + theme + '] line:  ' + JSON.stringify(grid.line))
+    log('  [' + theme + '] types: ' + JSON.stringify(grid.types))
+    log('  [' + theme + '] ability: ' + JSON.stringify(grid.ability))
+    log('  [' + theme + '] pitch: col=' + grid.colPitch + ' row=' + grid.rowPitch)
+    log('  [' + theme + '] style: ' + JSON.stringify(grid.style))
+
+    check(
+      '[' + theme + '] the grid lays out three columns, as the reference shows',
+      grid.columnsInFirstRow === 3,
+      '(' + grid.columnsInFirstRow + ')',
+    )
+    check(
+      '[' + theme + "] the card keeps Figma's 497:467 aspect",
+      nearRatio(grid.card.h, FIG.card.h / FIG.card.w, grid.card.w),
+      grid.card.w +
+        ' x ' +
+        grid.card.h +
+        ' (want h=' +
+        ((FIG.card.h / FIG.card.w) * grid.card.w).toFixed(1) +
+        ')',
+    )
+
+    // THE WATERMARK. The prose spec said "top-right, bleeding off the edge";
+    // Figma puts it at x=68 y=0 in a 497-wide card -- centred, flush with the top,
+    // and entirely inside the card. Both claims are asserted, including that it
+    // does NOT overhang either edge.
+    check(
+      '[' + theme + '] the watermark is flush with the card top (Figma y=0)',
+      Math.abs(grid.ghost.y) <= 2,
+      'y=' + grid.ghost.y.toFixed(1),
+    )
+    check(
+      '[' + theme + '] and horizontally centred, not pinned to a corner',
+      Math.abs(grid.ghost.x + grid.ghost.w / 2 - grid.card.w / 2) <= 0.02 * grid.card.w,
+      'centre=' +
+        (grid.ghost.x + grid.ghost.w / 2).toFixed(1) +
+        ' card centre=' +
+        (grid.card.w / 2).toFixed(1),
+    )
+    check(
+      '[' + theme + '] and does NOT bleed off either edge',
+      grid.ghost.x >= -1 && grid.ghost.x + grid.ghost.w <= grid.card.w + 1,
+      'spans ' +
+        grid.ghost.x.toFixed(1) +
+        '..' +
+        (grid.ghost.x + grid.ghost.w).toFixed(1) +
+        ' of ' +
+        grid.card.w,
+    )
+    check(
+      '[' + theme + "] its box matches Figma's 74.4% x 42.4% of the card",
+      nearRatio(grid.ghost.w, FIG.ghost.w / FIG.card.w, grid.card.w, 2) &&
+        nearRatio(grid.ghost.h, FIG.ghost.h / FIG.card.h, grid.card.h, 2),
+      grid.ghost.w.toFixed(1) +
+        ' x ' +
+        grid.ghost.h.toFixed(1) +
+        ' (want ' +
+        ((FIG.ghost.w / FIG.card.w) * grid.card.w).toFixed(1) +
+        ' x ' +
+        ((FIG.ghost.h / FIG.card.h) * grid.card.h).toFixed(1) +
+        ')',
+    )
+    check(
+      '[' + theme + '] three digits, at the locked font-size and 5% opacity',
+      /^\d{3}$/.test(grid.ghostText.trim()) &&
+        grid.style.ghostFontSize === SCALE['--font-size-ghost-watermark-grid'] &&
+        Number(grid.style.ghostOpacity) === GHOST_OPACITY,
+      grid.ghostText.trim() +
+        ' / ' +
+        grid.style.ghostFontSize +
+        ' / opacity ' +
+        grid.style.ghostOpacity,
+    )
+
+    // The sprite: centred, overlapping the watermark's lower half.
+    check(
+      '[' + theme + '] the sprite is centred at 40% of the card width',
+      nearRatio(grid.art.w, FIG.art.w / FIG.card.w, grid.card.w, 2) &&
+        Math.abs(grid.art.x + grid.art.w / 2 - grid.card.w / 2) <= 0.02 * grid.card.w,
+      'w=' + grid.art.w.toFixed(1) + ' x=' + grid.art.x.toFixed(1),
+    )
+    check(
+      '[' + theme + "] at Figma's y=98/467 down the card",
+      nearRatio(grid.art.y, FIG.art.y / FIG.card.h, grid.card.h),
+      'y=' +
+        grid.art.y.toFixed(1) +
+        ' (want ' +
+        ((FIG.art.y / FIG.card.h) * grid.card.h).toFixed(1) +
+        ')',
+    )
+    check(
+      '[' + theme + '] and overlaps the watermark rather than clearing it',
+      grid.art.y < grid.ghost.y + grid.ghost.h,
+      'sprite top ' +
+        grid.art.y.toFixed(1) +
+        ' vs watermark bottom ' +
+        (grid.ghost.y + grid.ghost.h).toFixed(1),
+    )
+
+    // Text block: one left edge for all three lines, at Figma's x=128/497.
+    check(
+      '[' + theme + '] all three text lines share one left edge at 25.8% in',
+      nearRatio(grid.line.x, FIG.line.x / FIG.card.w, grid.card.w) &&
+        Math.abs(grid.line.x - grid.types.x) <= 1 &&
+        (grid.ability == null || Math.abs(grid.line.x - grid.ability.x) <= 1),
+      'line=' +
+        grid.line.x.toFixed(1) +
+        ' types=' +
+        grid.types.x.toFixed(1) +
+        ' ability=' +
+        (grid.ability ? grid.ability.x.toFixed(1) : 'n/a') +
+        ' (want ' +
+        ((FIG.line.x / FIG.card.w) * grid.card.w).toFixed(1) +
+        ')',
+    )
+    for (const [label, got, figY] of [
+      ['number+name', grid.line.y, FIG.line.y],
+      ['type row', grid.types.y, FIG.types.y],
+      ['ability', grid.ability?.y, FIG.ability.y],
+    ]) {
+      if (got == null) continue
+      check(
+        '[' + theme + '] ' + label + " sits at Figma's y=" + figY + '/467',
+        nearRatio(got, figY / FIG.card.h, grid.card.h),
+        'y=' + got.toFixed(1) + ' (want ' + ((figY / FIG.card.h) * grid.card.h).toFixed(1) + ')',
+      )
+    }
+
+    // Stacking order, straight off the reference: watermark+sprite, then dex
+    // number and name on ONE line, then the type row, then the ability.
+    check(
+      '[' + theme + '] content stacks ghost, sprite, number+name, types, ability',
+      JSON.stringify(grid.order) ===
+        JSON.stringify(['ghost', 'art', 'dex-no', 'species-name', 'types', 'ability']),
+      JSON.stringify(grid.order),
+    )
+    check(
+      '[' + theme + '] the dex number and the name share one line, as the reference shows',
+      Math.abs(grid.num.y - grid.nameBox.y) <= 1 &&
+        grid.nameBox.x > grid.num.x &&
+        nearRatio(grid.line.h, FIG.line.h / FIG.card.h, grid.card.h, 3),
+      'number y=' +
+        grid.num.y.toFixed(1) +
+        ' name y=' +
+        grid.nameBox.y.toFixed(1) +
+        ' line height ' +
+        grid.line.h.toFixed(1),
+    )
+    check(
+      '[' + theme + '] the dex number is four digits, in --text-secondary',
+      /^#\d{4}$/.test(grid.style.numText.trim()) &&
+        grid.style.numColor === hexToRgb(want['--text-secondary']),
+      grid.style.numText.trim() + ' / ' + grid.style.numColor,
+    )
+    check(
+      '[' + theme + '] the name is bold --text-primary at --font-size-body',
+      grid.style.nameColor === hexToRgb(want['--text-primary']) &&
+        grid.style.nameFontSize === SCALE['--font-size-body'] &&
+        grid.style.nameWeight === SCALE['--font-weight-bold'],
+      grid.style.nameColor + ' / ' + grid.style.nameFontSize + ' / ' + grid.style.nameWeight,
+    )
+    check(
+      '[' + theme + '] the ability line is --text-secondary',
+      grid.style.abilityColor === hexToRgb(want['--text-secondary']),
+      String(grid.style.abilityColor),
+    )
+
+    // A ghost card: the artwork carries the colour, so no fill, no border, no
+    // shadow anywhere in the grid.
+    check(
+      '[' + theme + '] cards have no fill and no border',
+      grid.style.cardBackground === 'rgba(0, 0, 0, 0)' && grid.style.cardBorder === '0px',
+      grid.style.cardBackground + ' / ' + grid.style.cardBorder,
+    )
+    check(
+      '[' + theme + '] no shadow on anything in the grid',
+      grid.shadows.length === 0,
+      grid.shadows.join(' | '),
+    )
+
+    // Pitch: Figma's 21-raw column gap and 40-raw row gap.
+    check(
+      '[' + theme + "] column pitch matches Figma's 518:497",
+      nearRatio(grid.colPitch, FIG.colPitch / FIG.card.w, grid.card.w, 2),
+      grid.colPitch + ' (want ' + ((FIG.colPitch / FIG.card.w) * grid.card.w).toFixed(1) + ')',
+    )
+    check(
+      '[' + theme + "] row pitch matches Figma's 507:467",
+      nearRatio(grid.rowPitch, FIG.rowPitch / FIG.card.h, grid.card.h, 2),
+      grid.rowPitch + ' (want ' + ((FIG.rowPitch / FIG.card.h) * grid.card.h).toFixed(1) + ')',
+    )
+
+    await page.screenshot({ path: SHOTS + '/grid-' + theme + '.png' })
+  }
+  await page.emulateMedia({ colorScheme: 'light' })
+  await setTheme('light')
+
+  // The ability line is real data, not the mockup's text: non-hidden abilities
+  // only, middot-separated, and absent entirely in the generations that had none.
+  hr('GRID DATA — the ability slot carries real, generation-correct abilities')
   await page.click('[data-testid="nav-pokedex"]')
-  await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
-  const pokedex = await page.evaluate(() => {
-    const row = document.querySelector('[data-testid^="species-row-"]')
-    const cs = getComputedStyle(row)
+  await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 30000 })
+  const gridBaseline = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="species-row-1"]')
+    const box = card.getBoundingClientRect()
+    const line = card.querySelector('.species-card-line').getBoundingClientRect()
+    const types = card.querySelector('.species-card-types').getBoundingClientRect()
     return {
-      fontFamily: cs.fontFamily,
-      accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
-      dsClasses: document.querySelectorAll('.pokedex [class^="ds-"]').length,
+      cardHeight: Math.round(box.height),
+      lineY: Math.round(line.top - box.top),
+      typesY: Math.round(types.top - box.top),
     }
   })
-  log(`  pokedex row font: ${pokedex.fontFamily}`)
-  log(`  --accent seen by the old modules: ${pokedex.accent}`)
+  log('  baseline (all): ' + JSON.stringify(gridBaseline))
+  await page.selectOption('[data-testid="vg-select"]', 'platinum')
+  await page.waitForTimeout(300)
+  const gen4 = await page.evaluate(() => ({
+    bulbasaur:
+      document.querySelector('[data-testid="species-card-ability-1"]')?.textContent ?? null,
+    quagsire:
+      document.querySelector('[data-testid="species-card-ability-195"]')?.textContent ?? null,
+    espeon: document.querySelector('[data-testid="species-card-ability-196"]')?.textContent ?? null,
+  }))
+  log('  Gen 4 (platinum): ' + JSON.stringify(gen4))
   check(
-    'the old modules still use the app shell font, not --font-body',
-    !/IBM Plex/.test(pokedex.fontFamily),
-    pokedex.fontFamily,
+    'Bulbasaur shows Overgrow and not its hidden Chlorophyll',
+    gen4.bulbasaur === 'Overgrow',
+    String(gen4.bulbasaur),
   )
-  check('no design-system component was dropped into them', pokedex.dsClasses === 0)
+  check(
+    'Quagsire shows both non-hidden abilities, middot-separated',
+    gen4.quagsire === 'Damp · Water Absorb',
+    String(gen4.quagsire),
+  )
+  check(
+    'Espeon shows Synchronize and not its hidden Magic Bounce',
+    gen4.espeon === 'Synchronize',
+    String(gen4.espeon),
+  )
+  // Gens 1-2 had no abilities at all: the slot must be absent, and the two lines
+  // above it must not move.
+  await page.selectOption('[data-testid="vg-select"]', 'red-blue')
+  await page.waitForTimeout(300)
+  const gen1 = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="species-row-1"]')
+    const box = card.getBoundingClientRect()
+    const line = card.querySelector('.species-card-line').getBoundingClientRect()
+    const types = card.querySelector('.species-card-types').getBoundingClientRect()
+    return {
+      ability: document.querySelector('[data-testid="species-card-ability-1"]') != null,
+      cardHeight: Math.round(box.height),
+      lineY: Math.round(line.top - box.top),
+      typesY: Math.round(types.top - box.top),
+    }
+  })
+  log('  Gen 1 (red-blue): ' + JSON.stringify(gen1))
+  check('Gen 1 has no ability line at all', !gen1.ability)
+  check(
+    'and the lines above it did not move when it vanished',
+    gen1.lineY === gridBaseline.lineY &&
+      gen1.typesY === gridBaseline.typesY &&
+      gen1.cardHeight === gridBaseline.cardHeight,
+    JSON.stringify(gen1) + ' vs ' + JSON.stringify(gridBaseline),
+  )
+  await page.selectOption('[data-testid="vg-select"]', 'all')
+  await page.waitForTimeout(300)
+
+  // The scroll-down affordance: Figma's "icon-scrolldown" instance, centred.
+  hr('GRID — the scroll-down hint')
+  const hint = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="grid-scroll-hint"]')
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    const gridBox = document.querySelector('.pokedex-grid').getBoundingClientRect()
+    return {
+      atEnd: el.getAttribute('data-at-end'),
+      interactive: el.tagName.toLowerCase() === 'button' || el.querySelector('button') != null,
+      ariaHidden: el.getAttribute('aria-hidden'),
+      centreOffset: Math.round(r.left + r.width / 2 - (gridBox.left + gridBox.width / 2)),
+      opacity: getComputedStyle(el).opacity,
+    }
+  })
+  log('  hint: ' + JSON.stringify(hint))
+  check('the scroll hint renders under the grid', hint != null)
+  check(
+    'centred on the grid, as Figma places it',
+    hint != null && Math.abs(hint.centreOffset) <= 2,
+    hint ? hint.centreOffset + 'px off centre' : '',
+  )
+  check(
+    'decorative and non-interactive -- it is a scroll indicator, not a load-more',
+    hint != null && !hint.interactive && hint.ariaHidden === 'true',
+    hint ? 'interactive=' + hint.interactive + ' aria-hidden=' + hint.ariaHidden : '',
+  )
+  check('visible while there is more to scroll to', hint != null && hint.atEnd === 'false')
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await page.waitForTimeout(250)
+  const hintAtEnd = await page.evaluate(() => ({
+    atEnd: document.querySelector('[data-testid="grid-scroll-hint"]').getAttribute('data-at-end'),
+    opacity: getComputedStyle(document.querySelector('[data-testid="grid-scroll-hint"]')).opacity,
+  }))
+  log('  at the bottom: ' + JSON.stringify(hintAtEnd))
+  check(
+    'and hides once there is nothing further to scroll to',
+    hintAtEnd.atEnd === 'true' && Number(hintAtEnd.opacity) < 0.5,
+    JSON.stringify(hintAtEnd),
+  )
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForTimeout(150)
+
+  // ------------------------------------------- existing modules untouched
+  hr('SCOPE — the five modules outside this pass are still not restyled')
+  // The Pokedex has deliberately moved -- it is what this pass retrofits -- so the
+  // guard now covers the five that have not, and asserts the Pokedex is the only
+  // module the design system has reached.
+  const UNTOUCHED = ['movedex', 'itemdex', 'abilitydex', 'naturedex', 'berrydex']
+  for (const id of UNTOUCHED) {
+    await page.click(`[data-testid="nav-${id}"]`)
+    await page.waitForSelector(`[data-testid="${id}-rows"]`, { timeout: 30000 })
+    const mod = await page.evaluate((dexId) => {
+      const row = document.querySelector(`[data-testid^="${dexId}-row-"]`)
+      const root = document.querySelector(`[data-testid="dex-${dexId}"]`)
+      return {
+        fontFamily: row ? getComputedStyle(row).fontFamily : null,
+        rows: document.querySelectorAll(`[data-testid^="${dexId}-row-"]`).length,
+        dsClasses: root ? root.querySelectorAll('[class^="ds-"]').length : -1,
+        cards: root ? root.querySelectorAll('.species-card').length : -1,
+      }
+    }, id)
+    log(`  ${id}: ${mod.rows} rows, font ${mod.fontFamily}`)
+    check(
+      `${id} still uses the app shell font, not --font-body`,
+      mod.fontFamily != null && !/IBM Plex/.test(mod.fontFamily),
+      String(mod.fontFamily),
+    )
+    check(
+      `${id} has no design-system component and no grid card`,
+      mod.dsClasses === 0 && mod.cards === 0,
+      `ds=${mod.dsClasses} cards=${mod.cards}`,
+    )
+  }
+  await page.click('[data-testid="nav-pokedex"]')
+  await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+  const pokedex = await page.evaluate(() => ({
+    accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+  }))
+  log(`  --accent seen by the old modules: ${pokedex.accent}`)
   // The one deliberate bleed-through, called out in the report rather than hidden.
   check(
     '--accent app-wide is the design system value (the token names collide)',

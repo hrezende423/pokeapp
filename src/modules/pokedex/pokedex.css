@@ -58,6 +58,11 @@
   }
 }
 
+/* Browse mode: the grid is the whole page, so there is no 240px rail slot. */
+.pokedex-body-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /* ---------------------------------------------------------------- list */
 
 .species-list {
@@ -70,6 +75,43 @@
   flex-direction: column;
   padding-top: 1rem;
   box-sizing: border-box;
+}
+
+/* Browse mode is not a rail: it must not stick, must not clamp to 240px, and
+   must not cap its own height -- the page scrolls, and the scroll-down hint below
+   the grid depends on that. Sized by the grid it contains, and centred by
+   .pokedex-grid-wrap. */
+.species-list-grid {
+  position: static;
+  width: auto;
+  max-height: none;
+  padding-top: 0;
+}
+
+/* The reference frame shows no filter row above the grid, but it is explicitly a
+   mid-scroll splice (species 1-3 above 195-197), so controls could equally be
+   above its top edge. Kept, and constrained to the grid's own width. */
+.species-list-grid .list-controls {
+  margin-bottom: var(--space-gap-lg);
+}
+
+/* Back out of a species to the grid: Figma's icon-page-back, as a labelled
+   control rather than a bare arrow. */
+.pokedex-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pokedex-back:hover {
+  color: var(--text-primary);
 }
 
 .list-controls input[type='search'] {
@@ -203,6 +245,213 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem;
+}
+
+/* ----------------------------------------------------------- species grid */
+
+/*
+  The browse grid, from Figma MainPage-Light / MainPage-Dark (frames 9:143 and
+  12:248, geometry identical in both).
+
+  SCALE. The frames are drawn at 1860x1172, which is not CSS px: dividing each
+  text node's width by its glyph advances puts the card name at 14.4px and the
+  dex number at 14.3px -- i.e. --font-size-body -- and the type and ability rows
+  near 11px, i.e. --font-size-label. That fixes the frame at 2.23x the token
+  scale, and every length below is the Figma value / 2.23. Type sizes come from
+  the locked token scale and the geometry is scaled to them, rather than the
+  reverse; the ratios (not the absolute px) are what the verification asserts, so
+  the two stay consistent if the scale is ever re-based.
+
+  Per-card geometry, Figma raw -> CSS:
+    card            497 x 467  -> 223 x 209
+    shadow-number   x 68  y 0    w 370 h 198  -> centred, top 0, w 166 h 89
+    poke-artwork    x 156 y 98   199 x 199    -> centred, top 44, 89 x 89
+    number-name     x 128 y 319  h 39         -> left 57, top 143
+    Types           x 127 y 368  h 29         -> left 57, top 165
+    Ability         x 128 y 407  h 29         -> left 57, top 182
+    column pitch    518 (497 + 21)            -> 223 + 9
+    row pitch       507 (467 + 40)            -> 209 + 18
+*/
+.pokedex-grid-wrap {
+  /* The frame is 960 logical px wide (1860 / 1.9375 at the frame's own export
+     scale) against #root's 1600, so the grid is centred in the wider shell
+     rather than stretched: three 223px columns is what the reference shows, and
+     letting them grow to fill 1560px would rescale every proportion above. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--space-gap-xl);
+}
+
+.pokedex-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 223px);
+  column-gap: 9px;
+  row-gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 760px) {
+  .pokedex-grid {
+    grid-template-columns: repeat(2, 223px);
+  }
+}
+
+@media (max-width: 520px) {
+  .pokedex-grid {
+    grid-template-columns: 223px;
+  }
+}
+
+/* A ghost card: no border, no fill, no shadow. The artwork carries the colour. */
+.species-card {
+  position: relative;
+  display: block;
+  width: 223px;
+  height: 209px;
+  padding: 0;
+  font-family: var(--font-body);
+  line-height: 1.25;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+/*
+  The signature watermark. Two things here contradict what the prose spec said,
+  and Figma is followed on both:
+
+  POSITION. Not "top-right, bleeding off the edge". shadow-number sits at x=68
+  y=0 in a 497-wide card, so it is horizontally centred (68 left, 59 right) and
+  flush with the card top, entirely inside the card. Nothing bleeds, and no host
+  needs overflow: hidden. The sprite then overlaps its lower half, which is what
+  both screenshots show.
+
+  SIZE. Figma's box is 370 x 198 raw = 74.4% of the card width. The 64px token
+  alone renders "001" far narrower than that, so the width is made up with
+  letter-spacing rather than by overriding the locked font-size token -- which
+  also matches the wide digit tracking visible in both screenshots. The two
+  values below are calibrated against the rendered box, not guessed:
+  scripts/calibrate-ghost.mjs sweeps both in the real browser with the real font
+  and reports the pair that lands on Figma's ratios (0.315em renders 166.05px
+  against a 166.02px target; 1.38 renders 88.31px against 88.61px). The GRID
+  section of verify-design-system.mjs then asserts those ratios hold.
+*/
+.species-card-ghost {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-ghost-watermark-grid);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.38;
+  letter-spacing: 0.315em;
+  white-space: nowrap;
+  color: var(--ghost-watermark);
+  opacity: var(--ghost-watermark-opacity);
+  pointer-events: none;
+  user-select: none;
+}
+
+.species-card-art {
+  position: absolute;
+  z-index: 1;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 89px;
+  height: 89px;
+  object-fit: contain;
+}
+
+/* One absolutely-positioned block for all three text lines, so the ability line
+   going missing (Gens 1-2 have no abilities at all) cannot move the two above
+   it, and a long ability cannot change the card's height. */
+.species-card-text {
+  position: absolute;
+  z-index: 1;
+  top: 143px;
+  left: 57px;
+  right: 8px;
+}
+
+.species-card-line {
+  display: flex;
+  align-items: baseline;
+  /* Figma: Name starts 6 raw after Number's box ends, on every card. */
+  gap: 3px;
+  min-width: 0;
+}
+
+.species-card .dex-no {
+  flex: none;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.species-card .species-name {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.species-card-types {
+  display: block;
+  margin-top: 4px;
+}
+
+.species-card-ability {
+  display: block;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keyboard focus needs to be visible on a card with no border or fill of its
+   own; the accent ring is the same one the rest of the shell focuses with. */
+.species-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+/*
+  "icon-scrolldown" -- a component instance (110 x 94 raw) centred under the grid
+  on MainPage, and present again on DetailPage. The name settles what the static
+  screenshot could not: it is a scroll affordance, not pagination and not a
+  load-more control, so it is decorative and non-interactive, and it hides once
+  there is nothing further to scroll to. Figma places it 63 raw (28px) below the
+  last row.
+
+  The glyph is a custom component, not a Tabler icon, and it could not be
+  exported (the Figma MCP call cap). Tabler's chevron stands in at the Figma box
+  width; the reference glyph is wider and shallower than this one.
+*/
+.pokedex-grid-scroll {
+  display: flex;
+  justify-content: center;
+  height: 42px;
+  margin-top: 28px;
+  color: var(--text-secondary);
+  transition: opacity 160ms ease;
+}
+
+.pokedex-grid-scroll[data-at-end='true'] {
+  opacity: 0;
 }
 
 /* ---------------------------------------------------------------- cards */
@@ -742,9 +991,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-gap-lg);
-  align-items: flex-end;
+  /* Figma: the search text box (y 63-79) is centred on the tab row's box
+     (51.5-90.5) -- both centre on y=71 -- so the bar centres rather than
+     bottom-aligning. Nothing hangs off a baseline now that the active tab has no
+     underline to sit on. */
+  align-items: center;
   justify-content: space-between;
-  padding-bottom: 0;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--hairline);
   background: var(--surface);
   font-family: var(--font-body);
@@ -756,36 +1009,54 @@
 .app-bar-nav {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-gap-lg);
+  align-items: baseline;
+  /* Figma: "Pokeapp" ends at x=134, "Pokedex" starts at 154 -- the brand sits in
+     the same 20-raw (9px) rhythm as the tabs, not in a separate cluster. */
+  gap: 9px;
 }
 
 /* 14px/700, first in the row -- straight from the navbar spec. */
+/*
+  Figma's five nav labels all imply the same font size: dividing each text node's
+  width by its glyph advances gives 14.2-14.5px for every one of them, so the
+  brand is NOT larger than the tabs and the active tab is NOT wider than the
+  brand. What separates them is colour: --text-primary / --accent / --text-secondary.
+  Weight is the one attribute the inspector could not confirm (the Figma MCP
+  monthly call cap ran out before get_design_context returned), so 600 here is
+  read off the two reference screenshots, where the brand and the active tab are
+  visibly heavier than the inactive tabs.
+*/
 .app-brand {
   font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
   color: var(--text-primary);
-  margin-bottom: 10px;
 }
 
+/* Figma tab gaps are a uniform 20 raw = 9px: 154-134, 306-286, 409-389, 519-499. */
 .dex-switcher {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-gap-lg);
-  margin-bottom: -1px;
+  gap: 9px;
 }
 
-/* No fill, no box: an underline tab. Same treatment as the validated Tabs
-   component in src/components/ds. */
+/*
+  Text-only tabs: no fill, no box, and -- against the §5 Tabs spec -- no underline.
+  The MainPage nav-bar frame contains exactly six children in both themes: a Tabs
+  frame holding five bare <text> nodes, and the search <text>. There is no
+  rectangle, line or vector anywhere under it, so the active tab is marked by
+  colour alone. Both reference screenshots agree: nothing is drawn under "Pokedex".
+  The hairline under the whole row survives as the frame's own stroke (visible in
+  both screenshots) and stays on .app-bar.
+*/
 .dex-tab {
-  padding: 0 0 10px;
+  padding: 0;
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
   color: var(--text-secondary);
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
   border-radius: 0;
   cursor: pointer;
 }
@@ -799,8 +1070,7 @@
 
 .dex-tab-active {
   color: var(--accent);
-  font-weight: var(--font-weight-bold);
-  border-bottom-color: var(--accent);
+  font-weight: var(--font-weight-medium);
 }
 
 /* The version-group picker lives in this same bar, so it would have been the one
@@ -808,7 +1078,6 @@
    the full §5 select treatment (label above, underline only) would restructure a
    control that is not otherwise in scope for this pass. */
 .app-bar .vg-selector {
-  margin-bottom: 10px;
   font-family: var(--font-body);
   font-size: var(--font-size-label);
   color: var(--text-secondary);
@@ -949,24 +1218,42 @@
 /* The panel is absolutely positioned so opening it never reflows the dex below:
    the layout suites measure the sidebar and detail widths, and a dropdown that
    pushes the page down would move every element they check. */
+/*
+  Borderless, per the reference -- which overrides the bordered "Global search
+  bar" entry in ds-component-library-full95.html.
+
+  Figma's nav-bar has one search node: a bare <text> ("search-species", x=1726
+  y=63 w=94 h=16), right-aligned 40 raw (18px) off the frame edge. No rectangle,
+  no stroke, no fill and no icon node accompanies it in either theme, so the
+  bordered box and the Tabler magnifier added in 2616534 both come off. This also
+  brings the control in line with every other input in full95, which are all
+  underline-only rather than boxed.
+
+  Figma's own type size for it is unusable -- a 16-raw box and 94 raw for
+  fourteen characters works out near 6px -- so this reads as placeholder
+  imprecision in the mockup rather than intent, and the size falls back to
+  --font-size-label, which preserves what the reference does convey: the search
+  is markedly smaller than the nav labels beside it.
+*/
 .global-search {
   position: relative;
   flex: 1 1 16rem;
   max-width: 26rem;
-  margin-bottom: 10px;
 }
 
 .global-search-input {
   width: 100%;
-  /* Left padding clears the 24px icon; the icon sits in the field rather than
-     beside it, so the whole control is one target. */
-  padding: 9px 10px 9px 40px;
+  padding: 2px 0;
   font-family: var(--font-body);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-label);
   color: var(--text-primary);
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-control);
+  /* Right-aligned: the reference sets the text hard against the right margin,
+     and a left-aligned caret in a borderless field reads as stray page text. */
+  text-align: right;
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
   box-sizing: border-box;
 }
 
@@ -974,21 +1261,16 @@
   color: var(--text-secondary);
 }
 
-/* Focus is the accent, at the same 2px weight the form-field focus state uses --
-   padding drops by the 1px the border gains so the field does not shift. */
+/*
+  Figma has no focus state for this field, and a borderless input with the default
+  outline suppressed would have none at all. Resolved with the system's own
+  vocabulary rather than a new one: the accent (item 5 of the shell pass reserves
+  it for search focus) on the hairline underline that every full95 input already
+  uses. Nothing shifts, because the transparent underline is there at rest.
+*/
 .global-search-input:focus {
   outline: none;
-  border: var(--field-focus-border-width) solid var(--field-focus-border);
-  padding: 8px 9px 8px 39px;
-}
-
-.global-search-icon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-secondary);
-  pointer-events: none;
+  border-bottom-color: var(--accent);
 }
 
 /* A floating panel, so this is where --surface-raised belongs -- and the reason

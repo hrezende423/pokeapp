@@ -1,4 +1,3 @@
-import { IconSearch } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
@@ -49,16 +48,6 @@ export function GlobalSearch() {
 
   return (
     <div className="global-search" ref={wrapRef} data-testid="global-search-wrap">
-      {/* Tabler, on the locked 24px grid at 1.5 stroke. Decorative: the input
-          already carries the accessible name, so this is aria-hidden. */}
-      <IconSearch
-        className="global-search-icon"
-        size={24}
-        stroke={1.5}
-        data-testid="global-search-icon"
-        aria-hidden
-        focusable="false"
-      />
       <input
         type="search"
         className="global-search-input"
