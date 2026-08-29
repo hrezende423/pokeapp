@@ -59,10 +59,17 @@ colored text label only — no fill, no pill, no badge shape. Colored badge
 chips were tried and explicitly rejected (see §4) as the single most common
 "AI-generated dashboard" tell we found across every reference search.
 
-**Numbers are always monospace.** Dex index and stat values use
-`--font-numeric`; names, labels, and body copy use `--font-body`
-(**IBM Plex Sans**, self-hosted — see implementation note below). This is
-the only typographic mixing rule in the system.
+**Functional numbers are monospace.** Dex index and stat values use
+`--font-numeric` (**JetBrains Mono**, self-hosted); names, labels, and body
+copy use `--font-body` (**IBM Plex Sans**, self-hosted — see implementation
+note below). This is the only typographic mixing rule in the system.
+
+The rule is about tabular data, so it stops at the **ghost watermark**, which
+takes `--font-body`. Mono buys column alignment, and a single centered
+three-digit number at 5–9% opacity has no column to align to — it is display
+type that happens to be a number. Confirmed as a refinement of the mono rule,
+not an exception to it. Every number you actually read a value off of — stat
+tables, EV fields, dex numbers in list rows and grid cards — stays mono.
 
 **Stats are a plain data table, not a progress-bar widget.** Label left,
 value right, monospace, hairline row divider. Progress bars were tried and
@@ -132,8 +139,9 @@ Full species detail view. `--radius-card` corners, `--space-card-padding`
 padding, `--surface` background, no border, no shadow.
 - Rotated micro-label, top-left (e.g. "Gen 2"), `--font-size-caption`,
   `--text-secondary`, `rotate(-90deg)` from a left-top origin.
-- Ghost watermark: dex number, `--font-numeric`, `--font-size-ghost-watermark`,
-  `--ghost-watermark` color at `--ghost-watermark-opacity`, positioned
+- Ghost watermark: dex number, `--font-body` (display type, not tabular —
+  see §2), `--font-size-ghost-watermark`, `--ghost-watermark` color at
+  `--ghost-watermark-opacity` (0.09 light / 0.05 dark), positioned
   top-right, bleeding off the card edge.
 - Mini badges (height/weight), top corners, pill radius, small caption text,
   `--mini-badge-fill` background.
@@ -187,9 +195,13 @@ bottom border under the nav, active item in `--accent`. 3-column grid,
 `--space-gap-lg` gutters.
 - Card: no border, no background fill (ghost — ties to the "artwork provides
   the color" principle even at grid scale).
-- Mini ghost watermark: dex number, `--font-numeric`, `--font-size-ghost-watermark-grid`
-  (64px — a scaled-down version of the hero/detail treatment, same color and
-  opacity rules), positioned top-right of the card, bleeding off the edge.
+- Mini ghost watermark: dex number, `--font-body` (display type, not tabular —
+  see §2), `--font-size-ghost-watermark-grid` (64px — a scaled-down version of
+  the hero/detail treatment, same color and opacity rules). **Position corrected
+  against Figma MainPage-Light/Dark:** centered on the card and flush with its
+  top, entirely inside it, with the artwork overlapping its lower half — NOT
+  top-right and NOT bleeding off the edge. Figma's `shadow-number` node sits at
+  x=68 y=0 in a 497-wide card, and its box is 74.4% x 42.4% of the card.
 - Artwork: centered, top of card, background removed, no platform/frame.
 - Below artwork, in order: dex number (mono, secondary text) + name
   (bold, humanist) on one line; type row (colored text, dual types

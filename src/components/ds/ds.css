@@ -476,10 +476,16 @@
 
 /* The signature element: an oversized dex number at 5% opacity, bleeding off the
    top-right corner. Same colour and opacity rules at both scales. */
+/* Display type, not tabular data: the watermark is the one number in the system
+   that is decoration rather than a value to read off, so it takes the
+   proportional face while every functional number keeps --font-numeric. A
+   refinement of the mono rule (DESIGN-SYSTEM.md section 2), not an exception to
+   it -- mono buys column alignment, which a single centred 3-digit ghost at 5-9%
+   opacity has no use for, and Plex Mono's digits look mechanical at 220px. */
 .ds-ghost {
   position: absolute;
   z-index: 0;
-  font-family: var(--font-numeric);
+  font-family: var(--font-body);
   font-weight: var(--font-weight-bold);
   line-height: 0.8;
   color: var(--ghost-watermark);

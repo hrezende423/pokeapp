@@ -22,7 +22,7 @@
 
   /* decorative */
   --ghost-watermark: #141414;
-  --ghost-watermark-opacity: 0.05;
+  --ghost-watermark-opacity: 0.09;
   --mini-badge-fill: rgba(0, 0, 0, 0.05);
   --mini-badge-text: #555555;
 
@@ -105,7 +105,7 @@
      @font-face rules pointing at bundled .woff2 files once those assets
      exist. Fallback stack below is the previous system-humanist pick. */
   --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-numeric: "SF Mono", "JetBrains Mono", Consolas, monospace;
+  --font-numeric: "JetBrains Mono", "SF Mono", Consolas, monospace;
 
   --font-size-display: 38px;
   --font-size-title: 20px;

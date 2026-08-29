@@ -129,7 +129,10 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
                     <span className="species-name">{species.display_name}</span>
                   </span>
                   <span className="species-card-types">
-                    <TypeRow types={typeIds.map((id) => getType(id)?.name ?? '').filter(Boolean)} />
+                    <TypeRow
+                      types={typeIds.map((id) => getType(id)?.name ?? '').filter(Boolean)}
+                      small
+                    />
                   </span>
                   {/*
                     Non-hidden abilities only, middot-separated -- read off the

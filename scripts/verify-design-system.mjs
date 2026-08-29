@@ -113,6 +113,16 @@ const EXPECTED = {
   },
 }
 
+/**
+ * Per-mode now: 0.09 light / 0.05 dark. 5% white on a near-black surface reads
+ * far stronger than 5% black on a near-white one, so one value cannot match the
+ * reference in both -- the same asymmetry the type-color dark overrides use.
+ */
+const GHOST_OPACITY = {
+  light: String(tokenValue(tokens.opacity['ghost-watermark'], 'light')),
+  dark: String(tokenValue(tokens.opacity['ghost-watermark'], 'dark')),
+}
+
 /** Mode-agnostic scales, expected identical in both themes. */
 const SCALE = {
   '--font-size-display': tokens.typography['font-size'].display.$value,
@@ -137,7 +147,6 @@ const SCALE = {
   '--space-gap-md': tokens.spacing['gap-md'].$value,
   '--space-gap-lg': tokens.spacing['gap-lg'].$value,
   '--space-gap-xl': tokens.spacing['gap-xl'].$value,
-  '--ghost-watermark-opacity': String(tokens.opacity['ghost-watermark'].$value),
   '--icon-grid': tokens.icon.grid.$value,
   '--icon-stroke-width': tokens.icon['stroke-width'].$value,
 }
@@ -522,6 +531,59 @@ try {
     `${fontState.heroFontSize} / ${fontState.heroFontWeight}`,
   )
 
+  // --font-numeric used to trail 'SF Mono', so on any machine with SF Mono the
+  // numeric face resolved to an unbundled system font. It is now self-hosted and
+  // leads the stack, which is what these three checks pin.
+  const monoState = await page.evaluate(async () => {
+    await document.fonts.ready
+    const faces = [...document.fonts].filter((f) => f.family.includes('JetBrains Mono'))
+    const measure = (family, weight = 400) => {
+      const s = document.createElement('span')
+      s.textContent = '0123456789'
+      s.style.cssText =
+        'position:absolute;visibility:hidden;white-space:pre;font-size:40px;' +
+        `font-weight:${weight};font-family:${family}`
+      document.body.appendChild(s)
+      const w = s.getBoundingClientRect().width
+      s.remove()
+      return w
+    }
+    return {
+      faces: faces.map((f) => ({ weight: f.weight, status: f.status })),
+      check14: document.fonts.check('14px "JetBrains Mono"'),
+      resolved: getComputedStyle(document.documentElement)
+        .getPropertyValue('--font-numeric')
+        .trim(),
+      jbWidth: measure('"JetBrains Mono"'),
+      genericMonoWidth: measure('monospace'),
+    }
+  })
+  log(`  JetBrains Mono faces: ${JSON.stringify(monoState.faces)}`)
+  log(`  --font-numeric resolves to: ${monoState.resolved}`)
+  log(
+    `  digits at 40px, JetBrains vs generic mono: ${monoState.jbWidth.toFixed(1)} vs ${monoState.genericMonoWidth.toFixed(1)}`,
+  )
+  check(
+    'JetBrains Mono is registered and loaded, not just named',
+    monoState.faces.length > 0 &&
+      monoState.faces.some((f) => f.status === 'loaded') &&
+      monoState.check14,
+    JSON.stringify(monoState.faces),
+  )
+  check(
+    'it leads --font-numeric, so the bundled face is what resolves',
+    /^'?"?JetBrains Mono/.test(monoState.resolved),
+    monoState.resolved,
+  )
+  check(
+    'and its woff2 came from this origin, not a CDN',
+    fontReqs.some((u) => /jetbrains-mono/.test(u)) &&
+      fontReqs
+        .filter((u) => /jetbrains-mono/.test(u))
+        .every((u) => u.startsWith(`http://localhost:${PORT}/pokeapp/`)),
+    fontReqs.filter((u) => /jetbrains-mono/.test(u)).join(' ') || 'no jetbrains-mono request',
+  )
+
   // -------------------------------------------------------- no shadows
   hr('ELEVATION — no shadow on anything, in either theme')
   const shadows = await page.evaluate(() => {
@@ -831,8 +893,8 @@ try {
     comp.grid.ghostSize,
   )
   check(
-    'at the constant 5% opacity',
-    comp.grid.ghostOpacity === SCALE['--ghost-watermark-opacity'],
+    "at light mode's ghost-watermark opacity",
+    comp.grid.ghostOpacity === GHOST_OPACITY.light,
     comp.grid.ghostOpacity,
   )
   check(
@@ -840,9 +902,12 @@ try {
     comp.grid.ghostColor === rgb(EXPECTED.light['--ghost-watermark']),
     comp.grid.ghostColor,
   )
+  // Display type, not tabular data: the watermark is the one number in the system
+  // that takes --font-body. Every functional number keeps --font-numeric.
   check(
-    'and the numeric font',
-    /SF Mono|JetBrains Mono|Consolas|monospace/.test(comp.grid.ghostFont),
+    'and the proportional display font, not the mono one',
+    /^"?IBM Plex Sans"?/.test(comp.grid.ghostFont),
+    comp.grid.ghostFont,
   )
 
   log(`  hero card: ${JSON.stringify(comp.hero)}`)
@@ -1067,11 +1132,11 @@ try {
       const tabs = [...document.querySelectorAll('.dex-tab')]
       const gapAfterBrand =
         tabs.length > 0
-          ? Math.round(tabs[0].getBoundingClientRect().left - brandEl.getBoundingClientRect().right)
+          ? tabs[0].getBoundingClientRect().left - brandEl.getBoundingClientRect().right
           : null
       const gapBetweenTabs =
         tabs.length > 1
-          ? Math.round(tabs[1].getBoundingClientRect().left - tabs[0].getBoundingClientRect().right)
+          ? tabs[1].getBoundingClientRect().left - tabs[0].getBoundingClientRect().right
           : null
       return {
         elements: document.querySelectorAll('.app-bar *').length,
@@ -1104,6 +1169,7 @@ try {
         idleTab: {
           color: idle.color,
           fontSize: idle.fontSize,
+          weight: idle.fontWeight,
           borderBottomWidth: idle.borderBottomWidth,
           background: idle.backgroundColor,
         },
@@ -1184,6 +1250,13 @@ try {
       shell.brand.fontSize + ' / ' + shell.activeTab.fontSize + ' / ' + shell.idleTab.fontSize,
     )
     check(
+      '[' + theme + '] all five labels share --font-weight-medium; only colour separates them',
+      shell.brand.weight === SCALE['--font-weight-medium'] &&
+        shell.activeTab.weight === SCALE['--font-weight-medium'] &&
+        shell.idleTab.weight === SCALE['--font-weight-medium'],
+      shell.brand.weight + ' / ' + shell.activeTab.weight + ' / ' + shell.idleTab.weight,
+    )
+    check(
       '[' + theme + '] the brand is --text-primary',
       shell.brand.color === hexToRgb(want['--text-primary']),
       shell.brand.color,
@@ -1193,14 +1266,14 @@ try {
     // the same rhythm -- 154-134 for brand->tab, 306-286 / 409-389 / 519-499
     // between tabs.
     check(
-      '[' + theme + "] the brand-to-tab gap is Figma's 9px",
-      shell.gapAfterBrand === 9,
-      '(' + shell.gapAfterBrand + 'px)',
+      '[' + theme + "] the brand-to-tab gap is Figma's 20 raw = 8.5px",
+      Math.abs(shell.gapAfterBrand - 8.5) <= 0.6,
+      '(' + shell.gapAfterBrand.toFixed(2) + 'px)',
     )
     check(
       '[' + theme + '] and so is the gap between tabs',
-      shell.gapBetweenTabs === 9,
-      '(' + shell.gapBetweenTabs + 'px)',
+      Math.abs(shell.gapBetweenTabs - 8.5) <= 0.6,
+      '(' + shell.gapBetweenTabs.toFixed(2) + 'px)',
     )
 
     // FIGMA, against the §5 Tabs spec: the nav-bar frame holds a Tabs frame of
@@ -1320,6 +1393,74 @@ try {
   await page.emulateMedia({ colorScheme: 'light' })
   await setTheme('light')
 
+  // ------------------------------------------------ underline scope guard
+  hr('TABS — dropping the underline is scoped to the app nav, nothing else')
+  // Two different components that both happen to be called tabs. The top-level
+  // app nav (brand / Pokedex / Team / Notes / Tools) has no underline, because the
+  // MainPage frames have no such node. The §5 Tabs component -- which the species
+  // detail page's Stats / Moves / Evolution row will use -- keeps its 2px accent
+  // underline. This guard exists so a future edit to one cannot silently take the
+  // other with it.
+  for (const theme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: theme })
+    await setTheme(theme)
+    await page.click('[data-testid="nav-designsystem"]')
+    await page.waitForSelector('[data-testid="dex-designsystem"]', { timeout: 30000 })
+    await page.mouse.move(1200, 900)
+    const tabs = await page.evaluate((mode) => {
+      // The reference page renders every component twice, once per mode, so this
+      // has to find the Tabs demo in THIS mode's panel. Selecting the panel by
+      // data-demo-theme alone would land on the page's first light panel, which
+      // belongs to some earlier component and has no tabs in it at all.
+      const row = [...document.querySelectorAll('[data-ds="tabs"]')].find(
+        (el) => el.closest('[data-demo-theme]')?.dataset.demoTheme === mode,
+      )
+      const selected = row?.querySelector('[data-ds="tab"][aria-selected="true"]') ?? null
+      const idle = row?.querySelector('[data-ds="tab"][aria-selected="false"]') ?? null
+      const navActive = document.querySelector('.dex-tab-active')
+      const cs = (el) => (el ? getComputedStyle(el) : null)
+      const s = cs(selected)
+      const i = cs(idle)
+      const r = cs(row)
+      const n = cs(navActive)
+      return {
+        found: selected != null && idle != null && row != null,
+        selectedUnderline: s ? s.borderBottomWidth + ' ' + s.borderBottomColor : null,
+        selectedColor: s ? s.color : null,
+        idleUnderlineWidth: i ? i.borderBottomWidth : null,
+        idleUnderlineColor: i ? i.borderBottomColor : null,
+        rowRule: r ? r.borderBottomWidth + ' ' + r.borderBottomColor : null,
+        navActiveUnderlineWidth: n ? n.borderBottomWidth : null,
+      }
+    }, theme)
+    const want = EXPECTED[theme]
+    log('  [' + theme + '] §5 Tabs: ' + JSON.stringify(tabs))
+    check('[' + theme + '] the §5 Tabs component is on the page to check', tabs.found)
+    check(
+      '[' + theme + '] its selected tab KEEPS the 2px --accent underline',
+      tabs.selectedUnderline === '2px ' + hexToRgb(want['--accent']) &&
+        tabs.selectedColor === hexToRgb(want['--accent']),
+      tabs.selectedUnderline + ' / ' + tabs.selectedColor,
+    )
+    check(
+      '[' + theme + '] its unselected tabs keep the transparent 2px track',
+      tabs.idleUnderlineWidth === '2px' && tabs.idleUnderlineColor === 'rgba(0, 0, 0, 0)',
+      tabs.idleUnderlineWidth + ' ' + tabs.idleUnderlineColor,
+    )
+    check(
+      '[' + theme + '] and the row keeps its hairline rule',
+      tabs.rowRule === '1px ' + hexToRgb(want['--hairline']),
+      tabs.rowRule,
+    )
+    check(
+      '[' + theme + '] while the app nav tab still has none -- the two are independent',
+      tabs.navActiveUnderlineWidth === '0px',
+      String(tabs.navActiveUnderlineWidth),
+    )
+  }
+  await page.emulateMedia({ colorScheme: 'light' })
+  await setTheme('light')
+
   // ------------------------------------------------------- the browse grid
   hr('GRID — the Pokedex browse grid against MainPage-Light / MainPage-Dark')
   //
@@ -1333,7 +1474,6 @@ try {
   //   column pitch   518 (497 + 21) | row pitch 507 (467 + 40)
   //
   // Asserted as ratios of the rendered card, so the checks survive a re-scale.
-  const GHOST_OPACITY = tokens.opacity['ghost-watermark'].$value
   const FIG = {
     card: { w: 497, h: 467 },
     ghost: { x: 68, y: 0, w: 370, h: 198 },
@@ -1431,12 +1571,17 @@ try {
           ghostFontFamily: ghostCs.fontFamily,
           numColor: numCs.color,
           numFontSize: numCs.fontSize,
+          numFontFamily: numCs.fontFamily,
           numText: first.querySelector('.dex-no').textContent,
           nameColor: nameCs.color,
           nameFontSize: nameCs.fontSize,
           nameWeight: nameCs.fontWeight,
           abilityColor: abilityCs ? abilityCs.color : null,
           abilityFontSize: abilityCs ? abilityCs.fontSize : null,
+          typeFontSize: (() => {
+            const t = first.querySelector('[data-ds="type-label"]')
+            return t ? getComputedStyle(t).fontSize : null
+          })(),
         },
         ghostText: first.querySelector('.species-card-ghost').textContent,
         typeText: first.querySelector('.species-card-types').textContent,
@@ -1511,10 +1656,10 @@ try {
         ')',
     )
     check(
-      '[' + theme + '] three digits, at the locked font-size and 5% opacity',
+      '[' + theme + "] three digits, at the locked font-size and this mode's opacity",
       /^\d{3}$/.test(grid.ghostText.trim()) &&
         grid.style.ghostFontSize === SCALE['--font-size-ghost-watermark-grid'] &&
-        Number(grid.style.ghostOpacity) === GHOST_OPACITY,
+        grid.style.ghostOpacity === GHOST_OPACITY[theme],
       grid.ghostText.trim() +
         ' / ' +
         grid.style.ghostFontSize +
@@ -1523,6 +1668,18 @@ try {
     )
 
     // The sprite: centred, overlapping the watermark's lower half.
+    // Display type, not tabular data: the watermark is the one number that takes
+    // --font-body while every functional number keeps --font-numeric.
+    check(
+      '[' + theme + '] the watermark is set in the proportional face, not the mono one',
+      /^"?IBM Plex Sans"?/.test(grid.style.ghostFontFamily),
+      grid.style.ghostFontFamily,
+    )
+    check(
+      '[' + theme + '] while the dex number beside it stays mono',
+      /JetBrains Mono/.test(grid.style.numFontFamily),
+      grid.style.numFontFamily,
+    )
     check(
       '[' + theme + '] the sprite is centred at 40% of the card width',
       nearRatio(grid.art.w, FIG.art.w / FIG.card.w, grid.card.w, 2) &&
@@ -1602,17 +1759,27 @@ try {
         grid.style.numColor === hexToRgb(want['--text-secondary']),
       grid.style.numText.trim() + ' / ' + grid.style.numColor,
     )
+    // 600, not 700: across all six reference names the measured fit is 14.00px at
+    // weight 600 against 13.82px at 700.
     check(
-      '[' + theme + '] the name is bold --text-primary at --font-size-body',
+      '[' + theme + '] the name is --font-weight-medium --text-primary at --font-size-body',
       grid.style.nameColor === hexToRgb(want['--text-primary']) &&
         grid.style.nameFontSize === SCALE['--font-size-body'] &&
-        grid.style.nameWeight === SCALE['--font-weight-bold'],
+        grid.style.nameWeight === SCALE['--font-weight-medium'],
       grid.style.nameColor + ' / ' + grid.style.nameFontSize + ' / ' + grid.style.nameWeight,
     )
+    // Measured off the two reference strings with no middot in them, so no
+    // spacing ambiguity: PSYCHIC 9.92px and DARK 9.64px -- caption, not label.
     check(
-      '[' + theme + '] the ability line is --text-secondary',
-      grid.style.abilityColor === hexToRgb(want['--text-secondary']),
-      String(grid.style.abilityColor),
+      '[' + theme + '] the type row is --font-size-caption',
+      grid.style.typeFontSize === SCALE['--font-size-caption'],
+      String(grid.style.typeFontSize),
+    )
+    check(
+      '[' + theme + '] the ability line is --font-size-label in --text-secondary',
+      grid.style.abilityFontSize === SCALE['--font-size-label'] &&
+        grid.style.abilityColor === hexToRgb(want['--text-secondary']),
+      grid.style.abilityFontSize + ' / ' + grid.style.abilityColor,
     )
 
     // A ghost card: the artwork carries the colour, so no fill, no border, no

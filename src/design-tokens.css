@@ -1,12 +1,22 @@
 /*
   Pokeapp design tokens — consolidated v1.
   Moved verbatim from design-system/design-tokens.css, which stays the handoff
-  copy. Values are the source of truth and are not edited here; three deltas
+  copy. Values are the source of truth and are not edited here; five deltas
   from that file, all of them syncing it to design-tokens.json:
 
     - @font-face rules added for the bundled IBM Plex Sans (the file asked for
       them once the assets existed). Self-hosted, no CDN: an offline-first PWA
       cannot depend on fonts.gstatic.com.
+    - @font-face rules added for JetBrains Mono, and --font-numeric reordered to
+      put it first. It was already in the stack but behind 'SF Mono', so on any
+      machine with SF Mono the numeric face resolved to an unbundled system font
+      -- the one hole left in the offline-first font rule. Bundling it and moving
+      it to the front closes that; the remaining entries stay as fallbacks.
+      Variable file (wght 100-800), latin + latin-ext, matching the Plex setup.
+    - --ghost-watermark-opacity split per mode: 0.09 light, 0.05 dark. 5% white
+      on a near-black surface reads far stronger than 5% black on a near-white
+      one, so one value cannot match the reference in both. The same kind of
+      light/dark asymmetry the type-color dark-mode overrides already establish.
     - --field-* and --ledger-num-opacity-* moved from the [data-theme="dark"]
       rule into the mode-agnostic :root rule. They were dark-only, so in light
       mode form-field states and the ledger dim rule resolved to nothing. Both
@@ -20,6 +30,29 @@
   Toggle theme via data-theme="light" | "dark" on :root or any ancestor.
   src/theme.ts sets it from the OS preference at boot.
 */
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
 
 @font-face {
   font-family: 'IBM Plex Sans';
@@ -69,7 +102,7 @@
 
   /* decorative */
   --ghost-watermark: #141414;
-  --ghost-watermark-opacity: 0.05;
+  --ghost-watermark-opacity: 0.09;
   --mini-badge-fill: rgba(0, 0, 0, 0.05);
   --mini-badge-text: #555555;
 
@@ -139,7 +172,13 @@
      file and src/assets/fonts/. The fallback stack below is the previous
      system-humanist pick, and now only applies if the bundled files fail. */
   --font-body: 'IBM Plex Sans', -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-numeric: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+  /* JetBrains Mono is self-hosted too — see the @font-face rules at the top of
+     this file. It leads the stack rather than trailing 'SF Mono', so the bundled
+     face is what actually resolves everywhere; the rest are fallbacks only.
+     Functional numbers only: stat tables, EV fields, dex numbers in rows and
+     cards. NOT the oversized ghost watermark, which is display type and takes
+     --font-body (DESIGN-SYSTEM.md section 2). */
+  --font-numeric: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
   --font-size-display: 38px;
   --font-size-title: 20px;

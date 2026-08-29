@@ -253,30 +253,35 @@
   The browse grid, from Figma MainPage-Light / MainPage-Dark (frames 9:143 and
   12:248, geometry identical in both).
 
-  SCALE. The frames are drawn at 1860x1172, which is not CSS px: dividing each
-  text node's width by its glyph advances puts the card name at 14.4px and the
-  dex number at 14.3px -- i.e. --font-size-body -- and the type and ability rows
-  near 11px, i.e. --font-size-label. That fixes the frame at 2.23x the token
-  scale, and every length below is the Figma value / 2.23. Type sizes come from
-  the locked token scale and the geometry is scaled to them, rather than the
-  reverse; the ratios (not the absolute px) are what the verification asserts, so
-  the two stay consistent if the scale is ever re-based.
+  SCALE. The frames are drawn at 1860x1172, which is not CSS px, and the divisor
+  is measured rather than assumed: scripts/calibrate-scale.mjs takes every
+  unambiguous text node in MainPage-Light, measures that exact string's advance in
+  the real self-hosted IBM Plex Sans, and inverts it to the size the node was set
+  at. Solved across all roles at once that gives 2.348, at which every role lands
+  on the token scale -- card name 14.00, nav label 14.13, ability 10.88, dex
+  number 13.54, type row 9.6-9.9. The obvious alternative, a conventional 2.0
+  export scale, is ruled out: it puts every role between token sizes (names 16.2,
+  nav 16.6, ability 12.8, types 11.1-11.7), each 1.2-3.0px out.
+
+  So the type sizes below are the locked tokens and every length is the Figma
+  value / 2.348. The verification asserts the ratios rather than these absolute
+  px, so re-basing the scale cannot silently break them.
 
   Per-card geometry, Figma raw -> CSS:
-    card            497 x 467  -> 223 x 209
-    shadow-number   x 68  y 0    w 370 h 198  -> centred, top 0, w 166 h 89
-    poke-artwork    x 156 y 98   199 x 199    -> centred, top 44, 89 x 89
-    number-name     x 128 y 319  h 39         -> left 57, top 143
-    Types           x 127 y 368  h 29         -> left 57, top 165
-    Ability         x 128 y 407  h 29         -> left 57, top 182
-    column pitch    518 (497 + 21)            -> 223 + 9
-    row pitch       507 (467 + 40)            -> 209 + 18
+    card            497 x 467  -> 212 x 199
+    shadow-number   x 68  y 0    w 370 h 198  -> centred, top 0, w 158 h 84
+    poke-artwork    x 156 y 98   199 x 199    -> centred, top 42, 85 x 85
+    number-name     x 128 y 319  h 39         -> left 55, top 136
+    Types           x 127 y 368  h 29         -> left 55, top 157
+    Ability         x 128 y 407  h 29         -> left 55, top 173
+    column pitch    518 (497 + 21)            -> 212 + 9
+    row pitch       507 (467 + 40)            -> 199 + 17
 */
 .pokedex-grid-wrap {
-  /* The frame is 960 logical px wide (1860 / 1.9375 at the frame's own export
-     scale) against #root's 1600, so the grid is centred in the wider shell
-     rather than stretched: three 223px columns is what the reference shows, and
-     letting them grow to fill 1560px would rescale every proportion above. */
+  /* The frame is 792 logical px wide (1860 / 2.348) against #root's 1600, so the
+     grid is centred in the wider shell rather than stretched: three 212px columns
+     is what the reference shows, and letting them grow to fill 1560px would
+     rescale every proportion above. */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -285,23 +290,23 @@
 
 .pokedex-grid {
   display: grid;
-  grid-template-columns: repeat(3, 223px);
+  grid-template-columns: repeat(3, 212px);
   column-gap: 9px;
-  row-gap: 18px;
+  row-gap: 17px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 720px) {
   .pokedex-grid {
-    grid-template-columns: repeat(2, 223px);
+    grid-template-columns: repeat(2, 212px);
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 500px) {
   .pokedex-grid {
-    grid-template-columns: 223px;
+    grid-template-columns: 212px;
   }
 }
 
@@ -309,8 +314,8 @@
 .species-card {
   position: relative;
   display: block;
-  width: 223px;
-  height: 209px;
+  width: 212px;
+  height: 199px;
   padding: 0;
   font-family: var(--font-body);
   line-height: 1.25;
@@ -347,11 +352,12 @@
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  font-family: var(--font-numeric);
+  /* Display type, not tabular data -- see the note on .ds-ghost in ds.css. */
+  font-family: var(--font-body);
   font-size: var(--font-size-ghost-watermark-grid);
   font-weight: var(--font-weight-bold);
-  line-height: 1.38;
-  letter-spacing: 0.315em;
+  line-height: 1.32;
+  letter-spacing: 0.222em;
   white-space: nowrap;
   color: var(--ghost-watermark);
   opacity: var(--ghost-watermark-opacity);
@@ -362,11 +368,11 @@
 .species-card-art {
   position: absolute;
   z-index: 1;
-  top: 44px;
+  top: 42px;
   left: 50%;
   transform: translateX(-50%);
-  width: 89px;
-  height: 89px;
+  width: 85px;
+  height: 85px;
   object-fit: contain;
 }
 
@@ -376,8 +382,8 @@
 .species-card-text {
   position: absolute;
   z-index: 1;
-  top: 143px;
-  left: 57px;
+  top: 136px;
+  left: 55px;
   right: 8px;
 }
 
@@ -398,18 +404,23 @@
   color: var(--text-secondary);
 }
 
+/* 600, not 700: across all six names in the reference the measured fit is 14.00px
+   at weight 600 against 13.82px at 700. */
 .species-card .species-name {
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* The type row is --font-size-caption, not --font-size-label: the two reference
+   strings with no middot in them -- PSYCHIC and DARK, so no spacing ambiguity --
+   measure 9.92px and 9.64px. Set via TypeRow's `small` prop. */
 .species-card-types {
   display: block;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 .species-card-ability {
@@ -444,8 +455,8 @@
 .pokedex-grid-scroll {
   display: flex;
   justify-content: center;
-  height: 42px;
-  margin-top: 28px;
+  height: 40px;
+  margin-top: 27px;
   color: var(--text-secondary);
   transition: opacity 160ms ease;
 }
@@ -1011,8 +1022,8 @@
   flex-wrap: wrap;
   align-items: baseline;
   /* Figma: "Pokeapp" ends at x=134, "Pokedex" starts at 154 -- the brand sits in
-     the same 20-raw (9px) rhythm as the tabs, not in a separate cluster. */
-  gap: 9px;
+     the same 20-raw (8.5px) rhythm as the tabs, not in a separate cluster. */
+  gap: 8.5px;
 }
 
 /* 14px/700, first in the row -- straight from the navbar spec. */
@@ -1033,11 +1044,12 @@
   color: var(--text-primary);
 }
 
-/* Figma tab gaps are a uniform 20 raw = 9px: 154-134, 306-286, 409-389, 519-499. */
+/* Figma tab gaps are a uniform 20 raw = 8.5px at the measured 2.348 scale:
+   154-134, 306-286, 409-389, 519-499. */
 .dex-switcher {
   display: flex;
   flex-wrap: wrap;
-  gap: 9px;
+  gap: 8.5px;
 }
 
 /*
@@ -1053,7 +1065,10 @@
   padding: 0;
   font-family: var(--font-body);
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-regular);
+  /* One weight across all five labels: measured against the reference, 600 fits
+     every label to within 0.13px of --font-size-body where 400 is 0.52px out, and
+     the per-string spread is half as wide. Only colour separates them. */
+  font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
   background: none;
   border: none;
