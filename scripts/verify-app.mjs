@@ -19,6 +19,7 @@
 import { spawn } from 'node:child_process'
 import { get as httpGet } from 'node:http'
 import { chromium } from 'playwright'
+import { controls } from './lib/controls.mjs'
 
 const PORT = 4178
 const ORIGIN = `http://localhost:${PORT}`
@@ -159,30 +160,7 @@ try {
   const navStart = Date.now()
   await page.goto(APP_URL, { waitUntil: 'load' })
 
-  // Every control moved behind the app bar's toggle in the simplification pass,
-  // so an action on one has to open the panel first. Opened for the duration of
-  // the interaction and closed again: the panel floats over the page, and leaving
-  // it open would let it intercept clicks meant for the module underneath.
-  const controlsOpen = () =>
-    page.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
-  const openControls = async () => {
-    if (!(await controlsOpen())) {
-      await page.click('[data-testid="controls-toggle"]')
-      await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
-    }
-  }
-  const closeControls = async () => {
-    if (await controlsOpen()) {
-      await page.click('[data-testid="controls-toggle"]')
-      await page.waitForTimeout(80)
-    }
-  }
-  const withControls = async (fn) => {
-    await openControls()
-    const out = await fn()
-    await closeControls()
-    return out
-  }
+  const { withControls } = controls(page)
   await page.waitForSelector('[data-testid="boot-ms"]', { timeout: 60000 })
   const wallMs = Date.now() - navStart
 

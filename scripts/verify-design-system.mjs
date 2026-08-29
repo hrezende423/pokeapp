@@ -26,6 +26,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { controls } from './lib/controls.mjs'
 
 const PORT = 4192
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
@@ -371,24 +372,7 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
   await page.waitForSelector('[data-testid="dex-switcher"]', { timeout: 60000 })
 
-  // The game scope lives behind the app bar's toggle since the simplification
-  // pass, so changing it means opening the panel and closing it again -- the panel
-  // floats over the page and would otherwise intercept clicks on the grid.
-  const withControls = async (fn) => {
-    const isOpen = () =>
-      page.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
-    const opened = await isOpen()
-    if (!opened) {
-      await page.click('[data-testid="controls-toggle"]')
-      await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
-    }
-    const out = await fn()
-    if (!opened) {
-      await page.click('[data-testid="controls-toggle"]')
-      await page.waitForTimeout(80)
-    }
-    return out
-  }
+  const { withControls } = controls(page)
 
   const setTheme = async (theme) => {
     await page.evaluate((t) => {
@@ -2234,6 +2218,9 @@ try {
 
   // ------------------------------------------- existing modules untouched
   hr('SCOPE — the five modules outside this pass are still not restyled')
+  // "Not restyled" means no design-system component and no grid card. The app
+  // default font does reach them, unavoidably: a global default and a per-module
+  // opt-in are mutually exclusive, the same way --accent was.
   // The Pokedex has deliberately moved -- it is what this pass retrofits -- so the
   // guard now covers the five that have not, and asserts the Pokedex is the only
   // module the design system has reached.
@@ -2255,9 +2242,15 @@ try {
       }
     }, id)
     log(`  ${id}: ${mod.rows} rows, font ${mod.fontFamily}`)
+    // Inverted deliberately. This guard used to prove these modules were still on
+    // system-ui, which was true only because index.css's --sans named system-ui
+    // first -- the app-wide shadowing bug. Pointing --sans/--heading at
+    // --font-body makes Plex Sans the real default everywhere, so inheriting it
+    // is now the correct state and the old assertion was pinning a bug in place.
+    // What still matters -- that nothing here was restyled -- is the next check.
     check(
-      `${id} still uses the app shell font, not --font-body`,
-      mod.fontFamily != null && !/IBM Plex/.test(mod.fontFamily),
+      `${id} inherits the app default font now that --sans resolves to --font-body`,
+      mod.fontFamily != null && /IBM Plex/.test(mod.fontFamily),
       String(mod.fontFamily),
     )
     check(

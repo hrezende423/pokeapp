@@ -7,12 +7,13 @@
     - @font-face rules added for the bundled IBM Plex Sans (the file asked for
       them once the assets existed). Self-hosted, no CDN: an offline-first PWA
       cannot depend on fonts.gstatic.com.
-    - @font-face rules added for Martian Mono and JetBrains Mono, and
-      --font-numeric reordered to put them first. Martian Mono leads. It was already in the stack but behind 'SF Mono', so on any
-      machine with SF Mono the numeric face resolved to an unbundled system font
-      -- the one hole left in the offline-first font rule. Bundling it and moving
-      it to the front closes that; the remaining entries stay as fallbacks.
-      Variable file (wght 100-800), latin + latin-ext, matching the Plex setup.
+    - @font-face rules added for Martian Mono and JetBrains Mono, both now
+      leading --font-numeric with Martian Mono first. Every entry the stack had
+      before ('SF Mono', Consolas, monospace) is an unbundled system font, so on
+      any machine with SF Mono the numeric face resolved off-bundle -- the one
+      hole left in the offline-first font rule. Bundling both and putting them in
+      front closes it; the system entries stay as last-resort fallbacks. Variable
+      files (wght 100-800), latin + latin-ext, matching the Plex setup.
     - --ghost-watermark-opacity split per mode: 0.09 light, 0.05 dark. 5% white
       on a near-black surface reads far stronger than 5% black on a near-white
       one, so one value cannot match the reference in both. The same kind of

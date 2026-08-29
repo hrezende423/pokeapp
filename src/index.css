@@ -10,8 +10,15 @@
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Both point at --font-body (design-tokens.css), so the bundled IBM Plex
+     Sans is the app default rather than something each component has to opt
+     into. These previously named system-ui first, which meant Plex applied
+     only where a rule said font-family: var(--font-body) explicitly -- the
+     same shadowing bug as --font-numeric behind SF Mono, one level up. Both
+     custom properties sit on :root alongside --font-body, so the reference
+     resolves regardless of stylesheet import order. */
+  --sans: var(--font-body);
+  --heading: var(--font-body);
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
