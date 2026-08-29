@@ -29,6 +29,10 @@ import { chromium } from 'playwright'
 
 const PORT = 4192
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
+// The design-system reference page has no nav tab any more -- it was an
+// implementation aid, not a destination -- so it is reached by the query param
+// that App.tsx checks. Still the real app, real data layer, real stylesheet.
+const DS_URL = `${APP_URL}?ds=1`
 const SHOTS = 'scripts/.verify-shots'
 
 const failures = []
@@ -367,6 +371,25 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
   await page.waitForSelector('[data-testid="dex-switcher"]', { timeout: 60000 })
 
+  // The game scope lives behind the app bar's toggle since the simplification
+  // pass, so changing it means opening the panel and closing it again -- the panel
+  // floats over the page and would otherwise intercept clicks on the grid.
+  const withControls = async (fn) => {
+    const isOpen = () =>
+      page.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
+    const opened = await isOpen()
+    if (!opened) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    }
+    const out = await fn()
+    if (!opened) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForTimeout(80)
+    }
+    return out
+  }
+
   const setTheme = async (theme) => {
     await page.evaluate((t) => {
       document.documentElement.dataset.theme = t
@@ -425,7 +448,7 @@ try {
     bootTheme.attr === (bootTheme.prefersDark ? 'dark' : 'light'),
   )
 
-  await page.click('[data-testid="nav-designsystem"]')
+  await page.goto(DS_URL, { waitUntil: 'load' })
   await page.waitForSelector('[data-testid="dex-designsystem"]', { timeout: 30000 })
   // The reference page renders both themes at once via data-theme on a wrapper,
   // which is the contract the token file states ("on :root or any ancestor").
@@ -536,7 +559,7 @@ try {
   // leads the stack, which is what these three checks pin.
   const monoState = await page.evaluate(async () => {
     await document.fonts.ready
-    const faces = [...document.fonts].filter((f) => f.family.includes('JetBrains Mono'))
+    const faces = [...document.fonts].filter((f) => f.family.includes('Martian Mono'))
     const measure = (family, weight = 400) => {
       const s = document.createElement('span')
       s.textContent = '0123456789'
@@ -550,38 +573,43 @@ try {
     }
     return {
       faces: faces.map((f) => ({ weight: f.weight, status: f.status })),
-      check14: document.fonts.check('14px "JetBrains Mono"'),
+      check14: document.fonts.check('14px "Martian Mono"'),
       resolved: getComputedStyle(document.documentElement)
         .getPropertyValue('--font-numeric')
         .trim(),
-      jbWidth: measure('"JetBrains Mono"'),
+      jbWidth: measure('"Martian Mono"'),
       genericMonoWidth: measure('monospace'),
     }
   })
-  log(`  JetBrains Mono faces: ${JSON.stringify(monoState.faces)}`)
+  log(`  Martian Mono faces: ${JSON.stringify(monoState.faces)}`)
   log(`  --font-numeric resolves to: ${monoState.resolved}`)
   log(
-    `  digits at 40px, JetBrains vs generic mono: ${monoState.jbWidth.toFixed(1)} vs ${monoState.genericMonoWidth.toFixed(1)}`,
+    `  digits at 40px, Martian vs generic mono: ${monoState.jbWidth.toFixed(1)} vs ${monoState.genericMonoWidth.toFixed(1)}`,
   )
   check(
-    'JetBrains Mono is registered and loaded, not just named',
+    'Martian Mono is registered and loaded, not just named',
     monoState.faces.length > 0 &&
       monoState.faces.some((f) => f.status === 'loaded') &&
       monoState.check14,
     JSON.stringify(monoState.faces),
   )
   check(
-    'it leads --font-numeric, so the bundled face is what resolves',
-    /^'?"?JetBrains Mono/.test(monoState.resolved),
+    'Martian Mono leads --font-numeric, so the bundled face is what resolves',
+    /^'?"?Martian Mono/.test(monoState.resolved),
+    monoState.resolved,
+  )
+  check(
+    'with JetBrains Mono behind it as a second self-hosted fallback',
+    /Martian Mono['"]?,\s*['"]?JetBrains Mono/.test(monoState.resolved),
     monoState.resolved,
   )
   check(
     'and its woff2 came from this origin, not a CDN',
-    fontReqs.some((u) => /jetbrains-mono/.test(u)) &&
+    fontReqs.some((u) => /martian-mono/.test(u)) &&
       fontReqs
-        .filter((u) => /jetbrains-mono/.test(u))
+        .filter((u) => /martian-mono/.test(u))
         .every((u) => u.startsWith(`http://localhost:${PORT}/pokeapp/`)),
-    fontReqs.filter((u) => /jetbrains-mono/.test(u)).join(' ') || 'no jetbrains-mono request',
+    fontReqs.filter((u) => /martian-mono/.test(u)).join(' ') || 'no martian-mono request',
   )
 
   // -------------------------------------------------------- no shadows
@@ -1084,31 +1112,21 @@ try {
 
   // ---------------------------------------------------- the shared shell
   //
-  // Expected values here come from the Figma frames MainPage-Light (9:143) and
-  // MainPage-Dark (12:248), whose geometry is byte-identical, read out of
-  // get_metadata. Where those frames contradict the prose component specs, the
-  // frames win -- so the §5 Tabs underline and the full95 bordered search box are
-  // both asserted ABSENT below.
-  //
-  // Figma raw -> CSS uses 2.23, the scale at which the frames' text widths land on
-  // the locked token type sizes (card name 14.4px and dex number 14.3px against
-  // --font-size-body 14px; type and ability rows near 11px against
-  // --font-size-label). Ratios rather than raw px are asserted wherever a ratio is
-  // what the design actually fixes.
-  hr('SHELL — the app bar against MainPage: tabs, borderless search, type')
-  // Measured in both themes, because the bar is the one piece of chrome every
-  // module sits under and a token that only resolved in one mode would show here.
+  // Structure comes from the simplification pass, not the Figma frames: three nav
+  // groups with dropdowns rather than a flat tab row, and every permanently
+  // visible control moved behind one toggle. What still comes from the frames --
+  // and is still asserted -- is the treatment: --surface bar, hairline rule under
+  // the row, colour-only active state with no underline, and the token type scale.
+  hr('SHELL — three nav groups, one controls toggle, no persistent controls')
   for (const theme of ['light', 'dark']) {
-    // Both halves of the theme, not just the attribute: index.css still paints the
-    // page from its own prefers-color-scheme block, so forcing data-theme alone
-    // would screenshot a dark bar on a light page -- a state no real user is in.
     await page.emulateMedia({ colorScheme: theme })
     await setTheme(theme)
-    await page.click('[data-testid="nav-pokedex"]')
-    await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
-    // A hovered tab repaints, so park the pointer clear of the bar first.
+    await page.goto(APP_URL, { waitUntil: 'load' })
+    await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
+    // A hovered trigger repaints and a hovered group opens, so park the pointer.
     await page.mouse.move(1200, 900)
     const want = EXPECTED[theme]
+
     const shell = await page.evaluate(() => {
       const cs = (sel) => {
         const el = document.querySelector(sel)
@@ -1116,9 +1134,8 @@ try {
       }
       const bar = cs('.app-bar')
       const brand = cs('[data-testid="app-brand"]')
-      const active = cs('.dex-tab-active')
-      const idle = cs('.dex-tab:not(.dex-tab-active)')
-      const input = cs('[data-testid="global-search"]')
+      const active = cs('.nav-trigger-active')
+      const idle = cs('.nav-trigger:not(.nav-trigger-active)')
       const shadows = []
       for (const el of document.querySelectorAll('.app-bar, .app-bar *')) {
         const s = getComputedStyle(el)
@@ -1126,30 +1143,57 @@ try {
           shadows.push(el.tagName + '.' + String(el.className).split(' ')[0] + ': ' + s.boxShadow)
         }
       }
-      // Gap between the brand and the first tab, and between two tabs, measured
-      // from the rendered boxes rather than read off the stylesheet.
       const brandEl = document.querySelector('[data-testid="app-brand"]')
-      const tabs = [...document.querySelectorAll('.dex-tab')]
-      const gapAfterBrand =
-        tabs.length > 0
-          ? tabs[0].getBoundingClientRect().left - brandEl.getBoundingClientRect().right
-          : null
-      const gapBetweenTabs =
-        tabs.length > 1
-          ? tabs[1].getBoundingClientRect().left - tabs[0].getBoundingClientRect().right
-          : null
+      const triggers = [...document.querySelectorAll('.nav-trigger')]
+      const visible = (el) => el != null && el.getClientRects().length > 0
       return {
         elements: document.querySelectorAll('.app-bar *').length,
         shadows,
-        gapAfterBrand,
-        gapBetweenTabs,
-        iconPresent: document.querySelector('[data-testid="global-search-icon"]') != null,
-        anyBarSvg: document.querySelectorAll('.app-bar svg').length,
+        triggerLabels: triggers.map((t) => t.textContent.trim()),
+        gapAfterBrand:
+          triggers.length > 0
+            ? triggers[0].getBoundingClientRect().left - brandEl.getBoundingClientRect().right
+            : null,
+        gapBetweenTriggers:
+          triggers.length > 1
+            ? triggers[1].getBoundingClientRect().left - triggers[0].getBoundingClientRect().right
+            : null,
+        // Item 1: the design-system reference must not appear in the nav at all.
+        designSystemInNav:
+          document.querySelector('[data-testid="nav-designsystem"]') != null ||
+          [...document.querySelectorAll('.app-bar button, .app-bar a')].some((el) =>
+            /design\s*system/i.test(el.textContent ?? ''),
+          ),
+        // Item 3: none of the three controls may be on screen by default.
+        visibleByDefault: {
+          speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
+          typeFilterButtons: [...document.querySelectorAll('.tf')].filter(visible).length,
+          gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+          globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
+        },
+        // Item 4: one toggle, in the bar's top-right slot.
+        toggle: (() => {
+          const btn = document.querySelector('[data-testid="controls-toggle"]')
+          if (!btn) return null
+          const svg = btn.querySelector('svg')
+          const barBox = document.querySelector('.app-bar').getBoundingClientRect()
+          const box = btn.getBoundingClientRect()
+          return {
+            expanded: btn.getAttribute('aria-expanded'),
+            label: btn.getAttribute('aria-label'),
+            color: getComputedStyle(btn).color,
+            rightInset: Math.round(barBox.right - box.right),
+            iconTag: svg?.tagName.toLowerCase() ?? null,
+            iconClass: svg?.getAttribute('class') ?? null,
+            iconWidth: svg?.getAttribute('width') ?? null,
+            iconStroke: svg?.getAttribute('stroke-width') ?? null,
+          }
+        })(),
+        panelOpen: visible(document.querySelector('[data-testid="controls-panel"]')),
         bar: {
           background: bar.backgroundColor,
           borderBottom: bar.borderBottomWidth + ' ' + bar.borderBottomColor,
           fontFamily: bar.fontFamily,
-          textAlign: bar.textAlign,
         },
         brand: {
           fontSize: brand.fontSize,
@@ -1157,52 +1201,29 @@ try {
           color: brand.color,
           fontFamily: brand.fontFamily,
         },
-        activeTab: {
+        activeTrigger: {
           color: active.color,
           weight: active.fontWeight,
           fontSize: active.fontSize,
           borderBottomWidth: active.borderBottomWidth,
-          borderTopWidth: active.borderTopWidth,
           background: active.backgroundColor,
           fontFamily: active.fontFamily,
         },
-        idleTab: {
+        idleTrigger: {
           color: idle.color,
-          fontSize: idle.fontSize,
           weight: idle.fontWeight,
+          fontSize: idle.fontSize,
           borderBottomWidth: idle.borderBottomWidth,
           background: idle.backgroundColor,
-        },
-        input: {
-          borderTopWidth: input.borderTopWidth,
-          borderRightWidth: input.borderRightWidth,
-          borderLeftWidth: input.borderLeftWidth,
-          borderBottomWidth: input.borderBottomWidth,
-          borderBottomColor: input.borderBottomColor,
-          background: input.backgroundColor,
-          color: input.color,
-          textAlign: input.textAlign,
-          fontFamily: input.fontFamily,
-          fontSize: input.fontSize,
-          height: Math.round(
-            document.querySelector('[data-testid="global-search"]').getBoundingClientRect().height,
-          ),
         },
       }
     })
     log('  [' + theme + '] bar: ' + JSON.stringify(shell.bar))
-    log('  [' + theme + '] active tab: ' + JSON.stringify(shell.activeTab))
-    log('  [' + theme + '] idle tab: ' + JSON.stringify(shell.idleTab))
-    log('  [' + theme + '] search: ' + JSON.stringify(shell.input))
-    log(
-      '  [' +
-        theme +
-        '] gaps: brand->tab ' +
-        shell.gapAfterBrand +
-        'px, tab->tab ' +
-        shell.gapBetweenTabs +
-        'px',
-    )
+    log('  [' + theme + '] triggers: ' + shell.triggerLabels.join(' | '))
+    log('  [' + theme + '] active: ' + JSON.stringify(shell.activeTrigger))
+    log('  [' + theme + '] idle: ' + JSON.stringify(shell.idleTrigger))
+    log('  [' + theme + '] toggle: ' + JSON.stringify(shell.toggle))
+    log('  [' + theme + '] visible by default: ' + JSON.stringify(shell.visibleByDefault))
 
     check(
       '[' + theme + '] the bar sits on --surface',
@@ -1225,13 +1246,70 @@ try {
       '(' + shell.elements + ')',
     )
 
-    // Typography: the shell inherits system-ui from index.css, so this is what
-    // proves the bundled font is not being shadowed.
+    // ITEM 5: three groups, in this order, with Notes deliberately absent.
+    check(
+      '[' + theme + '] the nav is Pokédex / Team Builder / Tools',
+      JSON.stringify(shell.triggerLabels) === JSON.stringify(['Pokédex', 'Team Builder', 'Tools']),
+      shell.triggerLabels.join(','),
+    )
+    check(
+      '[' + theme + '] "Notes" is not in the nav',
+      !shell.triggerLabels.some((l) => /notes/i.test(l)),
+    )
+
+    // ITEM 1: the design-system reference is gone from the nav entirely.
+    check(
+      '[' + theme + '] no Design system tab anywhere in the bar',
+      shell.designSystemInNav === false,
+    )
+
+    // ITEM 3: nothing that was removed may render by default.
+    check(
+      '[' + theme + '] the species search is not on screen by default',
+      shell.visibleByDefault.speciesSearch === false,
+    )
+    check(
+      '[' + theme + '] no type-filter buttons are on screen by default',
+      shell.visibleByDefault.typeFilterButtons === 0,
+      '(' + shell.visibleByDefault.typeFilterButtons + ' visible)',
+    )
+    check(
+      '[' + theme + '] the game selector is not on screen by default',
+      shell.visibleByDefault.gameSelect === false,
+    )
+    check(
+      '[' + theme + '] nor is the cross-dex search, which moved into the panel',
+      shell.visibleByDefault.globalSearch === false,
+    )
+    check('[' + theme + '] and the panel itself starts closed', shell.panelOpen === false)
+
+    // ITEM 4: the toggle, its icon, and where it sits.
+    check(
+      '[' + theme + "] there is one controls toggle at the bar's right edge",
+      shell.toggle != null && Math.abs(shell.toggle.rightInset) <= 2,
+      shell.toggle ? shell.toggle.rightInset + 'px inset' : 'missing',
+    )
+    check(
+      '[' + theme + "] its icon is Tabler's IconFilter at 24px / 1.5 stroke",
+      shell.toggle?.iconTag === 'svg' &&
+        /tabler-icon-filter/.test(shell.toggle.iconClass ?? '') &&
+        shell.toggle.iconWidth === '24' &&
+        shell.toggle.iconStroke === '1.5',
+      JSON.stringify(shell.toggle),
+    )
+    check(
+      '[' + theme + '] in --text-secondary while closed, and it reports its state',
+      shell.toggle?.color === hexToRgb(want['--text-secondary']) &&
+        shell.toggle.expanded === 'false' &&
+        /show/i.test(shell.toggle.label ?? ''),
+      shell.toggle?.color + ' / aria-expanded=' + shell.toggle?.expanded,
+    )
+
+    // Typography: unchanged from the Figma pass, on the renamed elements.
     for (const pair of [
       ['bar', shell.bar.fontFamily],
       ['brand', shell.brand.fontFamily],
-      ['tab labels', shell.activeTab.fontFamily],
-      ['search input', shell.input.fontFamily],
+      ['nav labels', shell.activeTrigger.fontFamily],
     ]) {
       check(
         '[' + theme + '] ' + pair[0] + ' resolves to IBM Plex Sans, not the system stack',
@@ -1239,159 +1317,386 @@ try {
         pair[1],
       )
     }
-
-    // FIGMA: all five nav labels imply the same size -- 14.2-14.5px by glyph
-    // advance -- so brand and tabs share --font-size-body and differ by colour.
     check(
-      '[' + theme + '] brand and tabs share --font-size-body',
+      '[' + theme + '] brand and nav labels share --font-size-body',
       shell.brand.fontSize === SCALE['--font-size-body'] &&
-        shell.activeTab.fontSize === SCALE['--font-size-body'] &&
-        shell.idleTab.fontSize === SCALE['--font-size-body'],
-      shell.brand.fontSize + ' / ' + shell.activeTab.fontSize + ' / ' + shell.idleTab.fontSize,
+        shell.activeTrigger.fontSize === SCALE['--font-size-body'] &&
+        shell.idleTrigger.fontSize === SCALE['--font-size-body'],
+      shell.brand.fontSize + ' / ' + shell.activeTrigger.fontSize,
     )
     check(
-      '[' + theme + '] all five labels share --font-weight-medium; only colour separates them',
+      '[' + theme + '] all of them at --font-weight-medium; only colour separates them',
       shell.brand.weight === SCALE['--font-weight-medium'] &&
-        shell.activeTab.weight === SCALE['--font-weight-medium'] &&
-        shell.idleTab.weight === SCALE['--font-weight-medium'],
-      shell.brand.weight + ' / ' + shell.activeTab.weight + ' / ' + shell.idleTab.weight,
+        shell.activeTrigger.weight === SCALE['--font-weight-medium'] &&
+        shell.idleTrigger.weight === SCALE['--font-weight-medium'],
+      shell.brand.weight + ' / ' + shell.activeTrigger.weight + ' / ' + shell.idleTrigger.weight,
     )
     check(
       '[' + theme + '] the brand is --text-primary',
       shell.brand.color === hexToRgb(want['--text-primary']),
       shell.brand.color,
     )
-
-    // FIGMA: tab gaps are a uniform 20 raw (9px at 2.23), and the brand sits in
-    // the same rhythm -- 154-134 for brand->tab, 306-286 / 409-389 / 519-499
-    // between tabs.
     check(
-      '[' + theme + "] the brand-to-tab gap is Figma's 20 raw = 8.5px",
+      '[' + theme + "] the brand-to-nav gap keeps Figma's 8.5px rhythm",
       Math.abs(shell.gapAfterBrand - 8.5) <= 0.6,
       '(' + shell.gapAfterBrand.toFixed(2) + 'px)',
     )
     check(
-      '[' + theme + '] and so is the gap between tabs',
-      Math.abs(shell.gapBetweenTabs - 8.5) <= 0.6,
-      '(' + shell.gapBetweenTabs.toFixed(2) + 'px)',
+      '[' + theme + '] and so does the gap between nav groups',
+      Math.abs(shell.gapBetweenTriggers - 8.5) <= 0.6,
+      '(' + shell.gapBetweenTriggers.toFixed(2) + 'px)',
     )
 
-    // FIGMA, against the §5 Tabs spec: the nav-bar frame holds a Tabs frame of
-    // five bare text nodes plus the search text, and nothing else -- no
-    // rectangle, line or vector -- so the active tab carries no underline.
+    // Active state: colour only, still no underline and still no fill.
     check(
-      '[' + theme + '] the active tab is --accent',
-      shell.activeTab.color === hexToRgb(want['--accent']),
-      shell.activeTab.color,
+      '[' + theme + '] the active nav item is --accent',
+      shell.activeTrigger.color === hexToRgb(want['--accent']),
+      shell.activeTrigger.color,
     )
     check(
       '[' + theme + '] and carries NO underline (Figma has no such node)',
-      shell.activeTab.borderBottomWidth === '0px' && shell.activeTab.borderTopWidth === '0px',
-      'bottom=' + shell.activeTab.borderBottomWidth + ' top=' + shell.activeTab.borderTopWidth,
+      shell.activeTrigger.borderBottomWidth === '0px',
+      shell.activeTrigger.borderBottomWidth,
     )
     check(
-      '[' + theme + '] inactive tabs are --text-secondary, also with no underline',
-      shell.idleTab.color === hexToRgb(want['--text-secondary']) &&
-        shell.idleTab.borderBottomWidth === '0px',
-      shell.idleTab.color + ' / ' + shell.idleTab.borderBottomWidth,
+      '[' + theme + '] inactive items are --text-secondary, also with no underline',
+      shell.idleTrigger.color === hexToRgb(want['--text-secondary']) &&
+        shell.idleTrigger.borderBottomWidth === '0px',
+      shell.idleTrigger.color + ' / ' + shell.idleTrigger.borderBottomWidth,
     )
     check(
-      '[' + theme + '] no tab carries a background fill',
-      shell.activeTab.background === 'rgba(0, 0, 0, 0)' &&
-        shell.idleTab.background === 'rgba(0, 0, 0, 0)',
-      shell.activeTab.background + ' / ' + shell.idleTab.background,
+      '[' + theme + '] no nav item carries a background fill',
+      shell.activeTrigger.background === 'rgba(0, 0, 0, 0)' &&
+        shell.idleTrigger.background === 'rgba(0, 0, 0, 0)',
+      shell.activeTrigger.background + ' / ' + shell.idleTrigger.background,
     )
 
-    // FIGMA, against the full95 "Global search bar": the search is a bare text
-    // node, right-aligned, with no rect, no stroke, no fill and no icon.
-    check(
-      '[' + theme + '] the search field has no border box at rest',
-      shell.input.borderTopWidth === '0px' &&
-        shell.input.borderRightWidth === '0px' &&
-        shell.input.borderLeftWidth === '0px',
-      'top=' +
-        shell.input.borderTopWidth +
-        ' right=' +
-        shell.input.borderRightWidth +
-        ' left=' +
-        shell.input.borderLeftWidth,
-    )
-    check(
-      '[' + theme + '] and no fill of its own',
-      shell.input.background === 'rgba(0, 0, 0, 0)',
-      shell.input.background,
-    )
-    check(
-      '[' + theme + '] its text is right-aligned, as the reference shows',
-      shell.input.textAlign === 'right',
-      shell.input.textAlign,
-    )
-    check(
-      '[' + theme + '] the Tabler magnifier is gone (no icon node in either frame)',
-      !shell.iconPresent && shell.anyBarSvg === 0,
-      'icon=' + shell.iconPresent + ' svgs=' + shell.anyBarSvg,
-    )
-
-    // Focus: Figma has no focus state for a borderless field, so the accent lands
-    // on the hairline underline every full95 input already uses. The underline is
-    // present-but-transparent at rest, so nothing shifts.
-    await page.focus('[data-testid="global-search"]')
-    await page.waitForTimeout(120)
-    const focused = await page.evaluate(() => {
-      const cs = getComputedStyle(document.querySelector('[data-testid="global-search"]'))
+    // ITEM 2: the cards must be on exactly the bar's ground. Ghost cards have no
+    // fill of their own, so this compares the bar's painted colour against what
+    // is actually painted behind a card -- the nearest ancestor with a
+    // non-transparent background.
+    const grounds = await page.evaluate(() => {
+      const painted = (el) => {
+        for (let n = el; n; n = n.parentElement) {
+          const bg = getComputedStyle(n).backgroundColor
+          if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+            return { color: bg, from: n.tagName + '.' + String(n.className).split(' ')[0] }
+          }
+        }
+        return { color: null, from: null }
+      }
+      const card = document.querySelector('.species-card')
       return {
-        borderBottom: cs.borderBottomWidth + ' ' + cs.borderBottomColor,
-        outline: cs.outlineStyle,
-        boxHeight: Math.round(
-          document.querySelector('[data-testid="global-search"]').getBoundingClientRect().height,
-        ),
+        bar: getComputedStyle(document.querySelector('.app-bar')).backgroundColor,
+        cardOwn: getComputedStyle(card).backgroundColor,
+        cardGround: painted(card),
       }
     })
-    log('  [' + theme + '] focused search: ' + JSON.stringify(focused))
+    log('  [' + theme + '] grounds: ' + JSON.stringify(grounds))
     check(
-      '[' + theme + '] focus turns the underline --accent',
-      focused.borderBottom === '1px ' + hexToRgb(want['--accent']),
-      focused.borderBottom,
+      '[' + theme + '] the card itself has zero background fill',
+      grounds.cardOwn === 'rgba(0, 0, 0, 0)',
+      grounds.cardOwn,
     )
     check(
-      '[' + theme + '] and drops the default outline',
-      focused.outline === 'none',
-      focused.outline,
+      '[' + theme + '] and the ground behind it is byte-identical to the nav bar',
+      grounds.cardGround.color === grounds.bar,
+      'card ground ' +
+        grounds.cardGround.color +
+        ' (' +
+        grounds.cardGround.from +
+        ') vs bar ' +
+        grounds.bar,
     )
     check(
-      '[' + theme + '] focusing does not resize the field',
-      focused.boxHeight === shell.input.height,
-      'rest=' + shell.input.height + ' focused=' + focused.boxHeight,
+      '[' + theme + '] which is --surface, not --surface-raised or a species tint',
+      grounds.bar === hexToRgb(want['--surface']),
+      grounds.bar + ' vs --surface ' + hexToRgb(want['--surface']),
     )
 
-    // The dropdown is a floating panel: --surface-raised, hairline, no shadow.
-    await page.fill('[data-testid="global-search"]', 'sand')
-    await page.waitForSelector('[data-testid="global-search-results"]', { timeout: 15000 })
-    const panel = await page.evaluate(() => {
-      const cs = getComputedStyle(document.querySelector('[data-testid="global-search-results"]'))
+    // The panel: full95 dropdown container, and it really does reveal the three.
+    await page.click('[data-testid="controls-toggle"]')
+    await page.waitForSelector('[data-testid="species-search"]', { timeout: 15000 })
+    const opened = await page.evaluate(() => {
+      const panel = document.querySelector('[data-testid="controls-panel"]')
+      const cs = getComputedStyle(panel)
+      const visible = (el) => el != null && el.getClientRects().length > 0
       return {
         background: cs.backgroundColor,
         border: cs.borderTopWidth + ' ' + cs.borderTopColor,
         radius: cs.borderTopLeftRadius,
         shadow: cs.boxShadow,
+        speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
+        typeFilterButtons: [...document.querySelectorAll('.tf')].filter(visible).length,
+        gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+        globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
+        insidePanel: ['species-search', 'vg-select', 'global-search'].every(
+          (id) =>
+            document
+              .querySelector('[data-testid="' + id + '"]')
+              ?.closest('[data-testid="controls-panel"]') != null,
+        ),
+        toggleColor: getComputedStyle(document.querySelector('[data-testid="controls-toggle"]'))
+          .color,
+        expanded: document
+          .querySelector('[data-testid="controls-toggle"]')
+          .getAttribute('aria-expanded'),
       }
     })
-    log('  [' + theme + '] results panel: ' + JSON.stringify(panel))
+    log('  [' + theme + '] opened: ' + JSON.stringify(opened))
     check(
-      '[' + theme + '] the results panel floats on --surface-raised',
-      panel.background === hexToRgb(want['--surface-raised']),
-      panel.background,
+      '[' + theme + '] the toggle reveals all three controls, plus the cross-dex search',
+      opened.speciesSearch &&
+        opened.gameSelect &&
+        opened.globalSearch &&
+        opened.typeFilterButtons > 10,
+      JSON.stringify(opened),
+    )
+    check('[' + theme + '] all of them inside the revealed panel', opened.insidePanel)
+    check(
+      '[' + theme + '] the panel is --surface-raised with a hairline border and no shadow',
+      opened.background === hexToRgb(want['--surface-raised']) &&
+        opened.border === '1px ' + hexToRgb(want['--hairline']) &&
+        opened.shadow === 'none',
+      opened.background + ' / ' + opened.border + ' / ' + opened.shadow,
     )
     check(
-      '[' + theme + '] with a hairline border and no shadow',
-      panel.border === '1px ' + hexToRgb(want['--hairline']) && panel.shadow === 'none',
-      panel.border + ' / ' + panel.shadow,
+      '[' + theme + '] at --radius-control, per the full95 dropdown spec',
+      opened.radius === SCALE['--radius-control'],
+      opened.radius,
+    )
+    check(
+      '[' + theme + '] and the toggle now reports expanded, in --accent',
+      opened.expanded === 'true' && opened.toggleColor === hexToRgb(want['--accent']),
+      opened.expanded + ' / ' + opened.toggleColor,
+    )
+    // The cross-dex search still works from in here.
+    await page.fill('[data-testid="global-search"]', 'sand')
+    await page.waitForSelector('[data-testid="global-search-results"]', { timeout: 15000 })
+    const results = await page.evaluate(() => {
+      const cs = getComputedStyle(document.querySelector('[data-testid="global-search-results"]'))
+      return {
+        background: cs.backgroundColor,
+        border: cs.borderTopWidth + ' ' + cs.borderTopColor,
+        shadow: cs.boxShadow,
+        groups: document.querySelectorAll('[data-testid="global-search-results"] .gs-group').length,
+      }
+    })
+    log('  [' + theme + '] results: ' + JSON.stringify(results))
+    check(
+      '[' + theme + '] the search still returns grouped results from inside the panel',
+      results.groups > 0,
+      '(' + results.groups + ' groups)',
+    )
+    check(
+      '[' + theme + '] its results panel is still --surface-raised, hairline, no shadow',
+      results.background === hexToRgb(want['--surface-raised']) &&
+        results.border === '1px ' + hexToRgb(want['--hairline']) &&
+        results.shadow === 'none',
+      results.background + ' / ' + results.border + ' / ' + results.shadow,
+    )
+    await page.fill('[data-testid="global-search"]', '')
+    await page.screenshot({ path: SHOTS + '/shell-' + theme + '-open.png' })
+    // Closing again must genuinely remove them from view.
+    await page.click('[data-testid="controls-toggle"]')
+    await page.waitForTimeout(120)
+    const closed = await page.evaluate(() => {
+      const visible = (el) => el != null && el.getClientRects().length > 0
+      return {
+        speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
+        gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+        globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
+      }
+    })
+    check(
+      '[' + theme + '] clicking it again hides them all again',
+      !closed.speciesSearch && !closed.gameSelect && !closed.globalSearch,
+      JSON.stringify(closed),
     )
     await page.screenshot({ path: SHOTS + '/shell-' + theme + '.png' })
-    await page.fill('[data-testid="global-search"]', '')
   }
   await page.emulateMedia({ colorScheme: 'light' })
   await setTheme('light')
+
+  // ------------------------------------------------- nav dropdown behaviour
+  hr('NAV DROPDOWNS — hover, focus, and the full95 dropdown container')
+  await page.goto(APP_URL, { waitUntil: 'load' })
+  await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
+  await page.mouse.move(1200, 900)
+
+  const dropdownClosed = await page.evaluate(() => {
+    const visible = (el) => el != null && el.getClientRects().length > 0
+    return {
+      dexes: visible(document.querySelector('[data-testid="nav-dropdown-dexes"]')),
+      team: visible(document.querySelector('[data-testid="nav-dropdown-team"]')),
+      tools: visible(document.querySelector('[data-testid="nav-dropdown-tools"]')),
+      // Still in the DOM, so the switcher stays a complete registry-ordered list.
+      itemdexInDom: document.querySelector('[data-testid="nav-itemdex"]') != null,
+      itemdexVisible: visible(document.querySelector('[data-testid="nav-itemdex"]')),
+    }
+  })
+  log('  closed: ' + JSON.stringify(dropdownClosed))
+  check(
+    'every dropdown starts hidden',
+    !dropdownClosed.dexes && !dropdownClosed.team && !dropdownClosed.tools,
+    JSON.stringify(dropdownClosed),
+  )
+  check(
+    'the other dexes stay in the DOM while hidden',
+    dropdownClosed.itemdexInDom && !dropdownClosed.itemdexVisible,
+  )
+
+  // HOVER
+  await page.hover('[data-testid="nav-pokedex"]')
+  await page.waitForTimeout(120)
+  const hovered = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="nav-dropdown-dexes"]')
+    const cs = getComputedStyle(panel)
+    const items = [...panel.querySelectorAll('.nav-item')]
+    const firstDivider = items[1] ? getComputedStyle(items[1]) : null
+    return {
+      visible: panel.getClientRects().length > 0,
+      background: cs.backgroundColor,
+      border: cs.borderTopWidth + ' ' + cs.borderTopColor,
+      radius: cs.borderTopLeftRadius,
+      shadow: cs.boxShadow,
+      items: items.map((el) => el.getAttribute('data-testid')),
+      labels: items.map((el) => el.textContent.trim()),
+      dividerTop: firstDivider
+        ? firstDivider.borderTopWidth + ' ' + firstDivider.borderTopColor
+        : null,
+      expanded: document.querySelector('[data-testid="nav-pokedex"]').getAttribute('aria-expanded'),
+    }
+  })
+  log('  hovered: ' + JSON.stringify(hovered))
+  check('hovering Pokédex opens its dropdown', hovered.visible)
+  check('and the trigger reports it', hovered.expanded === 'true', String(hovered.expanded))
+  check(
+    'it lists the other five dexes, in registry order',
+    JSON.stringify(hovered.items) ===
+      JSON.stringify([
+        'nav-itemdex',
+        'nav-abilitydex',
+        'nav-naturedex',
+        'nav-berrydex',
+        'nav-movedex',
+      ]),
+    hovered.items.join(','),
+  )
+  check(
+    'the panel is --surface-raised, hairline border, no shadow',
+    hovered.background === hexToRgb(EXPECTED.light['--surface-raised']) &&
+      hovered.border === '1px ' + hexToRgb(EXPECTED.light['--hairline']) &&
+      hovered.shadow === 'none',
+    hovered.background + ' / ' + hovered.border + ' / ' + hovered.shadow,
+  )
+  check(
+    'with hairline dividers between items',
+    hovered.dividerTop === '1px ' + hexToRgb(EXPECTED.light['--hairline']),
+    String(hovered.dividerTop),
+  )
+  check('at --radius-control', hovered.radius === SCALE['--radius-control'], hovered.radius)
+  await page.mouse.move(1200, 900)
+  await page.waitForTimeout(150)
+  check(
+    'moving the pointer away closes it again',
+    !(await page.evaluate(
+      () =>
+        document.querySelector('[data-testid="nav-dropdown-dexes"]').getClientRects().length > 0,
+    )),
+  )
+
+  // FOCUS — the correctness requirement: keyboard must reveal the same dropdown.
+  for (const group of ['dexes', 'team']) {
+    const trigger = group === 'dexes' ? 'nav-pokedex' : 'nav-trigger-team'
+    await page.focus('[data-testid="' + trigger + '"]')
+    await page.waitForTimeout(120)
+    const focused = await page.evaluate((g) => {
+      const panel = document.querySelector('[data-testid="nav-dropdown-' + g + '"]')
+      return {
+        visible: panel.getClientRects().length > 0,
+        items: [...panel.querySelectorAll('.nav-item')].length,
+      }
+    }, group)
+    log('  focus on ' + trigger + ': ' + JSON.stringify(focused))
+    check(
+      'keyboard focus alone opens the ' + group + ' dropdown, without any hover',
+      focused.visible,
+      JSON.stringify(focused),
+    )
+    // And Tab from the trigger must land inside it, not skip past.
+    await page.keyboard.press('Tab')
+    const landed = await page.evaluate(
+      (g) =>
+        document.activeElement?.closest('[data-testid="nav-dropdown-' + g + '"]') != null
+          ? (document.activeElement.getAttribute('data-testid') ??
+            document.activeElement.textContent.trim())
+          : null,
+      group,
+    )
+    log('  Tab from ' + trigger + ' lands on: ' + landed)
+    check(
+      'Tab from the trigger moves into the ' + group + ' dropdown',
+      landed != null,
+      String(landed),
+    )
+    // Escape closes it and returns focus to the trigger.
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(120)
+    const afterEsc = await page.evaluate(
+      (g) => ({
+        visible:
+          document.querySelector('[data-testid="nav-dropdown-' + g + '"]').getClientRects().length >
+          0,
+        focus: document.activeElement?.getAttribute('data-testid'),
+      }),
+      group,
+    )
+    check(
+      'Escape closes the ' + group + ' dropdown and returns focus to its trigger',
+      !afterEsc.visible && afterEsc.focus === trigger,
+      JSON.stringify(afterEsc),
+    )
+  }
+
+  // Team Builder's two known items, and Tools with nothing behind it.
+  await page.hover('[data-testid="nav-trigger-team"]')
+  await page.waitForTimeout(120)
+  const team = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="nav-dropdown-team"]')
+    return {
+      labels: [...panel.querySelectorAll('.nav-item')].map((el) => el.textContent.trim()),
+      allDisabled: [...panel.querySelectorAll('.nav-item')].every(
+        (el) => el.getAttribute('aria-disabled') === 'true',
+      ),
+      allFocusable: [...panel.querySelectorAll('.nav-item')].every((el) => !el.disabled),
+    }
+  })
+  log('  team items: ' + JSON.stringify(team))
+  check(
+    'Team Builder lists the two items that were named',
+    JSON.stringify(team.labels) === JSON.stringify(['Build Library', 'Team Builder']),
+    team.labels.join(','),
+  )
+  check('both inert, because nothing is built behind them yet', team.allDisabled)
+  check('but still focusable -- aria-disabled, not the disabled attribute', team.allFocusable)
+  await page.hover('[data-testid="nav-trigger-tools"]')
+  await page.waitForTimeout(120)
+  const tools = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="nav-dropdown-tools"]')
+    return {
+      visible: panel.getClientRects().length > 0,
+      items: panel.querySelectorAll('.nav-item').length,
+      note: panel.querySelector('[data-testid="nav-dropdown-empty-tools"]')?.textContent?.trim(),
+    }
+  })
+  log('  tools: ' + JSON.stringify(tools))
+  check(
+    'Tools opens an explicit empty state rather than a dead dropdown',
+    tools.visible && tools.items === 0 && (tools.note ?? '').length > 0,
+    JSON.stringify(tools),
+  )
+  await page.mouse.move(1200, 900)
 
   // ------------------------------------------------ underline scope guard
   hr('TABS — dropping the underline is scoped to the app nav, nothing else')
@@ -1404,7 +1709,7 @@ try {
   for (const theme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: theme })
     await setTheme(theme)
-    await page.click('[data-testid="nav-designsystem"]')
+    await page.goto(DS_URL, { waitUntil: 'load' })
     await page.waitForSelector('[data-testid="dex-designsystem"]', { timeout: 30000 })
     await page.mouse.move(1200, 900)
     const tabs = await page.evaluate((mode) => {
@@ -1417,7 +1722,7 @@ try {
       )
       const selected = row?.querySelector('[data-ds="tab"][aria-selected="true"]') ?? null
       const idle = row?.querySelector('[data-ds="tab"][aria-selected="false"]') ?? null
-      const navActive = document.querySelector('.dex-tab-active')
+      const navActive = document.querySelector('.nav-trigger-active')
       const cs = (el) => (el ? getComputedStyle(el) : null)
       const s = cs(selected)
       const i = cs(idle)
@@ -1453,7 +1758,7 @@ try {
       tabs.rowRule,
     )
     check(
-      '[' + theme + '] while the app nav tab still has none -- the two are independent',
+      '[' + theme + '] while the app nav item still has none -- the two are independent',
       tabs.navActiveUnderlineWidth === '0px',
       String(tabs.navActiveUnderlineWidth),
     )
@@ -1491,8 +1796,10 @@ try {
 
   for (const theme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: theme })
+    // Back off ?ds=1: the reference page is chosen by the URL, so a nav click
+    // alone would leave it rendered.
+    await page.goto(APP_URL, { waitUntil: 'load' })
     await setTheme(theme)
-    await page.click('[data-testid="nav-pokedex"]')
     await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
     await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 30000 })
     await page.mouse.move(1200, 900)
@@ -1677,7 +1984,7 @@ try {
     )
     check(
       '[' + theme + '] while the dex number beside it stays mono',
-      /JetBrains Mono/.test(grid.style.numFontFamily),
+      /Martian Mono/.test(grid.style.numFontFamily),
       grid.style.numFontFamily,
     )
     check(
@@ -1829,7 +2136,7 @@ try {
     }
   })
   log('  baseline (all): ' + JSON.stringify(gridBaseline))
-  await page.selectOption('[data-testid="vg-select"]', 'platinum')
+  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'platinum'))
   await page.waitForTimeout(300)
   const gen4 = await page.evaluate(() => ({
     bulbasaur:
@@ -1856,7 +2163,7 @@ try {
   )
   // Gens 1-2 had no abilities at all: the slot must be absent, and the two lines
   // above it must not move.
-  await page.selectOption('[data-testid="vg-select"]', 'red-blue')
+  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'red-blue'))
   await page.waitForTimeout(300)
   const gen1 = await page.evaluate(() => {
     const card = document.querySelector('[data-testid="species-row-1"]')
@@ -1879,7 +2186,7 @@ try {
       gen1.cardHeight === gridBaseline.cardHeight,
     JSON.stringify(gen1) + ' vs ' + JSON.stringify(gridBaseline),
   )
-  await page.selectOption('[data-testid="vg-select"]', 'all')
+  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'all'))
   await page.waitForTimeout(300)
 
   // The scroll-down affordance: Figma's "icon-scrolldown" instance, centred.
@@ -1932,6 +2239,9 @@ try {
   // module the design system has reached.
   const UNTOUCHED = ['movedex', 'itemdex', 'abilitydex', 'naturedex', 'berrydex']
   for (const id of UNTOUCHED) {
+    // The other five dexes live in the Pokedex dropdown now, so opening it is
+    // part of reaching them.
+    await page.hover('[data-testid="nav-pokedex"]')
     await page.click(`[data-testid="nav-${id}"]`)
     await page.waitForSelector(`[data-testid="${id}-rows"]`, { timeout: 30000 })
     const mod = await page.evaluate((dexId) => {

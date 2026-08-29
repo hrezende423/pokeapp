@@ -275,7 +275,7 @@ try {
     )
   }
   const search = async (term, expectId) => {
-    await page.fill('[data-testid="species-search"]', term)
+    await withControls(() => page.fill('[data-testid="species-search"]', term))
     await page.waitForSelector(`[data-testid="species-row-${expectId}"]`, { timeout: 15000 })
   }
   const imgState = () =>
@@ -313,6 +313,31 @@ try {
     )
 
   await page.goto(APP_URL, { waitUntil: 'load' })
+
+  // Every control moved behind the app bar's toggle in the simplification pass,
+  // so an action on one has to open the panel first. Opened for the duration of
+  // the interaction and closed again: the panel floats over the page, and leaving
+  // it open would let it intercept clicks meant for the module underneath.
+  const controlsOpen = () =>
+    page.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
+  const openControls = async () => {
+    if (!(await controlsOpen())) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    }
+  }
+  const closeControls = async () => {
+    if (await controlsOpen()) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForTimeout(80)
+    }
+  }
+  const withControls = async (fn) => {
+    await openControls()
+    const out = await fn()
+    await closeControls()
+    return out
+  }
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
 
   // -------------------------------------------------------------- ITEM 1
@@ -574,7 +599,7 @@ try {
 
   // Clear the name search first: a leftover term would make both counts equal
   // and the "Any restores the list" assertion vacuous.
-  await page.fill('[data-testid="species-search"]', '')
+  await withControls(() => page.fill('[data-testid="species-search"]', ''))
   await page.waitForFunction(
     () => document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length > 100,
     undefined,
@@ -588,9 +613,9 @@ try {
     bg: getComputedStyle(el).backgroundColor,
     pressed: el.getAttribute('aria-pressed'),
   }))
-  await page.click('[data-testid="type-filter-fire"]')
-  await page.click('[data-testid="type-filter-water"]')
-  await page.click('[data-testid="type-filter-grass"]')
+  await withControls(() => page.click('[data-testid="type-filter-fire"]'))
+  await withControls(() => page.click('[data-testid="type-filter-water"]'))
+  await withControls(() => page.click('[data-testid="type-filter-grass"]'))
   const selectedColors = await page.$$eval('.type-filter [aria-pressed="true"][data-type]', (els) =>
     els.map((e) => ({
       type: e.getAttribute('data-type'),
@@ -629,7 +654,7 @@ try {
     (e) => e.length,
   )
   const filteredCount = await page.textContent('[data-testid="list-count"]')
-  await page.click('[data-testid="type-filter-any"]')
+  await withControls(() => page.click('[data-testid="type-filter-any"]'))
   await page.waitForFunction(
     () => document.querySelectorAll('.type-filter [aria-pressed="true"][data-type]').length === 0,
     undefined,
@@ -667,8 +692,8 @@ try {
   check('an ungrouped "All" option exists', allOption.value === 'all' && !allOption.grouped)
   check('its label names the dex ceiling from the constant', allOption.text.includes('493'))
 
-  await page.fill('[data-testid="species-search"]', '')
-  await page.selectOption('[data-testid="vg-select"]', 'all')
+  await withControls(() => page.fill('[data-testid="species-search"]', ''))
+  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'all'))
   await page.waitForFunction(
     () =>
       document
@@ -698,7 +723,7 @@ try {
   check('heading carries no version group under All', learnHeading.trim() === 'Learnset')
 
   // Switching back must restore real per-game rows.
-  await page.selectOption('[data-testid="vg-select"]', 'heartgold-soulsilver')
+  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'heartgold-soulsilver'))
   await page.waitForFunction(
     () => document.querySelector('[data-testid="learnset"]') != null,
     undefined,
@@ -932,7 +957,7 @@ try {
   ]
   const seenKinds = new Map()
   for (const stop of TRIGGER_TOUR) {
-    await page.fill('[data-testid="species-search"]', stop.name.toLowerCase())
+    await withControls(() => page.fill('[data-testid="species-search"]', stop.name.toLowerCase()))
     await page.waitForSelector(`[data-testid="species-row-${stop.id}"]`, { timeout: 15000 })
     await openSpecies(stop.id)
     const found = await page.$$eval('[data-testid="evolution-tree"] .evo-trigger', (els) =>
@@ -968,7 +993,7 @@ try {
   )
 
   // Shiny follows the detail toggle; the node stays static and default-gender.
-  await page.fill('[data-testid="species-search"]', 'eevee')
+  await withControls(() => page.fill('[data-testid="species-search"]', 'eevee'))
   await page.waitForSelector('[data-testid="species-row-133"]', { timeout: 15000 })
   await openSpecies(133)
   const regularNodes = await page.$$eval('[data-testid="evolution-tree"] img', (els) =>

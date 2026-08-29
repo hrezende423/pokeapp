@@ -60,7 +60,8 @@ chips were tried and explicitly rejected (see §4) as the single most common
 "AI-generated dashboard" tell we found across every reference search.
 
 **Functional numbers are monospace.** Dex index and stat values use
-`--font-numeric` (**JetBrains Mono**, self-hosted); names, labels, and body
+`--font-numeric` (**Martian Mono**, self-hosted, with JetBrains Mono as a
+second self-hosted fallback); names, labels, and body
 copy use `--font-body` (**IBM Plex Sans**, self-hosted — see implementation
 note below). This is the only typographic mixing rule in the system.
 

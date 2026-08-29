@@ -3,9 +3,19 @@
    palette. #root is a centred flex column with text-align: center; this panel
    opts back into a normal reading layout. */
 
+/*
+  --surface, not the older --bg from index.css. The app bar paints --surface
+  explicitly, while the page behind the grid was painting --bg -- #16171d against
+  the bar's #141414 in dark, and #fff against #fafafa in light. Ghost cards have
+  no fill of their own, so they showed that mismatch straight through. Painting
+  the panel with the same token the bar uses makes the two identical by
+  construction rather than by two values that happen to agree.
+*/
 .panel {
   flex: 1;
   width: 100%;
+  background: var(--surface);
+  color: var(--text-primary);
   /* Was 60rem, when this panel held prose. It now holds the Pokedex grid, which
      manages its own column widths, so the panel just fills #root. */
   max-width: 100%;

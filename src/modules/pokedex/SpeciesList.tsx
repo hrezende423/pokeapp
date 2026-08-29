@@ -1,16 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { TypeRow } from '../../components/ds/TypeLabel'
 import { TypeBadge } from '../../components/TypeBadge'
-import { TypeFilter } from '../../components/TypeFilter'
 import {
   DEFAULT_ARTWORK_VIEW,
   getType,
   resolveAbilitiesForGeneration,
   resolveArtworkUrl,
   resolveTypesForGeneration,
-  typesInGeneration,
 } from '../../data'
 import type { Species } from '../../data'
+import { useFilters } from '../filters/filtersContext'
 import { speciesEntries } from '../dex/entrySources'
 import { useVersionGroup } from '../version-group/context'
 
@@ -37,16 +36,9 @@ function defaultVariety(species: Species) {
 
 export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
   const { generation, isAll } = useVersionGroup()
-  const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState<number[]>([])
-
-  const availableTypes = useMemo(() => typesInGeneration(generation), [generation])
-
-  // A type that stops existing when the generation changes must not keep filtering.
-  const activeTypeFilter = useMemo(
-    () => typeFilter.filter((id) => availableTypes.some((t) => t.id === id)),
-    [typeFilter, availableTypes],
-  )
+  // The controls themselves live in the app bar's controls panel; this reads the
+  // same state they write. The generation clamp is applied by the provider.
+  const { search, typeFilter: activeTypeFilter } = useFilters()
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -71,17 +63,10 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
       })
   }, [generation, isAll, search, activeTypeFilter])
 
+  // The count stays on the page -- it is a readout, not a control, and the
+  // simplification pass only removed the three controls.
   const controls = (
     <div className="list-controls">
-      <input
-        type="search"
-        data-testid="species-search"
-        placeholder="Search by name…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        aria-label="Search species by name"
-      />
-      <TypeFilter available={availableTypes} selected={activeTypeFilter} onChange={setTypeFilter} />
       <p className="subtitle" data-testid="list-count">
         {rows.length} species
       </p>

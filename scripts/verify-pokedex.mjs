@@ -93,7 +93,7 @@ try {
   })
 
   const selectVersionGroup = async (name) => {
-    await page.selectOption('[data-testid="vg-select"]', name)
+    await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
     await page.waitForFunction(
       (n) => document.querySelector('[data-testid="scope-note"]')?.textContent?.includes(n),
       name,
@@ -121,6 +121,31 @@ try {
     )
 
   await page.goto(APP_URL, { waitUntil: 'load' })
+
+  // Every control moved behind the app bar's toggle in the simplification pass,
+  // so an action on one has to open the panel first. Opened for the duration of
+  // the interaction and closed again: the panel floats over the page, and leaving
+  // it open would let it intercept clicks meant for the module underneath.
+  const controlsOpen = () =>
+    page.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
+  const openControls = async () => {
+    if (!(await controlsOpen())) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    }
+  }
+  const closeControls = async () => {
+    if (await controlsOpen()) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForTimeout(80)
+    }
+  }
+  const withControls = async (fn) => {
+    await openControls()
+    const out = await fn()
+    await closeControls()
+    return out
+  }
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
 
   // ------------------------------------------------------------ SCENARIO 1
@@ -206,7 +231,7 @@ try {
 
   // ------------------------------------------------------------ SCENARIO B
   hr('SCENARIO B — search "char" narrows to the Charmander line')
-  await page.fill('[data-testid="species-search"]', 'char')
+  await withControls(() => page.fill('[data-testid="species-search"]', 'char'))
   await page.waitForFunction(
     () => document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length < 151,
     undefined,
@@ -221,15 +246,15 @@ try {
     charNames.join(','),
   )
   // Case-insensitivity and partial matching
-  await page.fill('[data-testid="species-search"]', 'CHAR')
+  await withControls(() => page.fill('[data-testid="species-search"]', 'CHAR'))
   const upperNames = await rowNames()
   check('search is case-insensitive', upperNames.join(',') === charNames.join(','))
   await page.screenshot({ path: `${SHOTS}/scenarioB-search.png` })
 
   // ------------------------------------------------------------ SCENARIO C
   hr('SCENARIO C — type filter is OR across selected types')
-  await page.fill('[data-testid="species-search"]', '')
-  await page.click('[data-testid="type-filter-fire"]')
+  await withControls(() => page.fill('[data-testid="species-search"]', ''))
+  await withControls(() => page.click('[data-testid="type-filter-fire"]'))
   await page.waitForFunction(
     () => document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length < 151,
     undefined,
@@ -250,7 +275,7 @@ try {
     fireRows.every((r) => r.types.includes('fire')),
   )
 
-  await page.click('[data-testid="type-filter-water"]')
+  await withControls(() => page.click('[data-testid="type-filter-water"]'))
   await page.waitForFunction(
     (n) => document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length > n,
     fireRows.length,
@@ -286,8 +311,8 @@ try {
 
   // ------------------------------------------------------------ SCENARIO D
   hr('SCENARIO D — search and type filter apply simultaneously')
-  await page.click('[data-testid="type-filter-water"]') // back to fire only
-  await page.fill('[data-testid="species-search"]', 'e')
+  await withControls(() => page.click('[data-testid="type-filter-water"]')) // back to fire only
+  await withControls(() => page.fill('[data-testid="species-search"]', 'e'))
   await page.waitForTimeout(300)
   const comboRows = await page.$$eval('[data-testid="species-rows"] li', (els) =>
     els
@@ -312,8 +337,8 @@ try {
 
   // ------------------------------------------------------------ SCENARIO F
   hr('SCENARIO F — Gengar under red-blue shows no abilities and no "undefined"')
-  await page.fill('[data-testid="species-search"]', 'gengar')
-  await page.click('[data-testid="type-filter-fire"]') // clear fire filter
+  await withControls(() => page.fill('[data-testid="species-search"]', 'gengar'))
+  await withControls(() => page.click('[data-testid="type-filter-fire"]')) // clear fire filter
   await page.waitForSelector('[data-testid="species-row-94"]', { timeout: 15000 })
   await openSpecies(94)
   const abilityNone = await page.textContent('[data-testid="abilities-none"]').catch(() => null)
@@ -380,7 +405,7 @@ try {
 
   // ------------------------------------------------------------ SCENARIO H
   hr('SCENARIO H — no gender toggle for a species without a gender difference')
-  await page.fill('[data-testid="species-search"]', 'bulbasaur')
+  await withControls(() => page.fill('[data-testid="species-search"]', 'bulbasaur'))
   await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 15000 })
   await openSpecies(1)
   // The switch is now always rendered and DISABLED when unavailable, which is
@@ -479,7 +504,7 @@ try {
 
   // ------------------------------------------------------------ SCENARIO I
   hr('SCENARIO I — Murkrow (#198) animated sprite uses the unsuffixed file')
-  await page.fill('[data-testid="species-search"]', 'murkrow')
+  await withControls(() => page.fill('[data-testid="species-search"]', 'murkrow'))
   await page.waitForSelector('[data-testid="species-row-198"]', { timeout: 15000 })
   await openSpecies(198)
   // Murkrow opens on artwork+static, where no gendered image exists, so the
@@ -558,7 +583,7 @@ try {
 
   // -------------------------------------------------- detail completeness
   hr('DETAIL COMPLETENESS — every required section renders')
-  await page.fill('[data-testid="species-search"]', 'eevee')
+  await withControls(() => page.fill('[data-testid="species-search"]', 'eevee'))
   await page.waitForSelector('[data-testid="species-row-133"]', { timeout: 15000 })
   await openSpecies(133)
   const sections = {

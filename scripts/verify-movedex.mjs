@@ -127,15 +127,22 @@ log(
 )
 
 hr('STATIC — the type filter is the shared component, not a copy')
+// The Pokedex's type filter moved out of SpeciesList and into the app bar's
+// controls panel during the simplification pass, so that is where the import has
+// to be. The point of the check is unchanged: one shared component, no copies.
 const speciesListSrc = readFileSync('src/modules/pokedex/SpeciesList.tsx', 'utf8')
+const controlsSrc = readFileSync('src/modules/nav/ControlsPanel.tsx', 'utf8')
 const movedexSrc = readFileSync('src/modules/dex/Movedex.tsx', 'utf8')
 const filterSrc = readFileSync('src/components/TypeFilter.tsx', 'utf8')
 const importsFilter = (src) => /from '(\.\.\/)+components\/TypeFilter'/.test(src)
-check('SpeciesList imports the shared TypeFilter', importsFilter(speciesListSrc))
+check("the Pokedex's controls panel imports the shared TypeFilter", importsFilter(controlsSrc))
 check('Movedex imports the shared TypeFilter', importsFilter(movedexSrc))
+check('and SpeciesList no longer renders a filter of its own', !importsFilter(speciesListSrc))
 check(
-  'neither module re-implements the filter buttons',
-  !/className=\{[^}]*'tf/.test(speciesListSrc) && !/className=\{[^}]*'tf/.test(movedexSrc),
+  'no module re-implements the filter buttons',
+  !/className=\{[^}]*'tf/.test(speciesListSrc) &&
+    !/className=\{[^}]*'tf/.test(controlsSrc) &&
+    !/className=\{[^}]*'tf/.test(movedexSrc),
 )
 check(
   'neither module holds its own palette',
@@ -176,19 +183,45 @@ try {
   })
 
   const goTo = async (id) => {
+    await page.hover('[data-testid="nav-pokedex"]')
     await page.click(`[data-testid="nav-${id}"]`)
     await page.waitForSelector(`[data-testid="dex-${id}"], [data-testid="species-rows"]`, {
       timeout: 30000,
     })
   }
   const selectGame = async (vg) => {
-    await page.selectOption('[data-testid="vg-select"]', vg)
+    await withControls(() => page.selectOption('[data-testid="vg-select"]', vg))
     await page.waitForTimeout(150)
   }
   const countOf = async (dex) =>
     Number((await page.textContent(`[data-testid="${dex}-count"]`)).trim().split(' ')[0])
 
   await page.goto(APP_URL, { waitUntil: 'load' })
+
+  // Every control moved behind the app bar's toggle in the simplification pass,
+  // so an action on one has to open the panel first. Opened for the duration of
+  // the interaction and closed again: the panel floats over the page, and leaving
+  // it open would let it intercept clicks meant for the module underneath.
+  const controlsOpen = () =>
+    page.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
+  const openControls = async () => {
+    if (!(await controlsOpen())) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    }
+  }
+  const closeControls = async () => {
+    if (await controlsOpen()) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForTimeout(80)
+    }
+  }
+  const withControls = async (fn) => {
+    await openControls()
+    const out = await fn()
+    await closeControls()
+    return out
+  }
   await page.waitForSelector('[data-testid="dex-switcher"]', { timeout: 60000 })
 
   // ------------------------------------------------------------ registration

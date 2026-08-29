@@ -2,14 +2,25 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
 import type { BootStats } from './data'
-import { DexSwitcher } from './modules/nav/DexSwitcher'
+import { DesignSystemPage } from './modules/design-system/DesignSystemPage'
+import { FiltersProvider } from './modules/filters/FiltersProvider'
+import { ControlsPanel } from './modules/nav/ControlsPanel'
+import { NavMenu } from './modules/nav/NavMenu'
 import { NavProvider } from './modules/nav/NavProvider'
 import { useNav } from './modules/nav/navContext'
 import { findModule } from './modules/nav/registry'
-import { GlobalSearch } from './modules/search/GlobalSearch'
 import { VersionGroupProvider } from './modules/version-group/VersionGroupProvider'
-import { VersionGroupSelector } from './modules/version-group/VersionGroupSelector'
 import './modules/pokedex/pokedex.css'
+
+/**
+ * The design-system reference page has no nav tab any more -- it was an
+ * implementation aid, not a destination. It is still reachable at ?ds=1 so the
+ * components stay rendered by the real app against the real data layer, which is
+ * what the design-system verification measures. Read once at module scope: there
+ * is no router, and nothing toggles this at runtime.
+ */
+const SHOW_DESIGN_SYSTEM =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('ds')
 
 const kib = (bytes: number) => `${(bytes / 1024).toFixed(1)} KiB`
 
@@ -30,18 +41,18 @@ function Shell() {
           five of the six dexes, and the search reaches all four searchable ones,
           so they sit beside the switcher rather than inside any one header. */}
       <div className="app-bar">
-        {/* Brand then tabs, per the full-95 navbar spec; grouped so the bar keeps
-            spacing three clusters rather than four loose items. */}
+        {/* Brand then the three nav groups, per the full-95 navbar spec. */}
         <div className="app-bar-nav">
           <span className="app-brand" data-testid="app-brand">
             Pokeapp
           </span>
-          <DexSwitcher activeId={active.id} onSelect={nav.setModule} />
+          <NavMenu activeId={active.id} onSelect={nav.setModule} />
         </div>
-        <GlobalSearch />
-        <VersionGroupSelector />
+        {/* Every control that used to sit permanently in the bar or above the
+            grid now lives behind this one toggle, at the bar's top right. */}
+        <ControlsPanel />
       </div>
-      <active.Component />
+      {SHOW_DESIGN_SYSTEM ? <DesignSystemPage /> : <active.Component />}
     </>
   )
 }
@@ -83,7 +94,11 @@ export default function App() {
     <main className="panel">
       <VersionGroupProvider>
         <NavProvider>
-          <Shell />
+          {/* Inside VersionGroupProvider: the type-filter clamp reads the
+              generation from it. */}
+          <FiltersProvider>
+            <Shell />
+          </FiltersProvider>
         </NavProvider>
       </VersionGroupProvider>
 

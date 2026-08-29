@@ -98,8 +98,8 @@ try {
   browser = await chromium.launch({ channel: 'chrome' })
 
   const openDetail = async (page, id, vg, name) => {
-    await page.selectOption('[data-testid="vg-select"]', vg)
-    await page.fill('[data-testid="species-search"]', name.toLowerCase())
+    await withControls(page, () => page.selectOption('[data-testid="vg-select"]', vg))
+    await withControls(page, () => page.fill('[data-testid="species-search"]', name.toLowerCase()))
     await page.waitForSelector(`[data-testid="species-row-${id}"]`, { timeout: 20000 })
     await page.click(`[data-testid="species-row-${id}"]`)
     await page.waitForSelector(`[data-testid="species-detail"][data-species-id="${id}"]`, {
@@ -118,6 +118,26 @@ try {
   })
   page.on('pageerror', (e) => pageErrors.push(e.message))
   await page.goto(APP_URL, { waitUntil: 'load' })
+
+  // Every control moved behind the app bar's toggle in the simplification pass,
+  // so an action on one has to open the panel first. This suite drives more than
+  // one page, so the page is a parameter rather than a closure capture -- the
+  // outer `page` is already closed by the time the later scenarios run.
+  const controlsOpen = (pg) =>
+    pg.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
+  const withControls = async (pg, fn) => {
+    const opened = await controlsOpen(pg)
+    if (!opened) {
+      await pg.click('[data-testid="controls-toggle"]')
+      await pg.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    }
+    const out = await fn()
+    if (!opened) {
+      await pg.click('[data-testid="controls-toggle"]')
+      await pg.waitForTimeout(80)
+    }
+    return out
+  }
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
 
   for (const c of CASES) {

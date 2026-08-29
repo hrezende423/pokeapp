@@ -88,11 +88,13 @@
   padding-top: 0;
 }
 
-/* The reference frame shows no filter row above the grid, but it is explicitly a
-   mid-scroll splice (species 1-3 above 195-197), so controls could equally be
-   above its top edge. Kept, and constrained to the grid's own width. */
+/* Only the species count is left here: the search, type filter and game scope
+   all moved into the app bar's controls panel. The count is a readout, not a
+   control, and the reference frame is a mid-scroll splice that would not show a
+   header row either way. */
 .species-list-grid .list-controls {
   margin-bottom: var(--space-gap-lg);
+  align-self: flex-start;
 }
 
 /* Back out of a species to the grid: Figma's icon-page-back, as a labelled
@@ -1044,30 +1046,43 @@
   color: var(--text-primary);
 }
 
-/* Figma tab gaps are a uniform 20 raw = 8.5px at the measured 2.348 scale:
-   154-134, 306-286, 409-389, 519-499. */
-.dex-switcher {
+/*
+  Three nav groups replace the flat row of six dex tabs. Text-only triggers, no
+  underline (the MainPage frames have no such node), colour alone marking the
+  current page -- unchanged from the Figma pass. What is new is the dropdown under
+  each group.
+
+  Dropdown panels follow the full-95 "Dropdown menu" spec exactly as the search
+  results panel already does: --surface-raised, a hairline border, hairline
+  dividers between items, radius-control, and no shadow. Elevation is the
+  tone-step and nothing else.
+*/
+/* The same 8.5px rhythm the reference uses between top-level nav labels. */
+.app-nav {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: 8.5px;
 }
 
-/*
-  Text-only tabs: no fill, no box, and -- against the §5 Tabs spec -- no underline.
-  The MainPage nav-bar frame contains exactly six children in both themes: a Tabs
-  frame holding five bare <text> nodes, and the search <text>. There is no
-  rectangle, line or vector anywhere under it, so the active tab is marked by
-  colour alone. Both reference screenshots agree: nothing is drawn under "Pokedex".
-  The hairline under the whole row survives as the frame's own stroke (visible in
-  both screenshots) and stays on .app-bar.
-*/
-.dex-tab {
+.nav-group {
+  position: relative;
+}
+
+/* The dex group is a plain wrapper around its single group now that the other
+   five dexes moved into the dropdown; it keeps its own element because the
+   switcher is the registry-driven list the suites inspect. */
+.dex-switcher {
+  display: flex;
+}
+
+.nav-trigger {
   padding: 0;
   font-family: var(--font-body);
   font-size: var(--font-size-body);
-  /* One weight across all five labels: measured against the reference, 600 fits
-     every label to within 0.13px of --font-size-body where 400 is 0.52px out, and
-     the per-string spread is half as wide. Only colour separates them. */
+  /* One weight across every label: measured against the reference, 600 fits each
+     to within 0.13px of --font-size-body where 400 is 0.52px out. Only colour
+     separates the current page from the rest. */
   font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
   background: none;
@@ -1076,35 +1091,221 @@
   cursor: pointer;
 }
 
-/* Excludes the active tab on purpose: (0,2,0) hover would otherwise outrank the
-   (0,1,0) active rule and repaint the current tab from --accent to ink whenever
-   the pointer happened to rest on it. */
-.dex-tab:not(.dex-tab-active):hover {
+/* Excludes the active trigger on purpose: (0,2,0) hover would otherwise outrank
+   the (0,1,0) active rule and repaint the current item from --accent to ink. */
+.nav-trigger:not(.nav-trigger-active):hover {
   color: var(--text-primary);
 }
 
-.dex-tab-active {
+.nav-trigger-active {
   color: var(--accent);
-  font-weight: var(--font-weight-medium);
 }
 
-/* The version-group picker lives in this same bar, so it would have been the one
-   control still drawn from the old palette. Tokens swapped, shape left alone --
-   the full §5 select treatment (label above, underline only) would restructure a
-   control that is not otherwise in scope for this pass. */
-.app-bar .vg-selector {
+.nav-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/*
+  Hidden with display: none rather than unmounted, so the switcher stays a
+  complete registry-ordered list of nav-<id> buttons -- and so nothing inside is
+  tabbable until the group opens, which is what makes Tab land on the trigger and
+  then step into the first item.
+*/
+.nav-dropdown {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  /* Flush against the trigger, with no gap: a gap between a hover trigger and
+     its panel is a dead zone that closes the dropdown as the pointer crosses it. */
+  top: 100%;
+  left: -12px;
+  min-width: 168px;
+  padding: 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+}
+
+.nav-group[data-open='true'] .nav-dropdown {
+  display: block;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Hairline dividers between items, per the spec -- and only between, so the
+   panel's own border is not doubled at the bottom. */
+.nav-item + .nav-item,
+.nav-dropdown-empty {
+  border-top: 1px solid var(--hairline);
+}
+
+.nav-item:hover:not([aria-disabled='true']) {
+  color: var(--accent);
+}
+
+/* Inert because nothing is built behind it yet -- still focusable, so the
+   attribute rather than :disabled carries the styling. */
+.nav-item[aria-disabled='true'] {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.nav-item-active {
+  color: var(--accent);
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.nav-dropdown-empty {
+  margin: 0;
+  padding: 9px 14px;
+  max-width: 220px;
   font-family: var(--font-body);
   font-size: var(--font-size-label);
   color: var(--text-secondary);
 }
 
-.app-bar .vg-selector select {
+/* ------------------------------------------------- app bar controls panel */
+
+/*
+  One toggle at the bar's top right, in the slot the persistent cross-dex search
+  used to occupy, revealing every control that used to be permanently on screen.
+  Same full-95 dropdown container as the nav panels above.
+*/
+.app-controls {
+  position: relative;
+  margin-left: auto;
+}
+
+.app-controls-toggle {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.app-controls-toggle:hover {
+  color: var(--text-primary);
+}
+
+/* Open, or narrowing the list: either way the accent says "this is doing
+   something", which is the binary-state-indicator use --accent is reserved for. */
+.app-controls[data-open='true'] .app-controls-toggle,
+.app-controls-toggle[data-filters-active='true'] {
+  color: var(--accent);
+}
+
+.app-controls-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app-controls-panel {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + var(--space-gap-sm));
+  right: 0;
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+}
+
+.app-controls[data-open='true'] .app-controls-panel {
+  display: block;
+}
+
+.app-controls-field {
+  padding: var(--space-gap-md);
+}
+
+.app-controls-field + .app-controls-field {
+  border-top: 1px solid var(--hairline);
+}
+
+.app-controls-label {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+/* The species name filter, in the panel rather than above the grid. */
+.app-controls-field input[type='search'] {
+  width: 100%;
+  padding: 6px 2px;
   font-family: var(--font-body);
   font-size: var(--font-size-body);
   color: var(--text-primary);
-  background: var(--surface);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  box-sizing: border-box;
+}
+
+.app-controls-field input[type='search']::placeholder {
+  color: var(--text-secondary);
+}
+
+.app-controls-field input[type='search']:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+/* The game scope, previously a permanent control in the bar. */
+.app-controls-field .vg-selector {
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.app-controls-field .vg-selector select {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  background: var(--surface-raised);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-control);
+}
+
+/* Inside the panel the cross-dex search is a labelled field in a column, not a
+   right-aligned strip in the bar, so both of those bar-specific rules are
+   undone here. */
+.app-controls-field .global-search {
+  flex: none;
+  max-width: none;
+}
+
+.app-controls-field .global-search-input {
+  text-align: left;
 }
 
 /* ------------------------------------------------------- shared dex bits */

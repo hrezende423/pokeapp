@@ -333,6 +333,31 @@ try {
   })
 
   await page.goto(APP_URL, { waitUntil: 'load' })
+
+  // Every control moved behind the app bar's toggle in the simplification pass,
+  // so an action on one has to open the panel first. Opened for the duration of
+  // the interaction and closed again: the panel floats over the page, and leaving
+  // it open would let it intercept clicks meant for the module underneath.
+  const controlsOpen = () =>
+    page.$eval('[data-testid="app-controls"]', (el) => el.dataset.open === 'true')
+  const openControls = async () => {
+    if (!(await controlsOpen())) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    }
+  }
+  const closeControls = async () => {
+    if (await controlsOpen()) {
+      await page.click('[data-testid="controls-toggle"]')
+      await page.waitForTimeout(80)
+    }
+  }
+  const withControls = async (fn) => {
+    await openControls()
+    const out = await fn()
+    await closeControls()
+    return out
+  }
   await page.waitForSelector('[data-testid="dex-switcher"]', { timeout: 60000 })
 
   // ---------------------------------------------------------------- helpers
@@ -346,6 +371,7 @@ try {
   }
   const goTo = async (id) => {
     await closePanel()
+    await page.hover('[data-testid="nav-pokedex"]')
     await page.click(`[data-testid="nav-${id}"]`)
     await page.waitForSelector(`[data-testid="dex-${id}"], [data-testid="species-rows"]`, {
       timeout: 30000,
@@ -353,10 +379,14 @@ try {
   }
   const selectGame = async (vg) => {
     await closePanel()
-    await page.selectOption('[data-testid="vg-select"]', vg)
+    await withControls(() => page.selectOption('[data-testid="vg-select"]', vg))
     await page.waitForTimeout(180)
   }
   const setTerm = async (term) => {
+    // The cross-dex search lives in the controls panel now, so it has to be open
+    // to type into -- and stays open afterwards, because the results dropdown
+    // this suite reads is nested inside that same panel.
+    await openControls()
     await page.fill('[data-testid="global-search"]', term)
     await page.waitForTimeout(160)
   }
@@ -434,6 +464,7 @@ try {
   // Persistent across tab switches: the term survives, so a search is not lost by
   // navigating to a result and coming back for the next one.
   await setTerm('sand')
+  await page.hover('[data-testid="nav-pokedex"]')
   await page.click('[data-testid="nav-naturedex"]')
   await page.waitForSelector('[data-testid="dex-naturedex"]', { timeout: 30000 })
   const kept = await page.inputValue('[data-testid="global-search"]')
@@ -749,7 +780,7 @@ try {
   // rows instead of the full list, so a result the local box hid would not open.
   hr("ITEM 3c — a result opens even when the dex's own search box hides its row")
   await goTo('pokedex')
-  await page.fill('[data-testid="species-search"]', 'zzzq')
+  await withControls(() => page.fill('[data-testid="species-search"]', 'zzzq'))
   await page.waitForTimeout(150)
   const emptyList = await page.$$eval('[data-testid="species-rows"] [data-species-id]', (e) =>
     e.map((x) => x.getAttribute('data-species-id')),
@@ -774,7 +805,7 @@ try {
   check('the species detail opened anyway', opened.id === slowbro.id && opened.name === 'Slowbro')
   check("the dex's own search term was left alone", opened.localTerm === 'zzzq', opened.localTerm)
   check('its row is genuinely still filtered out', opened.rows === 0)
-  await page.fill('[data-testid="species-search"]', '')
+  await withControls(() => page.fill('[data-testid="species-search"]', ''))
 
   // ================================================================ errors
   hr('CONSOLE / PAGE / HTTP ERRORS')
