@@ -93,6 +93,7 @@ const EXPECTED = {
   light: {
     '--surface': tokenValue(semantic.surface, 'light'),
     '--surface-raised': tokenValue(semantic['surface-raised'], 'light'),
+    '--surface-hover': tokenValue(semantic['surface-hover'], 'light'),
     '--text-primary': tokenValue(semantic['text-primary'], 'light'),
     '--text-secondary': tokenValue(semantic['text-secondary'], 'light'),
     '--hairline': tokenValue(semantic.hairline, 'light'),
@@ -105,6 +106,7 @@ const EXPECTED = {
   dark: {
     '--surface': tokenValue(semantic.surface, 'dark'),
     '--surface-raised': tokenValue(semantic['surface-raised'], 'dark'),
+    '--surface-hover': tokenValue(semantic['surface-hover'], 'dark'),
     '--text-primary': tokenValue(semantic['text-primary'], 'dark'),
     '--text-secondary': tokenValue(semantic['text-secondary'], 'dark'),
     '--hairline': tokenValue(semantic.hairline, 'dark'),

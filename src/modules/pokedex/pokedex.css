@@ -1156,10 +1156,11 @@
 /* Neutral hover, not --accent: the accent has exactly three sanctioned uses
    (active tab/nav, binary indicator, error/validation) and pointer feedback is
    none of them. A tone-step down from the panel is the in-system move -- the
-   panel is --surface-raised, so --surface is the only adjacent tone, and the
-   text colour stays put so nothing shifts on hover. */
+   panel is --surface-raised, and --surface-hover is the tone that exists for
+   exactly this, rather than borrowing --surface (imperceptible on white) or
+   --hairline (a border token). The text colour stays put so nothing shifts. */
 .nav-item:hover:not([aria-disabled='true']) {
-  background: var(--surface);
+  background: var(--surface-hover);
 }
 
 /* Inert because nothing is built behind it yet -- still focusable, so the

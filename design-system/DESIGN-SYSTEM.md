@@ -54,6 +54,15 @@ borders (`--hairline`) and whitespace. This was a hard-won decision after
 several rounds defaulted to "safe" ambient shadows — treat any urge to add a
 `box-shadow` as a signal to reconsider the layout, not a styling gap to fill.
 
+Three surface tones, and only three: `--surface` (the page), `--surface-raised`
+(anything floating above it), and `--surface-hover` (pointer feedback on a row
+inside a floating panel). The third exists because the accent has exactly three
+sanctioned uses and hover is not one of them, and because on white a step to
+`--surface` is imperceptible — `--surface-hover` is 0.129 of luminance below
+`--surface-raised` in light where `--surface` is only 0.044 below it. In dark it
+equals `--surface`, which already read correctly. It is a fill, so it never
+substitutes for `--hairline`, and vice versa.
+
 **Type is data, not decoration.** Type (Fire/Water/Grass/etc.) renders as a
 colored text label only — no fill, no pill, no badge shape. Colored badge
 chips were tried and explicitly rejected (see §4) as the single most common

@@ -23,6 +23,10 @@
         "light": { "$value": "#ffffff", "$description": "Drawer / floating-panel surface, light — lighter than base surface" },
         "dark": { "$value": "#1c1c1e", "$description": "Drawer / floating-panel surface, dark — lighter than base surface" }
       },
+      "surface-hover": {
+        "light": { "$value": "#f0f0f0", "$description": "Pointer-hover tone, light — a step DOWN from surface-raised, which is the top of the light ramp. Carries ~3x the luminance delta of surface against surface-raised (0.129 vs 0.044); the 2% surface step was too faint on white. Still short of the hairline, so a hovered row does not read as a filled band." },
+        "dark": { "$value": "#141414", "$description": "Pointer-hover tone, dark — same value as surface.dark, which already read correctly against surface-raised.dark. A token of its own so light can diverge without dragging dark with it." }
+      },
       "accent-red": {
         "light": { "$value": "#d91c2c", "$description": "Signature accent, grounded in real Pokedex device red, not a generic palette pick" },
         "dark": { "$value": "#ff3b4e", "$description": "Brightened for contrast against dark surface" }
@@ -105,6 +109,11 @@
         "light": { "$value": "{color.primitive.surface-raised.light}" },
         "dark": { "$value": "{color.primitive.surface-raised.dark}" },
         "$description": "Elevation without shadow: a lighter/darker tone-step instead of a drop shadow. Used for the detail-page drawer. This is the system's only elevation mechanism."
+      },
+      "surface-hover": {
+        "light": { "$value": "{color.primitive.surface-hover.light}" },
+        "dark": { "$value": "{color.primitive.surface-hover.dark}" },
+        "$description": "Pointer-feedback fill for a row inside a floating panel. Exists because accent-red has exactly three sanctioned uses and hover is not one of them, so hover needs a tone rather than borrowing hairline (a border token) or surface (whose light step is imperceptible against surface-raised)."
       },
       "surface-species-tint": {
         "$description": "Data-driven, not a fixed value. Populated per species from a species_id -> {bg_light, bg_dark} lookup table (implementation task, not a design token). Falls back to semantic.surface when no per-species data exists yet. Applies to the detail page's artwork panel only — surface-raised (the drawer) never changes."

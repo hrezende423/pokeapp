@@ -113,6 +113,8 @@
   /* surfaces */
   --surface: #fafafa;
   --surface-raised: #ffffff; /* drawer / floating panels — elevation via tone, never shadow */
+  /* pointer feedback on rows in a floating panel; --accent is not for hover */
+  --surface-hover: #f0f0f0;
   --text-primary: #141414;
   --text-secondary: #6b6b6b;
   --hairline: #e5e5e5;
@@ -154,6 +156,7 @@
 [data-theme='dark'] {
   --surface: #141414;
   --surface-raised: #1c1c1e;
+  --surface-hover: #141414;
   --text-primary: #f5f5f5;
   --text-secondary: #8f8f95;
   --hairline: #2c2c2e;
