@@ -20,6 +20,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
+import { goToDex } from './lib/nav.mjs'
 
 const PORT = 4187
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
@@ -184,8 +185,7 @@ try {
   })
 
   const goTo = async (id) => {
-    await page.hover('[data-testid="nav-pokedex"]')
-    await page.click(`[data-testid="nav-${id}"]`)
+    await goToDex(page, id)
     await page.waitForSelector(`[data-testid="dex-${id}"], [data-testid="species-rows"]`, {
       timeout: 30000,
     })
@@ -200,7 +200,7 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
 
   const { withControls } = controls(page)
-  await page.waitForSelector('[data-testid="dex-switcher"]', { timeout: 60000 })
+  await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
   // ------------------------------------------------------------ registration
   hr('NAVIGATION — Movedex is registered like the rest')

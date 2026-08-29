@@ -27,6 +27,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
+import { goToDex, openTab } from './lib/nav.mjs'
 
 const PORT = 4192
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
@@ -372,7 +373,7 @@ try {
   })
 
   await page.goto(APP_URL, { waitUntil: 'load' })
-  await page.waitForSelector('[data-testid="dex-switcher"]', { timeout: 60000 })
+  await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
   const { withControls } = controls(page)
 
@@ -1161,7 +1162,6 @@ try {
         toggle: (() => {
           const btn = document.querySelector('[data-testid="controls-toggle"]')
           if (!btn) return null
-          const svg = btn.querySelector('svg')
           const barBox = document.querySelector('.app-bar').getBoundingClientRect()
           const box = btn.getBoundingClientRect()
           return {
@@ -1169,10 +1169,10 @@ try {
             label: btn.getAttribute('aria-label'),
             color: getComputedStyle(btn).color,
             rightInset: Math.round(barBox.right - box.right),
-            iconTag: svg?.tagName.toLowerCase() ?? null,
-            iconClass: svg?.getAttribute('class') ?? null,
-            iconWidth: svg?.getAttribute('width') ?? null,
-            iconStroke: svg?.getAttribute('stroke-width') ?? null,
+            text: btn.textContent.trim(),
+            svgCount: btn.querySelectorAll('svg').length,
+            border: getComputedStyle(btn).borderTopWidth,
+            background: getComputedStyle(btn).backgroundColor,
           }
         })(),
         panelOpen: visible(document.querySelector('[data-testid="controls-panel"]')),
@@ -1234,8 +1234,9 @@ try {
 
     // ITEM 5: three groups, in this order, with Notes deliberately absent.
     check(
-      '[' + theme + '] the nav is Pokédex / Team Builder / Tools',
-      JSON.stringify(shell.triggerLabels) === JSON.stringify(['Pokédex', 'Team Builder', 'Tools']),
+      '[' + theme + '] the nav is Poképedia / Team Building / Tools',
+      JSON.stringify(shell.triggerLabels) ===
+        JSON.stringify(['Poképedia', 'Team Building', 'Tools']),
       shell.triggerLabels.join(','),
     )
     check(
@@ -1276,18 +1277,19 @@ try {
       shell.toggle ? shell.toggle.rightInset + 'px inset' : 'missing',
     )
     check(
-      '[' + theme + "] its icon is Tabler's IconFilter at 24px / 1.5 stroke",
-      shell.toggle?.iconTag === 'svg' &&
-        /tabler-icon-filter/.test(shell.toggle.iconClass ?? '') &&
-        shell.toggle.iconWidth === '24' &&
-        shell.toggle.iconStroke === '1.5',
+      '[' + theme + '] it is a text-only ghost button reading "Search/filter species"',
+      shell.toggle?.text === 'Search/filter species' && shell.toggle.svgCount === 0,
       JSON.stringify(shell.toggle),
+    )
+    check(
+      '[' + theme + '] with no border and no fill, per the ghost treatment',
+      shell.toggle?.border === '0px' && /rgba\(0, 0, 0, 0\)/.test(shell.toggle.background ?? ''),
+      shell.toggle?.border + ' / ' + shell.toggle?.background,
     )
     check(
       '[' + theme + '] in --text-secondary while closed, and it reports its state',
       shell.toggle?.color === hexToRgb(want['--text-secondary']) &&
-        shell.toggle.expanded === 'false' &&
-        /show/i.test(shell.toggle.label ?? ''),
+        shell.toggle.expanded === 'false',
       shell.toggle?.color + ' / aria-expanded=' + shell.toggle?.expanded,
     )
 
@@ -1513,8 +1515,8 @@ try {
   const dropdownClosed = await page.evaluate(() => {
     const visible = (el) => el != null && el.getClientRects().length > 0
     return {
-      dexes: visible(document.querySelector('[data-testid="nav-dropdown-dexes"]')),
-      team: visible(document.querySelector('[data-testid="nav-dropdown-team"]')),
+      pokepedia: visible(document.querySelector('[data-testid="nav-dropdown-pokepedia"]')),
+      team: visible(document.querySelector('[data-testid="nav-dropdown-team-building"]')),
       tools: visible(document.querySelector('[data-testid="nav-dropdown-tools"]')),
       // Still in the DOM, so the switcher stays a complete registry-ordered list.
       itemdexInDom: document.querySelector('[data-testid="nav-itemdex"]') != null,
@@ -1524,7 +1526,7 @@ try {
   log('  closed: ' + JSON.stringify(dropdownClosed))
   check(
     'every dropdown starts hidden',
-    !dropdownClosed.dexes && !dropdownClosed.team && !dropdownClosed.tools,
+    !dropdownClosed.pokepedia && !dropdownClosed.team && !dropdownClosed.tools,
     JSON.stringify(dropdownClosed),
   )
   check(
@@ -1533,10 +1535,10 @@ try {
   )
 
   // HOVER
-  await page.hover('[data-testid="nav-pokedex"]')
+  await openTab(page, 'pokepedia')
   await page.waitForTimeout(120)
   const hovered = await page.evaluate(() => {
-    const panel = document.querySelector('[data-testid="nav-dropdown-dexes"]')
+    const panel = document.querySelector('[data-testid="nav-dropdown-pokepedia"]')
     const cs = getComputedStyle(panel)
     const items = [...panel.querySelectorAll('.nav-item')]
     const firstDivider = items[1] ? getComputedStyle(items[1]) : null
@@ -1551,16 +1553,21 @@ try {
       dividerTop: firstDivider
         ? firstDivider.borderTopWidth + ' ' + firstDivider.borderTopColor
         : null,
-      expanded: document.querySelector('[data-testid="nav-pokedex"]').getAttribute('aria-expanded'),
+      expanded: document
+        .querySelector('[data-testid="nav-tab-pokepedia"]')
+        .getAttribute('aria-expanded'),
     }
   })
   log('  hovered: ' + JSON.stringify(hovered))
-  check('hovering Pokédex opens its dropdown', hovered.visible)
+  check('hovering Poképedia opens its dropdown', hovered.visible)
   check('and the trigger reports it', hovered.expanded === 'true', String(hovered.expanded))
+  // Six now, not five: Poképedia is the parent tab rather than the Pokedex
+  // wearing two hats, so the Pokedex is an item like the rest.
   check(
-    'it lists the other five dexes, in registry order',
+    'it lists all six dexes, in registry order',
     JSON.stringify(hovered.items) ===
       JSON.stringify([
+        'nav-pokedex',
         'nav-itemdex',
         'nav-abilitydex',
         'nav-naturedex',
@@ -1588,13 +1595,14 @@ try {
     'moving the pointer away closes it again',
     !(await page.evaluate(
       () =>
-        document.querySelector('[data-testid="nav-dropdown-dexes"]').getClientRects().length > 0,
+        document.querySelector('[data-testid="nav-dropdown-pokepedia"]').getClientRects().length >
+        0,
     )),
   )
 
   // FOCUS — the correctness requirement: keyboard must reveal the same dropdown.
-  for (const group of ['dexes', 'team']) {
-    const trigger = group === 'dexes' ? 'nav-pokedex' : 'nav-trigger-team'
+  for (const group of ['pokepedia', 'team-building', 'tools']) {
+    const trigger = 'nav-tab-' + group
     await page.focus('[data-testid="' + trigger + '"]')
     await page.waitForTimeout(120)
     const focused = await page.evaluate((g) => {
@@ -1645,42 +1653,61 @@ try {
     )
   }
 
-  // Team Builder's two known items, and Tools with nothing behind it.
-  await page.hover('[data-testid="nav-trigger-team"]')
+  // Team Building and Tools, both now full lists of real destinations.
+  await page.hover('[data-testid="nav-tab-team-building"]')
   await page.waitForTimeout(120)
   const team = await page.evaluate(() => {
-    const panel = document.querySelector('[data-testid="nav-dropdown-team"]')
+    const panel = document.querySelector('[data-testid="nav-dropdown-team-building"]')
     return {
       labels: [...panel.querySelectorAll('.nav-item')].map((el) => el.textContent.trim()),
-      allDisabled: [...panel.querySelectorAll('.nav-item')].every(
-        (el) => el.getAttribute('aria-disabled') === 'true',
+      testids: [...panel.querySelectorAll('.nav-item')].map((el) => el.getAttribute('data-testid')),
+      noneDisabled: [...panel.querySelectorAll('.nav-item')].every(
+        (el) => !el.disabled && el.getAttribute('aria-disabled') !== 'true',
       ),
-      allFocusable: [...panel.querySelectorAll('.nav-item')].every((el) => !el.disabled),
     }
   })
   log('  team items: ' + JSON.stringify(team))
   check(
-    'Team Builder lists the two items that were named',
-    JSON.stringify(team.labels) === JSON.stringify(['Build Library', 'Team Builder']),
+    'Team Building lists its five destinations, in order',
+    JSON.stringify(team.labels) ===
+      JSON.stringify([
+        'New Team',
+        'New Build',
+        'Team Library',
+        'Build Library',
+        'Pokemon Collection',
+      ]),
     team.labels.join(','),
   )
-  check('both inert, because nothing is built behind them yet', team.allDisabled)
-  check('but still focusable -- aria-disabled, not the disabled attribute', team.allFocusable)
-  await page.hover('[data-testid="nav-trigger-tools"]')
+  // They lead to stub pages, but they are real destinations now, so nothing is
+  // inert and nothing needs aria-disabled to stay keyboard-reachable.
+  check(
+    'all five are live destinations, none inert',
+    team.noneDisabled,
+    JSON.stringify(team.testids),
+  )
+  await page.hover('[data-testid="nav-tab-tools"]')
   await page.waitForTimeout(120)
   const tools = await page.evaluate(() => {
     const panel = document.querySelector('[data-testid="nav-dropdown-tools"]')
     return {
       visible: panel.getClientRects().length > 0,
-      items: panel.querySelectorAll('.nav-item').length,
-      note: panel.querySelector('[data-testid="nav-dropdown-empty-tools"]')?.textContent?.trim(),
+      labels: [...panel.querySelectorAll('.nav-item')].map((el) => el.textContent.trim()),
     }
   })
   log('  tools: ' + JSON.stringify(tools))
   check(
-    'Tools opens an explicit empty state rather than a dead dropdown',
-    tools.visible && tools.items === 0 && (tools.note ?? '').length > 0,
-    JSON.stringify(tools),
+    'Tools lists its five destinations, in order',
+    tools.visible &&
+      JSON.stringify(tools.labels) ===
+        JSON.stringify([
+          'Compare Pokemon',
+          'Battle Simulator',
+          'Training and Optimization',
+          'Breeding Planner',
+          'Calculators',
+        ]),
+    tools.labels.join(','),
   )
   await page.mouse.move(1200, 900)
 
@@ -2108,7 +2135,7 @@ try {
   // The ability line is real data, not the mockup's text: non-hidden abilities
   // only, middot-separated, and absent entirely in the generations that had none.
   hr('GRID DATA — the ability slot carries real, generation-correct abilities')
-  await page.click('[data-testid="nav-pokedex"]')
+  await goToDex(page, 'pokedex')
   await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 30000 })
   const gridBaseline = await page.evaluate(() => {
     const card = document.querySelector('[data-testid="species-row-1"]')
@@ -2230,8 +2257,7 @@ try {
   for (const id of UNTOUCHED) {
     // The other five dexes live in the Pokedex dropdown now, so opening it is
     // part of reaching them.
-    await page.hover('[data-testid="nav-pokedex"]')
-    await page.click(`[data-testid="nav-${id}"]`)
+    await goToDex(page, id)
     await page.waitForSelector(`[data-testid="${id}-rows"]`, { timeout: 30000 })
     const mod = await page.evaluate((dexId) => {
       const row = document.querySelector(`[data-testid^="${dexId}-row-"]`)
@@ -2261,7 +2287,7 @@ try {
       `ds=${mod.dsClasses} cards=${mod.cards}`,
     )
   }
-  await page.click('[data-testid="nav-pokedex"]')
+  await goToDex(page, 'pokedex')
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
   const pokedex = await page.evaluate(() => ({
     accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),

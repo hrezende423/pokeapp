@@ -146,3 +146,29 @@
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
+
+/*
+  Placeholder screens for nav destinations that have no feature yet. Deliberately
+  plain: tokens only, no layout work, nothing that could read as a half-built
+  feature rather than an empty room.
+*/
+.stub-page {
+  padding: var(--space-gap-lg) 0;
+  text-align: left;
+}
+
+.stub-page-title {
+  margin: 0 0 var(--space-gap-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.stub-page-note {
+  margin: 0;
+  max-width: 44ch;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+}

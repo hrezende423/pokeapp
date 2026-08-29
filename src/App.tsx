@@ -8,7 +8,7 @@ import { ControlsPanel } from './modules/nav/ControlsPanel'
 import { NavMenu } from './modules/nav/NavMenu'
 import { NavProvider } from './modules/nav/NavProvider'
 import { useNav } from './modules/nav/navContext'
-import { findModule } from './modules/nav/registry'
+import { findPage } from './modules/nav/navConfig'
 import { VersionGroupProvider } from './modules/version-group/VersionGroupProvider'
 import './modules/pokedex/pokedex.css'
 
@@ -33,7 +33,7 @@ const kib = (bytes: number) => `${(bytes / 1024).toFixed(1)} KiB`
  */
 function Shell() {
   const nav = useNav()
-  const active = findModule(nav.moduleId)
+  const active = findPage(nav.moduleId)
 
   return (
     <>

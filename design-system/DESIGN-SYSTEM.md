@@ -186,7 +186,12 @@ color-coding by value tier.
 - Primary: `--button-primary-fill` background, `--button-primary-text`,
   `--radius-control`, no shadow, no border.
 - Secondary: transparent background, `--hairline`-derived border, `--text-primary`.
-- No tertiary/ghost/danger variants specified yet.
+- Ghost: text only -- no border, no fill, no icon. `--text-secondary`, going
+  to `--text-primary` on hover, and the 2px accent focus ring. Added after the
+  fact rather than designed: `.nav-trigger` and `.pokedex-back` were already
+  exactly this, unnamed, and the app-bar controls trigger made a third, so it is
+  written down here as `.ghost-button` instead of being re-derived a fourth time.
+- No danger variant specified yet.
 
 ### Toggle (binary state, e.g. "caught")
 Track + circular thumb, `--radius-pill`. Off state: neutral gray track.

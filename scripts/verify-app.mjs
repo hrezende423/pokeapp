@@ -139,8 +139,11 @@ try {
 
   const selectGroup = async (name) => {
     await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
+    // The scope readout was removed from the page with the header block. The
+    // select holds the same state the list derives from, and both land in one
+    // React commit, so waiting for its value is waiting for the list.
     await page.waitForFunction(
-      (n) => document.querySelector('[data-testid="scope-note"]')?.textContent?.includes(n),
+      (n) => document.querySelector('[data-testid="vg-select"]')?.value === n,
       name,
       { timeout: 30000 },
     )
@@ -191,10 +194,15 @@ try {
   )
 
   await selectGroup(GROUP_A)
-  const listCount = (await page.textContent('[data-testid="list-count"]')).trim()
+  // Counted from the rows themselves rather than a rendered label: the label is
+  // gone, and the rows were always the thing it was describing.
+  const listCount = await page.$$eval(
+    '[data-testid="species-rows"] [data-species-id]',
+    (e) => e.length,
+  )
   log('')
   log(`  species listed under ${GROUP_A}: ${listCount}`)
-  check('full dex of 493 species is indexed', listCount.startsWith('493'), listCount)
+  check('full dex of 493 species is indexed', listCount === 493, String(listCount))
 
   // ---------------------------------------------------------------- STEP 2
   hr('STEP 2 — service worker activation')
@@ -301,8 +309,11 @@ try {
   check('app boots offline', true)
 
   await selectGroup(GROUP_A)
-  const offlineCount = (await page.textContent('[data-testid="list-count"]')).trim()
-  check('eager bundle resolves offline (493 species)', offlineCount.startsWith('493'), offlineCount)
+  const offlineCount = await page.$$eval(
+    '[data-testid="species-rows"] [data-species-id]',
+    (e) => e.length,
+  )
+  check('eager bundle resolves offline (493 species)', offlineCount === 493, String(offlineCount))
 
   await page.click(`[data-testid="species-row-${SPECIES}"]`)
   await page.waitForSelector('[data-testid="species-detail"]', { timeout: 30000 })

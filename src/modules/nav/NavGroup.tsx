@@ -22,8 +22,6 @@ export function NavGroup({
   active = false,
   onActivate,
   children,
-  emptyNote,
-  triggerTestId,
 }: {
   id: string
   label: string
@@ -33,14 +31,6 @@ export function NavGroup({
   onActivate?: () => void
   /** Dropdown items. Omit for a nav item with nothing under it. */
   children?: ReactNode
-  /** Shown in place of items when there is nothing to link to yet. */
-  emptyNote?: string
-  /**
-   * Overrides the trigger's test id. The dex group's trigger is also the Pokedex
-   * destination, so it carries `nav-pokedex` and keeps the switcher a complete
-   * registry-ordered list of `nav-<id>` buttons.
-   */
-  triggerTestId?: string
 }) {
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement>(null)
@@ -52,7 +42,7 @@ export function NavGroup({
   */
   const justEscaped = useRef(false)
   const panelId = useId()
-  const hasPanel = children != null || emptyNote != null
+  const hasPanel = children != null
 
   // Focus moving *within* the group must not close it, so this checks where focus
   // actually went rather than closing on every blur.
@@ -90,7 +80,7 @@ export function NavGroup({
       <button
         type="button"
         className={active ? 'nav-trigger nav-trigger-active' : 'nav-trigger'}
-        data-testid={triggerTestId ?? `nav-trigger-${id}`}
+        data-testid={`nav-tab-${id}`}
         aria-current={active ? 'page' : undefined}
         aria-expanded={hasPanel ? open : undefined}
         aria-controls={hasPanel ? panelId : undefined}
@@ -105,11 +95,6 @@ export function NavGroup({
       {hasPanel && (
         <div className="nav-dropdown" id={panelId} data-testid={`nav-dropdown-${id}`}>
           {children}
-          {emptyNote && (
-            <p className="nav-dropdown-empty" data-testid={`nav-dropdown-empty-${id}`}>
-              {emptyNote}
-            </p>
-          )}
         </div>
       )}
     </div>

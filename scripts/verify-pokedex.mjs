@@ -95,8 +95,11 @@ try {
 
   const selectVersionGroup = async (name) => {
     await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
+    // The scope readout was removed from the page with the header block. The
+    // select holds the same state the list derives from, and both land in one
+    // React commit, so waiting for its value is waiting for the list.
     await page.waitForFunction(
-      (n) => document.querySelector('[data-testid="scope-note"]')?.textContent?.includes(n),
+      (n) => document.querySelector('[data-testid="vg-select"]')?.value === n,
       name,
       { timeout: 30000 },
     )
@@ -196,8 +199,6 @@ try {
   hr('SCENARIO A — red-blue lists only ids 1-151')
   await selectVersionGroup('red-blue')
   const rbIds = await rowIds()
-  const rbCount = await page.textContent('[data-testid="list-count"]')
-  log(`  list count text : ${rbCount}`)
   log(
     `  rows            : ${rbIds.length}  min id ${Math.min(...rbIds)}  max id ${Math.max(...rbIds)}`,
   )

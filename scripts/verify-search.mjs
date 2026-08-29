@@ -29,6 +29,7 @@ import { mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
+import { goToDex } from './lib/nav.mjs'
 
 // NOT 4190: that is on the WHATWG fetch spec's blocked-port list (ManageSieve),
 // so vite serves it happily while every fetch() to it rejects with "bad port".
@@ -336,7 +337,7 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
 
   const { openControls, withControls } = controls(page)
-  await page.waitForSelector('[data-testid="dex-switcher"]', { timeout: 60000 })
+  await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
   // ---------------------------------------------------------------- helpers
   // Closed by clicking outside, NOT with Escape: Chrome natively clears an
@@ -349,8 +350,7 @@ try {
   }
   const goTo = async (id) => {
     await closePanel()
-    await page.hover('[data-testid="nav-pokedex"]')
-    await page.click(`[data-testid="nav-${id}"]`)
+    await goToDex(page, id)
     await page.waitForSelector(`[data-testid="dex-${id}"], [data-testid="species-rows"]`, {
       timeout: 30000,
     })
@@ -397,12 +397,19 @@ try {
   const dexCount = async (moduleId, term) => {
     await goTo(moduleId)
     const searchId = moduleId === 'pokedex' ? 'species-search' : `${moduleId}-search`
-    const countId = moduleId === 'pokedex' ? 'list-count' : `${moduleId}-count`
     await page.fill(`[data-testid="${searchId}"]`, term)
     await page.waitForTimeout(160)
-    const txt = (await page.textContent(`[data-testid="${countId}"]`)).trim()
+    // The Pokedex lost its count label with the page header; the five other
+    // dexes still render one, and they are outside this pass.
+    let n
+    if (moduleId === 'pokedex') {
+      n = await page.$$eval('[data-testid="species-rows"] [data-species-id]', (e) => e.length)
+    } else {
+      const txt = (await page.textContent(`[data-testid="${moduleId}-count"]`)).trim()
+      n = Number(txt.split(' ')[0])
+    }
     await page.fill(`[data-testid="${searchId}"]`, '')
-    return Number(txt.split(' ')[0])
+    return n
   }
 
   // ================================================================ item 1
@@ -442,8 +449,7 @@ try {
   // Persistent across tab switches: the term survives, so a search is not lost by
   // navigating to a result and coming back for the next one.
   await setTerm('sand')
-  await page.hover('[data-testid="nav-pokedex"]')
-  await page.click('[data-testid="nav-naturedex"]')
+  await goToDex(page, 'naturedex')
   await page.waitForSelector('[data-testid="dex-naturedex"]', { timeout: 30000 })
   const kept = await page.inputValue('[data-testid="global-search"]')
   check('the query survives a tab switch', kept === 'sand', `("${kept}")`)

@@ -63,20 +63,17 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
       })
   }, [generation, isAll, search, activeTypeFilter])
 
-  // The count stays on the page -- it is a readout, not a control, and the
-  // simplification pass only removed the three controls.
-  const controls = (
-    <div className="list-controls">
-      <p className="subtitle" data-testid="list-count">
-        {rows.length} species
-      </p>
-    </div>
-  )
+  /*
+    No count readout either. It was the last thing left in this block, so the
+    block itself is gone rather than left as an empty wrapper contributing
+    spacing. Row count is still observable -- it is the number of children of
+    [data-testid="species-rows"], which is the truth rather than a rendered
+    string about it.
+  */
 
   if (layout === 'grid') {
     return (
       <div className="species-list species-list-grid">
-        {controls}
         <ul className="pokedex-grid" data-testid="species-rows">
           {rows.map(({ species, variety, typeIds }) => (
             <li key={species.id}>
@@ -156,8 +153,6 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
 
   return (
     <div className="species-list">
-      {controls}
-
       <ul className="species-rows" data-testid="species-rows">
         {rows.map(({ species, typeIds }) => (
           <li key={species.id}>

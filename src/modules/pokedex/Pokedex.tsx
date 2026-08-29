@@ -1,6 +1,5 @@
 import { IconArrowLeft } from '@tabler/icons-react'
 import { useDexSelection } from '../nav/navContext'
-import { useVersionGroup } from '../version-group/context'
 import { ScrollDownHint } from './ScrollDownHint'
 import { SpeciesDetail } from './SpeciesDetail'
 import { SpeciesList } from './SpeciesList'
@@ -30,25 +29,22 @@ import './pokedex.css'
  */
 export function Pokedex() {
   const [selectedId, setSelectedId] = useDexSelection('pokedex')
-  const { versionGroup, generation, isAll } = useVersionGroup()
   const browsing = selectedId == null
 
   return (
     <div className="pokedex">
-      <header className="pokedex-head">
-        <div>
-          <h1>Pokédex</h1>
-          <p className="subtitle" data-testid="scope-note">
-            {isAll
-              ? 'All generations · national dex'
-              : `Generation ${generation} · ${versionGroup?.name ?? ''}`}
-          </p>
-        </div>
-        {/* The way back to the grid. Figma puts an "icon-page-back" instance at
-            the top-left of both DetailPage frames; this is the same affordance
-            kept inside the page header, so the detail view itself stays
-            untouched by this pass. */}
-        {!browsing && (
+      {/*
+        No page header. The title, the generation/version subtitle and the
+        species count are all gone -- the Figma MainPage frames never showed
+        them, so the grid sitting directly under the app bar's own hairline is
+        the reference, not a departure from it.
+
+        The way back from a detail view still needs somewhere to live, so it
+        renders on its own when something is selected. Figma puts an
+        "icon-page-back" instance at the top-left of both DetailPage frames.
+      */}
+      {!browsing && (
+        <div className="pokedex-back-row">
           <button
             type="button"
             className="pokedex-back"
@@ -58,8 +54,8 @@ export function Pokedex() {
             <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
             All species
           </button>
-        )}
-      </header>
+        </div>
+      )}
 
       {browsing ? (
         <div className="pokedex-body pokedex-body-grid">

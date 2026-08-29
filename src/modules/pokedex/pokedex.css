@@ -88,13 +88,12 @@
   padding-top: 0;
 }
 
-/* Only the species count is left here: the search, type filter and game scope
-   all moved into the app bar's controls panel. The count is a readout, not a
-   control, and the reference frame is a mid-scroll splice that would not show a
-   header row either way. */
-.species-list-grid .list-controls {
-  margin-bottom: var(--space-gap-lg);
-  align-self: flex-start;
+/* The back control's own row, now that there is no page header to sit in. No
+   rule under it: the divider that used to be here belonged to .pokedex-head,
+   which the grid no longer renders, and leaving one behind would be exactly the
+   orphaned hairline this pass removes. */
+.pokedex-back-row {
+  margin-bottom: var(--space-gap-md);
 }
 
 /* Back out of a species to the grid: Figma's icon-page-back, as a labelled
@@ -1174,6 +1173,34 @@
   color: var(--accent);
 }
 
+/*
+  One nesting level, rendered by the same NavEntryItem as a flat item. Nothing
+  uses it yet -- Calculators is a leaf until its sub-items are scoped -- but the
+  styles exist so adding them stays a data change in navConfig.ts.
+
+  Indented rather than flown out sideways: a second floating panel would need
+  collision handling against the viewport edge, and this dropdown is already at
+  the bar's left.
+*/
+.nav-subgroup {
+  display: contents;
+}
+
+.nav-subdropdown {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hairline);
+}
+
+.nav-subdropdown .nav-item {
+  padding-left: 28px;
+  font-size: var(--font-size-label);
+}
+
+.nav-item-parent {
+  font-weight: var(--font-weight-medium);
+}
+
 .nav-item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
@@ -1188,6 +1215,36 @@
   color: var(--text-secondary);
 }
 
+/*
+  Ghost button: text only, no border, no fill, no icon. DESIGN-SYSTEM.md's
+  Buttons section said "no tertiary/ghost variants specified yet", but the
+  treatment already existed twice unnamed -- .nav-trigger and .pokedex-back are
+  both exactly this -- so this is that pattern given a name rather than a new
+  invention. Documented in DESIGN-SYSTEM.md now that a third instance uses it.
+*/
+.ghost-button {
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.ghost-button:hover {
+  color: var(--text-primary);
+}
+
+.ghost-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
 /* ------------------------------------------------- app bar controls panel */
 
 /*
@@ -1200,31 +1257,11 @@
   margin-left: auto;
 }
 
-.app-controls-toggle {
-  display: flex;
-  align-items: center;
-  padding: 4px;
-  color: var(--text-secondary);
-  background: none;
-  border: none;
-  border-radius: var(--radius-control);
-  cursor: pointer;
-}
-
-.app-controls-toggle:hover {
-  color: var(--text-primary);
-}
-
 /* Open, or narrowing the list: either way the accent says "this is doing
    something", which is the binary-state-indicator use --accent is reserved for. */
 .app-controls[data-open='true'] .app-controls-toggle,
 .app-controls-toggle[data-filters-active='true'] {
   color: var(--accent);
-}
-
-.app-controls-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .app-controls-panel {

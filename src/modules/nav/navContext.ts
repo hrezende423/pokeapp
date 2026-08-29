@@ -15,6 +15,7 @@
 
 import { createContext, useContext } from 'react'
 import type { DexModuleId } from './registry'
+import type { PageId } from './navConfig'
 
 /**
  * Every id here is a DexModuleId -- the union the registry actually declares --
@@ -23,9 +24,13 @@ import type { DexModuleId } from './registry'
  * instead of a click that silently lands somewhere else.
  */
 export interface NavState {
-  /** The active dex module id, from the nav registry. */
-  moduleId: DexModuleId
-  setModule: (moduleId: DexModuleId) => void
+  /**
+   * The open page. A PageId, not a DexModuleId: the nav reaches destinations
+   * that are not dexes. Per-entry selection below stays DexModuleId-only, so a
+   * search result can still only point at a module that actually has entries.
+   */
+  moduleId: PageId
+  setModule: (moduleId: PageId) => void
   /** The open entry in `moduleId`, or null when nothing is open. */
   selectionFor: (moduleId: DexModuleId) => number | null
   select: (moduleId: DexModuleId, entryId: number | null) => void

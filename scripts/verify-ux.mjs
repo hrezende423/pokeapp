@@ -631,7 +631,6 @@ try {
     '[data-testid="species-rows"] [data-species-id]',
     (e) => e.length,
   )
-  const filteredCount = await page.textContent('[data-testid="list-count"]')
   await withControls(() => page.click('[data-testid="type-filter-any"]'))
   await page.waitForFunction(
     () => document.querySelectorAll('.type-filter [aria-pressed="true"][data-type]').length === 0,
@@ -642,10 +641,9 @@ try {
     '[data-testid="species-rows"] [data-species-id]',
     (e) => e.length,
   )
-  const clearedCount = await page.textContent('[data-testid="list-count"]')
   const anyPressed = await page.getAttribute('[data-testid="type-filter-any"]', 'aria-pressed')
-  log(`  rows with fire+water+grass selected: ${filteredRows} (${filteredCount})`)
-  log(`  rows after clicking "Any"           : ${clearedRows} (${clearedCount})`)
+  log(`  rows with fire+water+grass selected: ${filteredRows}`)
+  log(`  rows after clicking "Any"           : ${clearedRows}`)
   check('"Any" clears every type selection', anyPressed === 'true')
   check(
     'the three types did filter the list down',
@@ -672,11 +670,9 @@ try {
 
   await withControls(() => page.fill('[data-testid="species-search"]', ''))
   await withControls(() => page.selectOption('[data-testid="vg-select"]', 'all'))
+  // Same swap as elsewhere: the scope readout is gone, the select holds the state.
   await page.waitForFunction(
-    () =>
-      document
-        .querySelector('[data-testid="scope-note"]')
-        ?.textContent?.includes('All generations'),
+    () => document.querySelector('[data-testid="vg-select"]')?.value === 'all',
     undefined,
     { timeout: 20000 },
   )

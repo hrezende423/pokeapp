@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { NavContext, type NavState } from './navContext'
+import type { PageId } from './navConfig'
 import { DEFAULT_MODULE_ID, type DexModuleId } from './registry'
 
 export function NavProvider({ children }: { children: ReactNode }) {
-  const [moduleId, setModuleId] = useState(DEFAULT_MODULE_ID)
+  const [moduleId, setModuleId] = useState<PageId>(DEFAULT_MODULE_ID)
   const [selection, setSelection] = useState<Partial<Record<DexModuleId, number | null>>>({})
 
   const select = useCallback((id: DexModuleId, entryId: number | null) => {
