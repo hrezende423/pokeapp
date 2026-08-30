@@ -103,12 +103,24 @@ export default function App() {
       </VersionGroupProvider>
 
       <footer className="app-footer">
+        {/* Every figure here is a count or a measurement, so every one of them is
+            in --font-numeric -- the words between them are not. */}
         <p className="subtitle" data-testid="boot-status">
-          data layer ready in <span data-testid="boot-ms">{boot.ms.toFixed(0)} ms</span> ·{' '}
-          <span data-testid="boot-bytes">{kib(boot.bytes)}</span> decoded ·{' '}
-          {counts.species.toLocaleString()} species, {counts.moves.toLocaleString()} moves,{' '}
-          {counts.items.toLocaleString()} items, {counts.abilities} abilities, {counts.natures}{' '}
-          natures, {counts.berries} berries · dex 1–{meta.scope.max_species_id}
+          data layer ready in{' '}
+          <span data-testid="boot-ms" className="num">
+            {boot.ms.toFixed(0)} ms
+          </span>{' '}
+          ·{' '}
+          <span data-testid="boot-bytes" className="num">
+            {kib(boot.bytes)}
+          </span>{' '}
+          decoded · <span className="num">{counts.species.toLocaleString()}</span> species,{' '}
+          <span className="num">{counts.moves.toLocaleString()}</span> moves,{' '}
+          <span className="num">{counts.items.toLocaleString()}</span> items,{' '}
+          <span className="num">{counts.abilities}</span> abilities,{' '}
+          <span className="num">{counts.natures}</span> natures,{' '}
+          <span className="num">{counts.berries}</span> berries · dex{' '}
+          <span className="num">1–{meta.scope.max_species_id}</span>
         </p>
       </footer>
     </main>

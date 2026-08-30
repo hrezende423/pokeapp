@@ -17,7 +17,7 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { controls, fillDexSearch } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
 
 const PORT = 4185
@@ -272,7 +272,15 @@ try {
   // registry, and not every registered module is a DexShell (the design-system
   // reference page is not), so this has to be asserted from a known dex.
   await goTo('itemdex')
-  const shellCount = await page.$$eval('.pokedex-body', (e) => e.length)
+  /*
+    `.pokedex-body` was DexShell's rail-plus-detail wrapper, and DexShell no
+    longer exists -- every dex is on DexPageShell, whose root is
+    [data-testid="dex-<id>"]. The claim being made is unchanged: one dex module
+    on screen, not two, so it is asserted against the element that now marks one.
+  */
+  // .pokedex narrows it to a dex MODULE root: [data-testid^="dex-"] on its own
+  // also matches the nav's own "dex-switcher" dropdown.
+  const shellCount = await page.$$eval('.pokedex[data-testid^="dex-"]', (e) => e.length)
   check('exactly one dex is mounted at a time', shellCount === 1, `(${shellCount})`)
   await page.screenshot({ path: `${SHOTS}/dex-nav.png` })
 
@@ -284,7 +292,7 @@ try {
   log(`  gen 4 list count: ${n} (expected ${itemCount(4)})`)
   check('Itemdex lists every gen-4 item', n === itemCount(4), `(${n} vs ${itemCount(4)})`)
 
-  await page.fill('[data-testid="itemdex-search"]', 'ball')
+  await fillDexSearch(page, 'itemdex', 'ball')
   await page.waitForTimeout(120)
   const ballCount = await countOf('itemdex')
   const expectedBalls = items.filter(
@@ -304,7 +312,7 @@ try {
     'every result contains the search term',
     ballLabels.every((l) => l.toLowerCase().includes('ball')),
   )
-  await page.fill('[data-testid="itemdex-search"]', 'master ball')
+  await fillDexSearch(page, 'itemdex', 'master ball')
   await page.waitForSelector('[data-testid="itemdex-row-1"]', { timeout: 10000 })
   await page.click('[data-testid="itemdex-row-1"]')
   await page.waitForSelector('[data-testid="itemdex-detail"]', { timeout: 10000 })
@@ -313,7 +321,15 @@ try {
     category: document.querySelector('[data-testid="itemdex-category"]')?.textContent,
     effect: document.querySelector('[data-testid="itemdex-effect"]')?.textContent,
     price: document.querySelector('[data-testid="itemdex-price"]')?.textContent,
-    cards: [...document.querySelectorAll('[data-testid="itemdex-detail"] .card')].length,
+    // The item page is boxless now, so what is counted is the ABSENCE of a
+    // bordered container -- see the inverted check below.
+    boxed: [...document.querySelectorAll('[data-testid="itemdex-detail"] *')].filter((el) => {
+      const cs = getComputedStyle(el)
+      return parseFloat(cs.borderTopWidth) > 0 && parseFloat(cs.borderLeftWidth) > 0
+    }).length,
+    factRows: document.querySelectorAll('[data-testid="itemdex-facts"] li').length,
+    pocket: document.querySelector('[data-testid="itemdex-pocket"]')?.textContent,
+    artSource: document.querySelector('[data-testid="itemdex-artwork"]')?.dataset.source,
   }))
   log(`  Master Ball detail: ${JSON.stringify(masterBall).slice(0, 260)}`)
   const realItem = itemsById[1]
@@ -324,12 +340,38 @@ try {
     (masterBall.effect ?? '').startsWith(realItem.effect.slice(0, 40)),
   )
   check('detail shows a price field', (masterBall.price ?? '').length > 0, masterBall.price)
-  check('detail is built from cards', masterBall.cards >= 3, `(${masterBall.cards})`)
+  /*
+    INVERTED DELIBERATELY. This asserted `cards >= 3` -- the item page was four
+    bordered DexCards. The refinement pass made it boxless and purely
+    typographic, so the same structural question now has the opposite answer, and
+    asserting it this way is what stops the boxes coming back unnoticed.
+  */
+  check(
+    'detail is boxless -- no bordered container anywhere on the page',
+    masterBall.boxed === 0,
+    `(${masterBall.boxed} boxed elements)`,
+  )
+  check(
+    'and shows its facts as hairline rows instead',
+    masterBall.factRows >= 5,
+    `(${masterBall.factRows})`,
+  )
+  // Bag pocket is a separate field from category, added to the bundle for this.
+  check(
+    'detail shows the bag pocket as well as the category',
+    /pokeballs/i.test(masterBall.pocket ?? ''),
+    String(masterBall.pocket),
+  )
+  check(
+    'detail uses the larger Dream World artwork when the item has one',
+    masterBall.artSource === 'dream-world',
+    String(masterBall.artSource),
+  )
   await page.screenshot({ path: `${SHOTS}/dex-itemdex.png` })
 
   // Generation gating for items (item 5): a real signal exists, so it is applied.
   hr('ITEM 5a — Itemdex generation gating (generation_ids is a real signal)')
-  await page.fill('[data-testid="itemdex-search"]', '')
+  await fillDexSearch(page, 'itemdex', '')
   for (const g of GAMES) {
     await selectGame(g.vg)
     await page.waitForTimeout(150)
@@ -339,7 +381,7 @@ try {
   }
   // Safari Ball is the case that proves membership, not min<=G, is the rule.
   await selectGame('gold-silver')
-  await page.fill('[data-testid="itemdex-search"]', 'safari ball')
+  await fillDexSearch(page, 'itemdex', 'safari ball')
   await page.waitForTimeout(150)
   const safariGen2 = await countOf('itemdex')
   await selectGame('red-blue')
@@ -351,7 +393,7 @@ try {
   log(`  Safari Ball visible in gen 1: ${safariGen1 === 1}, in gen 2: ${safariGen2 === 1}`)
   check('Safari Ball shows in Gen 1', safariGen1 === 1)
   check('Safari Ball is hidden in Gen 2 (gap respected, not min<=G)', safariGen2 === 0)
-  await page.fill('[data-testid="itemdex-search"]', '')
+  await fillDexSearch(page, 'itemdex', '')
 
   // ------------------------------------------------------------ item 2
   hr('ITEM 2 — Abilitydex')
@@ -361,7 +403,7 @@ try {
   log(`  gen 4 list count: ${n} (expected ${abilityCount(4)})`)
   check('Abilitydex lists every gen-4 ability', n === abilityCount(4), `(${n})`)
   await toDexList('abilitydex')
-  await page.fill('[data-testid="abilitydex-search"]', 'levit')
+  await fillDexSearch(page, 'abilitydex', 'levit')
   await page.waitForTimeout(120)
   const levitCount = await countOf('abilitydex')
   check('search narrows to Levitate', levitCount === 1, `(${levitCount})`)
@@ -420,7 +462,7 @@ try {
   // Second ability: Chlorophyll, whose interesting case is an exclusion.
   await selectGame('heartgold-soulsilver')
   await toDexList('abilitydex')
-  await page.fill('[data-testid="abilitydex-search"]', 'chloro')
+  await fillDexSearch(page, 'abilitydex', 'chloro')
   await page.waitForTimeout(150)
   const chloroId = abilityByName.chlorophyll.id
   await page.click(`[data-testid="abilitydex-row-${chloroId}"]`)
@@ -446,7 +488,7 @@ try {
 
   hr('ITEM 2b — Abilitydex is empty under a Gen 1-2 selection')
   await toDexList('abilitydex')
-  await page.fill('[data-testid="abilitydex-search"]', '')
+  await fillDexSearch(page, 'abilitydex', '')
   for (const g of GAMES) {
     await selectGame(g.vg)
     await page.waitForTimeout(200)
@@ -481,17 +523,75 @@ try {
   const adamant = natures.find((x) => x.name === 'adamant')
   await page.click(`[data-testid="naturedex-row-${adamant.id}"]`)
   await page.waitForSelector('[data-testid="naturedex-detail"]', { timeout: 10000 })
-  const adamantView = await page.evaluate(() => ({
-    name: document.querySelector('[data-testid="naturedex-name"]')?.textContent,
-    up: document.querySelector('[data-testid="naturedex-increased"]')?.textContent,
-    down: document.querySelector('[data-testid="naturedex-decreased"]')?.textContent,
-  }))
+  /*
+    DIRECTION IS AN ARROW NOW, not the words "increases" / "decreases", so this
+    reads the structure rather than a sentence: the stat name, which arrow class
+    the glyph carries, and which token that class resolves to. textContent still
+    carries the direction as a word, because each arrow is paired with a
+    visually-hidden "raised" / "lowered" for screen readers -- which is why the
+    name is compared against a trimmed prefix rather than the whole string.
+  */
+  const adamantView = await page.evaluate(() => {
+    const read = (id) => {
+      const li = document.querySelector(`[data-testid="${id}"]`)
+      if (!li) return null
+      const arrow = li.querySelector('.stat-arrow')
+      return {
+        stat: li.querySelector('.stat-direction')?.firstChild?.textContent?.trim(),
+        delta: li.querySelector('.nature-stat-delta')?.textContent?.trim(),
+        arrow: arrow?.classList.contains('stat-arrow-up')
+          ? 'up'
+          : arrow?.classList.contains('stat-arrow-down')
+            ? 'down'
+            : null,
+        color: arrow ? getComputedStyle(arrow).color : null,
+        sr: li.querySelector('.visually-hidden')?.textContent?.trim(),
+      }
+    }
+    const words = document.querySelector('[data-testid="naturedex-detail"]')?.textContent ?? ''
+    return {
+      name: document.querySelector('[data-testid="naturedex-name"]')?.textContent,
+      up: read('naturedex-increased'),
+      down: read('naturedex-decreased'),
+      // The words this pass removed must not be back anywhere on the page.
+      hasRaisesLowers: /\b(Raises|Lowers|increases|decreases)\b/.test(words),
+    }
+  })
   log(
     `  Adamant: ${JSON.stringify(adamantView)} (data: +${adamant.increased_stat} -${adamant.decreased_stat})`,
   )
   check('Adamant detail names the nature', adamantView.name === 'Adamant')
-  check('Adamant raises Attack', /Attack \+10%/.test(adamantView.up ?? ''), adamantView.up)
-  check('Adamant lowers Sp. Atk', /Sp\. Atk −10%/.test(adamantView.down ?? ''), adamantView.down)
+  check(
+    'Adamant raises Attack, shown as an up arrow after the stat name',
+    adamantView.up?.stat === 'Attack' &&
+      adamantView.up?.arrow === 'up' &&
+      adamantView.up?.delta === '+10%',
+    JSON.stringify(adamantView.up),
+  )
+  check(
+    'the up arrow is --stat-increase and NOT --accent',
+    adamantView.up?.color === 'rgb(179, 38, 30)',
+    String(adamantView.up?.color),
+  )
+  check(
+    'and the direction exists as a word for a screen reader',
+    adamantView.up?.sr === 'raised' && adamantView.down?.sr === 'lowered',
+    `${adamantView.up?.sr} / ${adamantView.down?.sr}`,
+  )
+  check('the words "Raises" and "Lowers" are gone from the page', !adamantView.hasRaisesLowers)
+  check(
+    'Adamant lowers Sp. Atk, shown as a down arrow after the stat name',
+    adamantView.down?.stat === 'Sp. Atk' &&
+      adamantView.down?.arrow === 'down' &&
+      adamantView.down?.delta === '−10%',
+    JSON.stringify(adamantView.down),
+  )
+  check(
+    'the down arrow is --stat-decrease',
+    adamantView.down?.color === 'rgb(31, 95, 168)',
+    String(adamantView.down?.color),
+  )
+
   check(
     'matches the bundle',
     adamant.increased_stat === 'attack' && adamant.decreased_stat === 'special-attack',
@@ -606,53 +706,109 @@ try {
   await selectGame('heartgold-soulsilver')
   n = await countOf('berrydex')
   check('Berrydex lists every gen-4 berry', n === berryCount(4), `(${n} vs ${berryCount(4)})`)
-  await page.fill('[data-testid="berrydex-search"]', 'oran')
+  await fillDexSearch(page, 'berrydex', 'oran')
   await page.waitForTimeout(150)
   const oranCount = await countOf('berrydex')
   check('search narrows to Oran Berry', oranCount === 1, `(${oranCount})`)
   const oran = berries.find((b) => b.name === 'oran')
-  await page.click(`[data-testid="berrydex-row-${oran.id}"]`)
-  await page.waitForSelector('[data-testid="berrydex-detail"]', { timeout: 10000 })
-  const oranView = await page.evaluate(() => ({
-    name: document.querySelector('[data-testid="berrydex-name"]')?.textContent,
-    firmness: document.querySelector('[data-testid="berrydex-firmness"]')?.textContent,
-    growth: document.querySelector('[data-testid="berrydex-growth-time"]')?.textContent,
-    ngPower: document.querySelector('[data-testid="berrydex-ng-power"]')?.textContent,
-    ngType: document
-      .querySelector('[data-testid="berrydex-ng-type"] [data-type]')
-      ?.getAttribute('data-type'),
-    flavors: [...document.querySelectorAll('[data-testid="berrydex-flavors"] li')].map((l) => [
-      l.getAttribute('data-flavor'),
-      l.querySelector('.stat-value').textContent,
-    ]),
-  }))
-  log(`  Oran Berry: ${JSON.stringify(oranView)}`)
+
+  /*
+    NO DETAIL PAGE, BY DESIGN. The Berrydex is now a card grid and nothing else:
+    all six fields a berry has fit on the card, so there was nothing left for a
+    second screen to hold and the cards are not clickable. This section therefore
+    reads the CARD rather than opening an entry -- which also means it checks the
+    stronger claim, that every field is on screen at once.
+
+    The flavour-potency bars are gone with the detail page. They were the one
+    berry field that did not fit the card and are NOT among the six the spec
+    lists; that is a real reduction in what the Berrydex shows, and it is stated
+    here rather than left for someone to notice.
+  */
+  const oranCard = await page.evaluate((id) => {
+    const card = document.querySelector(`[data-testid="berrydex-row-${id}"]`)
+    if (!card) return null
+    const t = (sel) => card.querySelector(sel)?.textContent?.trim() ?? null
+    return {
+      name: t('.species-name'),
+      dexNo: t('.dex-no'),
+      firmness: t(`[data-testid="berrydex-firmness-${id}"]`),
+      size: t(`[data-testid="berrydex-size-${id}"]`),
+      smoothness: t(`[data-testid="berrydex-smoothness-${id}"]`),
+      ngPower: t(`[data-testid="berrydex-ng-power-${id}"]`),
+      growth: t(`[data-testid="berrydex-growth-time-${id}"]`),
+      ngType: card.querySelector('[data-ds="type-label"]')?.getAttribute('data-type'),
+      // The card must be the Pokedex card's chrome, not a lookalike.
+      ghost: t('.species-card-ghost'),
+      art: !!card.querySelector('.item-artwork'),
+      artSource: card.querySelector('.item-artwork')?.dataset.source,
+      width: Math.round(card.getBoundingClientRect().width),
+      height: Math.round(card.getBoundingClientRect().height),
+      // Nothing may be clipped: the reason the facts are on three short lines.
+      clipped: [...card.querySelectorAll('.berry-card-fact-line')].filter(
+        (el) => el.scrollWidth > el.clientWidth + 1,
+      ).length,
+      clickable: card.querySelector('.species-card-hit') != null,
+    }
+  }, oran.id)
+  log(`  Oran Berry card: ${JSON.stringify(oranCard)}`)
   log(
-    `  bundle: firmness=${oran.firmness} growth=${oran.growth_time} ngPower=${oran.natural_gift_power} ngType=${oran.natural_gift_type_id} flavors=${JSON.stringify(oran.flavors.filter((f) => f.potency > 0))}`,
+    `  bundle: firmness=${oran.firmness} size=${oran.size} smooth=${oran.smoothness} growth=${oran.growth_time} ngPower=${oran.natural_gift_power} ngType=${oran.natural_gift_type_id}`,
   )
-  check('name comes from the linked item', oranView.name === itemsById[oran.item_id].display_name)
+  check('name comes from the linked item', oranCard.name === itemsById[oran.item_id].display_name)
   // The UI title-cases and de-hyphenates ("super-hard" -> "Super Hard"), so compare
   // against that transform rather than the raw slug.
   const firmnessLabel = oran.firmness.replace(/-/g, ' ')
   check(
     'firmness matches the bundle',
-    new RegExp(firmnessLabel, 'i').test(oranView.firmness ?? ''),
-    `"${oranView.firmness}" vs "${firmnessLabel}"`,
+    new RegExp(firmnessLabel, 'i').test(oranCard.firmness ?? ''),
+    `"${oranCard.firmness}" vs "${firmnessLabel}"`,
   )
-  check('growth time matches', oranView.growth.includes(String(oran.growth_time)))
-  check('Natural Gift power matches', oranView.ngPower === String(oran.natural_gift_power))
-  check('Natural Gift type renders as a type badge', oranView.ngType != null, oranView.ngType)
-  const expFlavors = oran.flavors.filter((f) => f.potency > 0)
   check(
-    'flavour stats match the bundle',
-    JSON.stringify(oranView.flavors) ===
-      JSON.stringify(expFlavors.map((f) => [f.flavor, String(f.potency)])),
-    JSON.stringify(oranView.flavors),
+    'size matches the bundle',
+    (oranCard.size ?? '').includes(String(oran.size)),
+    String(oranCard.size),
   )
+  check(
+    'smoothness matches the bundle',
+    (oranCard.smoothness ?? '').includes(String(oran.smoothness)),
+    String(oranCard.smoothness),
+  )
+  check(
+    'growth time matches the bundle',
+    (oranCard.growth ?? '').includes(String(oran.growth_time)),
+    String(oranCard.growth),
+  )
+  check(
+    'Natural Gift power matches the bundle',
+    (oranCard.ngPower ?? '').includes(String(oran.natural_gift_power)),
+    String(oranCard.ngPower),
+  )
+  check(
+    'Natural Gift type renders as the shared coloured type label',
+    oranCard.ngType != null,
+    String(oranCard.ngType),
+  )
+  check('all six berry fields are on the card at once', oranCard.clipped === 0)
+  check(
+    'the card carries the Pokedex card chrome -- watermark and artwork',
+    oranCard.ghost === '001'.slice(0, 0) + String(oran.id).padStart(3, '0') && oranCard.art,
+    `${oranCard.ghost} / art=${oranCard.art}`,
+  )
+  check(
+    'berry artwork is the larger Dream World image, not the 30px icon',
+    oranCard.artSource === 'dream-world',
+    String(oranCard.artSource),
+  )
+  check(
+    'card width matches the Pokedex grid card exactly (212px)',
+    oranCard.width === 212,
+    `${oranCard.width}x${oranCard.height}`,
+  )
+  check('and the card is not clickable, because there is nothing to open', !oranCard.clickable)
   await page.screenshot({ path: `${SHOTS}/dex-berrydex.png` })
 
   hr("ITEM 5b — Berrydex gating (derived from each berry's linked item)")
-  await page.fill('[data-testid="berrydex-search"]', '')
+  await fillDexSearch(page, 'berrydex', '')
   for (const g of GAMES) {
     await selectGame(g.vg)
     await page.waitForTimeout(200)
@@ -714,12 +870,21 @@ try {
   await selectGame('all')
   await page.waitForTimeout(200)
   await goTo('abilitydex')
-  const abilityNote = (await page.textContent('[data-testid="abilitydex-note"]')).trim()
+  /*
+    THE DESCRIPTIVE NOTE IS GONE, app-wide -- the "N of M abilities exist in
+    Generation G" line was part of the header block this pass removed. What it
+    said is still asserted, just from the count readout and the row list rather
+    than from a sentence about them, which is the stronger check anyway: the note
+    could have been right while the list was wrong.
+
+    One thing genuinely went away with it: the UI no longer TELLS the reader that
+    38 later abilities exist in the data but are not listed. The clamp is checked
+    below; the disclosure of it is not there to check.
+  */
   const abilityAllCount = await countOf('abilitydex')
   log(
     `  Abilitydex under All: ${abilityAllCount} rows (in-scope ${inScopeAbilities.length} of ${abilities.length})`,
   )
-  log(`  note: "${abilityNote}"`)
   check(
     'Abilitydex under All lists only the 123 in-scope abilities',
     abilityAllCount === inScopeAbilities.length,
@@ -730,15 +895,16 @@ try {
     abilityAllCount !== abilities.length,
     `(${abilityAllCount} vs ${abilities.length})`,
   )
+  // The count readout is the surviving statement of the clamped total.
+  const abilityCountText = (await page.textContent('[data-testid="abilitydex-count"]')).trim()
   check(
-    'its note states the clamped total',
-    abilityNote.includes(String(inScopeAbilities.length)),
-    abilityNote,
+    'the count readout states the clamped total',
+    abilityCountText.startsWith(String(inScopeAbilities.length)),
+    abilityCountText,
   )
   check(
-    'its note says how many are hidden',
-    abilityNote.includes(String(abilitiesOutOfScope.length)),
-    abilityNote,
+    'and no descriptive header sentence is left behind',
+    (await page.$('[data-testid="abilitydex-note"]')) == null,
   )
 
   // Every listed row must be in scope, and named Gen 5 abilities must be absent.
@@ -762,28 +928,34 @@ try {
   }
   // A search for a hidden ability must come up empty rather than surfacing it.
   await toDexList('abilitydex')
-  await page.fill('[data-testid="abilitydex-search"]', 'cursed')
+  await fillDexSearch(page, 'abilitydex', 'cursed')
   await page.waitForTimeout(150)
   const cursedCount = await countOf('abilitydex')
   check('searching for a hidden ability finds nothing', cursedCount === 0, `(${cursedCount})`)
   await toDexList('abilitydex')
-  await page.fill('[data-testid="abilitydex-search"]', '')
+  await fillDexSearch(page, 'abilitydex', '')
 
   await goTo('itemdex')
-  const itemNote = (await page.textContent('[data-testid="itemdex-note"]')).trim()
   const itemAllCount = await countOf('itemdex')
-  log(`  Itemdex under All: ${itemAllCount} rows | note: "${itemNote}"`)
+  log(`  Itemdex under All: ${itemAllCount} rows (bundle has ${items.length})`)
   check('Itemdex under All lists all items', itemAllCount === items.length, `(${itemAllCount})`)
   check(
-    'its note truthfully says every item is indexed in Gen 1-4',
-    /Generations 1-4/.test(itemNote),
-    itemNote,
+    'and no descriptive header sentence is left behind',
+    (await page.$('[data-testid="itemdex-note"]')) == null,
   )
 
   await goTo('berrydex')
-  const berryNote = (await page.textContent('[data-testid="berrydex-note"]')).trim()
-  log(`  Berrydex under All: note: "${berryNote}"`)
-  check('Berrydex note truthfully claims full Gen 1-4 coverage', /Generations 1-4/.test(berryNote))
+  const berryAllCount = await countOf('berrydex')
+  log(`  Berrydex under All: ${berryAllCount} rows (bundle has ${berries.length})`)
+  check(
+    'Berrydex under All lists every berry',
+    berryAllCount === berries.length,
+    `(${berryAllCount} vs ${berries.length})`,
+  )
+  check(
+    'and no descriptive header sentence is left behind',
+    (await page.$('[data-testid="berrydex-note"]')) == null,
+  )
 
   // ------------------------------------------------------------ errors
   hr('CONSOLE / PAGE / HTTP ERRORS')

@@ -1,15 +1,11 @@
 import { useMemo } from 'react'
-import {
-  ABILITIES_INTRODUCED_IN_GENERATION,
-  LATEST_GENERATION,
-  speciesWithAbility,
-} from '../../data'
+import { ABILITIES_INTRODUCED_IN_GENERATION, speciesWithAbility } from '../../data'
 import type { Ability } from '../../data'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell, LedgerList } from './DexPageShell'
 import { EntityDetailPage } from './EntityDetailPage'
-import { abilitiesHiddenFromList, abilitiesInList, abilityEntries } from './entrySources'
+import { abilityEntries } from './entrySources'
 
 /**
  * REGULAR / HIDDEN GROUPING: measured, and deliberately not applied.
@@ -46,9 +42,11 @@ export function Abilitydex() {
   // instance. The clamp lives in entrySources.ts, where the global search reads it
   // too: the list and a search over it were once scoped differently, which is the
   // leak that has to stay impossible.
-  const inScope = useMemo(() => abilitiesInList(), [])
-  const hiddenFromList = abilitiesHiddenFromList().length
-
+  //
+  // abilitiesInList() and abilitiesHiddenFromList() used to be read here to build
+  // the "N of M abilities exist in Generation G" line. That line is gone with the
+  // rest of this pass's descriptive text; the clamp itself is unchanged and still
+  // lives in entrySources.
   const entries = useMemo(() => abilityEntries({ generation, isAll }), [generation, isAll])
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 
@@ -58,11 +56,7 @@ export function Abilitydex() {
       entries={entries}
       entryId={(ability) => ability.id}
       searchText={(ability) => ability.display_name}
-      note={
-        isAll
-          ? `All ${inScope.length} abilities that existed by Generation ${LATEST_GENERATION} (${hiddenFromList} later additions are in the data but not listed here)`
-          : `${entries.length} of ${inScope.length} abilities exist in Generation ${generation}`
-      }
+      searchLabel="Search/filter abilities"
       gatedMessage={
         preAbilityEra
           ? `Abilities did not exist in Generation ${generation}. They were introduced in Generation ${ABILITIES_INTRODUCED_IN_GENERATION} — pick a Generation ${ABILITIES_INTRODUCED_IN_GENERATION}+ game to browse them.`

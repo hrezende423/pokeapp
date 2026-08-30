@@ -687,6 +687,25 @@ async function main() {
   // -- Items ---------------------------------------------------------------
   const allItems = await readAll('item')
 
+  /*
+    Bag pocket, via item-category -> pocket.
+
+    An item resource carries `category` but NOT a pocket: the pocket is a
+    property of the category, one level up. All 54 categories in the snapshot
+    have a pocket, and the 8 pockets cover every category our retained items
+    use, so this is a total function rather than a lookup that can miss. Read
+    from the snapshot for the same reason everything else here is -- the
+    alternative was a hand-written 54-entry map, which would be the same data
+    with no way to notice when it drifts.
+  */
+  const allItemCategories = await readAll('item-category')
+  const pocketByCategory = new Map<string, string>()
+  for (const cat of allItemCategories) {
+    const name = refName(cat)
+    const pocket = refName(cat.pocket)
+    if (name && pocket) pocketByCategory.set(name, pocket)
+  }
+
   const heldItemIds = new Set<number>()
   for (const pid of retainedPokemon) {
     const p = pokemonRaw.get(pid)!
@@ -739,6 +758,7 @@ async function main() {
       name: it.name,
       display_name: english(it.names)?.name ?? it.name,
       category: refName(it.category),
+      pocket: pocketByCategory.get(refName(it.category) ?? '') ?? null,
       attributes: (it.attributes ?? []).map((a: NamedRef) => refName(a)).sort(),
       generation_ids: sortedUnique(
         (it.game_indices ?? [])

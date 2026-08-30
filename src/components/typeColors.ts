@@ -1,46 +1,50 @@
 /**
- * Canonical Pokemon type colours, keyed by PokeAPI type name.
+ * Canonical Pokemon type colours for FILLED contexts, keyed by PokeAPI type name.
  *
- * SOURCE: Bulbapedia's per-type colour templates, read from their raw wikitext,
- * e.g.
+ * ONE PALETTE, APP-WIDE. This is the community-standard type hex set -- the same
+ * palette the --type-* CSS custom properties now carry, and the only type palette
+ * left in the project. The muted custom set is retired, and the Bulbapedia
+ * template transcription that used to live in this file is retired with it:
+ * having a third palette here meant the Movedex's type-filter buttons could sit
+ * directly beside type text and disagree with it about what colour Water is.
  *
- *   https://bulbapedia.bulbagarden.net/w/index.php?title=Template:Fire_color&action=raw
+ * WHY THE RAW VALUES HERE, AND ADJUSTED ONES IN CSS. These two consumers paint
+ * the colour as a background with #fff text on top (TypeBadge, and TypeFilter's
+ * pressed state), which is what the community palette was drawn for -- it comes
+ * from the games' own type-chart UI, where every swatch is a fill. --type-* is
+ * for coloured TEXT on a page surface, a different problem with a different
+ * answer: 12 of the 17 are illegible as light-mode text unmodified (Electric at
+ * 1.43:1), so that side of the system darkens them to a >=4:1 floor. Same hue,
+ * two renderings, each correct for its medium. See design-tokens.json,
+ * type-color-community and its two per-mode override sets.
  *
- * Those templates are what the wiki itself renders every type banner and infobox
- * with, which makes them the closest thing to a published standard palette. The
- * values below were transcribed from the templates rather than eyeballed, so
- * they are reproducible: re-fetch the 18 URLs and diff.
- *
- * Two things worth knowing before reviewing the hues:
- *
- *   - Bulbapedia's FIRE is a red-orange (#E62829) and its FIGHTING is the pure
- *     orange (#FF8000). That is the wiki's convention, not a transcription slip.
- *   - Every template pairs its colour with white text, so #fff is legible on all
- *     18 and no per-type text colour is needed.
- *
- * Used by both the type badges and the list's type filter, deliberately from one
- * table: two palettes would let the same type render two different colours in
- * the same view.
+ * A NOTE ON WHAT THIS IS NOT: DESIGN-SYSTEM.md is explicit that a type indicator
+ * is coloured text and never a fill or a pill, so TypeBadge is legacy -- it
+ * predates that rule and survives only in the pre-redesign modules that CLAUDE.md
+ * leaves alone. TypeLabel/TypeRow are the sanctioned treatment and read --type-*
+ * instead. Nothing new should reach for this table.
  */
 export const TYPE_COLORS: Record<string, string> = {
-  normal: '#9FA19F',
-  fire: '#E62829',
-  water: '#2980EF',
-  electric: '#FAC000',
-  grass: '#3FA129',
-  ice: '#3DCEF3',
-  fighting: '#FF8000',
-  poison: '#9141CB',
-  ground: '#915121',
-  flying: '#81B9EF',
-  psychic: '#EF4179',
-  bug: '#91A119',
-  rock: '#AFA981',
-  ghost: '#704170',
-  dragon: '#5060E1',
-  dark: '#624D4E',
-  steel: '#60A1B8',
-  fairy: '#EF70EF',
+  normal: '#A8A878',
+  fire: '#F08030',
+  water: '#6890F0',
+  electric: '#F8D030',
+  grass: '#78C850',
+  ice: '#98D8D8',
+  fighting: '#C03028',
+  poison: '#A040A0',
+  ground: '#E0C068',
+  flying: '#A890F0',
+  psychic: '#F85888',
+  bug: '#A8B820',
+  rock: '#B8A038',
+  ghost: '#705898',
+  dragon: '#7038F8',
+  dark: '#705848',
+  // Gen 6, so outside this app's Gen 1-4 scope and unreachable via
+  // resolveTypesForGeneration. Listed for completeness of the palette.
+  fairy: '#EE99AC',
+  steel: '#B8B8D0',
 }
 
 /** Neutral fill for anything outside the 18 real types (e.g. the `unknown` type). */

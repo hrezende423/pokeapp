@@ -188,6 +188,13 @@ export interface Item {
   name: string
   display_name: string
   category: string | null
+  /**
+   * Bag pocket. A separate axis from `category`, not a coarser version of it:
+   * the 40 categories our items use map onto 8 pockets, and the mapping lives on
+   * item-category in PokeAPI rather than on the item. Total for every item in
+   * the bundle -- see the derivation in scripts/build-data.ts.
+   */
+  pocket: string | null
   attributes: (string | null)[]
   generation_ids: number[]
   fling_power: number | null

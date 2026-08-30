@@ -122,6 +122,15 @@
   /* accent — reserved for active tab/nav state and binary indicators only */
   --accent: #d91c2c;
 
+  /* Stat direction on a nature. NOT --accent: that has exactly three sanctioned
+     uses and "a stat went up" is none of them, so these are their own tokens.
+     Both computed against #fafafa the same way the type colours were —
+     increase 6.26:1, decrease 6.17:1, deliberately matched so neither arrow
+     out-shouts the other. The red sits 42 units of RGB distance from --accent
+     (#d91c2c), far enough not to read as the accent. */
+  --stat-increase: #b3261e;
+  --stat-decrease: #1f5fa8;
+
   /* buttons */
   --button-primary-fill: #3a3a3a; /* ink.800 — deliberately not full ink.900 black */
   --button-primary-text: #ffffff;
@@ -133,24 +142,45 @@
   --mini-badge-text: #555555;
 
   /* type-indicator colors — text only, never a fill/background.
-     All 17 types in Gen 1-4 scope. Unverified in dark mode except --type-dark. */
-  --type-normal: #6b6a52;
-  --type-fire: #b85a0f;
-  --type-water: #2c6da8;
-  --type-electric: #8a6d0a;
-  --type-grass: #4d7c0f;
-  --type-ice: #3d7a86;
-  --type-fighting: #8a3d2e;
-  --type-poison: #7c3f8f;
-  --type-ground: #7a5c3a;
-  --type-flying: #5b7a9c;
-  --type-psychic: #a8447a;
-  --type-bug: #78822f;
-  --type-rock: #6e5f47;
-  --type-ghost: #4a3d6b;
-  --type-dragon: #4a5a8a;
-  --type-dark: #6b5b52;
-  --type-steel: #6b7480;
+
+     THE COMMUNITY PALETTE, which replaced the muted custom one everywhere. Its
+     raw hexes are used unchanged wherever they are legible; 12 of the 17 are
+     not, in light mode, because that palette was drawn for type-chart FILLS
+     with text on top rather than for coloured text on a near-white surface.
+     Measured against #fafafa, unmodified: Electric 1.43:1, Ice 1.53:1, Ground
+     1.69:1, Steel 1.86:1, Grass 1.98:1, Bug 2.11:1, Rock 2.48:1, Flying 2.54:1,
+     Fire 2.57:1, Normal 2.36:1, Water 2.94:1, Psychic 2.98:1 — all far under
+     the >=4:1 floor this project already adopted, and Electric at 1.43:1 is
+     effectively invisible.
+
+     So each of those 12 is the community hue mixed toward black until it reaches
+     exactly 4:1 — the mirror of the computed lightening already applied to the
+     dark mode set (type-color-community-dark-mode-override), same method, same
+     floor, opposite direction. Scaling all three channels equally preserves the
+     hue exactly, so Electric is still the community yellow and Ice still the
+     community cyan, only dark enough to read.
+
+     The remaining 5 — Fighting, Poison, Ghost, Dragon, Dark — are the community
+     values untouched, and they are precisely the 5 that needed a dark-mode lift.
+     Mid-dark saturated colours work on white and fail on black; bright pastels
+     do the reverse. */
+  --type-normal: #7e7e5a;
+  --type-fire: #bd6526;
+  --type-water: #587acb;
+  --type-electric: #927a1c;
+  --type-grass: #538a37;
+  --type-ice: #5c8383;
+  --type-fighting: #c03028;
+  --type-poison: #a040a0;
+  --type-ground: #8f7a42;
+  --type-flying: #8370bb;
+  --type-psychic: #d34b74;
+  --type-bug: #778317;
+  --type-rock: #8e7b2b;
+  --type-ghost: #705898;
+  --type-dragon: #7038f8;
+  --type-dark: #705848;
+  --type-steel: #7b7b8b;
 }
 
 [data-theme='dark'] {
@@ -163,6 +193,11 @@
 
   --accent: #ff3b4e;
 
+  /* increase 6.38:1, decrease 6.87:1 against #141414; the red is 70 units from
+     the dark --accent (#ff3b4e). */
+  --stat-increase: #e8776a;
+  --stat-decrease: #6ba3d6;
+
   --button-primary-fill: #f5f5f5;
   --button-primary-text: #141414;
 
@@ -174,23 +209,27 @@
   /* Every type now has a computed, contrast-verified dark-mode variant
      (>=4:1 against #141414). "dark" keeps its earlier hand-picked value,
      tested against real Umbreon artwork, since it already clears the floor. */
-  --type-normal: #7a7963;
-  --type-fire: #ba5f16;
-  --type-water: #417cb1;
-  --type-electric: #907416;
-  --type-grass: #58841d;
-  --type-ice: #47818c;
-  --type-fighting: #a4685c;
-  --type-poison: #9665a5;
-  --type-ground: #8d7356;
-  --type-flying: #5b7a9c;
-  --type-psychic: #b25989;
-  --type-bug: #78822f;
-  --type-rock: #847763;
-  --type-ghost: #7d7394;
-  --type-dragon: #69769e;
-  --type-dark: #a89484;
-  --type-steel: #6f7884;
+  /* Community palette on dark. 12 of the 17 clear >=4:1 against #141414 as
+     published; the 5 that did not carry the computed lift already recorded in
+     type-color-community-dark-mode-override. No new work in this mode — the
+     light block is where this pass did its measuring. */
+  --type-normal: #a8a878;
+  --type-fire: #f08030;
+  --type-water: #6890f0;
+  --type-electric: #f8d030;
+  --type-grass: #78c850;
+  --type-ice: #98d8d8;
+  --type-fighting: #c94f48;
+  --type-poison: #ab57ab;
+  --type-ground: #e0c068;
+  --type-flying: #a890f0;
+  --type-psychic: #f85888;
+  --type-bug: #a8b820;
+  --type-rock: #b8a038;
+  --type-ghost: #836ea5;
+  --type-dragon: #8556f9;
+  --type-dark: #887467;
+  --type-steel: #b8b8d0;
 }
 
 :root {

@@ -1,6 +1,7 @@
 import { IconArrowLeft } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
 import { SpeciesCardGrid, type SpeciesCardEntry } from '../../components/SpeciesCardGrid'
+import type { SpeciesCardFooter } from '../../components/speciesCardFooters'
 
 /**
  * The detail page shared by the Movedex, the Abilitydex and the Breeding dex.
@@ -34,6 +35,7 @@ export function EntityDetailPage({
   generation,
   onSelectSpecies,
   testId,
+  footer,
   children,
 }: {
   /**
@@ -58,6 +60,11 @@ export function EntityDetailPage({
   generation: number
   onSelectSpecies: (id: number) => void
   testId: string
+  /**
+   * Overrides the card's bottom line for every grid on this page. The Breeding
+   * dex shows egg groups there instead of abilities.
+   */
+  footer?: SpeciesCardFooter
   /** Extra blocks between the description and the species grids. */
   children?: ReactNode
 }) {
@@ -106,6 +113,7 @@ export function EntityDetailPage({
             onSelect={onSelectSpecies}
             testId={`entity-grid-${slug(section.label ?? 'species')}`}
             testIdPrefix="entity-species"
+            footer={footer}
           />
         </section>
       ))}

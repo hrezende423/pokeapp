@@ -56,17 +56,60 @@
 }
 
 /* Widened from the starter template's fixed 1126px: the Pokedex is a 240px rail
-   plus a detail column of side-by-side cards, which needs the room. */
+   plus a detail column of side-by-side cards, which needs the room.
+
+   HEIGHT, not min-height, and overflow: hidden -- the app is viewport-locked.
+   Nothing outside a .scroll-area scrolls, so this element must be exactly the
+   viewport and must not grow past it; min-height would let a tall module push
+   the page taller and hand the scroll back to the browser. See
+   components/ScrollArea.tsx for the other half of the model. */
 #root {
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
   text-align: center;
   border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+
+/* The document itself must not be a scroll container either. Without this the
+   browser keeps a scrollbar gutter for a page that can never overflow, and on
+   touch platforms the whole app rubber-bands against a fixed viewport. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+/*
+  NO NATIVE SCROLLBAR ANYWHERE. Stated as one universal rule rather than added to
+  each scroller: besides the .scroll-area sections, the app has several small
+  internal scrollers that predate this model -- the evolution tree, the learnset
+  and encounter tables, the global-search dropdown -- and each was showing a real
+  scrollbar. Chasing them individually would also mean the next one added starts
+  out wrong.
+
+  Three declarations because three engines: `scrollbar-width` for Firefox,
+  `-ms-overflow-style` for legacy Edge, the pseudo-element for WebKit/Blink.
+
+  NOTE ON THE HORIZONTAL ONES: a wide table inside a card still scrolls
+  sideways, and it deliberately does NOT get a back-to-top control -- "top" is
+  not where a horizontal scroller has gone. The rule this satisfies is the
+  no-visible-scrollbar one; the back-to-top and the scroll-down indicator belong
+  to vertical sections, which is what ScrollArea wraps.
+*/
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
 }
 
 body {

@@ -1,6 +1,6 @@
 import { IconArrowLeft } from '@tabler/icons-react'
 import { useDexSelection } from '../nav/navContext'
-import { ScrollDownHint } from './ScrollDownHint'
+import { ScrollArea } from '../../components/ScrollArea'
 import { SpeciesDetail } from './SpeciesDetail'
 import { SpeciesList } from './SpeciesList'
 // The grid card's type row is the validated TypeLabel/TypeRow pair, whose styles
@@ -57,26 +57,46 @@ export function Pokedex() {
         </div>
       )}
 
+      {/*
+        Each pane scrolls itself, and the page does not scroll at all. In the
+        detail state that means TWO independent scroll areas side by side: the
+        240px species rail and the detail column are different lengths, and
+        making the page scroll both together was what previously forced the
+        rail to be sticky and height-capped.
+
+        The scroll-down indicator and the back-to-top control come from
+        ScrollArea, so the grid keeps the affordance it already had -- built for
+        exactly this -- and every other pane gains the same one.
+      */}
       {browsing ? (
         <div className="pokedex-body pokedex-body-grid">
-          <div className="pokedex-grid-wrap">
-            <SpeciesList selectedId={selectedId} onSelect={setSelectedId} layout="grid" />
-            <ScrollDownHint />
-          </div>
+          <ScrollArea testId="pokedex-grid-scroll-area">
+            <div className="pokedex-grid-wrap">
+              <SpeciesList selectedId={selectedId} onSelect={setSelectedId} layout="grid" />
+            </div>
+          </ScrollArea>
         </div>
       ) : (
         <div className="pokedex-body">
-          <SpeciesList selectedId={selectedId} onSelect={setSelectedId} />
-          <div className="pokedex-detail">
-            {/* Keyed by species so the artwork toggles remount: each species
-                opens on regular static artwork rather than inheriting the
-                previous one's source/colour/motion/gender state. */}
-            <SpeciesDetail
-              key={selectedId}
-              speciesId={selectedId}
-              onSelectSpecies={setSelectedId}
-            />
-          </div>
+          <ScrollArea
+            className="species-list-scroll"
+            testId="pokedex-rail-scroll-area"
+            hint={false}
+          >
+            <SpeciesList selectedId={selectedId} onSelect={setSelectedId} />
+          </ScrollArea>
+          <ScrollArea testId="pokedex-detail-scroll-area">
+            <div className="pokedex-detail">
+              {/* Keyed by species so the artwork toggles remount: each species
+                  opens on regular static artwork rather than inheriting the
+                  previous one's source/colour/motion/gender state. */}
+              <SpeciesDetail
+                key={selectedId}
+                speciesId={selectedId}
+                onSelectSpecies={setSelectedId}
+              />
+            </div>
+          </ScrollArea>
         </div>
       )}
     </div>

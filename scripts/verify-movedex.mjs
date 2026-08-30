@@ -19,7 +19,7 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { controls, fillDexSearch } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
 
 const PORT = 4187
@@ -228,7 +228,7 @@ try {
   /** Open one move, and wait for its async learnset to land. */
   const openMove = async (term, id) => {
     await toList()
-    await page.fill('[data-testid="movedex-search"]', term)
+    await fillDexSearch(page, 'movedex', term)
     await page.waitForSelector(`[data-testid="movedex-row-${id}"]`, { timeout: 15000 })
     await page.click(`[data-testid="movedex-row-${id}"]`)
     await page.waitForSelector('[data-testid="movedex-detail"]', { timeout: 15000 })
@@ -280,7 +280,7 @@ try {
 
   await selectGame('heartgold-soulsilver')
   await toList()
-  await page.fill('[data-testid="movedex-search"]', 'head')
+  await fillDexSearch(page, 'movedex', 'head')
   await page.waitForTimeout(150)
   const headCount = await countOf('movedex')
   const expectedHead = moves.filter(
@@ -296,7 +296,7 @@ try {
     headLabels.every((l) => l.toLowerCase().includes('head')),
   )
   await toList()
-  await page.fill('[data-testid="movedex-search"]', '')
+  await fillDexSearch(page, 'movedex', '')
 
   // ------------------------------------------------- type filter, same component
   hr('ITEM 1b — type filter reuses the Pokedex component and colours')
@@ -355,9 +355,17 @@ try {
   }))
   log(`  water filter: ${waterCount} moves (expected ${expectedWater}), bg=${waterSelected.bg}`)
   check('type filter narrows the list', waterCount === expectedWater, `(${waterCount})`)
+  /*
+    #6890F0 -- the COMMUNITY palette's Water, which is now the only type palette
+    in the app. This asserted #2980EF, the Bulbapedia transcription that used to
+    live in typeColors.ts; that table was retired along with the muted custom set,
+    so the whole app draws from one palette in both themes. The value is hardcoded
+    on purpose: the point of the check is that the filter and the type text agree
+    on a specific colour, which a lookup shared with the source would not test.
+  */
   check(
-    'selected button is colour-filled',
-    waterSelected.bg === 'rgb(41, 128, 239)',
+    'selected button is filled with the community palette Water',
+    waterSelected.bg === 'rgb(104, 144, 240)',
     waterSelected.bg,
   )
   await page.click('[data-testid="movedex-type-fire"]')
@@ -553,7 +561,7 @@ try {
 
   await selectGame('heartgold-soulsilver')
   await toList()
-  await page.fill('[data-testid="movedex-search"]', 'headbutt')
+  await fillDexSearch(page, 'movedex', 'headbutt')
   await page.waitForTimeout(200)
   await page.click(`[data-testid="movedex-row-${HEADBUTT}"]`)
   let got = await readLearners()
@@ -600,7 +608,7 @@ try {
 
   // Second move: Surf.
   await toList()
-  await page.fill('[data-testid="movedex-search"]', 'surf')
+  await fillDexSearch(page, 'movedex', 'surf')
   await page.waitForTimeout(200)
   await page.click(`[data-testid="movedex-row-${SURF}"]`)
   got = await readLearners()
@@ -615,7 +623,7 @@ try {
   await selectGame('all')
   await page.waitForTimeout(200)
   await toList()
-  await page.fill('[data-testid="movedex-search"]', 'surf')
+  await fillDexSearch(page, 'movedex', 'surf')
   await page.waitForTimeout(200)
   await page.click(`[data-testid="movedex-row-${SURF}"]`)
   const surfAllView = await readLearners()

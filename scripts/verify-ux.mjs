@@ -552,25 +552,37 @@ try {
 
   // -------------------------------------------------------------- ITEM 4
   hr('ITEM 4 (DOM) — type filter buttons carry the real type colour; "Any" clears')
+  /*
+    THE COMMUNITY PALETTE, which is now the only type palette in the app.
+
+    This table used to hold the Bulbapedia template transcription that lived in
+    typeColors.ts. Both that and the muted custom set are retired: the community
+    hexes are what type text resolves to (per theme, contrast-adjusted -- see
+    design-tokens.json) and what these filled filter buttons paint directly,
+    which is what the palette was originally drawn for.
+
+    Left as literals rather than imported from src/: a test that reads its
+    expectations out of the code under test cannot detect the code changing.
+  */
   const EXPECTED = {
-    normal: '#9FA19F',
-    fire: '#E62829',
-    water: '#2980EF',
-    electric: '#FAC000',
-    grass: '#3FA129',
-    ice: '#3DCEF3',
-    fighting: '#FF8000',
-    poison: '#9141CB',
-    ground: '#915121',
-    flying: '#81B9EF',
-    psychic: '#EF4179',
-    bug: '#91A119',
-    rock: '#AFA981',
-    ghost: '#704170',
-    dragon: '#5060E1',
-    dark: '#624D4E',
-    steel: '#60A1B8',
-    fairy: '#EF70EF',
+    normal: '#A8A878',
+    fire: '#F08030',
+    water: '#6890F0',
+    electric: '#F8D030',
+    grass: '#78C850',
+    ice: '#98D8D8',
+    fighting: '#C03028',
+    poison: '#A040A0',
+    ground: '#E0C068',
+    flying: '#A890F0',
+    psychic: '#F85888',
+    bug: '#A8B820',
+    rock: '#B8A038',
+    ghost: '#705898',
+    dragon: '#7038F8',
+    dark: '#705848',
+    steel: '#B8B8D0',
+    fairy: '#EE99AC',
   }
   const hexToRgb = (h) =>
     `rgb(${parseInt(h.slice(1, 3), 16)}, ${parseInt(h.slice(3, 5), 16)}, ${parseInt(h.slice(5, 7), 16)})`
@@ -614,7 +626,7 @@ try {
   check('three types are selected', selectedColors.length === 3, `(${selectedColors.length})`)
   for (const c of selectedColors) {
     check(
-      `${c.type} renders its Bulbapedia colour ${EXPECTED[c.type]}`,
+      `${c.type} renders its community-palette colour ${EXPECTED[c.type]}`,
       c.declared === EXPECTED[c.type] && c.computed === hexToRgb(EXPECTED[c.type]),
       `${c.computed} vs ${hexToRgb(EXPECTED[c.type])}`,
     )

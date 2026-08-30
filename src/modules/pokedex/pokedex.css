@@ -3,22 +3,13 @@
 
 .pokedex {
   text-align: left;
-}
-
-.pokedex-head {
+  /* Fills the module row of .panel and passes the height down, so the scroll
+     lands inside a .scroll-area rather than on the page. */
+  flex: 1;
+  min-height: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.pokedex-head h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-h);
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .vg-selector {
@@ -49,7 +40,13 @@
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: 1.25rem;
-  align-items: start;
+  /* stretch, not start: each column is its own scroll area and has to be given
+     the full height to scroll WITHIN. align-items: start would size each column
+     to its content, which is what made the page scroll. */
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 860px) {
@@ -65,26 +62,32 @@
 
 /* ---------------------------------------------------------------- list */
 
+/* Neither sticky nor height-capped any more. Both were compensating for a
+   scrolling page: position: sticky kept the rail on screen while the page moved
+   under it, and max-height: 100svh stopped it growing taller than the viewport.
+   The rail now sits inside a .scroll-area that is exactly the available height,
+   so it scrolls itself and there is nothing to stick to. */
 .species-list {
-  position: sticky;
-  top: 0;
   width: 240px;
   max-width: 100%;
-  max-height: 100svh;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* The rail's scroll area, as opposed to the detail column's: the 240px width has
+   to live on the scrolling element, or the grid track collapses around it. */
+.species-list-scroll {
+  width: 240px;
+  max-width: 100%;
   padding-top: 1rem;
   box-sizing: border-box;
 }
 
-/* Browse mode is not a rail: it must not stick, must not clamp to 240px, and
-   must not cap its own height -- the page scrolls, and the scroll-down hint below
-   the grid depends on that. Sized by the grid it contains, and centred by
-   .pokedex-grid-wrap. */
+/* Browse mode is not a rail: it must not clamp to 240px. Sized by the grid it
+   contains, and centred by .pokedex-grid-wrap. */
 .species-list-grid {
-  position: static;
   width: auto;
-  max-height: none;
   padding-top: 0;
 }
 
@@ -162,9 +165,15 @@
   font-weight: 600;
 }
 
+/*
+  NOT a scroll container any more. It carried overflow-y: auto from when the rail
+  scrolled itself inside a height-capped .species-list; the rail now sits inside a
+  ScrollArea that is exactly the available height, and leaving the overflow here
+  made this a second, nested scroller -- which showed up as a 1px horizontal
+  scrollbar on the species rail.
+*/
 .species-rows {
   flex: 1;
-  overflow-y: auto;
   margin: 0.5rem 0 0;
   padding: 0;
   list-style: none;
@@ -212,10 +221,21 @@
   background: var(--accent-bg);
 }
 
+/*
+  A catalog number in a list, which is one of the cases --font-numeric exists for.
+
+  This rule previously set font-variant-numeric but NOT font-family, so it was
+  asking for tabular digits from whatever family had already applied -- Plex Sans,
+  inherited from the shell. Only .species-card .dex-no named the face, which is
+  why the grid cards looked right and every ledger row did not. Exactly the
+  failure mode CLAUDE.md records under "font stack order matters", one level up.
+*/
 .dex-no {
   color: var(--text);
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
+  letter-spacing: -0.02em;
 }
 
 .species-rows .empty {
@@ -319,11 +339,49 @@
   height: 199px;
   padding: 0;
   font-family: var(--font-body);
+  /*
+    EXPLICIT, AND LOAD-BEARING. This element used to be a <button>, and a button
+    does not inherit font-size -- Chrome's UA stylesheet gives it 13.3333px. That
+    accidental value, times line-height 1.25, is what set the height of the type
+    row's line box (16.67px) and therefore the y position of the ability line
+    below it. The Figma calibration was done against it without anyone naming it.
+
+    Turning the card into a <div> for the footer variant made it inherit :root's
+    18px instead, the type row's box grew to 22.5px, and the ability line dropped
+    from Figma's y=173.4 to y=182 -- which the design-system suite caught.
+
+    So the value is stated here on purpose rather than restored by putting the
+    button back. Nothing inside the card renders at this size: the number, the
+    name, the type labels and the ability line all set their own font-size from
+    tokens. All this does is fix the inherited line box the calibration assumed.
+  */
+  font-size: 13.3333px;
   line-height: 1.25;
   color: var(--text-primary);
   background: none;
   border: none;
   text-align: left;
+}
+
+/*
+  The card's primary action, stretched over the whole card. The card element used
+  to BE the button; the Breeding dex footer puts real controls on the bottom line,
+  and an interactive element inside a <button> is invalid and keyboard-unreachable,
+  so the action became this overlay instead. See SpeciesCardGrid.tsx.
+
+  z-index 0 against the footer's 1: a pointer landing anywhere on the card hits
+  this, except on a footer control, which is exactly the intent.
+*/
+.species-card-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
 
@@ -434,11 +492,13 @@
 }
 
 /* Keyboard focus needs to be visible on a card with no border or fill of its
-   own; the accent ring is the same one the rest of the shell focuses with. */
-.species-card:focus-visible {
+   own; the accent ring is the same one the rest of the shell focuses with. It is
+   drawn on the overlay button now rather than the card, since the overlay is what
+   actually takes focus -- and the overlay is inset: 0, so the ring lands in the
+   same place it always did. */
+.species-card-hit:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: var(--radius-control);
 }
 
 /*
@@ -1364,12 +1424,6 @@
   white-space: nowrap;
 }
 
-.item-sprite {
-  display: block;
-  margin-top: 0.5rem;
-  image-rendering: pixelated;
-}
-
 .holder-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
@@ -1629,14 +1683,6 @@
   font-size: var(--font-size-body);
 }
 
-.nature-matrix-caption {
-  margin-bottom: var(--space-gap-md);
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-  text-align: left;
-  caption-side: top;
-}
-
 .nature-matrix th {
   padding: 8px 12px;
   font-size: var(--font-size-label);
@@ -1713,6 +1759,11 @@
   overflow-x: auto;
 }
 
+/* The table no longer fills the width, so the wrap must not force it to. */
+.data-table-wrap > .data-table {
+  margin-right: auto;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -1735,12 +1786,18 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+  COMPACTED. Header and cell padding were 8px 10px; they are 5px 7px now, and the
+  table gets a fixed layout with per-column widths so the six columns keep a tight
+  horizontal rhythm instead of each one sizing itself to its widest cell. The
+  numeric columns in particular were far wider than three digits need.
+*/
 .data-table-sort {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 5px 7px;
   font-family: var(--font-body);
   font-size: var(--font-size-label);
   font-weight: var(--font-weight-medium);
@@ -1773,9 +1830,73 @@
 }
 
 .data-table td {
-  padding: 8px 10px;
+  padding: 5px 7px;
   color: var(--text-primary);
   border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+
+/*
+  Column widths, so a numeric column is as wide as its numbers and not as wide as
+  its header word. table-layout: fixed is what makes these authoritative; without
+  it the browser re-negotiates every width from content and "Accuracy" sets the
+  floor for a column of three-digit numbers.
+
+  The name column takes whatever is left, which is the one column where a long
+  value actually needs the room.
+*/
+/*
+  width: auto, not 100%. With table-layout: fixed and every column given a width,
+  the table is exactly the sum of its columns -- about 47rem -- instead of being
+  stretched across a 1440px viewport with all the slack dumped into the name
+  column. That slack was the actual problem: the columns were individually narrow
+  and still 700px apart.
+*/
+.data-table {
+  table-layout: fixed;
+  width: auto;
+  min-width: 0;
+}
+
+.data-table th:first-child,
+.data-table td:first-child {
+  width: 15rem;
+}
+
+.data-table th:nth-child(2),
+.data-table td:nth-child(2) {
+  width: 6.5rem;
+}
+
+.data-table th:nth-child(3),
+.data-table td:nth-child(3) {
+  width: 6rem;
+}
+
+.data-table th:nth-child(4),
+.data-table td:nth-child(4),
+.data-table th:nth-child(5),
+.data-table td:nth-child(5) {
+  width: 5.5rem;
+}
+
+.data-table th:nth-child(6),
+.data-table td:nth-child(6) {
+  width: 4rem;
+}
+
+/* The chevron column: just wide enough for a 16px glyph plus its breathing room. */
+.data-table-chevron-col {
+  width: 1.75rem;
+  padding-left: 0 !important;
+  padding-right: 0.35rem !important;
+  text-align: right;
+}
+
+/* A name longer than the column gets an ellipsis rather than widening the table. */
+.data-table td:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .data-table-row-clickable:hover {
@@ -1808,12 +1929,30 @@
   text-align: left;
 }
 
-.entity-detail-name {
+/*
+  SCOPED TO .entity-detail ON PURPOSE, for specificity and nothing else.
+
+  This is an <h2>, and App.css carries a bare `.panel h2` that uppercases it at
+  0.8rem. `.panel h2` is (0,1,1) and `.entity-detail-name` alone is (0,1,0), so
+  the legacy rule won and every shared detail page -- Movedex, Abilitydex,
+  Breeding dex, Naturedex, Itemdex -- rendered its title as small uppercase label
+  text instead of a page title. Exactly the trap CLAUDE.md lists first under
+  known gotchas: "bare element selectors in old CSS (.panel h2, .panel section)
+  can silently outrank a component class by specificity."
+
+  Two classes make this (0,2,0), which beats it. The alternative -- narrowing
+  `.panel h2` -- would touch the legacy Pokedex detail page that still relies on
+  it, so the fix is kept local to the component that was losing.
+*/
+.entity-detail .entity-detail-name {
   margin: 0 0 var(--space-gap-sm);
   font-family: var(--font-body);
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-medium);
+  font-style: normal;
   color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .entity-detail-meta {
@@ -1844,7 +1983,9 @@
   border-top: 1px solid var(--hairline);
 }
 
-.entity-detail-section-label {
+/* h3, and .panel has no bare h3 rule -- but scoped anyway, so a future one
+   cannot silently take this over the way .panel h2 took the title. */
+.entity-detail .entity-detail-section-label {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -1893,29 +2034,258 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The line above a full-width dex list, where the rail's note used to sit. */
-.dex-list-note {
-  margin: 0 0 var(--space-gap-md);
-}
+/*
+  Full-width ledger list: no rail to constrain it any more, and no longer the
+  Pokedex rail's two-row grid either.
 
-/* Full-width ledger list: no rail to constrain it any more. */
+  .species-row is shared with that rail, where it is
+  `grid-template-areas: 'dex name' 'dex types'` -- a number column beside a
+  stacked name and type row. A ledger row is now number, then a growing middle
+  column, then optional meta, then the chevron, so it is laid out as a flex row
+  here and the inherited grid areas are switched off. Shared class, two layouts,
+  the difference stated in one place rather than fought over by specificity.
+*/
 .ledger-list {
   max-height: none;
   overflow: visible;
 }
 
-/* The search box and entry count above a full-width dex list -- the pair that
-   used to sit at the top of DexShell's rail. */
-.dex-list-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-gap-lg);
-  margin-bottom: var(--space-gap-sm);
+/*
+  Capped, for the same reason the table is: a row whose name is at x=90 and whose
+  chevron is at x=1400 does not read as one row. 52rem keeps the number, the name,
+  the meta and the chevron inside one comfortable scan.
+*/
+.ledger-list {
+  max-width: 52rem;
 }
 
-.dex-list-head input[type='search'] {
-  width: 240px;
-  padding: 6px 2px;
+.ledger-list .species-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.35rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ledger-list .dex-no {
+  flex: none;
+  width: 2.9rem;
+}
+
+/* Right-aligned, and allowed to give up its space before the name does. */
+.ledger-list .row-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: var(--font-size-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-list .species-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Hover on a ledger row is the dedicated hover tone, not the legacy --code-bg
+   the Pokedex rail still uses. */
+.ledger-list .species-row:hover {
+  background: var(--surface-hover);
+}
+
+/* ------------------------------------------------- nature stat direction */
+
+/*
+  A stat name with its direction arrow trailing it. The words "raises" and
+  "lowers" used to sit above the name in the matrix headers, and "increases" /
+  "decreases" beside it on the detail page; the arrow replaces all four.
+*/
+.stat-direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
+.stat-arrow {
+  flex: none;
+}
+
+/* The two new tokens. Not --accent: see the note in Naturedex.tsx. */
+.stat-arrow-up {
+  color: var(--stat-increase);
+}
+
+.stat-arrow-down {
+  color: var(--stat-decrease);
+}
+
+/* The detail page's two stat lines. A plain list, hairline-separated -- the
+   boxed .stats grid it replaced was a container this pass removes. */
+.nature-stat-pair {
+  margin: var(--space-gap-md) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.nature-stat-pair li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-gap-md);
+  padding: 0.5rem 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--hairline);
+  max-width: 22rem;
+}
+
+.nature-stat-delta {
+  color: var(--text-secondary);
+  font-size: var(--font-size-label);
+}
+
+/* The matrix headers hold a StatDirection now, so they need to stop being a
+   two-line stack. */
+.nature-matrix th {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------- card footer variants */
+
+/*
+  Clicks pass through the card's own content to the hit overlay underneath, so the
+  whole card is one target -- except for a control in the footer, which re-enables
+  pointer events for itself.
+
+  DELIBERATELY NO `position` HERE. These four are already positioned (absolute,
+  at Figma's measured offsets) and already carry their own z-index. Setting
+  position: relative in this rule -- which an earlier version of it did -- put
+  every one of them back in normal flow and moved the text block from its
+  measured top: 136px down to wherever it happened to land, breaking the card
+  layout on all five grids at once.
+*/
+.species-card-text,
+.species-card-ghost,
+.species-card-art,
+.species-card-badge {
+  pointer-events: none;
+}
+
+/*
+  Egg groups on a Breeding dex card, in place of the abilities line. Middot
+  separators match the type row directly above it, so the two read as the same
+  kind of list.
+*/
+.species-card-egg-groups {
+  display: block;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Re-enabled against the block rule above: these ARE controls. */
+  pointer-events: auto;
+}
+
+/* A ghost-button by treatment -- text only -- but underlined on hover so it
+   reads as navigation rather than as the static ability text it replaces. */
+.species-card-egg-group {
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.species-card-egg-group:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.species-card-egg-group:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.species-card-egg-sep {
+  margin: 0 0.25rem;
+}
+
+/* ================================================== per-dex controls row */
+
+/*
+  The dex's own search/filter disclosure, plus its count. Same treatment as the
+  app bar's controls panel (see .app-controls) rather than a second pattern: a
+  ghost-button trigger, and a panel that floats over the list instead of pushing
+  it down, so opening the search does not move the row you were reading.
+*/
+.dex-controls {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-gap-md);
+  padding: 0 0 var(--space-gap-sm);
+  /* Fixed row above the scroll area, never part of what scrolls. */
+  flex: 0 0 auto;
+}
+
+.dex-controls-count {
+  margin: 0;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  letter-spacing: -0.02em;
+}
+
+/* Open, or narrowing the list: either way --accent marks a binary state, which
+   is one of the three uses it is reserved for. */
+.dex-controls[data-open='true'] .dex-controls-toggle,
+.dex-controls-toggle[data-filters-active='true'] {
+  color: var(--accent);
+}
+
+.dex-controls-panel {
+  display: none;
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  min-width: 18rem;
+  margin-top: 4px;
+  padding: var(--space-gap-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+}
+
+.dex-controls[data-open='true'] .dex-controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+}
+
+/*
+  The hairline-underline text field, which is the standard input treatment in this
+  app (this was DexShell rail search, and is the app bar search): a rule under the
+  text, never a bordered box.
+*/
+.dex-controls-panel input[type='search'],
+.dex-controls-inline input[type='search'] {
+  width: 100%;
+  padding: 0.3rem 0;
   font-family: var(--font-body);
   font-size: var(--font-size-body);
   color: var(--text-primary);
@@ -1923,13 +2293,267 @@
   border: none;
   border-bottom: 1px solid var(--hairline);
   border-radius: 0;
+  box-sizing: border-box;
 }
 
-.dex-list-head input[type='search']:focus {
+.dex-controls-panel input[type='search']:focus,
+.dex-controls-inline input[type='search']:focus {
   outline: none;
   border-bottom-color: var(--accent);
 }
 
-.dex-list-head .subtitle {
-  margin: 0;
+/*
+  MOVEDEX ONLY: search, type filter and count in one always-visible row. The
+  reasoning for the exception is in DexControls.tsx.
+*/
+.dex-controls-inline {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dex-controls-inline input[type='search'] {
+  width: 12rem;
+  flex: 0 0 auto;
+}
+
+.dex-controls-inline .type-filter {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dex-controls-inline .dex-controls-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ================================================== ledger row additions */
+
+/*
+  The row is now: number | (name + optional sprite, optional second line) | meta |
+  chevron. The middle column is what grew -- the Itemdex needs a category/pocket
+  line under the item name -- and it is a column rather than two stacked rows, so
+  the number and the chevron stay vertically centred against however tall it is.
+*/
+.row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.row-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+/* The sprite sits AFTER the name, so the names stay in one left-aligned column
+   down the whole list -- which is what makes 563 rows scannable. */
+.row-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.row-icon img {
+  display: block;
+  /* A 30px source rendered at 24px; nearest-neighbour keeps the pixel art crisp
+     rather than smearing it at a non-integer ratio. */
+  image-rendering: pixelated;
+}
+
+.row-sub {
+  display: block;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-sub-sep {
+  margin: 0 0.3rem;
+}
+
+/*
+  Trailing chevron: this row opens something. On every ledger row and every
+  clickable table row, at one size, so the promise reads the same in both. Dimmer
+  than the text it follows -- it is an affordance, not content -- and it steps up
+  on hover so the row feels like a target.
+*/
+.row-chevron {
+  flex: none;
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.species-row:hover .row-chevron,
+.data-table-row-clickable:hover .row-chevron {
+  opacity: 1;
+}
+
+/* ================================================== item detail page */
+
+/*
+  Boxless: no bordered card anywhere on this page. Artwork beside the name,
+  effect text as text, and facts on hairlines -- the same restraint the shared
+  entity detail page uses.
+*/
+.item-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gap-lg);
+  padding-bottom: var(--space-gap-md);
+}
+
+.item-hero-text {
+  min-width: 0;
+}
+
+.item-artwork {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+/*
+  The 30x30 icon standing in for a missing 90x90 Dream World image -- 3x exactly,
+  so nearest-neighbour gives crisp pixels instead of the blur smooth scaling
+  produces. Roughly half the items land here; see components/ItemArtwork.tsx.
+*/
+.item-artwork-icon {
+  image-rendering: pixelated;
+}
+
+.item-short-effect {
+  margin: 0 0 var(--space-gap-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+/* Label/value rows, hairline-separated. What the bordered facts card became. */
+.fact-rows {
+  margin: var(--space-gap-lg) 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 32rem;
+}
+
+.fact-rows li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-gap-md);
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.fact-label {
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fact-value {
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.fact-note {
+  color: var(--text-secondary);
+  font-size: var(--font-size-label);
+}
+
+/* ================================================== berry card */
+
+/*
+  The species card chrome with a berry inside it: same watermark, artwork box,
+  number/name line and type row, from the same .species-card-* rules above, so
+  the two cannot drift apart. The only difference is one extra line of text and
+  the height that line needs -- 199px becomes 216px.
+*/
+/*
+  229px against the species card's 199px -- three short fact lines instead of one
+  ability line. The WIDTH is deliberately untouched at 212px so the berry grid and
+  the species grid share their column pitch exactly; see the note in Berrydex.tsx
+  for the measurement that ruled out fitting this into two lines.
+*/
+.berry-card {
+  height: 229px;
+  cursor: default;
+}
+
+.berry-grid {
+  /* Row gap opened against .pokedex-grid at 17px, because these cards are taller
+     and denser and needed the separation. */
+  row-gap: 22px;
+}
+
+/*
+  The berry artwork takes the species sprite's exact box -- top: 42px, 85x85,
+  centred -- rather than a size of its own, so a berry card and a species card
+  are the same object with different contents. Copied as values because
+  .species-card-art is an element-specific rule, not a token; if that geometry is
+  ever recalibrated against Figma both need the same edit, which is what the
+  cross-reference in the comment above it is for.
+*/
+.berry-card .item-artwork {
+  position: absolute;
+  z-index: 1;
+  top: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 85px;
+  height: 85px;
+  pointer-events: none;
+}
+
+.berry-card-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 3px;
+}
+
+.berry-card-fact-line {
+  display: block;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.berry-card-sep {
+  margin: 0 0.28rem;
+}
+
+.berry-card-none {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+/* ================================================== inline units */
+
+/*
+  The unit after a number -- hp, %, mm, h/stage. Set in the body face and slightly
+  dimmed, so the NUMBER reads as the value and the unit reads as a suffix rather
+  than as part of the digits. Without this the unit inherits Martian Mono from
+  .num and competes with the number for attention.
+*/
+.move-unit {
+  margin-left: 0.1em;
+  font-family: var(--font-body);
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  letter-spacing: normal;
 }

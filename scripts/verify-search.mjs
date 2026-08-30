@@ -28,7 +28,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { controls, fillDexSearch } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
 
 // NOT 4190: that is on the WHATWG fetch spec's blocked-port list (ManageSieve),
@@ -416,7 +416,19 @@ try {
       const gated = (await page.textContent(`[data-testid="${moduleId}-count"]`)).trim()
       return Number(gated.split(' ')[0])
     }
-    await page.fill(`[data-testid="${searchId}"]`, term)
+    /*
+      The per-dex search sits behind a ghost-button disclosure now, so it is
+      mounted but hidden until the panel is opened -- and it has to be closed
+      again before reading the list, because the panel floats over it. That is
+      what fillDexSearch does. The Pokedex's own filter lives in the app bar's
+      controls panel instead, which is a different disclosure, so it keeps the
+      direct fill inside withControls.
+    */
+    if (moduleId === 'pokedex') {
+      await withControls(() => page.fill(`[data-testid="${searchId}"]`, term))
+    } else {
+      await fillDexSearch(page, moduleId, term)
+    }
     await page.waitForTimeout(160)
     // The Pokedex lost its count label with the page header; the five other
     // dexes still render one, and they are outside this pass.
@@ -427,7 +439,11 @@ try {
       const txt = (await page.textContent(`[data-testid="${moduleId}-count"]`)).trim()
       n = Number(txt.split(' ')[0])
     }
-    await page.fill(`[data-testid="${searchId}"]`, '')
+    if (moduleId === 'pokedex') {
+      await withControls(() => page.fill(`[data-testid="${searchId}"]`, ''))
+    } else {
+      await fillDexSearch(page, moduleId, '')
+    }
     return n
   }
 

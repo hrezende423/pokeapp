@@ -1,3 +1,4 @@
+import { IconChevronRight } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -11,6 +12,12 @@ import type { ReactNode } from 'react'
  * Sorting is stable and null-last in both directions. A move with no power is
  * not "0 power" -- status moves have no power at all -- so nulls sink whichever
  * way the arrow points rather than clustering at the strong end when descending.
+ *
+ * A CLICKABLE ROW ENDS IN A CHEVRON, added by the table rather than declared as a
+ * column: it is not data, it is the affordance saying the row opens something,
+ * and it appears exactly when `onRowClick` is set. The ledger list carries the
+ * identical glyph at the same size, so a table row and a ledger row make the same
+ * promise. The header gets an empty cell above it so the column count matches.
  */
 
 export interface Column<T> {
@@ -113,6 +120,9 @@ export function DataTable<T>({
                 </th>
               )
             })}
+            {/* Header cell for the chevron column: unlabelled, but it has to
+                exist or the header row is one cell short of the body rows. */}
+            {onRowClick && <th scope="col" className="data-table-chevron-col" aria-label="Open" />}
           </tr>
         </thead>
         <tbody>
@@ -150,12 +160,27 @@ export function DataTable<T>({
                     )}
                   </td>
                 ))}
+                {onRowClick && (
+                  <td className="data-table-chevron-col">
+                    <IconChevronRight
+                      className="row-chevron"
+                      size={16}
+                      stroke={1.5}
+                      aria-hidden
+                      focusable="false"
+                    />
+                  </td>
+                )}
               </tr>
             )
           })}
           {sorted.length === 0 && emptyNote && (
             <tr>
-              <td colSpan={columns.length} className="empty" data-testid={`${base}-empty`}>
+              <td
+                colSpan={columns.length + (onRowClick ? 1 : 0)}
+                className="empty"
+                data-testid={`${base}-empty`}
+              >
                 {emptyNote}
               </td>
             </tr>

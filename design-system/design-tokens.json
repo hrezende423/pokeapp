@@ -31,8 +31,18 @@
         "light": { "$value": "#d91c2c", "$description": "Signature accent, grounded in real Pokedex device red, not a generic palette pick" },
         "dark": { "$value": "#ff3b4e", "$description": "Brightened for contrast against dark surface" }
       },
+      "stat-increase": {
+        "$description": "The up-arrow beside a nature's raised stat. Deliberately NOT accent-red: --accent has exactly three sanctioned uses (active tab/nav, binary indicator, error/validation) and 'this stat went up' is none of them. Contrast computed the same way the type palettes were, and the light/dark pair is matched to its stat-decrease counterpart so neither arrow reads as louder than the other. RGB distance from accent-red is 42 (light) and 70 (dark), far enough not to be mistaken for it.",
+        "light": { "$value": "#b3261e", "$description": "6.26:1 on #fafafa" },
+        "dark": { "$value": "#e8776a", "$description": "6.38:1 on #141414" }
+      },
+      "stat-decrease": {
+        "$description": "The down-arrow beside a nature's lowered stat. Blue against stat-increase's red, matched for contrast rather than for hue symmetry.",
+        "light": { "$value": "#1f5fa8", "$description": "6.17:1 on #fafafa" },
+        "dark": { "$value": "#6ba3d6", "$description": "6.87:1 on #141414" }
+      },
       "type-color": {
-        "$description": "Text-only by default; solid-square badge (see radius.badge-square) also sanctioned. Both this muted palette and type-color-community below are valid — which one a given context uses is a dev-time call, not a design decision left open. All 17 types in Gen 1-4 scope (Fairy excluded — Gen 6). Only 'dark' has a confirmed, tested dark-mode variant (see type-color-dark-mode below) — the rest are unverified placeholders inheriting the light value until checked against real dark-surface contrast.",
+        "$description": "RETIRED, kept for the record — no longer used anywhere in the app. The dev-time choice between this muted palette and type-color-community is closed: the community palette won and is now the only type palette, app-wide, in both themes and on every screen. Nothing references these values; see type-color-community and its two per-mode override sets. All 17 types in Gen 1-4 scope (Fairy excluded — Gen 6).",
         "normal":   { "$value": "#6b6a52" },
         "fire":     { "$value": "#B85A0F" },
         "water":    { "$value": "#2C6DA8" },
@@ -52,7 +62,7 @@
         "steel":    { "$value": "#6b7480" }
       },
       "type-color-community": {
-        "$description": "The de facto community-standard type hex set (originally from the games' own type-chart UI, widely paired with PokeAPI though not returned by it). More saturated than type-color above. Sanctioned as an equally valid option — dev-time choice, per context. 12 of 17 already clear a >=4:1 contrast floor against #141414 unmodified, thanks to being brighter/more saturated to begin with; the 5 listed in type-color-community-dark-mode-override needed the same computed-lightening treatment as the muted palette.",
+        "$description": "THE type palette, app-wide, in both themes — the muted type-color group above is retired. The de facto community-standard type hex set (originally from the games' own type-chart UI, widely paired with PokeAPI though not returned by it). These raw values are the reference hue; neither mode uses all 17 of them unmodified, because the set was drawn for type-chart FILLS with text on top, not for coloured text. Dark mode: 12 of 17 clear a >=4:1 floor against #141414 as published, the other 5 are in type-color-community-dark-mode-override. Light mode: only 5 of 17 clear the floor against #fafafa and the other 12 are in type-color-community-light-mode-override — the two sets are exact complements, which is what you would expect of mid-dark saturated colours versus bright pastels.",
         "normal":   { "$value": "#A8A878" },
         "fire":     { "$value": "#F08030" },
         "water":    { "$value": "#6890F0" },
@@ -78,6 +88,21 @@
         "ghost":    { "$value": "#836ea5" },
         "dragon":   { "$value": "#8556f9" },
         "dark":     { "$value": "#887467" }
+      },
+      "type-color-community-light-mode-override": {
+        "$description": "The other twelve. Computed exactly as the dark-mode set was, mirrored: each community hue mixed toward BLACK until it reaches >=4:1 against the light surface #fafafa, rather than toward white against #141414. Scaling all three channels equally preserves hue and saturation, so each stays recognisably its community colour — Electric is still that yellow — only dark enough to read as text. Measured unmodified contrast, worst first: electric 1.43, ice 1.53, ground 1.69, steel 1.86, grass 1.98, bug 2.11, normal 2.36, rock 2.48, flying 2.54, fire 2.57, water 2.94, psychic 2.98. Fighting, Poison, Ghost, Dragon and Dark are absent here because they already clear the floor in light mode — and they are exactly the five that needed the dark-mode lift.",
+        "normal":   { "$value": "#7e7e5a" },
+        "fire":     { "$value": "#bd6526" },
+        "water":    { "$value": "#587acb" },
+        "electric": { "$value": "#927a1c" },
+        "grass":    { "$value": "#538a37" },
+        "ice":      { "$value": "#5c8383" },
+        "ground":   { "$value": "#8f7a42" },
+        "flying":   { "$value": "#8370bb" },
+        "psychic":  { "$value": "#d34b74" },
+        "bug":      { "$value": "#778317" },
+        "rock":     { "$value": "#8e7b2b" },
+        "steel":    { "$value": "#7b7b8b" }
       },
       "type-color-dark-mode-override": {
         "$description": "Dark-mode variant for every type in type-color, now resolved (previously only 'dark' was tested). Computed via actual WCAG relative-luminance contrast against #141414, each lightened (mixed toward white) until reaching >=4:1 — a deliberate floor between 'no check at all' and full WCAG AA, consistent with the project's 'good contrast, not full compliance' bar. 'dark' keeps its earlier hand-picked value (#a89484, tested against real Umbreon artwork) rather than the computed one, since it already exceeds the floor. The other 16 are computed, not hand-art-directed — treat as verified-sufficient, not necessarily the most beautiful possible choice; further eyeballing is optional polish, not a blocker.",
@@ -114,6 +139,16 @@
         "light": { "$value": "{color.primitive.surface-hover.light}" },
         "dark": { "$value": "{color.primitive.surface-hover.dark}" },
         "$description": "Pointer-feedback fill for a row inside a floating panel. Exists because accent-red has exactly three sanctioned uses and hover is not one of them, so hover needs a tone rather than borrowing hairline (a border token) or surface (whose light step is imperceptible against surface-raised)."
+      },
+      "stat-increase": {
+        "light": { "$value": "{color.primitive.stat-increase.light}" },
+        "dark": { "$value": "{color.primitive.stat-increase.dark}" },
+        "$description": "Up-arrow colour beside a nature's raised stat. A fourth semantic colour alongside accent — added rather than reusing accent, whose three sanctioned uses do not include stat direction."
+      },
+      "stat-decrease": {
+        "light": { "$value": "{color.primitive.stat-decrease.light}" },
+        "dark": { "$value": "{color.primitive.stat-decrease.dark}" },
+        "$description": "Down-arrow colour beside a nature's lowered stat."
       },
       "surface-species-tint": {
         "$description": "Data-driven, not a fixed value. Populated per species from a species_id -> {bg_light, bg_dark} lookup table (implementation task, not a design token). Falls back to semantic.surface when no per-species data exists yet. Applies to the detail page's artwork panel only — surface-raised (the drawer) never changes."

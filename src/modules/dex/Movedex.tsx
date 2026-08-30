@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { DataTable, type Column } from '../../components/DataTable'
 import { TypeLabel } from '../../components/ds/TypeLabel'
 import { getType, typesInGeneration } from '../../data'
+import { fixedDamage } from '../../data/moveDamage'
 import type { Move } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { TypeFilter } from '../../components/TypeFilter'
@@ -24,6 +25,51 @@ function titleCase(value: string | null): string {
  * damage is calculated. The table's CATEGORY column is damage_class, which is what
  * the column name means everywhere else.
  */
+
+/**
+ * What the POWER cell says.
+ *
+ *   an ordinary damaging move   the number
+ *   Dragon Rage / Sonic Boom    "40 hp" / "20 hp" -- a constant, not a power stat
+ *   everything else             an em dash
+ *
+ * That last case covers two different things on purpose: a status move has no
+ * power because it deals no damage, and a variable-damage move has none because
+ * the amount depends on level, HP, weight or happiness. Neither has a number, so
+ * both get the dash. There are 176 of the first and 31 of the second in scope;
+ * see data/moveDamage.ts for how the split is derived, and why Seismic Toss and
+ * Night Shade belong to the second group rather than being printed as constants.
+ */
+function powerCell(move: Move) {
+  if (move.power != null) return <span className="num">{move.power}</span>
+  const fixed = fixedDamage(move)
+  if (fixed != null) {
+    return (
+      <span className="num" data-fixed-damage={fixed}>
+        {fixed}
+        <span className="move-unit">hp</span>
+      </span>
+    )
+  }
+  return <span className="num">—</span>
+}
+
+/**
+ * What the ACCURACY cell says: the number with a percent sign, or a dash that
+ * keeps its percent sign for a move that never misses.
+ *
+ * The dash keeps the "%" so the column stays a column: every cell then ends in
+ * the same glyph at the same x, and a never-miss row does not read as a shorter
+ * number. `accuracy: null` in the bundle means "no accuracy check", not unknown.
+ */
+function accuracyCell(move: Move) {
+  return (
+    <span className="num">
+      {move.accuracy ?? '—'}
+      <span className="move-unit">%</span>
+    </span>
+  )
+}
 
 /**
  * The learner grid, grouped by how each species learns the move.
@@ -89,13 +135,13 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
       {' · '}
       <span data-testid="movedex-category">{titleCase(move.damage_class)}</span>
       {' · Power '}
-      <span data-testid="movedex-power">{move.power ?? '—'}</span>
+      <span data-testid="movedex-power">{powerCell(move)}</span>
       {' · Accuracy '}
-      <span data-testid="movedex-accuracy">
-        {move.accuracy != null ? `${move.accuracy}%` : '—'}
-      </span>
+      <span data-testid="movedex-accuracy">{accuracyCell(move)}</span>
       {' · PP '}
-      <span data-testid="movedex-pp">{move.pp ?? '—'}</span>
+      <span data-testid="movedex-pp" className="num">
+        {move.pp ?? '—'}
+      </span>
     </>
   )
 
@@ -145,12 +191,13 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
           data-learner-count={shownIds.size}
           data-excluded={excluded}
         >
-          {shownIds.size} species{isAll ? ' across all Generation 1-4 games' : ` in ${vgName}`}
+          <span className="num">{shownIds.size}</span> species
+          {isAll ? ' across all Generation 1-4 games' : ` in ${vgName}`}
           {excluded > 0 && (
             <span data-testid="movedex-learners-excluded">
-              {' '}
-              · {excluded} more learn it only by a method this page does not group (Purification,
-              form change, or a Stadium/Light Ball special case)
+              {' · '}
+              <span className="num">{excluded}</span> more learn it only by a method this page does
+              not group (Purification, form change, or a Stadium/Light Ball special case)
             </span>
           )}
         </p>
@@ -202,9 +249,30 @@ export function Movedex() {
         sortValue: (m) => m.damage_class,
         render: (m) => titleCase(m.damage_class),
       },
-      { key: 'power', label: 'Power', sortValue: (m) => m.power, numeric: true },
-      { key: 'accuracy', label: 'Accuracy', sortValue: (m) => m.accuracy, numeric: true },
-      { key: 'pp', label: 'PP', sortValue: (m) => m.pp, numeric: true },
+      {
+        key: 'power',
+        label: 'Power',
+        // Sorts on the real power only. A fixed-damage move is deliberately NOT
+        // sorted as though 40 hp were 40 power -- different quantities -- and
+        // null-last keeps those rows together at the end either way.
+        sortValue: (m) => m.power,
+        render: powerCell,
+        numeric: true,
+      },
+      {
+        key: 'accuracy',
+        label: 'Accuracy',
+        sortValue: (m) => m.accuracy,
+        render: accuracyCell,
+        numeric: true,
+      },
+      {
+        key: 'pp',
+        label: 'PP',
+        sortValue: (m) => m.pp,
+        render: (m) => <span className="num">{m.pp ?? '—'}</span>,
+        numeric: true,
+      },
     ],
     [],
   )
@@ -215,10 +283,20 @@ export function Movedex() {
       entries={entries}
       entryId={(move) => move.id}
       searchText={(move) => move.display_name}
-      note={
-        isAll
-          ? `All ${gated.length} moves — every one exists in at least one of Generations 1-4`
-          : `${gated.length} moves exist in Generation ${generation}`
+      searchLabel="Search/filter moves"
+      // The one dex with an always-visible control row rather than the
+      // ghost-button disclosure every other dex uses. Deliberate: this table is
+      // dense enough that filtering is the primary way through it, so the filter
+      // is not something to put behind a click. See DexControls.
+      controlsVariant="inline"
+      controls={
+        <TypeFilter
+          available={availableTypes}
+          selected={activeTypeFilter}
+          onChange={setTypeFilter}
+          testIdPrefix="movedex-type"
+          label="Filter moves by type"
+        />
       }
       gatedMessage={
         entries.length === 0
@@ -226,26 +304,15 @@ export function Movedex() {
           : undefined
       }
       list={({ entries: visible, onSelect }) => (
-        <>
-          {/* Above the table rather than in a sidebar: this list is full-width
-              now, and the filter was an existing feature of it. */}
-          <TypeFilter
-            available={availableTypes}
-            selected={activeTypeFilter}
-            onChange={setTypeFilter}
-            testIdPrefix="movedex-type"
-            label="Filter moves by type"
-          />
-          <DataTable
-            rows={visible}
-            columns={columns}
-            rowKey={(m) => m.id}
-            onRowClick={(m) => onSelect(m.id)}
-            initialSort="name"
-            testId="movedex-rows"
-            emptyNote="No move matches those filters."
-          />
-        </>
+        <DataTable
+          rows={visible}
+          columns={columns}
+          rowKey={(m) => m.id}
+          onRowClick={(m) => onSelect(m.id)}
+          initialSort="name"
+          testId="movedex-rows"
+          emptyNote="No move matches those filters."
+        />
       )}
       detail={({ entry, onBack }) => (
         <MoveDetail key={`${entry.id}`} move={entry} onBack={onBack} />

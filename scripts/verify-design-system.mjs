@@ -87,7 +87,34 @@ function tokenValue(node, mode) {
 
 const semantic = tokens.color.semantic
 const primitive = tokens.color.primitive
-const TYPES = Object.keys(primitive['type-color']).filter((k) => !k.startsWith('$'))
+/*
+  THE COMMUNITY PALETTE IS THE PALETTE NOW, in both themes.
+
+  `type-color` (the muted custom set) is retired -- still in design-tokens.json
+  for the record, referenced by nothing -- so the expected value of --type-<t> is
+  built from `type-color-community` with each mode's override set applied on top.
+  Neither mode uses all 17 raw community values, and for opposite reasons:
+
+    dark   5 of 17 overridden (fighting, poison, ghost, dragon, dark) -- the
+           mid-dark saturated ones did not clear 4:1 against #141414.
+    light  12 of 17 overridden -- the bright pastels did not clear 4:1 against
+           #fafafa, Electric worst at 1.43:1.
+
+  Read from the JSON rather than restated here, so the CSS and the source of
+  truth are compared to each other rather than both to a copy in this file.
+*/
+const TYPES = Object.keys(primitive['type-color-community']).filter((k) => !k.startsWith('$'))
+
+const typeExpectations = (mode) => {
+  const overrideKey = `type-color-community-${mode}-mode-override`
+  const overrides = primitive[overrideKey] ?? {}
+  return Object.fromEntries(
+    TYPES.map((t) => [
+      `--type-${t}`,
+      (overrides[t] ?? primitive['type-color-community'][t]).$value,
+    ]),
+  )
+}
 
 /** The custom properties design-tokens.css is expected to expose, per theme. */
 const EXPECTED = {
@@ -102,7 +129,7 @@ const EXPECTED = {
     '--button-primary-fill': tokenValue(semantic['button-primary-fill'], 'light'),
     '--button-primary-text': tokenValue(semantic['button-primary-text'], 'light'),
     '--ghost-watermark': tokenValue(semantic['ghost-watermark'], 'light'),
-    ...Object.fromEntries(TYPES.map((t) => [`--type-${t}`, primitive['type-color'][t].$value])),
+    ...typeExpectations('light'),
   },
   dark: {
     '--surface': tokenValue(semantic.surface, 'dark'),
@@ -115,9 +142,7 @@ const EXPECTED = {
     '--button-primary-fill': tokenValue(semantic['button-primary-fill'], 'dark'),
     '--button-primary-text': tokenValue(semantic['button-primary-text'], 'dark'),
     '--ghost-watermark': tokenValue(semantic['ghost-watermark'], 'dark'),
-    ...Object.fromEntries(
-      TYPES.map((t) => [`--type-${t}`, primitive['type-color-dark-mode-override'][t].$value]),
-    ),
+    ...typeExpectations('dark'),
   },
 }
 
@@ -2231,13 +2256,43 @@ try {
     hint ? 'interactive=' + hint.interactive + ' aria-hidden=' + hint.ariaHidden : '',
   )
   check('visible while there is more to scroll to', hint != null && hint.atEnd === 'false')
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
-  await page.waitForTimeout(250)
+  // The other half of the scroll model: the indicator only means anything if the
+  // page itself is NOT what moves.
+  const scrollModel = await page.evaluate(() => ({
+    page: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    body: document.body.scrollHeight - document.body.clientHeight,
+    areas: document.querySelectorAll('.scroll-area').length,
+    backToTop: document.querySelector('[data-testid="scroll-top"]') != null,
+  }))
+  log('  scroll model: ' + JSON.stringify(scrollModel))
+  check(
+    'the page itself does not scroll -- only the section does',
+    scrollModel.page === 0 && scrollModel.body === 0 && scrollModel.areas >= 1,
+    JSON.stringify(scrollModel),
+  )
+  check('and no back-to-top control is offered before scrolling', !scrollModel.backToTop)
+  /*
+    THE PAGE NO LONGER SCROLLS. The app is viewport-locked and the grid scrolls
+    inside its own .scroll-area, so window.scrollTo is a no-op and the hint would
+    never reach its at-end state. Driving the container is the same gesture the
+    reader actually makes.
+  */
+  await page.$eval('.scroll-area', (el) => el.scrollTo(0, el.scrollHeight))
+  await page.waitForTimeout(350)
   const hintAtEnd = await page.evaluate(() => ({
     atEnd: document.querySelector('[data-testid="grid-scroll-hint"]').getAttribute('data-at-end'),
     opacity: getComputedStyle(document.querySelector('[data-testid="grid-scroll-hint"]')).opacity,
   }))
   log('  at the bottom: ' + JSON.stringify(hintAtEnd))
+  check(
+    'a back-to-top control appears once the section is scrolled',
+    (await page.$('[data-testid="scroll-top"]')) != null,
+  )
+  // It has to actually work, not just appear.
+  await page.click('[data-testid="scroll-top"]')
+  await page.waitForTimeout(700)
+  const backAtTop = await page.$eval('.scroll-area', (el) => el.scrollTop)
+  check('and returns the section to the top', backAtTop <= 8, 'scrollTop=' + backAtTop)
   check(
     'and hides once there is nothing further to scroll to',
     hintAtEnd.atEnd === 'true' && Number(hintAtEnd.opacity) < 0.5,
@@ -2246,55 +2301,109 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.waitForTimeout(150)
 
-  // ------------------------------------------- existing modules untouched
-  hr('SCOPE — the five modules outside this pass are still not restyled')
-  // "Not restyled" means no design-system component and no grid card. The app
-  // default font does reach them, unavoidably: a global default and a per-module
-  // opt-in are mutually exclusive, the same way --accent was.
-  // The Pokedex has deliberately moved -- it is what this pass retrofits -- so the
-  // guard now covers the five that have not, and asserts the Pokedex is the only
-  // module the design system has reached.
+  // ------------------------------------------------- Itemdex and Berrydex
+  hr('SCOPE — the last two dexes, and what each was actually given')
   /*
-    Two left, not five. The rebuild pass deliberately moved the Movedex,
-    Abilitydex, Naturedex and the new Breeding dex ONTO the shared components
-    -- the species-card grid and the shared detail template -- so asserting
-    they carry no ds- component would now be asserting the opposite of the
-    intent. They get their own positive check below instead.
+    NOTHING IS UNTOUCHED ANY MORE. This was a scope guard: a list of dexes the
+    current pass had not been near, asserted to carry no design-system component
+    and no grid card, so a stray restyle would be caught. The refinement pass took
+    the last two -- Itemdex and Berrydex -- so the list is empty and the guard has
+    nothing left to guard.
+
+    Deleting it outright would lose a real check, so it is replaced by the
+    positive claim it becomes: each of those two now carries the specific
+    treatment it was given, and both still inherit the app-wide Plex Sans.
   */
-  const UNTOUCHED = ['itemdex', 'berrydex']
-  for (const id of UNTOUCHED) {
-    // The other five dexes live in the Pokedex dropdown now, so opening it is
-    // part of reaching them.
-    await goToDex(page, id)
-    await page.waitForSelector(`[data-testid="${id}-rows"]`, { timeout: 30000 })
-    const mod = await page.evaluate((dexId) => {
-      const row = document.querySelector(`[data-testid^="${dexId}-row-"]`)
-      const root = document.querySelector(`[data-testid="dex-${dexId}"]`)
-      return {
-        fontFamily: row ? getComputedStyle(row).fontFamily : null,
-        rows: document.querySelectorAll(`[data-testid^="${dexId}-row-"]`).length,
-        dsClasses: root ? root.querySelectorAll('[class^="ds-"]').length : -1,
-        cards: root ? root.querySelectorAll('.species-card').length : -1,
-      }
-    }, id)
-    log(`  ${id}: ${mod.rows} rows, font ${mod.fontFamily}`)
-    // Inverted deliberately. This guard used to prove these modules were still on
-    // system-ui, which was true only because index.css's --sans named system-ui
-    // first -- the app-wide shadowing bug. Pointing --sans/--heading at
-    // --font-body makes Plex Sans the real default everywhere, so inheriting it
-    // is now the correct state and the old assertion was pinning a bug in place.
-    // What still matters -- that nothing here was restyled -- is the next check.
-    check(
-      `${id} inherits the app default font now that --sans resolves to --font-body`,
-      mod.fontFamily != null && /IBM Plex/.test(mod.fontFamily),
-      String(mod.fontFamily),
-    )
-    check(
-      `${id} has no design-system component and no grid card`,
-      mod.dsClasses === 0 && mod.cards === 0,
-      `ds=${mod.dsClasses} cards=${mod.cards}`,
-    )
-  }
+  await goToDex(page, 'itemdex')
+  await page.waitForSelector('[data-testid="itemdex-rows"]', { timeout: 30000 })
+  const itemRow = await page.evaluate(() => {
+    const row = document.querySelector('[data-testid="itemdex-row-1"]')
+    if (!row) return null
+    const name = row.querySelector('.species-name')
+    const icon = row.querySelector('.row-icon')
+    return {
+      font: getComputedStyle(row).fontFamily,
+      // Sprite AFTER the name: compare left edges rather than DOM order, since
+      // what matters is where the reader sees it.
+      iconAfterName:
+        name != null &&
+        icon != null &&
+        icon.getBoundingClientRect().left > name.getBoundingClientRect().left,
+      chevron: row.querySelector('.row-chevron') != null,
+      sub: row.querySelector('.row-sub')?.textContent?.trim() ?? null,
+      category: row.querySelector('[data-testid="itemdex-row-category-1"]')?.textContent?.trim(),
+      pocket: row.querySelector('[data-testid="itemdex-row-pocket-1"]')?.textContent?.trim(),
+      // The numeric face on the catalog number, which the base .dex-no rule was
+      // missing until this pass -- it set tabular-nums without a font-family.
+      dexNoFont: getComputedStyle(row.querySelector('.dex-no')).fontFamily,
+    }
+  })
+  log(`  itemdex row: ${JSON.stringify(itemRow)}`)
+  check('itemdex still inherits Plex Sans', /IBM Plex/.test(itemRow?.font ?? ''), itemRow?.font)
+  check('itemdex puts the sprite AFTER the item name', itemRow?.iconAfterName === true)
+  check('itemdex rows end in a chevron', itemRow?.chevron === true)
+  check(
+    'itemdex shows category AND pocket as two distinct fields',
+    (itemRow?.category ?? '').length > 0 &&
+      (itemRow?.pocket ?? '').length > 0 &&
+      itemRow.category !== itemRow.pocket,
+    `${itemRow?.category} / ${itemRow?.pocket}`,
+  )
+  check(
+    'the catalog number is in --font-numeric, not just tabular-nums',
+    /Martian Mono/.test(itemRow?.dexNoFont ?? ''),
+    itemRow?.dexNoFont,
+  )
+
+  await goToDex(page, 'berrydex')
+  await page.waitForSelector('[data-testid="berrydex-rows"]', { timeout: 30000 })
+  const berryCard = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="berrydex-row-1"]')
+    if (!card) return null
+    const r = card.getBoundingClientRect()
+    return {
+      font: getComputedStyle(card).fontFamily,
+      // The SHARED card chrome, by class, not a lookalike.
+      isSpeciesCard: card.classList.contains('species-card'),
+      ghost: card.querySelector('.species-card-ghost') != null,
+      typeLabel: card.querySelector('[data-ds="type-label"]') != null,
+      width: Math.round(r.width),
+      height: Math.round(r.height),
+      factLines: card.querySelectorAll('.berry-card-fact-line').length,
+      clipped: [...card.querySelectorAll('.berry-card-fact-line')].filter(
+        (el) => el.scrollWidth > el.clientWidth + 1,
+      ).length,
+      hasDetailPage: document.querySelector('[data-testid="berrydex-detail"]') != null,
+      clickable: card.querySelector('.species-card-hit') != null,
+    }
+  })
+  log(`  berrydex card: ${JSON.stringify(berryCard)}`)
+  check(
+    'berrydex still inherits Plex Sans',
+    /IBM Plex/.test(berryCard?.font ?? ''),
+    berryCard?.font,
+  )
+  check(
+    'berrydex uses the SHARED species-card chrome, not its own card',
+    berryCard?.isSpeciesCard === true && berryCard?.ghost === true,
+    JSON.stringify(berryCard),
+  )
+  check(
+    'at exactly the Pokedex card width, so the two grids share a column pitch',
+    berryCard?.width === 212,
+    `${berryCard?.width}x${berryCard?.height}`,
+  )
+  check(
+    'taller than the species card, because it carries three fact lines',
+    berryCard?.height > 199 && berryCard?.factLines === 3,
+    `h=${berryCard?.height} lines=${berryCard?.factLines}`,
+  )
+  check('with nothing clipped on any of them', berryCard?.clipped === 0)
+  check(
+    'and no detail page at all -- every field is on the card',
+    berryCard?.hasDetailPage === false && berryCard?.clickable === false,
+  )
+
   // ------------------------------------------- the rebuilt dexes share the card
   hr('SHARED COMPONENTS — one species-card grid and one detail template')
   const SHARED = [
