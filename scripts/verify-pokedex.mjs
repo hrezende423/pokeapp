@@ -6,10 +6,11 @@
  * the real DOM and the real network log.
  *
  * Caching is measured with a CDP Network session rather than Playwright's request
- * events. Two things matter: how many times a URL is actually requested
- * (Network.requestWillBeSent, counted against the exact URL rather than a
- * substring), and whether the response came via the service worker or the disk
- * cache (Network.responseReceived). The Cache Storage contents are then read
+ * events. requestWillBeSent and responseReceived are joined by requestId so each
+ * fetch attempt for a URL can be classified as a real network fetch or a cache
+ * hit -- a request EVENT is not a fetch, since Chrome fires one for cache hits
+ * too, and counting events as fetches is what made the artwork-caching assertion
+ * flaky. See the comment on attemptsFor. The Cache Storage contents are then read
  * directly from the page, so "cached after" is proven rather than inferred.
  *
  * Usage: node scripts/verify-pokedex.mjs
@@ -52,6 +53,66 @@ async function waitForServer(url, timeoutMs = 60000) {
 
 mkdirSync(SHOTS, { recursive: true })
 
+/**
+ * Classify one fetch attempt from its CDP response event.
+ *
+ * Pure, and outside the browser block on purpose: the shapes that matter are
+ * asserted below against recorded events from a real failing run, so the fix is
+ * proven against the input that actually broke rather than only against whichever
+ * shape this machine happens to produce today.
+ *
+ * `fromServiceWorker` is NOT the discriminator. With the CacheFirst runtime
+ * handler it is true both for the first fetch (the SW goes to the network and
+ * caches the result) and for later ones (the SW answers from Cache Storage). Bytes
+ * on the wire is the discriminator; fromDiskCache is a second, independent signal
+ * of the same thing.
+ */
+function classifyAttempt(res) {
+  if (!res) return { kind: 'pending', bytes: 0, disk: null, sw: null }
+  const cached = res.fromDiskCache || res.encodedDataLength === 0
+  return {
+    kind: cached ? 'cache' : 'network',
+    bytes: res.encodedDataLength,
+    disk: res.fromDiskCache,
+    sw: res.fromServiceWorker,
+  }
+}
+
+hr('CACHE ATTRIBUTION — the classifier, against recorded events')
+/*
+  These are the two response events verbatim from the run where the old assertion
+  failed: one real fetch, then a disk-cache hit. The old code counted both as
+  requests and reported "2", which is the flake. Both shapes are pinned here so a
+  future edit cannot quietly reintroduce it.
+*/
+const RECORDED = {
+  'real network fetch': [
+    { fromDiskCache: false, fromServiceWorker: true, encodedDataLength: 214708 },
+    'network',
+  ],
+  'disk-cache hit (the flake)': [
+    { fromDiskCache: true, fromServiceWorker: true, encodedDataLength: 0 },
+    'cache',
+  ],
+  'service-worker cache hit, no disk flag': [
+    { fromDiskCache: false, fromServiceWorker: true, encodedDataLength: 0 },
+    'cache',
+  ],
+  'response not yet received': [undefined, 'pending'],
+}
+for (const [label, [event, expected]] of Object.entries(RECORDED)) {
+  const got = classifyAttempt(event).kind
+  check(`${label} classifies as "${expected}"`, got === expected, `got "${got}"`)
+}
+const recordedRun = [RECORDED['real network fetch'][0], RECORDED['disk-cache hit (the flake)'][0]]
+  .map(classifyAttempt)
+  .filter((a) => a.kind === 'network').length
+check(
+  'the recorded failing run now counts as exactly 1 network fetch',
+  recordedRun === 1,
+  `(${recordedRun})`,
+)
+
 const preview = spawn(
   process.platform === 'win32' ? 'npx.cmd' : 'npx',
   ['vite', 'preview', '--port', String(PORT), '--strictPort'],
@@ -75,16 +136,35 @@ try {
   })
   page.on('pageerror', (err) => pageErrors.push(err.message))
 
-  // ---- CDP network capture with cache attribution ------------------------
+  /*
+    ---- CDP network capture with cache attribution ------------------------
+
+    A REQUEST EVENT IS NOT A NETWORK FETCH. Chrome fires requestWillBeSent for
+    every fetch the page initiates, including ones answered from the HTTP disk
+    cache or by the service worker without touching the network. Counting those
+    events to prove "fetched once" therefore counts cache hits as fetches, which
+    is what made the shiny-artwork assertion flaky: whether the second view was
+    reported as a disk-cache hit or never reached the network at all depended on
+    timing, so the count came out 1 or 2 run to run.
+
+    Requests and responses are joined by requestId so each attempt can be
+    classified. fromServiceWorker alone cannot separate them -- with the CacheFirst
+    runtime handler it is true for BOTH the first fetch (SW goes to the network and
+    caches) and later ones (SW answers from Cache Storage). What does separate them
+    is bytes on the wire: the real fetch reports encodedDataLength in the hundreds
+    of KB, a cache hit reports 0, and a disk-cache hit additionally sets
+    fromDiskCache.
+  */
   const cdp = await context.newCDPSession(page)
   await cdp.send('Network.enable')
   const responses = []
   const requested = []
   cdp.on('Network.requestWillBeSent', (e) => {
-    requested.push(e.request.url)
+    requested.push({ requestId: e.requestId, url: e.request.url })
   })
   cdp.on('Network.responseReceived', (e) => {
     responses.push({
+      requestId: e.requestId,
       url: e.response.url,
       status: e.response.status,
       fromDiskCache: e.response.fromDiskCache === true,
@@ -92,6 +172,19 @@ try {
       encodedDataLength: e.response.encodedDataLength ?? 0,
     })
   })
+
+  /**
+   * Every fetch attempt for one exact URL, classified as network or cache.
+   *
+   * An attempt with no response event yet is counted as pending rather than
+   * silently dropped -- a fetch in flight is not evidence of a cache hit.
+   */
+  const attemptsFor = (url) =>
+    requested
+      .filter((r) => r.url === url)
+      .map((r) => classifyAttempt(responses.find((x) => x.requestId === r.requestId)))
+  /** Fetches that actually put bytes on the wire. */
+  const networkFetches = (url) => attemptsFor(url).filter((a) => a.kind === 'network').length
 
   const selectVersionGroup = async (name) => {
     await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
@@ -428,9 +521,11 @@ try {
   log(`  regular src : ${regularSrc}`)
   log(`  shiny src   : ${shinySrc}`)
   check('artwork src changed on shiny toggle', shinySrc !== regularSrc)
-  const exact = (url) => requested.filter((u) => u === url).length
-  const firstRequests = exact(shinySrc)
-  log(`  after 1st toggle: ${firstRequests} request(s) for the exact shiny URL`)
+  const firstFetches = networkFetches(shinySrc)
+  const firstAttempts = attemptsFor(shinySrc).length
+  log(
+    `  after 1st toggle: ${firstAttempts} attempt(s), ${firstFetches} of them a real network fetch`,
+  )
 
   // Toggle away and back twice; the same URL must not be re-fetched.
   for (let i = 0; i < 2; i++) {
@@ -439,24 +534,54 @@ try {
     await page.click('[data-testid="toggle-shiny"]')
     await page.waitForTimeout(400)
   }
-  const shinyState = await page.getAttribute('[data-testid="artwork-img"]', 'data-shiny')
-  const afterRequests = exact(shinySrc)
-  log(`  after 3 total shiny views: ${afterRequests} request(s) for the exact shiny URL`)
-  log(`  artwork img data-shiny=${shinyState}`)
-  log(`  response events for that URL:`)
-  responses
-    .filter((r) => r.url === shinySrc)
-    .forEach((r) =>
-      log(
-        `    status=${r.status} disk=${r.fromDiskCache} sw=${r.fromServiceWorker} bytes=${r.encodedDataLength}`,
-      ),
+  /*
+    Settle before measuring. Without this the third view's response event can
+    still be in flight, which is the other half of why this block flaked: an
+    attempt with no response yet classifies as 'pending', and a run that measured
+    early saw a different mix than one that did not.
+  */
+  await page
+    .waitForFunction(
+      () => {
+        const img = document.querySelector('[data-testid="artwork-img"]')
+        return img != null && img.complete && img.naturalWidth > 0
+      },
+      undefined,
+      { timeout: 15000 },
     )
-  check(
-    'shiny artwork requested exactly once across three views',
-    afterRequests === 1,
-    `(${afterRequests})`,
+    .catch(() => {})
+  const shinyState = await page.getAttribute('[data-testid="artwork-img"]', 'data-shiny')
+  const attempts = attemptsFor(shinySrc)
+  const afterFetches = networkFetches(shinySrc)
+  const cacheHits = attempts.filter((a) => a.kind === 'cache').length
+  const pending = attempts.filter((a) => a.kind === 'pending').length
+  log(
+    `  after 3 total shiny views: ${attempts.length} attempt(s) = ${afterFetches} network + ${cacheHits} cache + ${pending} pending`,
   )
-  check('no extra request on repeat toggles', afterRequests === firstRequests)
+  log(`  artwork img data-shiny=${shinyState}`)
+  log(`  per-attempt classification:`)
+  attempts.forEach((a, i) =>
+    log(`    #${i + 1} ${a.kind.padEnd(7)} bytes=${a.bytes} disk=${a.disk} sw=${a.sw}`),
+  )
+
+  /*
+    THE CLAIM IS ABOUT NETWORK FETCHES, NOT REQUEST EVENTS. It used to count
+    requestWillBeSent events, which include cache hits, so a second view served
+    from the disk cache read as a second fetch. What the spec actually promises is
+    that the bytes cross the wire once and every later view is served locally --
+    which is now three separate claims instead of one ambiguous count.
+  */
+  check(
+    'shiny artwork crossed the network exactly once across three views',
+    afterFetches === 1,
+    `(${afterFetches} network fetch(es) of ${attempts.length} attempts)`,
+  )
+  check('no additional network fetch on repeat toggles', afterFetches === firstFetches)
+  check(
+    'and every later attempt was served from a cache, not left pending',
+    attempts.length >= 1 && pending === 0 && cacheHits === attempts.length - afterFetches,
+    `${cacheHits} cache, ${pending} pending`,
+  )
   check('shiny is the state being displayed', shinyState === 'true')
 
   // "cached after" is only meaningful if it is actually in the cache.
