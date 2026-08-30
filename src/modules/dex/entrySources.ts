@@ -25,6 +25,7 @@ import {
   itemExistsInGeneration,
   listAbilities,
   listBerries,
+  listEggGroups,
   listItems,
   listMoves,
   listNatures,
@@ -32,7 +33,7 @@ import {
   moveExistsInGeneration,
   naturesExistInGeneration,
 } from '../../data'
-import type { Ability, Berry, Item, Move, Nature, Species } from '../../data'
+import type { Ability, Berry, EggGroup, Item, Move, Nature, Species } from '../../data'
 
 /**
  * Which era to scope to. `isAll` is not the same as "generation 4": it means the
@@ -96,6 +97,19 @@ export function abilityEntries({ generation, isAll }: EntryScope): Ability[] {
  */
 export function natureEntries({ generation, isAll }: EntryScope): Nature[] {
   return isAll || naturesExistInGeneration(generation) ? listNatures() : []
+}
+
+/**
+ * Breeding arrived in Generation 2, and no egg group has been added or removed
+ * inside Gen 1-4 -- so, like natures, this is one rule rather than a per-entry
+ * test. Gen 1 has no egg groups at all.
+ */
+export const BREEDING_INTRODUCED_IN_GENERATION = 2
+
+/** All 15 egg groups, or none in a pre-breeding era. */
+export function eggGroupEntries({ generation, isAll }: EntryScope): EggGroup[] {
+  if (!isAll && generation < BREEDING_INTRODUCED_IN_GENERATION) return []
+  return listEggGroups()
 }
 
 /** Berries, availability derived from each berry's linked item. */

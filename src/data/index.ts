@@ -24,6 +24,7 @@ export {
   isDataLayerReady,
   listAbilities,
   listBerries,
+  listEggGroups,
   listItems,
   listMoves,
   listNatures,

@@ -258,6 +258,10 @@ export const listAbilities = (): Ability[] =>
 export const listNatures = (): Nature[] =>
   [...requireBundle().natures.values()].sort((a, b) => a.id - b.id)
 
+/** All egg groups, ascending by id. */
+export const listEggGroups = (): EggGroup[] =>
+  [...requireBundle().eggGroups.values()].sort((a, b) => a.id - b.id)
+
 /** All berries, ascending by id. */
 export const listBerries = (): Berry[] =>
   [...requireBundle().berries.values()].sort((a, b) => a.id - b.id)

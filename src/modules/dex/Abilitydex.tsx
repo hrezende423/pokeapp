@@ -5,116 +5,149 @@ import {
   speciesWithAbility,
 } from '../../data'
 import type { Ability } from '../../data'
+import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
-import { DexCard, DexFacts, DexShell } from './DexShell'
+import { DexPageShell, LedgerList } from './DexPageShell'
+import { EntityDetailPage } from './EntityDetailPage'
 import { abilitiesHiddenFromList, abilitiesInList, abilityEntries } from './entrySources'
 
-/** The reverse lookup, rendered as a dex-ordered list of carriers. */
-function Holders({ ability, generation }: { ability: Ability; generation: number }) {
-  const holders = useMemo(
-    () => speciesWithAbility(ability.id, generation),
-    [ability.id, generation],
-  )
-
-  if (holders.length === 0) {
-    return (
-      <p className="subtitle" data-testid="abilitydex-holders-none">
-        No species in Generation {generation} has this ability.
-      </p>
-    )
-  }
-
-  return (
-    <>
-      <p className="subtitle" data-testid="abilitydex-holder-count">
-        {holders.length} species in Generation {generation}
-      </p>
-      <ul className="holder-list" data-testid="abilitydex-holders">
-        {holders.map((h) => (
-          <li key={h.species.id} data-species-id={h.species.id}>
-            <span className="dex-no">#{String(h.species.id).padStart(3, '0')}</span>{' '}
-            <span className="holder-name">{h.species.display_name}</span>
-            {h.is_hidden && <span className="subtitle"> (hidden)</span>}
-            {h.forms.length > 0 && <span className="subtitle"> · {h.forms.join(', ')}</span>}
-          </li>
-        ))}
-      </ul>
-    </>
-  )
-}
-
+/**
+ * REGULAR / HIDDEN GROUPING: measured, and deliberately not applied.
+ *
+ * The question was whether the species grid should split into "Regular" and
+ * "Hidden" sections the way the Movedex splits by learn method. Running the
+ * app's own era resolver across the whole bundle:
+ *
+ *   gen 1: 0 regular, 0 hidden      (abilities did not exist)
+ *   gen 2: 0 regular, 0 hidden
+ *   gen 3: 621 regular, 12 hidden   (12 species)
+ *   gen 4: 768 regular, 17 hidden   (17 species)
+ *
+ * Hidden abilities were introduced in Generation 5, so the true answer inside
+ * this app's Gen 1-4 scope is zero. Those 12-17 are PokeAPI artifacts: slot-3
+ * entries whose `past_abilities` never recorded the slot as empty for the earlier
+ * generation (Koffing/Weezing "Stench", Zapdos "Lightning Rod", the Cyndaquil
+ * line's "Flash Fire"). 427 other species DO record slot 3 as empty, which is why
+ * the residue is small rather than ~446.
+ *
+ * A two-section grid would therefore present a data gap as a game mechanic, and
+ * the Hidden section would be a list of 17 bugs. One flat grid, as the handoff's
+ * own fallback instructs. The residue is worth a separate look -- it also reaches
+ * the species detail page -- and is flagged rather than patched here.
+ */
 export function Abilitydex() {
   const { generation, isAll } = useVersionGroup()
+  const [, selectSpecies] = useDexSelection('pokedex')
+  const nav = useNav()
 
   // The dex lists only abilities with a Generation 1-4 presence: 123 of the 161
   // in the bundle. The other 38 (Gens 5/6/8/9) are retained in the data purely so
   // species ability references never dangle -- Gengar's modern Cursed Body, for
-  // instance -- and listing them in a Gen 1-4 dex would offer the user entries no
-  // in-scope game has. This clamps the LIST only; resolveAbilitiesForGeneration
-  // still sees all 161, which is what keeps the species view correct.
-  // The clamp itself lives in entrySources.ts, where the global search reads it
+  // instance. The clamp lives in entrySources.ts, where the global search reads it
   // too: the list and a search over it were once scoped differently, which is the
   // leak that has to stay impossible.
   const inScope = useMemo(() => abilitiesInList(), [])
-  const hidden = abilitiesHiddenFromList().length
+  const hiddenFromList = abilitiesHiddenFromList().length
 
-  // "All" means every in-scope generation at once, not every row in the file.
   const entries = useMemo(() => abilityEntries({ generation, isAll }), [generation, isAll])
-
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 
   return (
-    <DexShell
+    <DexPageShell
       dexId="abilitydex"
-      title="Abilitydex"
       entries={entries}
+      entryId={(ability) => ability.id}
+      searchText={(ability) => ability.display_name}
+      note={
+        isAll
+          ? `All ${inScope.length} abilities that existed by Generation ${LATEST_GENERATION} (${hiddenFromList} later additions are in the data but not listed here)`
+          : `${entries.length} of ${inScope.length} abilities exist in Generation ${generation}`
+      }
       gatedMessage={
         preAbilityEra
           ? `Abilities did not exist in Generation ${generation}. They were introduced in Generation ${ABILITIES_INTRODUCED_IN_GENERATION} — pick a Generation ${ABILITIES_INTRODUCED_IN_GENERATION}+ game to browse them.`
           : undefined
       }
-      note={
-        isAll
-          ? `All ${inScope.length} abilities that existed by Generation ${LATEST_GENERATION} (${hidden} later additions are in the data but not listed here)`
-          : preAbilityEra
-            ? `Abilities did not exist in Generation ${generation}`
-            : `${entries.length} of ${inScope.length} abilities exist in Generation ${generation}`
-      }
-      row={(ability) => ({ id: ability.id, label: ability.display_name })}
-      detail={(ability) => (
-        <>
-          <DexCard testId="abilitydex-card-head" title="Ability">
-            <h2 data-testid="abilitydex-name">{ability.display_name}</h2>
-            <p className="subtitle" data-testid="abilitydex-intro">
-              Introduced in Generation {ability.generation_id ?? '?'}
-            </p>
-          </DexCard>
-
-          <DexCard testId="abilitydex-card-effect" title="Effect">
-            {ability.short_effect && (
-              <p data-testid="abilitydex-short-effect">
-                <strong>{ability.short_effect}</strong>
-              </p>
-            )}
-            <p data-testid="abilitydex-effect">
-              {ability.effect ?? 'No effect text in the bundle.'}
-            </p>
-          </DexCard>
-
-          <DexCard testId="abilitydex-card-facts" title="Details">
-            <DexFacts
-              facts={[
-                ['generation', ability.generation_id ?? '—'],
-                ['main series', ability.is_main_series ? 'yes' : 'no'],
-              ]}
-            />
-          </DexCard>
-
-          <DexCard testId="abilitydex-card-holders" title="Species with this ability">
-            <Holders ability={ability} generation={generation} />
-          </DexCard>
-        </>
+      list={({ entries: visible, onSelect }) => (
+        <LedgerList
+          testId="abilitydex-rows"
+          rows={visible.map((a) => ({
+            id: a.id,
+            label: a.display_name,
+            meta: a.short_effect ?? undefined,
+          }))}
+          onSelect={onSelect}
+          emptyNote="No ability matches that search."
+        />
+      )}
+      detail={({ entry, onBack }) => (
+        <AbilityDetail
+          key={entry.id}
+          ability={entry}
+          generation={generation}
+          onBack={onBack}
+          onSelectSpecies={(id) => {
+            selectSpecies(id)
+            nav.setModule('pokedex')
+          }}
+        />
       )}
     />
+  )
+}
+
+function AbilityDetail({
+  ability,
+  generation,
+  onBack,
+  onSelectSpecies,
+}: {
+  ability: Ability
+  generation: number
+  onBack: () => void
+  onSelectSpecies: (id: number) => void
+}) {
+  // The same reverse lookup as before, and still generation-aware: a Gen 3
+  // selection cannot list Leafeon among Chlorophyll's carriers.
+  const holders = useMemo(
+    () => speciesWithAbility(ability.id, generation),
+    [ability.id, generation],
+  )
+
+  return (
+    <EntityDetailPage
+      testId="abilitydex-detail"
+      entryId={ability.id}
+      onBack={onBack}
+      backLabel="All abilities"
+      title={ability.display_name}
+      titleTestId="abilitydex-name"
+      meta={
+        <>
+          <span data-testid="abilitydex-intro">
+            Introduced in Generation {ability.generation_id ?? '?'}
+          </span>
+          <span data-testid="abilitydex-holder-count">
+            {' '}
+            · {holders.length} species in Generation {generation}
+          </span>
+        </>
+      }
+      description={
+        <span data-testid="abilitydex-effect">
+          {ability.effect ?? ability.short_effect ?? 'No effect text in the bundle.'}
+        </span>
+      }
+      // One flat, unlabelled grid -- see the note at the top of this file.
+      sections={[{ entries: holders.map((h) => ({ species: h.species })) }]}
+      generation={generation}
+      onSelectSpecies={onSelectSpecies}
+    >
+      {holders.length === 0 && (
+        <p className="subtitle" data-testid="abilitydex-holders-none">
+          No species in Generation {generation} has this ability.
+        </p>
+      )}
+    </EntityDetailPage>
   )
 }

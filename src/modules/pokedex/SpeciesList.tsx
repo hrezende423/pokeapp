@@ -1,13 +1,7 @@
 import { useMemo } from 'react'
-import { TypeRow } from '../../components/ds/TypeLabel'
+import { SpeciesCardGrid } from '../../components/SpeciesCardGrid'
 import { TypeBadge } from '../../components/TypeBadge'
-import {
-  DEFAULT_ARTWORK_VIEW,
-  getType,
-  resolveAbilitiesForGeneration,
-  resolveArtworkUrl,
-  resolveTypesForGeneration,
-} from '../../data'
+import { resolveTypesForGeneration } from '../../data'
 import type { Species } from '../../data'
 import { useFilters } from '../filters/filtersContext'
 import { speciesEntries } from '../dex/entrySources'
@@ -74,79 +68,20 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
   if (layout === 'grid') {
     return (
       <div className="species-list species-list-grid">
-        <ul className="pokedex-grid" data-testid="species-rows">
-          {rows.map(({ species, variety, typeIds }) => (
-            <li key={species.id}>
-              <button
-                type="button"
-                data-testid={`species-row-${species.id}`}
-                data-species-id={species.id}
-                aria-current={selectedId === species.id}
-                className="species-card"
-                onClick={() => onSelect(species.id)}
-              >
-                {/* Centred on the card and flush with its top, per Figma's
-                    shadow-number node -- not bleeding off a corner. Three digits,
-                    against the four in the line below it. */}
-                <span className="species-card-ghost" aria-hidden>
-                  {String(species.id).padStart(3, '0')}
-                </span>
-                {(() => {
-                  // Official artwork, regular, static -- the same default the
-                  // detail view opens on, and what the reference renders.
-                  const art = resolveArtworkUrl(species, variety, DEFAULT_ARTWORK_VIEW)
-                  return art ? (
-                    <img
-                      className="species-card-art"
-                      src={art}
-                      alt=""
-                      loading="lazy"
-                      data-testid={`species-card-art-${species.id}`}
-                    />
-                  ) : null
-                })()}
-                <span className="species-card-text">
-                  <span className="species-card-line">
-                    <span className="dex-no">#{String(species.id).padStart(4, '0')}</span>
-                    <span className="species-name">{species.display_name}</span>
-                  </span>
-                  <span className="species-card-types">
-                    <TypeRow
-                      types={typeIds.map((id) => getType(id)?.name ?? '').filter(Boolean)}
-                      small
-                    />
-                  </span>
-                  {/*
-                    Non-hidden abilities only, middot-separated -- read off the
-                    reference, where Quagsire shows "Damp · Water Absorb" but not
-                    Unaware, and Bulbasaur shows Overgrow but not Chlorophyll.
-                    Empty for Gens 1-2, which had no abilities at all; the line is
-                    simply absent then, and because the text block is positioned
-                    as a whole it cannot move the two lines above it.
-                  */}
-                  {(() => {
-                    const abilities = resolveAbilitiesForGeneration(variety, generation)
-                      .filter((a) => !a.is_hidden)
-                      .map((a) => a.ability.display_name)
-                    return abilities.length > 0 ? (
-                      <span
-                        className="species-card-ability"
-                        data-testid={`species-card-ability-${species.id}`}
-                      >
-                        {abilities.join(' · ')}
-                      </span>
-                    ) : null
-                  })()}
-                </span>
-              </button>
-            </li>
-          ))}
-          {rows.length === 0 && (
-            <li className="empty" data-testid="list-empty">
-              No species match those filters.
-            </li>
-          )}
-        </ul>
+        {/*
+          The card itself lives in components/SpeciesCardGrid.tsx, shared with the
+          Movedex, Abilitydex and Breeding dex detail pages. This call site keeps
+          the "species-rows" test id, so the grid is still the same thing every
+          suite already inspects.
+        */}
+        <SpeciesCardGrid
+          entries={rows.map(({ species }) => ({ species }))}
+          generation={generation}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          testId="species-rows"
+          emptyNote="No species match those filters."
+        />
       </div>
     )
   }

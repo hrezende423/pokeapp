@@ -65,6 +65,17 @@ const abilities = Object.values(abilitiesById)
 const natures = Object.values(bundle('natures'))
 const berries = Object.values(bundle('berries'))
 const abilityByName = Object.fromEntries(abilities.map((a) => [a.name, a]))
+const eggGroups = Object.values(bundle('egg-groups'))
+const speciesList = Object.values(speciesById)
+
+/** Species introduced by `g`, matching data/generations.ts by dex-id range. */
+const speciesUpTo = (g) => speciesList.filter((sp) => (sp.generation_id ?? 99) <= g)
+
+/** Members of an egg group at a generation, straight from the bundle. */
+const eggMembers = (groupId, g) =>
+  speciesUpTo(g)
+    .filter((sp) => (sp.egg_group_ids ?? []).includes(groupId))
+    .map((sp) => sp.display_name)
 
 const itemCount = (g) => items.filter((i) => i.generation_ids.includes(g)).length
 const abilityCount = (g) => abilities.filter((a) => (a.generation_id ?? 99) <= g).length
@@ -171,6 +182,20 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
 
   const { withControls } = controls(page)
+
+  /*
+    Four dexes are a list PAGE plus a detail PAGE now (Naturedex, Movedex,
+    Abilitydex, Breeding dex), rather than a rail beside a detail. Their search
+    box lives in list view only, so searching again means going back first.
+    Itemdex and Berrydex keep the rail, where both are on screen at once, and
+    calling this on them is a no-op.
+  */
+  const toDexList = async (dexId) => {
+    if (await page.$('[data-testid="entity-back"]')) {
+      await page.click('[data-testid="entity-back"]')
+    }
+    await page.waitForSelector(`[data-testid="${dexId}-count"]`, { timeout: 15000 })
+  }
   await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
   const goTo = async (id) => {
@@ -183,7 +208,14 @@ try {
     await withControls(() => page.selectOption('[data-testid="vg-select"]', vg))
     await page.waitForTimeout(150)
   }
+  /*
+    The count lives on the LIST page. Four dexes now replace their list with a
+    detail page rather than showing both, so asking for a count while an entry
+    is open has to close it first -- otherwise the readout genuinely is not on
+    screen. Done here rather than at ~15 call sites.
+  */
   const countOf = async (dex) => {
+    await toDexList(dex)
     const txt = await page.textContent(`[data-testid="${dex}-count"]`)
     return Number(txt.trim().split(' ')[0])
   }
@@ -328,6 +360,7 @@ try {
   n = await countOf('abilitydex')
   log(`  gen 4 list count: ${n} (expected ${abilityCount(4)})`)
   check('Abilitydex lists every gen-4 ability', n === abilityCount(4), `(${n})`)
+  await toDexList('abilitydex')
   await page.fill('[data-testid="abilitydex-search"]', 'levit')
   await page.waitForTimeout(120)
   const levitCount = await countOf('abilitydex')
@@ -335,11 +368,18 @@ try {
 
   const levitateId = abilityByName.levitate.id
   await page.click(`[data-testid="abilitydex-row-${levitateId}"]`)
-  await page.waitForSelector('[data-testid="abilitydex-holders"]', { timeout: 15000 })
+  await page.waitForSelector('[data-testid="abilitydex-detail"]', { timeout: 15000 })
 
+  /*
+    The carriers are the shared species-card grid now, not a bespoke <li> list --
+    same reverse lookup, same order, different markup. One flat grid: hidden
+    abilities do not exist in Gen 1-4, so there is nothing to split on. (Measured:
+    12 residual "hidden" flags at gen 3 and 17 at gen 4, all PokeAPI artifacts.
+    See the note at the top of Abilitydex.tsx.)
+  */
   const readHolders = () =>
-    page.$$eval('[data-testid="abilitydex-holders"] li', (els) =>
-      els.map((e) => e.querySelector('.holder-name').textContent.trim()),
+    page.$$eval('[data-testid="abilitydex-detail"] .species-card .species-name', (els) =>
+      els.map((e) => e.textContent.trim()),
     )
 
   const levitateG4 = await readHolders()
@@ -379,11 +419,12 @@ try {
 
   // Second ability: Chlorophyll, whose interesting case is an exclusion.
   await selectGame('heartgold-soulsilver')
+  await toDexList('abilitydex')
   await page.fill('[data-testid="abilitydex-search"]', 'chloro')
   await page.waitForTimeout(150)
   const chloroId = abilityByName.chlorophyll.id
   await page.click(`[data-testid="abilitydex-row-${chloroId}"]`)
-  await page.waitForSelector('[data-testid="abilitydex-holders"]', { timeout: 15000 })
+  await page.waitForSelector('[data-testid="abilitydex-detail"]', { timeout: 15000 })
   const chloroG4 = await readHolders()
   const expChloroG4 = expectedHolders('chlorophyll', 4)
   log(`  Chlorophyll @ gen4: ${chloroG4.length} species`)
@@ -404,6 +445,7 @@ try {
   await page.screenshot({ path: `${SHOTS}/dex-abilitydex.png` })
 
   hr('ITEM 2b — Abilitydex is empty under a Gen 1-2 selection')
+  await toDexList('abilitydex')
   await page.fill('[data-testid="abilitydex-search"]', '')
   for (const g of GAMES) {
     await selectGame(g.vg)
@@ -457,6 +499,8 @@ try {
 
   // Hardy: the neutral case, where both fields are null.
   const hardy = natures.find((x) => x.name === 'hardy')
+  // Back to the matrix: a detail page replaces it rather than sitting beside it.
+  await toDexList('naturedex')
   await page.click(`[data-testid="naturedex-row-${hardy.id}"]`)
   await page.waitForSelector('[data-testid="naturedex-neutral"]', { timeout: 10000 })
   const neutralText = await page.textContent('[data-testid="naturedex-neutral"]')
@@ -464,7 +508,82 @@ try {
   check('neutral nature explained, not shown as undefined', !/undefined|null/.test(neutralText))
   await page.screenshot({ path: `${SHOTS}/dex-naturedex.png` })
 
+  // ------------------------------------------------------- item 3c: breeding
+  hr('ITEM 3c — Breeding dex (new): egg groups, counts, and membership')
+  await goTo('breedingdex')
+  await selectGame('heartgold-soulsilver')
+  const eggCount = await countOf('breedingdex')
+  log(`  gen 4 egg groups: ${eggCount} (bundle has ${eggGroups.length})`)
+  check('Breeding dex lists every egg group', eggCount === eggGroups.length, `(${eggCount})`)
+
+  // The member count on each row must equal the bundle join, not a guess.
+  const rowCounts = await page.$$eval('[data-testid="breedingdex-rows"] .species-row', (els) =>
+    els.map((e) => ({
+      id: Number(e.getAttribute('data-entry-id')),
+      name: e.querySelector('.species-name').textContent.trim(),
+      count: Number(e.querySelector('.row-count').textContent.trim()),
+    })),
+  )
+  const countMismatches = rowCounts.filter((r) => r.count !== eggMembers(r.id, 4).length)
+  log(`  row counts: ${rowCounts.map((r) => `${r.name}=${r.count}`).join(' ')}`)
+  check(
+    'every row count matches the bundle join at gen 4',
+    countMismatches.length === 0,
+    countMismatches.map((r) => `${r.name}:${r.count}`).join(','),
+  )
+
+  // Monster: a group with a known, checkable membership.
+  const monster = eggGroups.find((g) => g.name === 'monster')
+  await page.click(`[data-testid="breedingdex-row-${monster.id}"]`)
+  await page.waitForSelector('[data-testid="breedingdex-detail"]', { timeout: 15000 })
+  const monsterMembers = await page.$$eval(
+    '[data-testid="breedingdex-detail"] .species-card .species-name',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
+  const expMonster = eggMembers(monster.id, 4)
+  log(`  Monster @ gen4: ${monsterMembers.length} species (expected ${expMonster.length})`)
+  check(
+    'Monster membership matches the bundle exactly',
+    JSON.stringify(monsterMembers) === JSON.stringify(expMonster),
+    `(${monsterMembers.length} vs ${expMonster.length})`,
+  )
+  for (const known of ['Bulbasaur', 'Charmander', 'Squirtle', 'Lapras', 'Totodile']) {
+    check(
+      `known Monster member ${known} present`,
+      monsterMembers.includes(known) === expMonster.includes(known),
+    )
+  }
+  check(
+    'the detail uses the shared species-card grid',
+    (await page.$$('[data-testid="breedingdex-detail"] .species-card-ghost')).length ===
+      monsterMembers.length,
+  )
+
+  // Gen 1 had no breeding, so the dex is gated as one rule.
+  await selectGame('red-blue')
+  await page.waitForTimeout(200)
+  const eggGen1 = await countOf('breedingdex')
+  const eggGatedMsg = (await page.textContent('[data-testid="breedingdex-empty"]')).trim()
+  log(`  gen 1: ${eggGen1} entries | "${eggGatedMsg.slice(0, 60)}"`)
+  check('Breeding dex is empty under Gen 1', eggGen1 === 0, `(${eggGen1})`)
+  check(
+    'and says why, rather than showing a blank list',
+    /breeding|egg group/i.test(eggGatedMsg),
+    eggGatedMsg.slice(0, 60),
+  )
+  await selectGame('gold-silver')
+  await page.waitForTimeout(200)
+  const eggGen2 = await countOf('breedingdex')
+  check(
+    'and populated from Gen 2, when breeding arrived',
+    eggGen2 === eggGroups.length,
+    `(${eggGen2})`,
+  )
+  await page.screenshot({ path: `${SHOTS}/dex-breedingdex.png` })
+
   hr('ITEM 3b — Naturedex gated as one rule under Gen 1-2')
+  // The Breeding dex section above navigated away; this loop reads naturedex.
+  await goTo('naturedex')
   for (const g of GAMES) {
     await selectGame(g.vg)
     await page.waitForTimeout(200)
@@ -642,10 +761,12 @@ try {
     )
   }
   // A search for a hidden ability must come up empty rather than surfacing it.
+  await toDexList('abilitydex')
   await page.fill('[data-testid="abilitydex-search"]', 'cursed')
   await page.waitForTimeout(150)
   const cursedCount = await countOf('abilitydex')
   check('searching for a hidden ability finds nothing', cursedCount === 0, `(${cursedCount})`)
+  await toDexList('abilitydex')
   await page.fill('[data-testid="abilitydex-search"]', '')
 
   await goTo('itemdex')

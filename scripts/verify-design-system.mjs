@@ -1564,7 +1564,7 @@ try {
   // Six now, not five: Poképedia is the parent tab rather than the Pokedex
   // wearing two hats, so the Pokedex is an item like the rest.
   check(
-    'it lists all six dexes, in registry order',
+    'it lists every registered dex, in registry order',
     JSON.stringify(hovered.items) ===
       JSON.stringify([
         'nav-pokedex',
@@ -1573,6 +1573,7 @@ try {
         'nav-naturedex',
         'nav-berrydex',
         'nav-movedex',
+        'nav-breedingdex',
       ]),
     hovered.items.join(','),
   )
@@ -2253,7 +2254,14 @@ try {
   // The Pokedex has deliberately moved -- it is what this pass retrofits -- so the
   // guard now covers the five that have not, and asserts the Pokedex is the only
   // module the design system has reached.
-  const UNTOUCHED = ['movedex', 'itemdex', 'abilitydex', 'naturedex', 'berrydex']
+  /*
+    Two left, not five. The rebuild pass deliberately moved the Movedex,
+    Abilitydex, Naturedex and the new Breeding dex ONTO the shared components
+    -- the species-card grid and the shared detail template -- so asserting
+    they carry no ds- component would now be asserting the opposite of the
+    intent. They get their own positive check below instead.
+  */
+  const UNTOUCHED = ['itemdex', 'berrydex']
   for (const id of UNTOUCHED) {
     // The other five dexes live in the Pokedex dropdown now, so opening it is
     // part of reaching them.
@@ -2287,6 +2295,42 @@ try {
       `ds=${mod.dsClasses} cards=${mod.cards}`,
     )
   }
+  // ------------------------------------------- the rebuilt dexes share the card
+  hr('SHARED COMPONENTS — one species-card grid and one detail template')
+  const SHARED = [
+    { dex: 'movedex', open: 'movedex-row-1' },
+    { dex: 'abilitydex', open: 'abilitydex-row-1' },
+    { dex: 'breedingdex', open: 'breedingdex-row-1' },
+  ]
+  for (const { dex, open } of SHARED) {
+    await goToDex(page, dex)
+    await page.waitForSelector(`[data-testid="${dex}-count"]`, { timeout: 30000 })
+    await page.waitForSelector(`[data-testid="${open}"]`, { timeout: 30000 })
+    await page.click(`[data-testid="${open}"]`)
+    await page.waitForSelector('[data-testid="entity-back"]', { timeout: 30000 })
+    // The Movedex's sections wait on a learnset partition; the other two are
+    // synchronous, so this is only ever a real wait for one of the three.
+    await page.waitForSelector('[data-testid^="entity-grid-"]', { timeout: 60000 })
+    const shape = await page.evaluate(() => ({
+      // The shared template's own landmarks, not a per-dex lookalike.
+      name: document.querySelector('[data-testid="entity-name"]') != null,
+      back: document.querySelector('[data-testid="entity-back"]') != null,
+      grids: document.querySelectorAll('[data-testid^="entity-grid-"]').length,
+      cards: document.querySelectorAll('.entity-detail-section .species-card').length,
+      cardGhosts: document.querySelectorAll('.entity-detail-section .species-card-ghost').length,
+      typeLabels: document.querySelectorAll(
+        '.entity-detail-section .species-card [data-ds="type-label"]',
+      ).length,
+    }))
+    log(`  ${dex}: ${JSON.stringify(shape)}`)
+    check(`${dex} detail renders the shared template`, shape.name && shape.back && shape.grids > 0)
+    check(
+      `${dex} detail renders the shared species card, not a lookalike`,
+      shape.cards > 0 && shape.cardGhosts === shape.cards && shape.typeLabels > 0,
+      JSON.stringify(shape),
+    )
+  }
+
   await goToDex(page, 'pokedex')
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
   const pokedex = await page.evaluate(() => ({

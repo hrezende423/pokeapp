@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { Pokedex } from '../pokedex/Pokedex'
 import { Abilitydex } from '../dex/Abilitydex'
+import { Breedingdex } from '../dex/Breedingdex'
 import { Berrydex } from '../dex/Berrydex'
 import { Itemdex } from '../dex/Itemdex'
 import { Movedex } from '../dex/Movedex'
@@ -38,6 +39,7 @@ export const DEX_MODULES = [
   { id: 'naturedex', label: 'Naturedex', Component: Naturedex },
   { id: 'berrydex', label: 'Berrydex', Component: Berrydex },
   { id: 'movedex', label: 'Movedex', Component: Movedex },
+  { id: 'breedingdex', label: 'Breeding dex', Component: Breedingdex },
 ] as const satisfies readonly DexModule[]
 
 /** Union of the registered ids, so a reference to an unregistered module fails to compile. */

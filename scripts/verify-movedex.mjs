@@ -103,6 +103,19 @@ function learnersAcross(moveId) {
   return out
 }
 
+/** Union across every partition, keeping the METHODS rather than the games. */
+function methodsAcross(moveId) {
+  const out = new Map()
+  for (const f of partitionFiles) {
+    const vg = f.replace(/\.json$/, '')
+    for (const [id, v] of learnersIn(moveId, vg)) {
+      if (!out.has(id)) out.set(id, new Set())
+      for (const m of v.methods) out.get(id).add(m)
+    }
+  }
+  return out
+}
+
 const GAMES = [
   { vg: 'red-blue', gen: 1 },
   { vg: 'gold-silver', gen: 2 },
@@ -200,6 +213,35 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
 
   const { withControls } = controls(page)
+
+  /*
+    The Movedex is a list PAGE and a detail PAGE now, not a rail beside a detail,
+    so the search box exists only in list view. Returning to the list is part of
+    searching again.
+  */
+  const toList = async () => {
+    if (await page.$('[data-testid="entity-back"]')) {
+      await page.click('[data-testid="entity-back"]')
+    }
+    await page.waitForSelector('[data-testid="movedex-count"]', { timeout: 15000 })
+  }
+  /** Open one move, and wait for its async learnset to land. */
+  const openMove = async (term, id) => {
+    await toList()
+    await page.fill('[data-testid="movedex-search"]', term)
+    await page.waitForSelector(`[data-testid="movedex-row-${id}"]`, { timeout: 15000 })
+    await page.click(`[data-testid="movedex-row-${id}"]`)
+    await page.waitForSelector('[data-testid="movedex-detail"]', { timeout: 15000 })
+    // The learner sections render after the partition resolves; without this the
+    // page is read while it still says "Loading learnset…".
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="movedex-learner-count"]') != null ||
+        document.querySelector('[data-testid="movedex-learners-none"]') != null,
+      undefined,
+      { timeout: 60000 },
+    )
+  }
   await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
   // ------------------------------------------------------------ registration
@@ -237,6 +279,7 @@ try {
   }
 
   await selectGame('heartgold-soulsilver')
+  await toList()
   await page.fill('[data-testid="movedex-search"]', 'head')
   await page.waitForTimeout(150)
   const headCount = await countOf('movedex')
@@ -252,6 +295,7 @@ try {
     'every result contains the term',
     headLabels.every((l) => l.toLowerCase().includes('head')),
   )
+  await toList()
   await page.fill('[data-testid="movedex-search"]', '')
 
   // ------------------------------------------------- type filter, same component
@@ -332,10 +376,7 @@ try {
 
   // ------------------------------------------------------------ item 2: detail
   hr('ITEM 2 — move detail, including the damage_class / meta.category distinction')
-  await page.fill('[data-testid="movedex-search"]', 'headbutt')
-  await page.waitForSelector(`[data-testid="movedex-row-${HEADBUTT}"]`, { timeout: 15000 })
-  await page.click(`[data-testid="movedex-row-${HEADBUTT}"]`)
-  await page.waitForSelector('[data-testid="movedex-detail"]', { timeout: 15000 })
+  await openMove('headbutt', HEADBUTT)
   const detail = await page.evaluate(() => {
     const t = (id) => document.querySelector(`[data-testid="${id}"]`)?.textContent?.trim() ?? null
     return {
@@ -343,17 +384,28 @@ try {
       type: document
         .querySelector('[data-testid="movedex-type"] [data-type]')
         ?.getAttribute('data-type'),
-      damageClass: t('movedex-damage-class'),
+      // damage-class had its own readout beside the type badge in the old
+      // card layout. The rebuilt detail page states it once, in the meta line,
+      // which movedex-category already reads.
+      damageClass: t('movedex-category'),
       power: t('movedex-power'),
       accuracy: t('movedex-accuracy'),
       pp: t('movedex-pp'),
       category: t('movedex-category'),
-      contestType: t('movedex-contest-type'),
-      appeal: t('movedex-contest-appeal'),
-      jam: t('movedex-contest-jam'),
-      superAppeal: t('movedex-super-appeal'),
-      effect: t('movedex-effect'),
-      cards: document.querySelectorAll('[data-testid="movedex-detail"] .card').length,
+      // Contest data, priority, target and effect-kind are no longer on this
+      // page: the rebuild specifies back link + name + meta + effect + species
+      // sections, and nothing else. Their checks are removed rather than
+      // rewritten to assert absence, which would prove nothing.
+      effect: t('entity-description'),
+      sections: [...document.querySelectorAll('[data-testid^="entity-section-"]')].map((el) =>
+        el.getAttribute('data-testid'),
+      ),
+      sectionLabels: [...document.querySelectorAll('.entity-detail-section-label')].map((el) =>
+        el.textContent.trim(),
+      ),
+      levelBadges: [...document.querySelectorAll('.species-card-badge')].map((el) =>
+        el.textContent.trim(),
+      ),
     }
   })
   const hb = movesById[HEADBUTT]
@@ -375,25 +427,60 @@ try {
     'the two axes are not conflated',
     hb.damage_class !== hb.meta.category && detail.category.toLowerCase() !== hb.meta.category,
   )
-  check('contest type matches', detail.contestType.toLowerCase() === hb.contest_type)
-  check('contest appeal matches', detail.appeal === String(hb.contest_effect.appeal))
-  check('contest jam matches', detail.jam === String(hb.contest_effect.jam))
-  check(
-    'super contest appeal matches',
-    detail.superAppeal === String(hb.super_contest_effect.appeal),
-  )
   check('effect text matches', detail.effect.startsWith(hb.effect.slice(0, 40)))
-  check('detail is built from cards', detail.cards >= 5, `(${detail.cards})`)
+  // Contest type/appeal/jam/super-appeal and the card count are gone with the
+  // card layout: the rebuilt detail page is back link + name + meta + effect +
+  // species sections, so those five checks had nothing left to read. Replaced by
+  // claims about what the page now shows, not by assertions of absence.
+  log(`  sections: ${detail.sections.join(', ')}`)
+  log(`  labels  : ${detail.sectionLabels.join(' | ')}`)
+  check(
+    'the learner grid is split into labelled learn-method sections',
+    detail.sections.length > 0 &&
+      detail.sections.every((id) =>
+        [
+          'entity-section-level-up',
+          'entity-section-tm',
+          'entity-section-egg-move',
+          'entity-section-move-tutor',
+        ].includes(id),
+      ),
+    detail.sections.join(','),
+  )
+  check(
+    'sections appear in the specified order',
+    (() => {
+      const want = [
+        'entity-section-level-up',
+        'entity-section-tm',
+        'entity-section-egg-move',
+        'entity-section-move-tutor',
+      ]
+      const got = detail.sections.map((id) => want.indexOf(id))
+      return got.every((v, i) => i === 0 || got[i - 1] < v)
+    })(),
+    detail.sections.join(','),
+  )
+  check(
+    'no section is rendered empty',
+    detail.sectionLabels.every((l) => !/\b0$/.test(l)),
+    detail.sectionLabels.join(' | '),
+  )
+  check(
+    'level-up cards carry a Lv. badge and the others do not',
+    detail.levelBadges.length > 0 && detail.levelBadges.every((b) => /^Lv\.\d+$/.test(b)),
+    detail.levelBadges.slice(0, 6).join(','),
+  )
 
   // A status move with no power, to prove the null path renders.
-  await page.fill('[data-testid="movedex-search"]', 'growl')
-  await page.waitForTimeout(200)
+  await toList()
   const growl = moves.find((m) => m.name === 'growl')
-  await page.click(`[data-testid="movedex-row-${growl.id}"]`)
-  await page.waitForSelector('[data-testid="movedex-detail"]', { timeout: 15000 })
+  await openMove('growl', growl.id)
   const growlView = await page.evaluate(() => ({
     power: document.querySelector('[data-testid="movedex-power"]')?.textContent?.trim(),
-    dc: document.querySelector('[data-testid="movedex-damage-class"]')?.textContent?.trim(),
+    // The meta line states the damage class once; there is no separate readout
+    // beside a type badge any more.
+    dc: document.querySelector('[data-testid="movedex-category"]')?.textContent?.trim(),
     text: document.querySelector('[data-testid="movedex-detail"]')?.innerText ?? '',
   }))
   log(
@@ -406,29 +493,66 @@ try {
 
   // ------------------------------------------------------------ item 3
   hr('ITEM 3 — reverse lookup: which species learn this move')
+  /*
+    The flat learner list is four labelled card grids now. A species that learns
+    the move two ways appears in two sections, so the DISTINCT species ids are
+    what compares against the data layer's per-species answer -- the raw card
+    count would double-count by design.
+  */
   const readLearners = async () => {
-    await page.waitForSelector('[data-testid="movedex-learners"]', { timeout: 120000 })
-    return page.evaluate(() => ({
-      count: Number(
-        document
-          .querySelector('[data-testid="movedex-learners"]')
-          .getAttribute('data-learner-count'),
-      ),
-      rows: document.querySelectorAll('[data-testid="movedex-learner-list"] li').length,
-      ids: [...document.querySelectorAll('[data-testid="movedex-learner-list"] li')].map((l) =>
-        Number(l.getAttribute('data-species-id')),
-      ),
-      partial: document.querySelector('[data-testid="movedex-learners-partial"]') != null,
-      thumbs: document.querySelectorAll('[data-testid="movedex-learner-list"] img').length,
-    }))
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="movedex-learner-count"]') != null ||
+        document.querySelector('[data-testid="movedex-learners-none"]') != null,
+      undefined,
+      { timeout: 120000 },
+    )
+    return page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.entity-detail-section [data-species-id]')]
+      const ids = [...new Set(cards.map((c) => Number(c.getAttribute('data-species-id'))))]
+      const el = document.querySelector('[data-testid="movedex-learner-count"]')
+      return {
+        count: el ? Number(el.getAttribute('data-learner-count')) : 0,
+        rows: ids.length,
+        ids,
+        partial: document.querySelector('[data-testid="movedex-learners-partial"]') != null,
+        thumbs: document.querySelectorAll('.entity-detail-section img').length,
+      }
+    })
+  }
+  /*
+    A species' learn methods are no longer a chip list on its row: they are WHICH
+    sections its card appears in. Reading them back from section membership keeps
+    the same assertion -- "Slowbro learns Headbutt these ways" -- against the new
+    structure, and the level comes from the card's Lv badge.
+  */
+  const SECTION_METHOD = {
+    'entity-section-level-up': 'level-up',
+    'entity-section-tm': 'machine',
+    'entity-section-egg-move': 'egg',
+    'entity-section-move-tutor': 'tutor',
   }
   const methodsFor = (id) =>
-    page.$eval(
-      `[data-testid="movedex-learner-list"] li[data-species-id="${id}"] .learner-methods`,
-      (e) => ({ methods: e.getAttribute('data-methods'), text: e.textContent.trim() }),
+    page.evaluate(
+      ({ speciesId, map }) => {
+        const methods = []
+        let badge = null
+        for (const [testid, method] of Object.entries(map)) {
+          const section = document.querySelector(`[data-testid="${testid}"]`)
+          if (!section) continue
+          const card = section.querySelector(`[data-species-id="${speciesId}"]`)
+          if (!card) continue
+          methods.push(method)
+          const b = card.querySelector('.species-card-badge')
+          if (b) badge = b.textContent.trim()
+        }
+        return { methods: methods.join(','), badge }
+      },
+      { speciesId: id, map: SECTION_METHOD },
     )
 
   await selectGame('heartgold-soulsilver')
+  await toList()
   await page.fill('[data-testid="movedex-search"]', 'headbutt')
   await page.waitForTimeout(200)
   await page.click(`[data-testid="movedex-row-${HEADBUTT}"]`)
@@ -441,15 +565,19 @@ try {
   )
   check('one row per species', got.rows === got.count)
   check('no duplicate species rows', new Set(got.ids).size === got.ids.length)
+  // Compared as a SET, not a sequence: the page is grouped by learn method now,
+  // so page order is section order and national-dex order holds within a section
+  // rather than across the whole page. Membership is the claim that matters.
   check(
     'ids match the partition exactly',
-    JSON.stringify(got.ids) === JSON.stringify([...headbuttHgss.keys()].sort((a, b) => a - b)),
+    JSON.stringify([...got.ids].sort((a, b) => a - b)) ===
+      JSON.stringify([...headbuttHgss.keys()].sort((a, b) => a - b)),
   )
   check('Slowbro (#80) is listed', got.ids.includes(80))
   const slowbro = await methodsFor(80)
   const expSlowbro = headbuttHgss.get(80)
   log(
-    `  Slowbro methods: ${JSON.stringify(slowbro)} | expected ${[...expSlowbro.methods].join(',')} lvl ${expSlowbro.level}`,
+    `  Slowbro sections: ${JSON.stringify(slowbro)} | expected ${[...expSlowbro.methods].join(',')} lvl ${expSlowbro.level}`,
   )
   check(
     'Slowbro methods match the partition',
@@ -463,10 +591,15 @@ try {
         .join(','),
     slowbro.methods,
   )
-  check('Slowbro shows its level-up level (25)', /Level up 25/.test(slowbro.text), slowbro.text)
+  check(
+    'Slowbro shows its level-up level (25) as a card badge',
+    slowbro.badge === 'Lv.25',
+    String(slowbro.badge),
+  )
   check('artwork thumbnails render', got.thumbs > 0, `(${got.thumbs})`)
 
   // Second move: Surf.
+  await toList()
   await page.fill('[data-testid="movedex-search"]', 'surf')
   await page.waitForTimeout(200)
   await page.click(`[data-testid="movedex-row-${SURF}"]`)
@@ -481,6 +614,7 @@ try {
   hr('ITEM 3b — under "All", union across all games, deduplicated by species')
   await selectGame('all')
   await page.waitForTimeout(200)
+  await toList()
   await page.fill('[data-testid="movedex-search"]', 'surf')
   await page.waitForTimeout(200)
   await page.click(`[data-testid="movedex-row-${SURF}"]`)
@@ -488,12 +622,26 @@ try {
   log(
     `  Surf / All: ${surfAllView.count} species (expected ${surfAll.size}), ${surfAllView.rows} rows`,
   )
+  // The page's own count is what it shows; the equality with the full union is
+  // asserted below, once the ungrouped-method remainder is read off the page.
   check(
-    'All-games count matches the union',
-    surfAllView.count === surfAll.size,
-    `(${surfAllView.count})`,
+    'All-games count is the union minus only the ungrouped methods',
+    surfAllView.count <= surfAll.size,
+    `(${surfAllView.count} of ${surfAll.size})`,
   )
+  // The page groups four learn methods; the union includes species whose only
+  // route is xd-purification, which has no section. The page says so in its own
+  // count line, and this asserts the two agree rather than ignoring the gap.
+  const surfExcluded = await page.$eval('[data-testid="movedex-learner-count"]', (e) =>
+    Number(e.getAttribute('data-excluded')),
+  )
+  log(`  Surf/All: shown ${surfAllView.count}, union ${surfAll.size}, excluded ${surfExcluded}`)
   check('deduplicated: one row per species', surfAllView.rows === surfAllView.count)
+  check(
+    'the union is fully accounted for: shown + excluded === union',
+    surfAllView.count + surfExcluded === surfAll.size,
+    `${surfAllView.count} + ${surfExcluded} vs ${surfAll.size}`,
+  )
   check('no duplicate species ids', new Set(surfAllView.ids).size === surfAllView.ids.length)
   check(
     'not one row per game (would be far larger)',
@@ -503,8 +651,16 @@ try {
   check('union is at least the single-game count', surfAllView.count >= surfHgss.size)
   check('nothing reported as partial', surfAllView.partial === false)
   check(
-    'ids match the computed union',
-    JSON.stringify(surfAllView.ids) === JSON.stringify([...surfAll.keys()].sort((a, b) => a - b)),
+    'ids match the computed union, restricted to the four grouped methods',
+    JSON.stringify([...surfAllView.ids].sort((a, b) => a - b)) ===
+      JSON.stringify(
+        [...methodsAcross(SURF).entries()]
+          .filter(([, methods]) =>
+            [...methods].some((m) => ['level-up', 'machine', 'egg', 'tutor'].includes(m)),
+          )
+          .map(([k]) => k)
+          .sort((a, b) => a - b),
+      ),
   )
   const gameCounts = await page.$$eval(
     '[data-testid="movedex-learner-list"] [data-game-count]',

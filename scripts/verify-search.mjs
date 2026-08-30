@@ -396,7 +396,26 @@ try {
   /** What the dex's OWN list reports for the same term. */
   const dexCount = async (moduleId, term) => {
     await goTo(moduleId)
+    /*
+      Four dexes replace their list with a detail page rather than showing both,
+      so an open entry has to be closed before the search box exists. Navigating
+      to the dex is not enough: the selection is remembered per module, so
+      arriving back at a dex can land straight on whatever was open there.
+    */
+    if (await page.$('[data-testid="entity-back"]')) {
+      await page.click('[data-testid="entity-back"]')
+    }
     const searchId = moduleId === 'pokedex' ? 'species-search' : `${moduleId}-search`
+    /*
+      A dex gated out by the era has no search box, because it has no list to
+      search -- it renders its explanation and a count of zero. That is the right
+      answer to "what does this dex report for this term" in that state, so it is
+      read rather than waited for.
+    */
+    if ((await page.$(`[data-testid="${searchId}"]`)) == null) {
+      const gated = (await page.textContent(`[data-testid="${moduleId}-count"]`)).trim()
+      return Number(gated.split(' ')[0])
+    }
     await page.fill(`[data-testid="${searchId}"]`, term)
     await page.waitForTimeout(160)
     // The Pokedex lost its count label with the page header; the five other

@@ -1606,3 +1606,330 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ============================================================ rebuild pass
+   Nature matrix, the sortable data table, the shared entity detail page, and
+   the card badge. Appended here rather than in a new stylesheet because every
+   one of these reuses the tokens and the card/row classes already defined
+   above; a second file would only make the cascade harder to follow.
+   ========================================================================== */
+
+/* ------------------------------------------------------------ nature matrix */
+
+/* Wide content scrolls inside its own box: the page body must never scroll
+   sideways. */
+.nature-matrix-wrap {
+  overflow-x: auto;
+  margin-bottom: var(--space-gap-lg);
+}
+
+.nature-matrix {
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+}
+
+.nature-matrix-caption {
+  margin-bottom: var(--space-gap-md);
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  text-align: left;
+  caption-side: top;
+}
+
+.nature-matrix th {
+  padding: 8px 12px;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  text-align: left;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+
+.nature-matrix tbody th {
+  border-right: 1px solid var(--hairline);
+  border-bottom: none;
+}
+
+/* The axis word above the stat, so a reader does not have to infer which
+   direction a row or column means. */
+.nature-matrix-axis {
+  display: block;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.nature-cell {
+  padding: 0;
+  border: 1px solid var(--hairline);
+}
+
+.nature-cell-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nature-cell-btn:hover {
+  background: var(--surface-hover);
+}
+
+.nature-cell-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The five natures that raise and lower the same stat have no effect. Marked by
+   a tone-step and italics -- "different/inert" -- not by a new colour. */
+.nature-cell-neutral {
+  background: var(--surface-raised);
+}
+
+.nature-cell-neutral .nature-cell-btn {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.nature-cell-missing {
+  padding: 10px 12px;
+  color: var(--text-secondary);
+}
+
+/* -------------------------------------------------------------- data table */
+
+.data-table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+}
+
+.data-table th {
+  padding: 0;
+  text-align: left;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.data-table th.data-table-num,
+.data-table td.data-table-num {
+  text-align: right;
+  /* Numeric columns are tabular data, which is exactly what --font-numeric is
+     reserved for. */
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table-sort {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: inherit;
+  background: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.data-table-num .data-table-sort {
+  justify-content: flex-end;
+}
+
+.data-table-sort:hover,
+.data-table-sort.is-active {
+  color: var(--text-primary);
+}
+
+.data-table-sort:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.data-table-arrow {
+  font-size: 0.7em;
+}
+
+.data-table td {
+  padding: 8px 10px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.data-table-row-clickable:hover {
+  background: var(--surface-hover);
+}
+
+/* The row is the click target, but the keyboard needs a real control, so the
+   first cell carries a button styled as plain text. */
+.data-table-open {
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.data-table-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------ shared entity detail page */
+
+.entity-detail {
+  text-align: left;
+}
+
+.entity-detail-name {
+  margin: 0 0 var(--space-gap-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.entity-detail-meta {
+  margin: 0 0 var(--space-gap-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+}
+
+.entity-detail-desc {
+  margin: 0 0 var(--space-gap-lg);
+  max-width: 68ch;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+}
+
+.entity-detail-facts {
+  max-width: 32rem;
+  margin-bottom: var(--space-gap-lg);
+}
+
+/* One section per group of species. The hairline sits above the label, so the
+   rule reads as separating this group from what precedes it. */
+.entity-detail-section {
+  margin-top: var(--space-gap-lg);
+  padding-top: var(--space-gap-md);
+  border-top: 1px solid var(--hairline);
+}
+
+.entity-detail-section-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 var(--space-gap-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.entity-detail-section-count {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------- card badge + ledger metadata */
+
+/*
+  The level a species learns a move at, in the card's top-left. --surface-raised
+  pill, --font-numeric text: it is a number about the card's subject, which is
+  what the numeric face is for. Only the level-up section sets one.
+*/
+.species-card-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  padding: 2px 6px;
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  background: var(--surface-raised);
+  border-radius: var(--radius-pill, 999px);
+  line-height: 1.4;
+}
+
+/* A count in a ledger row, right-aligned in the numeric face -- the same
+   convention every other count-metadata cell uses. */
+.row-count {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The line above a full-width dex list, where the rail's note used to sit. */
+.dex-list-note {
+  margin: 0 0 var(--space-gap-md);
+}
+
+/* Full-width ledger list: no rail to constrain it any more. */
+.ledger-list {
+  max-height: none;
+  overflow: visible;
+}
+
+/* The search box and entry count above a full-width dex list -- the pair that
+   used to sit at the top of DexShell's rail. */
+.dex-list-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-gap-lg);
+  margin-bottom: var(--space-gap-sm);
+}
+
+.dex-list-head input[type='search'] {
+  width: 240px;
+  padding: 6px 2px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+}
+
+.dex-list-head input[type='search']:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.dex-list-head .subtitle {
+  margin: 0;
+}
