@@ -56,7 +56,7 @@ several rounds defaulted to "safe" ambient shadows — treat any urge to add a
 
 Three surface tones, and only three: `--surface` (the page), `--surface-raised`
 (anything floating above it), and `--surface-hover` (pointer feedback on a row
-inside a floating panel). The third exists because the accent has exactly three
+inside a floating panel). The third exists because the accent has exactly four
 sanctioned uses and hover is not one of them, and because on white a step to
 `--surface` is imperceptible — `--surface-hover` is 0.129 of luminance below
 `--surface-raised` in light where `--surface` is only 0.044 below it. In dark it

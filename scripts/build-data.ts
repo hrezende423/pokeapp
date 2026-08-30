@@ -107,6 +107,113 @@ function english(entries: Json[] | undefined): Json | null {
   return entries.find((e: Json) => refName(e.language) === 'en') ?? null
 }
 
+/**
+ * Name in one language, by api-data's language code.
+ *
+ * CODES ARE LOWERCASE HERE. The snapshot uses `ja-hrkt`, not the `ja-Hrkt` form
+ * the PokeAPI docs show, and a mis-cased lookup silently returns null rather than
+ * erroring -- which is exactly how it would have shipped empty.
+ *
+ * The three that matter for the species page, all present for 493/493:
+ *
+ *   ja-hrkt  katakana ("ゲンガー"). Identical to `ja` for every species in scope,
+ *            verified, but it is the semantically correct code so it is the one
+ *            used.
+ *   ja-roma  THE OFFICIAL ROMANIZATION, and the reason no transliteration library
+ *            is involved. These are trademark spellings, not mechanical romaji:
+ *            ゲンガー is "Gangar" not "gengaa", フーディン is "Foodin" not
+ *            "fuudin", ラッキー is "Lucky" not "rakkii". A katakana-to-romaji
+ *            converter would have been confidently wrong on all three.
+ */
+function nameInLanguage(entries: Json[] | undefined, code: string): string | null {
+  if (!entries || !entries.length) return null
+  return (entries.find((e: Json) => refName(e.language) === code)?.name as string) ?? null
+}
+
+/**
+ * Which of api-data's per-game sprite slots actually have an image, bit-packed.
+ *
+ * WHY THIS IS STORED AT ALL. The URLs are perfectly predictable
+ * (`versions/{gen}/{game}/[shiny/][female/]{id}.png`, confirmed 200 for a sample)
+ * so the Sprites tab could construct them without help -- except that roughly a
+ * quarter are null. Bulbasaur has 52 of 88 in-scope slots. Constructing blind
+ * would give a grid peppered with broken images, and an onError-per-tile fallback
+ * (the ItemArtwork approach) is wrong here: there the fallback was a smaller real
+ * image, whereas a missing game sprite has no substitute and the tile should
+ * simply not exist.
+ *
+ * IN-SCOPE GENERATIONS ONLY. api-data carries 19 game entries per species, up to
+ * Scarlet/Violet, plus two `icons` pseudo-games. Keeping all of them cost 638 KiB
+ * on species.json -- which is EAGERLY precached, so it would have been 638 KiB on
+ * every cold boot to describe games this app does not cover.
+ *
+ * WHY BIT-PACKED RATHER THAN SLOT NAMES, and why still eager. Slot-name arrays for
+ * Gen 1-4 alone were 390 KiB: eight distinct strings repeated 16204 times, plus a
+ * 36-character key per game. A bitmask over SPRITE_SLOT_ORDER plus the bare game
+ * name is the same information an order of magnitude smaller.
+ *
+ * The alternative was a lazily-fetched sprite-slots.json, which was rejected: this
+ * is an offline-first PWA, and a lazy file means the Sprites tab is broken offline
+ * until someone has opened it online first. Paying ~130 KiB once at install keeps
+ * the tab working offline like every other page.
+ *
+ * The `typeof url === 'string'` check matters: `generation-v/black-white` nests an
+ * `animated` OBJECT alongside its string URLs, and counting that as a present slot
+ * is what made a first measurement report 67 slots for Bulbasaur where the real
+ * count of images is 66 (52 of them in scope).
+ */
+const SPRITE_GENERATIONS = new Set([
+  'generation-i',
+  'generation-ii',
+  'generation-iii',
+  'generation-iv',
+])
+
+/**
+ * Bit position per slot. APPEND-ONLY -- the numbers are stored in the bundle, so
+ * reordering this silently rewrites what every existing record means. Mirrored in
+ * src/data/spriteSlots.ts, which the design-system suite compares against.
+ */
+const SPRITE_SLOT_ORDER = [
+  'front_default',
+  'front_shiny',
+  'front_female',
+  'front_shiny_female',
+  'back_default',
+  'back_shiny',
+  'back_female',
+  'back_shiny_female',
+  // Gen 1-2 only. Left out of a first pass and it silently dropped 2714 of the
+  // 16204 real tiles, because indexOf returned -1 and the bit was never set.
+  'front_transparent',
+  'back_transparent',
+  'front_shiny_transparent',
+  'back_shiny_transparent',
+  'front_gray',
+  'back_gray',
+] as const
+
+function versionSpriteSlots(sprites: Json | undefined): Record<string, number> {
+  const out: Record<string, number> = {}
+  const versions = sprites?.versions as Record<string, Json> | undefined
+  if (!versions) return out
+  for (const [gen, games] of Object.entries(versions)) {
+    if (!SPRITE_GENERATIONS.has(gen)) continue
+    for (const [game, slots] of Object.entries(games as Record<string, Json>)) {
+      let mask = 0
+      for (const [slot, url] of Object.entries(slots as Record<string, unknown>)) {
+        if (typeof url !== 'string' || url.length === 0) continue
+        const bit = SPRITE_SLOT_ORDER.indexOf(slot as (typeof SPRITE_SLOT_ORDER)[number])
+        if (bit >= 0) mask |= 1 << bit
+      }
+      // Bare game name: the generation is recoverable from it via a fixed
+      // 11-entry table, and the prefix was 15 of every 36 key characters.
+      if (mask !== 0) out[game] = mask
+    }
+  }
+  return out
+}
+
 /** Game text uses form feeds and hard newlines for in-game line breaks. */
 function cleanText(s: string | null | undefined): string | null {
   if (!s) return null
@@ -1123,6 +1230,8 @@ async function main() {
             official_artwork: p.sprites?.other?.['official-artwork']?.front_default ?? null,
             official_artwork_shiny: p.sprites?.other?.['official-artwork']?.front_shiny ?? null,
           },
+          // Slot names only, for the Sprites tab -- see versionSpriteSlots.
+          version_sprite_slots: versionSpriteSlots(p.sprites),
         }
       })
 
@@ -1132,6 +1241,9 @@ async function main() {
       id: sp.id,
       name: sp.name,
       display_name: english(sp.names)?.name ?? sp.name,
+      // Katakana and its official romanization -- see nameInLanguage.
+      name_ja: nameInLanguage(sp.names, 'ja-hrkt'),
+      name_ja_romanized: nameInLanguage(sp.names, 'ja-roma'),
       genus: english(sp.genera)?.genus ?? null,
       generation_id: genId(sp.generation),
       order: sp.order ?? null,

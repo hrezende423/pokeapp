@@ -5,7 +5,7 @@ import type { ButtonHTMLAttributes } from 'react'
  * variant is specified, so none is invented here.
  *
  * Primary stays monochrome -- it uses --button-primary-fill, which inverts
- * between modes, rather than the accent. The accent has three sanctioned uses
+ * between modes, rather than the accent. The accent has four sanctioned uses
  * (active tab/nav, binary indicators, error/validation) and a primary button is
  * none of them.
  *

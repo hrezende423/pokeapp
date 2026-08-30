@@ -1256,7 +1256,7 @@
   border-top: 1px solid var(--hairline);
 }
 
-/* Neutral hover, not --accent: the accent has exactly three sanctioned uses
+/* Neutral hover, not --accent: the accent has exactly four sanctioned uses
    (active tab/nav, binary indicator, error/validation) and pointer feedback is
    none of them. A tone-step down from the panel is the in-system move -- the
    panel is --surface-raised, and --surface-hover is the tone that exists for
@@ -2321,7 +2321,7 @@
 }
 
 /* Open, or narrowing the list: either way --accent marks a binary state, which
-   is one of the three uses it is reserved for. */
+   is one of the four uses it is reserved for. */
 .dex-controls[data-open='true'] .dex-controls-toggle,
 .dex-controls-toggle[data-filters-active='true'] {
   color: var(--accent);

@@ -32,7 +32,7 @@
         "dark": { "$value": "#ff3b4e", "$description": "Brightened for contrast against dark surface" }
       },
       "stat-increase": {
-        "$description": "The up-arrow beside a nature's raised stat. Deliberately NOT accent-red: --accent has exactly three sanctioned uses (active tab/nav, binary indicator, error/validation) and 'this stat went up' is none of them. Contrast computed the same way the type palettes were, and the light/dark pair is matched to its stat-decrease counterpart so neither arrow reads as louder than the other. RGB distance from accent-red is 42 (light) and 70 (dark), far enough not to be mistaken for it.",
+        "$description": "The up-arrow beside a nature's raised stat. Deliberately NOT accent-red: --accent has exactly four sanctioned uses (active tab/nav, binary indicator, error/validation, stat magnitude on a base-stat bar) and 'this stat went up' is none of them — a nature's direction arrow is not a magnitude. Contrast computed the same way the type palettes were, and the light/dark pair is matched to its stat-decrease counterpart so neither arrow reads as louder than the other. RGB distance from accent-red is 42 (light) and 70 (dark), far enough not to be mistaken for it.",
         "light": { "$value": "#b3261e", "$description": "6.26:1 on #fafafa" },
         "dark": { "$value": "#e8776a", "$description": "6.38:1 on #141414" }
       },
@@ -138,12 +138,12 @@
       "surface-hover": {
         "light": { "$value": "{color.primitive.surface-hover.light}" },
         "dark": { "$value": "{color.primitive.surface-hover.dark}" },
-        "$description": "Pointer-feedback fill for a row inside a floating panel. Exists because accent-red has exactly three sanctioned uses and hover is not one of them, so hover needs a tone rather than borrowing hairline (a border token) or surface (whose light step is imperceptible against surface-raised)."
+        "$description": "Pointer-feedback fill for a row inside a floating panel. Exists because accent-red has exactly four sanctioned uses and hover is not one of them, so hover needs a tone rather than borrowing hairline (a border token) or surface (whose light step is imperceptible against surface-raised)."
       },
       "stat-increase": {
         "light": { "$value": "{color.primitive.stat-increase.light}" },
         "dark": { "$value": "{color.primitive.stat-increase.dark}" },
-        "$description": "Up-arrow colour beside a nature's raised stat. A fourth semantic colour alongside accent — added rather than reusing accent, whose three sanctioned uses do not include stat direction."
+        "$description": "Up-arrow colour beside a nature's raised stat. A fourth semantic colour alongside accent — added rather than reusing accent, whose four sanctioned uses do not include stat direction."
       },
       "stat-decrease": {
         "light": { "$value": "{color.primitive.stat-decrease.light}" },
@@ -168,7 +168,7 @@
       "accent": {
         "light": { "$value": "{color.primitive.accent-red.light}" },
         "dark": { "$value": "{color.primitive.accent-red.dark}" },
-        "$description": "Reserved for exactly three functional uses: active tab/nav state, binary state indicators (e.g. caught toggle), and error/validation emphasis (confirmed in the form-field-states work, see DESIGN-SYSTEM.md section 8). Never decoration, never more than one element type per screen. CONFIRMED app-wide, not namespaced: this red now also affects the old (pre-redesign) modules that share the --accent variable, replacing their previous purple. Deliberate — those modules are getting replaced eventually, and the color clash is a reasonable 'not yet migrated' signal rather than a bug worth engineering around."
+        "$description": "Reserved for exactly four functional uses: active tab/nav state, binary state indicators (e.g. caught toggle), error/validation emphasis (confirmed in the form-field-states work, see DESIGN-SYSTEM.md section 8), and stat magnitude — the filled portion of a base-stat bar on the species detail page. The fourth reverses an earlier decision on purpose: base stats were once specified as a plain data table, and the real Figma prototype for the species page uses accent-filled horizontal bars. Never decoration, never more than one element type per screen. CONFIRMED app-wide, not namespaced: this red now also affects the old (pre-redesign) modules that share the --accent variable, replacing their previous purple. Deliberate — those modules are getting replaced eventually, and the color clash is a reasonable 'not yet migrated' signal rather than a bug worth engineering around."
       },
       "button-primary-fill": {
         "light": { "$value": "{color.primitive.ink.800}" },

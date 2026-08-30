@@ -122,8 +122,9 @@
   /* accent — reserved for active tab/nav state and binary indicators only */
   --accent: #d91c2c;
 
-  /* Stat direction on a nature. NOT --accent: that has exactly three sanctioned
-     uses and "a stat went up" is none of them, so these are their own tokens.
+  /* Stat direction on a nature. NOT --accent: that has exactly four sanctioned
+     uses and "a stat went up" is none of them -- a direction arrow is not a
+     magnitude, which is what the fourth use (base-stat bars) covers.
      Both computed against #fafafa the same way the type colours were —
      increase 6.26:1, decrease 6.17:1, deliberately matched so neither arrow
      out-shouts the other. The red sits 42 units of RGB distance from --accent

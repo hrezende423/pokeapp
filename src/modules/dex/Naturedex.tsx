@@ -25,7 +25,7 @@ import { natureEntries } from './entrySources'
  * spell out "raises" / "lowers" / "increases" / "decreases"; they now carry an
  * arrow after the stat name instead, red up for the raised stat and blue down for
  * the lowered one. Two new tokens back this -- --stat-increase and
- * --stat-decrease -- rather than --accent, whose three sanctioned uses do not
+ * --stat-decrease -- rather than --accent, whose four sanctioned uses do not
  * include stat direction. The arrows are aria-hidden and every one is paired with
  * a text alternative, because a colour-plus-glyph pair carrying the only copy of
  * "which way" would be unreadable to a screen reader and to anyone who cannot

@@ -100,12 +100,28 @@ export interface Variety {
   past_stats: PastStats[]
   held_items: HeldItem[]
   sprites: Sprites
+  /**
+   * Per-game sprite slots that actually have an image, bit-packed:
+   * "diamond-pearl" -> 51, read against SLOT_ORDER in src/data/spriteSlots.ts.
+   *
+   * A mask rather than slot names, and Gen 1-4 games only, because this rides in
+   * the eagerly precached species.json -- the full slot-name version cost 638 KiB
+   * there. Decode with slotsFor()/hasSlot() rather than touching the bits.
+   */
+  version_sprite_slots: Record<string, number>
 }
 
 export interface Species {
   id: number
   name: string
   display_name: string
+  /** Katakana, from api-data's `ja-hrkt`. */
+  name_ja: string | null
+  /**
+   * Official romanization, from api-data's `ja-roma` -- a trademark spelling, not
+   * a transliteration ("Gangar", not "gengaa"). Present for all 493 in scope.
+   */
+  name_ja_romanized: string | null
   genus: string | null
   generation_id: number | null
   order: number | null
