@@ -26,6 +26,19 @@ const MANIFEST = `${ICON_DIR}/evo-condition-icons.json`
 const TS_MODULE = 'src/modules/pokedex/evoConditionIcons.ts'
 const GENDER_MODULE = 'src/modules/pokedex/evoGenderIcon.ts'
 
+/*
+  The normalised geometry, and it must match scripts/normalize-evo-icons.mjs.
+  Kept as plain numbers here rather than imported from the normaliser so this
+  suite fails if someone changes the normaliser without re-running it -- an
+  import would silently agree with whatever the normaliser now says.
+*/
+const CANVAS = 128
+const TARGET_FILL_PCT = 79.7 // 102/128
+/** Rounding to whole pixels moves fill by up to ~0.8pp on the shortest side. */
+const FILL_TOLERANCE_PCT = 1
+/** Ceiling, not a target: catches an unnormalised original dropped in later. */
+const MAX_SET_KB = 400
+
 const failures = []
 const log = (...a) => console.log(...a)
 const hr = (t) => {
@@ -249,29 +262,57 @@ try {
     onDisk.every((f) => measured[f].partial > 0),
   )
 
-  // ------------------------------------------------------------ attention
-  hr('ATTENTION — true but not asserted, because the fix is a design decision')
+  // ------------------------------------------------------- geometry, gated
+  /*
+    THESE WERE AN UNGATED "ATTENTION" BLOCK until the set was normalised.
+
+    The reason they were only reported is that the target canvas and fill were the
+    owner's decision, not this script's, and a suite that is red on purpose trains
+    people to ignore red. The decision is made -- 128x128, 80% fill, produced by
+    scripts/normalize-evo-icons.mjs -- so they are now assertions, and their job
+    flips from "tell someone" to "stop the next unnormalised drop-in".
+
+    Fill is measured on the LONGEST content side, which is the axis the normaliser
+    scales to. The shorter side is free to be smaller: icon-female is a tall narrow
+    figure and forcing both axes to 80% would stretch it.
+  */
+  hr('GEOMETRY — one canvas, one fill ratio')
 
   const sizes = [...new Set(fills.map((x) => `${x.w}x${x.h}`))]
-  const maxDim = Math.max(...fills.map((x) => Math.max(x.w, x.h)))
-  const minDim = Math.min(...fills.map((x) => Math.max(x.w, x.h)))
   const totalKB = onDisk.reduce((n, f) => n + headers[f].bytes, 0) / 1024
-
-  log(
-    `  1. DIMENSIONS ARE NOT CONSISTENT: ${sizes.length} distinct sizes, ${minDim}px to ${maxDim}px`,
-  )
-  log(`     ${sizes.join('  |  ')}`)
   const byFill = [...fills].sort((a, b) => a.fill - b.fill)
+  const fillSpread = byFill[byFill.length - 1].fill - byFill[0].fill
+
+  log(`  canvas sizes present: ${sizes.join(', ')}`)
   log(
-    `     Content fill also varies ${byFill[0].fill.toFixed(0)}% (${byFill[0].f}) to ${byFill[
-      byFill.length - 1
-    ].fill.toFixed(0)}% (${byFill[byFill.length - 1].f}), so normalising the`,
+    `  fill range: ${byFill[0].fill.toFixed(1)}% (${byFill[0].f}) to ${byFill[byFill.length - 1].fill.toFixed(1)}% (${byFill[byFill.length - 1].f})`,
   )
-  log('     canvas alone will not even them out -- the artwork inside needs matching too.')
-  log('')
-  log(`  2. WEIGHT: ${totalKB.toFixed(0)} KB across 11 files, unoptimised.`)
-  log('     vite.config.ts precaches **/*.png, so all of it enters the install payload')
-  log('     automatically. Rendered size in the chart is 16-24px.')
+  log(`  total payload: ${totalKB.toFixed(0)} KB across ${onDisk.length} files`)
+
+  check('every icon is on one shared canvas size', sizes.length === 1, sizes.join(', '))
+  check(`and that canvas is ${CANVAS}x${CANVAS}`, sizes[0] === `${CANVAS}x${CANVAS}`, sizes[0])
+  check(
+    `longest content side is ${TARGET_FILL_PCT}% of the canvas on every icon`,
+    fills.every((x) => Math.abs(x.fill - TARGET_FILL_PCT) <= FILL_TOLERANCE_PCT),
+    `spread ${fillSpread.toFixed(2)}pp, tolerance ${FILL_TOLERANCE_PCT}pp`,
+  )
+  check(
+    'so no icon draws visibly heavier than another at the same CSS size',
+    fillSpread <= FILL_TOLERANCE_PCT,
+    `${fillSpread.toFixed(2)}pp spread`,
+  )
+  /*
+    A payload ceiling, not a target. The set is 176 KB normalised, against 3219 KB
+    as delivered; 400 KB leaves room for a couple more icons while still catching
+    a 1024x1024 original dropped in by mistake, which is the actual failure mode --
+    the workbox png glob takes every one of these into the install payload, so an
+    unnormalised file would inflate it silently.
+  */
+  check(
+    `the whole set stays under ${MAX_SET_KB} KB, since workbox precaches all of it`,
+    totalKB < MAX_SET_KB,
+    `${totalKB.toFixed(0)} KB`,
+  )
 } finally {
   await browser.close()
 }
@@ -279,7 +320,6 @@ try {
 hr('SUMMARY')
 if (failures.length === 0) {
   log('  ALL CHECKS PASSED')
-  log('  (see the ATTENTION block above — two known items, deliberately not gated)')
 } else {
   log(`  ${failures.length} FAILED:`)
   for (const f of failures) log(`   - ${f}`)
