@@ -36,23 +36,46 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/*
+  KEYED ON data-theme, NOT prefers-color-scheme, and that is a bug fix rather than
+  a preference.
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+  This block was `@media (prefers-color-scheme: dark)`, which was fine while the
+  OS was the only input. It stopped being fine the moment an explicit user choice
+  existed: --bg and --text are painted on :root (see the block above), and
+  design-tokens.css does not define either, so nothing overrode them. The result,
+  measured before the fix:
+
+    OS dark  + user picks light -> app bar #fafafa, page background #16171d
+    OS light + user picks dark  -> app bar #141414, page background #ffffff
+
+  i.e. a light app in a dark frame, or the reverse. Everything keyed on --surface
+  followed the choice correctly and everything keyed on --bg did not.
+
+  Re-keying costs nothing on first visit: theme.ts always sets data-theme, from
+  the OS when no choice is stored, so OS-following behaviour is preserved -- it now
+  arrives through the one contract instead of two that could disagree. The tokens
+  design-tokens.css also defines (--accent and friends) still resolve from there,
+  since it is imported after this file at equal specificity.
+
+  The #social rule is dead -- no element with that id exists anywhere in src -- and
+  is re-keyed rather than deleted only to keep this a mechanical change.
+*/
+[data-theme='dark'] {
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.5);
+  --social-bg: rgba(47, 48, 58, 0.5);
+  --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+}
+
+[data-theme='dark'] #social .button-icon {
+  filter: invert(1) brightness(2);
 }
 
 /* Widened from the starter template's fixed 1126px: the Pokedex is a 240px rail

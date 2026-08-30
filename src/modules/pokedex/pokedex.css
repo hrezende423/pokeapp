@@ -1356,9 +1356,17 @@
   used to occupy, revealing every control that used to be permanently on screen.
   Same full-95 dropdown container as the nav panels above.
 */
+/* The bar's right-hand cluster. margin-left:auto moved here from .app-controls,
+   which is no longer the rightmost thing in the bar. */
+.app-bar-utils {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gap-md);
+  margin-left: auto;
+}
+
 .app-controls {
   position: relative;
-  margin-left: auto;
 }
 
 /* Open, or narrowing the list: either way the accent says "this is doing

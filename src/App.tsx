@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
 import type { BootStats } from './data'
+import { ThemeSwitcher } from './components/ds/ThemeSwitcher'
+// The app shell itself now renders a design-system component, so the shell owns
+// the import rather than relying on Pokedex.tsx having pulled it in first.
+import './components/ds/ds.css'
 import { DesignSystemPage } from './modules/design-system/DesignSystemPage'
 import { FiltersProvider } from './modules/filters/FiltersProvider'
 import { ControlsPanel } from './modules/nav/ControlsPanel'
@@ -48,9 +52,22 @@ function Shell() {
           </span>
           <NavMenu activeId={active.id} onSelect={nav.setModule} />
         </div>
-        {/* Every control that used to sit permanently in the bar or above the
-            grid now lives behind this one toggle, at the bar's top right. */}
-        <ControlsPanel />
+        {/*
+          The bar's right-hand cluster: theme, then the controls disclosure.
+
+          THE THEME SWITCHER IS PERMANENT, which is a deliberate exception to the
+          "everything lives behind one toggle" simplification and worth stating.
+          That toggle is labelled "Search/filter species" and holds controls that
+          narrow what you are looking at; the theme changes how the whole app
+          looks and belongs to no dex. Filing it under a species filter would
+          miscategorise it, and a display preference people reach for once is one
+          they should not have to hunt for. It is 2 segments and ~110px, so the
+          cost to the bar is small.
+        */}
+        <div className="app-bar-utils">
+          <ThemeSwitcher />
+          <ControlsPanel />
+        </div>
       </div>
       {SHOW_DESIGN_SYSTEM ? <DesignSystemPage /> : <active.Component />}
     </>

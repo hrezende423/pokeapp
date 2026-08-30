@@ -333,6 +333,174 @@ try {
     (alert ?? '').length > 0,
   )
 
+  // ==================================================================
+  // THEME — OS default, explicit override, and persistence across reload
+  // ==================================================================
+  /*
+    PERSISTENCE IS ASSERTED THROUGH A REAL RELOAD, not by reading localStorage
+    after a click. The version-group selector shipped with exactly that gap --
+    it looked right in-session and did not survive a reload -- so "the value is in
+    storage" is not the claim worth making here. page.reload() and re-read is.
+
+    Fresh contexts are used for the first-visit cases because a Playwright context
+    is the storage boundary: reusing the one above would carry a stored choice into
+    a test that is specifically about there being none. colorScheme is set per
+    context (and flipped mid-page with emulateMedia) so both OS preferences are
+    exercised rather than whichever one this machine happens to have.
+  */
+  hr('THEME — OS default, explicit override, persistence')
+
+  const themeState = (p) =>
+    p.evaluate(() => {
+      const sw = document.querySelector('[data-testid="theme-switcher"]')
+      let stored = 'UNREADABLE'
+      try {
+        stored = localStorage.getItem('pokeapp:theme')
+      } catch {
+        /* storage disabled; the app must still work */
+      }
+      return {
+        attr: document.documentElement.dataset.theme ?? null,
+        value: sw?.dataset.themeValue ?? null,
+        source: sw?.dataset.themeSource ?? null,
+        lightPressed: document.querySelector('[data-testid="theme-light"]')?.ariaPressed ?? null,
+        darkPressed: document.querySelector('[data-testid="theme-dark"]')?.ariaPressed ?? null,
+        stored,
+        /*
+          :root, not body. body is transparent here -- index.css paints the page
+          background on :root via --bg -- so reading body reported rgba(0,0,0,0)
+          for every theme and the assertion could never have failed.
+
+          Both tokens are read because they come from different files and were the
+          actual bug: --bg from index.css (once OS-keyed, now data-theme) and
+          --surface from design-tokens.css. They must now agree about the theme.
+        */
+        bg: getComputedStyle(document.documentElement).backgroundColor,
+        varBg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+        varSurface: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim(),
+        barBg: (() => {
+          const bar = document.querySelector('.app-bar')
+          return bar ? getComputedStyle(bar).backgroundColor : null
+        })(),
+      }
+    })
+
+  /** The two palettes' page-background values, for an exact both-ways assertion. */
+  const PAGE_BG = { light: '#fff', dark: '#16171d' }
+  const SURFACE = { light: '#fafafa', dark: '#141414' }
+
+  const freshThemePage = async (colorScheme) => {
+    const ctx = await browser.newContext({ colorScheme })
+    const p = await ctx.newPage()
+    await p.goto(APP_URL, { waitUntil: 'load' })
+    await p.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+    return { ctx, p }
+  }
+
+  // ---- first visit, nothing stored: follow the OS, both directions ----
+  for (const os of ['dark', 'light']) {
+    const { ctx, p } = await freshThemePage(os)
+    const s = await themeState(p)
+    log(`  first visit, OS=${os}: ${JSON.stringify(s)}`)
+    check(`first visit with OS ${os} follows the OS`, s.attr === os && s.value === os)
+    check(
+      `  and reports source=system with nothing stored`,
+      s.source === 'system' && s.stored === null,
+    )
+    check(
+      `  and the ${os} segment is the pressed one`,
+      (os === 'dark' ? s.darkPressed : s.lightPressed) === 'true' &&
+        (os === 'dark' ? s.lightPressed : s.darkPressed) === 'false',
+      `light=${s.lightPressed} dark=${s.darkPressed}`,
+    )
+    check(
+      `  and both palettes agree on ${os}`,
+      s.varBg === PAGE_BG[os] && s.varSurface === SURFACE[os],
+      `--bg=${s.varBg} --surface=${s.varSurface}`,
+    )
+    await ctx.close()
+  }
+
+  // ---- explicit choice beats the OS, survives reload, survives a new tab ----
+  const { ctx: themeCtx, p: themePage } = await freshThemePage('light')
+  const lightBg = (await themeState(themePage)).bg
+
+  await themePage.click('[data-testid="theme-dark"]')
+  await themePage.waitForFunction(
+    () => document.documentElement.dataset.theme === 'dark',
+    undefined,
+    { timeout: 5000 },
+  )
+  let s = await themeState(themePage)
+  log(`  after choosing Dark on a light OS: ${JSON.stringify(s)}`)
+  check('an explicit choice overrides a light OS', s.attr === 'dark' && s.value === 'dark')
+  check('the switcher reports source=user', s.source === 'user')
+  check('the choice is persisted', s.stored === 'dark')
+  check('the pill state follows the theme', s.darkPressed === 'true' && s.lightPressed === 'false')
+  check('and the painted colours actually changed', s.bg !== lightBg, `${lightBg} -> ${s.bg}`)
+  check(
+    '  including the PAGE background, not just the surfaces',
+    s.varBg === PAGE_BG.dark && s.varSurface === SURFACE.dark,
+    `--bg=${s.varBg} --surface=${s.varSurface}`,
+  )
+
+  await themePage.reload({ waitUntil: 'load' })
+  await themePage.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+  s = await themeState(themePage)
+  log(`  after a real reload: ${JSON.stringify(s)}`)
+  check('A RELOAD PRESERVES the explicit choice', s.attr === 'dark' && s.value === 'dark')
+  check('  still attributed to the user, not the OS', s.source === 'user')
+
+  const secondTab = await themeCtx.newPage()
+  await secondTab.goto(APP_URL, { waitUntil: 'load' })
+  await secondTab.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+  const tabState = await themeState(secondTab)
+  log(`  a new tab in the same profile: ${JSON.stringify(tabState)}`)
+  check(
+    'a new tab opens on the stored choice',
+    tabState.attr === 'dark' && tabState.source === 'user',
+  )
+  await secondTab.close()
+
+  // ---- an OS change must not silently undo the user ----
+  await themePage.emulateMedia({ colorScheme: 'dark' })
+  await themePage.waitForTimeout(200)
+  await themePage.click('[data-testid="theme-light"]')
+  await themePage.waitForFunction(
+    () => document.documentElement.dataset.theme === 'light',
+    undefined,
+    { timeout: 5000 },
+  )
+  await themePage.emulateMedia({ colorScheme: 'dark' })
+  await themePage.waitForTimeout(200)
+  s = await themeState(themePage)
+  log(`  explicit light, OS flipped to dark mid-session: ${JSON.stringify(s)}`)
+  check('an OS change does NOT override an explicit choice', s.attr === 'light')
+
+  await themePage.reload({ waitUntil: 'load' })
+  await themePage.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+  s = await themeState(themePage)
+  log(`  explicit light on a dark OS, after reload: ${JSON.stringify(s)}`)
+  check('explicit light beats a dark OS across a reload', s.attr === 'light' && s.value === 'light')
+  /*
+    index.css still carries a legacy `@media (prefers-color-scheme: dark)` block
+    that redefines --bg and friends off the OS, with no data-theme involvement.
+    design-tokens.css is imported after it and redeclares the same properties, so
+    the override wins -- but that is load-order luck, not design, and this is the
+    assertion that would catch it if the import order ever changed.
+  */
+  check(
+    '  and the LIGHT palette is what is painted, page background included',
+    s.varBg === PAGE_BG.light && s.varSurface === SURFACE.light,
+    `--bg=${s.varBg} --surface=${s.varSurface} html=${s.bg} bar=${s.barBg}`,
+  )
+  check(
+    '  so the page frame and the app bar cannot disagree about the theme',
+    s.bg === 'rgb(255, 255, 255)' && s.barBg === 'rgb(250, 250, 250)',
+    `html=${s.bg} bar=${s.barBg}`,
+  )
+  await themeCtx.close()
+
   hr('SUMMARY')
   if (failures.length === 0) log('  ALL CHECKS PASSED')
   else {

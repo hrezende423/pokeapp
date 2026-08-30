@@ -806,3 +806,57 @@
   text-transform: none;
   letter-spacing: normal;
 }
+
+/* -------------------------------------------- theme switcher (Utility & Misc) */
+
+/*
+  The segmented Light/Dark pill. Measurements are the full-95 spec's, with the
+  flat hexes swapped for the tokens that resolve to them in light mode:
+  #eee -> --hairline, #fff -> --surface-raised, #888 -> --text-secondary.
+
+  The 10px track radius is the spec's literal value and has no token; 8px on the
+  selected segment is --radius-control exactly. 12px type matches .ds-toggle,
+  which is the established size for these small library controls.
+
+  No box-shadow, per the house rule -- the selected segment is a tone-step.
+*/
+.ds-theme-switcher {
+  display: inline-flex;
+  flex: none;
+  gap: 0;
+  padding: 3px;
+  background: var(--hairline);
+  border-radius: 10px;
+}
+
+.ds-theme-segment {
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--font-weight-regular);
+  line-height: 1;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  /* Both segments reserve the bold metrics, so selecting one does not shift the
+     other sideways. Without this the pill jiggles on every switch. */
+  min-width: 3.4rem;
+}
+
+.ds-theme-segment[data-active='true'] {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+  background: var(--surface-raised);
+  cursor: default;
+}
+
+.ds-theme-segment:not([data-active='true']):hover {
+  color: var(--text-primary);
+}
+
+.ds-theme-segment:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
