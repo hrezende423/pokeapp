@@ -601,6 +601,139 @@ try {
   check('encounters section resolved', encounterTable != null)
   await page.screenshot({ path: `${SHOTS}/detail-eevee.png`, fullPage: true })
 
+  // --------------------------------------------- painted condition icons
+  /*
+    THE CUSTOM EVOLUTION-CONDITION ICONS, on the chart rather than on disk --
+    verify-evo-icons.mjs owns the asset checks (canvas size, fill, transparency),
+    this owns "the right one shows up on the right branch".
+
+    Every icon is forced eager and scrolled into view before measuring: they are
+    loading="lazy", so an off-screen icon reports naturalWidth 0 and reads as
+    broken when it is merely deferred. That false positive cost time once already.
+  */
+  /*
+    RESET THE LIST FIRST. The scenario above left "eevee" in the search box, so
+    every row but one is filtered out and the cases below would look like missing
+    species rather than a stale filter. Scope also has to be "All": the cases span
+    Gen 1 to Gen 4 (Machoke to Mantyke) and no single game holds them all.
+  */
+  await page.click('[data-testid="back-to-grid"]')
+  await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+  await withControls(() => page.fill('[data-testid="species-search"]', ''))
+  await selectVersionGroup('all')
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length > 400,
+    undefined,
+    { timeout: 30000 },
+  )
+
+  const paintedOn = async (id) => {
+    // The detail replaces the grid rather than sitting beside it, so every case
+    // after the first has to come back to the list before it can click a row.
+    if (await page.$('[data-testid="back-to-grid"]')) {
+      await page.click('[data-testid="back-to-grid"]')
+      await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+    }
+    // 'attached', not the default 'visible': the list scrolls inside a ScrollArea
+    // and a row 349 deep is below the fold. page.click scrolls it in.
+    await page.waitForSelector(`[data-testid="species-row-${id}"]`, {
+      state: 'attached',
+      timeout: 30000,
+    })
+    await openSpecies(id)
+    await page.evaluate(() => {
+      for (const i of document.querySelectorAll('.evo-painted-icon')) {
+        i.loading = 'eager'
+        i.scrollIntoView({ block: 'center' })
+      }
+    })
+    await page
+      .waitForFunction(
+        () =>
+          [...document.querySelectorAll('.evo-painted-icon')].every(
+            (i) => i.complete && i.naturalWidth > 0,
+          ),
+        undefined,
+        { timeout: 20000 },
+      )
+      .catch(() => {})
+    return page.evaluate(() => ({
+      keys: [...document.querySelectorAll('.evo-painted-icon')].map((i) => i.dataset.evoIcon),
+      natural: [...document.querySelectorAll('.evo-painted-icon')].map(
+        (i) => `${i.naturalWidth}x${i.naturalHeight}`,
+      ),
+      boxes: [...document.querySelectorAll('.evo-painted-icon')].map((i) =>
+        Math.round(i.getBoundingClientRect().width),
+      ),
+      labels: [
+        ...document.querySelectorAll(
+          '.evo-arrow .visually-hidden, .evo-fork-random .visually-hidden',
+        ),
+      ].map((e) => e.textContent),
+      fork: document.querySelector('[data-random-fork="true"]') != null,
+    }))
+  }
+
+  // One species per painted condition, chosen because each is the only Gen 1-4
+  // user of its field (or one of two, for the locations).
+  const PAINTED_CASES = [
+    { id: 349, name: 'Feebas', expect: 'beauty' },
+    { id: 458, name: 'Mantyke', expect: 'party-species-remoraid' },
+    { id: 82, name: 'Magneton', expect: 'location-mount-coronet' },
+    { id: 67, name: 'Machoke', expect: 'trade' },
+    { id: 281, name: 'Kirlia', expect: 'gender-male' },
+    { id: 361, name: 'Snorunt', expect: 'gender-female' },
+  ]
+  for (const c of PAINTED_CASES) {
+    const got = await paintedOn(c.id)
+    log(`  ${c.name}: ${got.keys.join(', ')}  natural=${got.natural.join(',')}`)
+    check(
+      `${c.name} renders the painted "${c.expect}" icon`,
+      got.keys.includes(c.expect),
+      got.keys.join(', ') || '(none)',
+    )
+    check(
+      `  and it is the normalised 128px asset drawn at 20px`,
+      got.natural.every((n) => n === '128x128') && got.boxes.every((b) => b === 20),
+      `${got.natural.join(',')} @ ${got.boxes.join(',')}px`,
+    )
+    check(
+      `  with a screen-reader label`,
+      got.labels.some((l) => l && l.length > 0),
+      got.labels.join(' | '),
+    )
+  }
+
+  // Eevee: four painted conditions on one chart, and NO random fork -- its seven
+  // branches all distinguish themselves, so the dice must not appear.
+  const eeveeIcons = await paintedOn(133)
+  log(`  Eevee painted: ${eeveeIcons.keys.join(', ')}`)
+  check(
+    'Eevee shows day, night and both rock locations as painted icons',
+    ['day', 'night', 'location-moss-rock', 'location-ice-rock'].every((k) =>
+      eeveeIcons.keys.includes(k),
+    ),
+    eeveeIcons.keys.join(', '),
+  )
+  check('and Eevee is NOT marked a random fork', eeveeIcons.fork === false)
+
+  /*
+    Wurmple is the ONLY fork in the whole bundle whose branches are byte-identical,
+    measured across all 11 multi-branch forks. The dice marks the branch point for
+    display; it resolves nothing, because nothing in this app tracks individual
+    caught Pokemon to resolve against.
+  */
+  const wurmple = await paintedOn(265)
+  log(`  Wurmple painted: ${wurmple.keys.join(', ')}  fork=${wurmple.fork}`)
+  check('Wurmple is marked a random fork', wurmple.fork === true)
+  check('with the dice icon at the branch point', wurmple.keys.includes('random-split'))
+  check(
+    'and the hidden label names both outcomes',
+    wurmple.labels.some((l) => l?.includes('Silcoon') && l.includes('Cascoon')),
+    wurmple.labels.join(' | '),
+  )
+  await page.screenshot({ path: `${SHOTS}/evo-wurmple-random.png`, fullPage: true })
+
   // ------------------------------------------------------- console errors
   hr('CONSOLE / PAGE ERRORS')
   log(`  console errors : ${consoleErrors.length}`)

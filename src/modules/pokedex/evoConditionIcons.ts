@@ -80,3 +80,86 @@ export function evoIconUrl(file: string): string {
 export function evoConditionIconUrl(key: EvoConditionIconKey): string {
   return evoIconUrl(EVO_CONDITION_ICON_FILES[key])
 }
+
+/*
+  The three location ids and the one party species that have a painted icon.
+
+  Named constants rather than inline numbers because the mapping is not derivable:
+  the asset is named for the in-game object (the Moss Rock) while the bundle names
+  the surrounding place (Eterna Forest), so only a lookup table connects them. All
+  four were read out of public/data/ rather than assumed -- see the manifest.
+*/
+const LOCATION_ETERNA_FOREST = 8
+const LOCATION_ROUTE_217 = 48
+const LOCATION_MT_CORONET = 10
+const SPECIES_REMORAID = 223
+
+/** Only what the resolver needs, so it stays testable without a full detail. */
+interface ConditionFields {
+  trigger: string | null
+  location_id: number | null
+  party_species_id: number | null
+  min_beauty: number | null
+  time_of_day: string | null
+}
+
+/**
+ * The painted icon for one evolution requirement, or null to fall back to the
+ * Tabler trigger glyph.
+ *
+ * PRECEDENCE IS MOST-DISTINGUISHING-FIRST, matching what triggerKind already does:
+ * a requirement usually sets several fields at once, and the icon should carry the
+ * one that separates this branch from its siblings while the caption spells out
+ * the rest. Espeon and Umbreon are both level-up-plus-friendship, so the time of
+ * day is the whole story and beats the friendship glyph.
+ *
+ * Verified against the bundle: no detail sets two of these categories at once, so
+ * the order below never actually has to break a tie. It is fixed rather than
+ * arbitrary anyway, so a future generation cannot make the icon flicker between
+ * two equally valid answers.
+ *
+ * GENDER IS RESOLVED SEPARATELY and takes precedence over everything here -- it is
+ * the distinguishing field for all five details that set it. The caller checks the
+ * gender module first; this function never sees the gender field at all, which is
+ * what keeps those two assets out of this module.
+ */
+export function evoConditionIconKey(detail: ConditionFields): EvoConditionIconKey | null {
+  if (detail.location_id === LOCATION_ETERNA_FOREST) return 'location-moss-rock'
+  if (detail.location_id === LOCATION_ROUTE_217) return 'location-ice-rock'
+  if (detail.location_id === LOCATION_MT_CORONET) return 'location-mount-coronet'
+  if (detail.min_beauty != null) return 'beauty'
+  if (detail.party_species_id === SPECIES_REMORAID) return 'party-species-remoraid'
+  if (detail.time_of_day === 'day') return 'day'
+  if (detail.time_of_day === 'night') return 'night'
+  // Both plain trade and trade-holding-an-item: it is the same condition, and the
+  // caption already names the item on the 14 details that carry one.
+  if (detail.trigger === 'trade') return 'trade'
+  return null
+}
+
+/**
+ * Do these sibling branches differ by nothing the data records?
+ *
+ * WHY THIS IS A SHAPE TEST AND NOT A SPECIES LIST. Wurmple's split into Silcoon
+ * and Cascoon is decided by the personality value, which PokeAPI does not model,
+ * so both branches carry byte-identical details -- level-up at 7, every other
+ * field null. Rather than hardcode that pair, the fork is detected structurally:
+ * two or more siblings whose requirements are indistinguishable.
+ *
+ * Measured across the whole bundle, that rule fires on exactly one fork. The other
+ * ten multi-branch forks all distinguish their branches (Tyrogue by relative
+ * stats, Burmy and Kirlia and Snorunt by gender, Eevee's seven by stone, location
+ * and time), so this is a precise description of the Wurmple case rather than a
+ * net that catches innocents -- and it will pick up any future fork of the same
+ * shape without an edit here.
+ *
+ * NOTE ON WHAT IT DOES NOT MEAN: this marks the branch point as random for
+ * DISPLAY. It does not resolve which outcome a given Pokemon gets, because nothing
+ * in this app tracks individual caught Pokemon -- no personality value, no IVs, no
+ * per-instance state of any kind. There is nothing to resolve against.
+ */
+export function isIndistinguishableFork(details: unknown[]): boolean {
+  if (details.length < 2) return false
+  const first = JSON.stringify(details[0])
+  return details.every((d) => JSON.stringify(d) === first)
+}

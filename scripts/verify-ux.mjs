@@ -162,6 +162,38 @@ const TRIGGER_ICON_NAMES = {
   shed: 'IconGhost',
   other: 'IconHelpCircle',
 }
+/*
+  Mirror of src/modules/pokedex/evoConditionIcons.ts, same reason as the table
+  above: an independent copy, so a disagreement shows up as a failure rather than
+  as two files quietly agreeing on the wrong thing. Gender is resolved separately
+  in the app (its own scoped module); here it is just two more branches.
+*/
+const PAINTED_ICON_KEYS = [
+  'day',
+  'night',
+  'trade',
+  'random-split',
+  'location-moss-rock',
+  'location-ice-rock',
+  'location-mount-coronet',
+  'beauty',
+  'party-species-remoraid',
+  'gender-male',
+  'gender-female',
+]
+function paintedIconKey(d) {
+  if (d.gender === 2) return 'gender-male'
+  if (d.gender === 1) return 'gender-female'
+  if (d.location_id === 8) return 'location-moss-rock'
+  if (d.location_id === 48) return 'location-ice-rock'
+  if (d.location_id === 10) return 'location-mount-coronet'
+  if (d.min_beauty != null) return 'beauty'
+  if (d.party_species_id === 223) return 'party-species-remoraid'
+  if (d.time_of_day === 'day') return 'day'
+  if (d.time_of_day === 'night') return 'night'
+  if (d.trigger === 'trade') return 'trade'
+  return null
+}
 function triggerKind(d) {
   if (d.trigger === 'trade') return d.held_item_id != null ? 'trade-item' : 'trade'
   if (d.trigger === 'use-item') return 'stone'
@@ -176,8 +208,20 @@ function triggerKind(d) {
 
 const kindCounts = {}
 const kindExamples = {}
+/*
+  PARENT species id -> every requirement on its outgoing branches, in branch
+  order. Keyed by the parent because that is the species whose page shows the
+  arrows: Eevee's page renders Espeon's and Umbreon's requirements, not its own.
+  Branch order is preserved so "the first arrow of kind K" means the same thing
+  here as it does in the DOM.
+*/
+const childDetailsByParent = new Map()
 function walk(node) {
   for (const child of node.evolves_to) {
+    if (!childDetailsByParent.has(node.species_id)) {
+      childDetailsByParent.set(node.species_id, [])
+    }
+    childDetailsByParent.get(node.species_id).push(...child.evolution_details)
     for (const d of child.evolution_details) {
       const kind = triggerKind(d)
       kindCounts[kind] = (kindCounts[kind] ?? 0) + 1
@@ -864,6 +908,9 @@ try {
     const triggers = [...root.querySelectorAll('.evo-trigger')].map((e) => ({
       kind: e.getAttribute('data-kind'),
       icon: e.querySelector('svg')?.getAttribute('data-icon') ?? null,
+      // The second register: a painted PNG instead of a Tabler svg. Exactly one
+      // of the two is present per arrow.
+      painted: e.querySelector('.evo-painted-icon')?.getAttribute('data-evo-icon') ?? null,
       caption: e.querySelector('.evo-trigger-text')?.textContent ?? '',
       title: e.getAttribute('title'),
     }))
@@ -911,20 +958,52 @@ try {
   log('  arrow labels:')
   eeveeTree.triggers.forEach((t) =>
     log(
-      `    kind=${(t.kind ?? '?').padEnd(11)} icon=${(t.icon ?? 'NONE').padEnd(20)} "${t.caption}"`,
+      `    kind=${(t.kind ?? '?').padEnd(11)} ${t.painted ? `painted=${t.painted.padEnd(24)}` : `tabler=${(t.icon ?? 'NONE').padEnd(25)}`} "${t.caption}"`,
     ),
   )
+  /*
+    TWO REGISTERS NOW, and this block used to assume one.
+
+    It asserted that every arrow carries a Tabler svg matching TRIGGER_ICON_NAMES
+    for its kind. That is still the rule for the generic conditions, but the
+    painted set in public/evo-icons/ now takes precedence for the specific ones --
+    Eevee's Espeon shows a sun rather than IconHeart, because the time of day is
+    what separates it from Umbreon. So the claim splits in two rather than being
+    weakened: exactly one register per arrow, and the Tabler mapping still exact
+    wherever no painted icon applies.
+  */
   check(
-    'every arrow carries an icon',
-    eeveeTree.triggers.every((t) => t.icon != null),
+    'every arrow carries an icon in one register or the other',
+    eeveeTree.triggers.every((t) => t.icon != null || t.painted != null),
+    eeveeTree.triggers.filter((t) => !t.icon && !t.painted).length + ' bare',
   )
   check(
-    'every icon matches the declared mapping for its kind',
-    eeveeTree.triggers.every((t) => TRIGGER_ICON_NAMES[t.kind] === t.icon),
+    'and never both at once',
+    eeveeTree.triggers.every((t) => !(t.icon != null && t.painted != null)),
+  )
+  check(
+    'every Tabler icon still matches the declared mapping for its kind',
+    eeveeTree.triggers
+      .filter((t) => t.painted == null)
+      .every((t) => TRIGGER_ICON_NAMES[t.kind] === t.icon),
+    eeveeTree.triggers
+      .filter((t) => t.painted == null && TRIGGER_ICON_NAMES[t.kind] !== t.icon)
+      .map((t) => `${t.kind}:${t.icon}`)
+      .join(', ') || 'all match',
+  )
+  check(
+    'every painted icon is one of the eleven in the manifest',
+    eeveeTree.triggers
+      .filter((t) => t.painted != null)
+      .every((t) => PAINTED_ICON_KEYS.includes(t.painted)),
+    eeveeTree.triggers
+      .filter((t) => t.painted && !PAINTED_ICON_KEYS.includes(t.painted))
+      .map((t) => t.painted)
+      .join(', ') || 'all known',
   )
   check(
     'no arrow icon is a Poke Ball',
-    eeveeTree.triggers.every((t) => !/Ball|CircleDot/i.test(t.icon)),
+    eeveeTree.triggers.every((t) => !/Ball|CircleDot/i.test(t.icon ?? '')),
   )
   check(
     'non-trade arrows carry a caption',
@@ -951,20 +1030,41 @@ try {
         e.getAttribute('data-kind'),
         e.querySelector('svg')?.getAttribute('data-icon'),
         e.querySelector('.evo-trigger-text')?.textContent ?? '',
+        e.querySelector('.evo-painted-icon')?.getAttribute('data-evo-icon') ?? null,
       ]),
     )
     log(`  ${stop.name} (#${stop.id}):`)
-    found.forEach(([k, i, c]) => {
-      log(`    ${String(k).padEnd(11)} ${String(i).padEnd(20)} "${c}"`)
-      if (!seenKinds.has(k)) seenKinds.set(k, [i, c])
+    found.forEach(([k, i, c, p]) => {
+      log(`    ${String(k).padEnd(11)} ${String(p ?? i).padEnd(24)} "${c}"`)
+      if (!seenKinds.has(k)) seenKinds.set(k, [p ?? i, c])
     })
+    /*
+      THE EXPECTED REGISTER IS DERIVED, NOT RESTATED. For each kind on the tour,
+      the first matching detail is pulled from the bundle and run through
+      paintedIconKey; if that yields a key the arrow must carry the painted icon,
+      otherwise it must carry exactly the Tabler glyph the kind maps to.
+
+      This is why Onix and Kadabra both land on the painted trade icon, and why
+      Happiny -- which evolves in the DAY while holding an Oval Stone -- shows a
+      sun rather than IconHandGrab. Nothing about those cases is hardcoded here.
+    */
     for (const kind of stop.kinds) {
       const hit = found.find(([k]) => k === kind)
-      check(
-        `${stop.name} shows a ${kind} arrow with ${TRIGGER_ICON_NAMES[kind]}`,
-        hit != null && hit[1] === TRIGGER_ICON_NAMES[kind],
-        hit ? `icon=${hit[1]} caption="${hit[2]}"` : 'not found',
-      )
+      const detail = (childDetailsByParent.get(stop.id) ?? []).find((d) => triggerKind(d) === kind)
+      const expectPainted = detail ? paintedIconKey(detail) : null
+      if (expectPainted) {
+        check(
+          `${stop.name} shows a ${kind} arrow with the painted "${expectPainted}"`,
+          hit != null && hit[3] === expectPainted,
+          hit ? `painted=${hit[3]} caption="${hit[2]}"` : 'not found',
+        )
+      } else {
+        check(
+          `${stop.name} shows a ${kind} arrow with ${TRIGGER_ICON_NAMES[kind]}`,
+          hit != null && hit[1] === TRIGGER_ICON_NAMES[kind] && hit[3] == null,
+          hit ? `icon=${hit[1]} painted=${hit[3]} caption="${hit[2]}"` : 'not found',
+        )
+      }
     }
   }
   log('')
@@ -982,7 +1082,15 @@ try {
   await withControls(() => page.fill('[data-testid="species-search"]', 'eevee'))
   await page.waitForSelector('[data-testid="species-row-133"]', { timeout: 15000 })
   await openSpecies(133)
-  const regularNodes = await page.$$eval('[data-testid="evolution-tree"] img', (els) =>
+  /*
+    .evo-thumb img, not every img in the tree. The tree now also contains painted
+    condition icons, which are <img> elements and are correctly NOT affected by the
+    shiny toggle -- a bare `img` selector swept them in and read as "a node failed
+    to switch". Narrowed to the species thumbnails, which is what the claim below
+    has always been about.
+  */
+  const THUMB_SELECTOR = '[data-testid="evolution-tree"] .evo-thumb img'
+  const regularNodes = await page.$$eval(THUMB_SELECTOR, (els) =>
     els.map((e) => e.getAttribute('src')),
   )
   await page.click('[data-testid="toggle-shiny"]')
@@ -994,11 +1102,24 @@ try {
     { timeout: 10000 },
   )
   await settleEvolutionThumbs()
-  const shinyNodes = await page.$$eval('[data-testid="evolution-tree"] img', (els) =>
+  const shinyNodes = await page.$$eval(THUMB_SELECTOR, (els) =>
     els.map((e) => ({ src: e.getAttribute('src'), loaded: e.naturalWidth > 0 })),
   )
   log(`  regular node[0]: ${regularNodes[0]}`)
   log(`  shiny   node[0]: ${shinyNodes[0].src}`)
+  log(`  thumbs compared : ${shinyNodes.length} (painted condition icons excluded)`)
+  // The painted icons must still be there -- narrowing the selector must not have
+  // been achieved by the icons quietly disappearing.
+  const paintedInTree = await page.$$eval(
+    '[data-testid="evolution-tree"] .evo-painted-icon',
+    (els) => els.map((e) => e.getAttribute('data-evo-icon')),
+  )
+  log(`  painted icons still present: ${paintedInTree.join(', ') || '(none)'}`)
+  check(
+    'the painted condition icons are unaffected by the shiny toggle',
+    paintedInTree.length > 0 && paintedInTree.every((k) => PAINTED_ICON_KEYS.includes(k)),
+    paintedInTree.join(', '),
+  )
   check(
     'every evolution node switched to shiny artwork',
     shinyNodes.every((n) => n.src.includes('official-artwork/shiny/')),
@@ -1020,13 +1141,16 @@ try {
     undefined,
     { timeout: 10000 },
   )
-  const afterMotion = await page.$$eval('[data-testid="evolution-tree"] img', (els) =>
+  // Same narrowing as above: compare thumbnails against thumbnails, or the
+  // painted icons make the two lists different lengths and the claim never holds.
+  const afterMotion = await page.$$eval(THUMB_SELECTOR, (els) =>
     els.map((e) => e.getAttribute('src')),
   )
   check(
     'tree ignores the motion toggle',
     afterMotion.every((s) => !s.endsWith('.webp')) &&
       JSON.stringify(afterMotion) === JSON.stringify(shinyNodes.map((n) => n.src)),
+    `${afterMotion.length} thumbs vs ${shinyNodes.length}`,
   )
   await page.click('[data-testid="toggle-motion"]')
   await page.screenshot({ path: `${SHOTS}/ux-item7-evolution.png`, fullPage: true })

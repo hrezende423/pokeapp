@@ -941,6 +941,50 @@
   color: var(--accent);
 }
 
+/*
+  The painted condition icons, sitting in the same slot as .trigger-icon.
+
+  20px against the line icons' 16px, deliberately: these are shaded artwork rather
+  than 1.8px strokes, and at 16 the detail turns to mush. The source is 128px, so
+  this is a 6.4x reduction with retina headroom. No colour applied -- unlike the
+  Tabler glyphs these carry their own, which is the whole point of the register.
+
+  They are all 128x128 with content at 79.7% of the canvas (see
+  scripts/normalize-evo-icons.mjs), so a fixed box needs no per-icon nudging and
+  none of them draws heavier than another.
+*/
+.evo-painted-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  /* The row is 16px-tall text; a 20px image would otherwise push the pill taller
+     than its line-icon siblings. Negative margin keeps the pill heights equal. */
+  margin: -2px 0;
+}
+
+/*
+  The random-fork marker: one row above the branches it describes, inside the same
+  .evo-children column so it reads as belonging to the fork rather than to either
+  outcome. No border, unlike .evo-trigger -- it is a note on the branch point, not
+  a requirement on an arrow, and giving it the pill chrome made it look like a
+  third sibling.
+*/
+.evo-fork-random {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding-left: 0.15rem;
+  color: var(--text-secondary);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.evo-fork-random-text {
+  white-space: nowrap;
+}
+
 .evo-trigger-vg {
   color: var(--text);
   font-size: 0.55rem;

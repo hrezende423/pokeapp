@@ -1,6 +1,7 @@
 import { evolutionThumbUrl, getItem, getLocation, getMove, getSpecies, getType } from '../../data'
 import type { EvolutionDetail, EvolutionNode, Species } from '../../data'
-import { TriggerIcon } from './TriggerIcon'
+import { EvoRequirementIcon } from './TriggerIcon'
+import { evoConditionIconUrl, isIndistinguishableFork } from './evoConditionIcons'
 import { triggerCaption, triggerKind } from './evolutionTriggers'
 
 /**
@@ -154,7 +155,7 @@ function Arrow({ details, childId }: { details: EvolutionDetail[]; childId: numb
               data-testid={`evo-trigger-${childId}-${i}`}
               title={describe(detail) + (detail.version_group ? ` (${detail.version_group})` : '')}
             >
-              <TriggerIcon kind={kind} />
+              <EvoRequirementIcon detail={detail} kind={kind} />
               {caption && <span className="evo-trigger-text">{caption}</span>}
               {detail.version_group && (
                 <span className="evo-trigger-vg">{detail.version_group}</span>
@@ -188,6 +189,22 @@ function Subtree({
   onSelect?: (id: number) => void
   depth: number
 }) {
+  /*
+    A RANDOM FORK IS A PROPERTY OF THE BRANCH POINT, so the dice goes here on the
+    parent rather than on either arrow. Both outcomes stay fully drawn beside it --
+    the icon says "which one you get is not determined by anything above", and the
+    two cards say what the outcomes are. Naming them in the hidden label too, since
+    the icon alone does not say Silcoon or Cascoon.
+
+    No resolver sits behind this and none is needed: nothing in the app tracks
+    individual caught Pokemon, so there is no personality value to resolve against.
+    See isIndistinguishableFork for why the detection is structural.
+  */
+  const randomFork = isIndistinguishableFork(node.evolves_to.map((c) => c.evolution_details))
+  const outcomeNames = node.evolves_to
+    .map((c) => getSpecies(c.species_id)?.display_name ?? `#${c.species_id}`)
+    .join(' or ')
+
   return (
     <div className="evo-subtree" data-depth={depth}>
       <NodeCard node={node} currentId={currentId} shiny={shiny} onSelect={onSelect} />
@@ -195,8 +212,32 @@ function Subtree({
         <ul
           className="evo-children"
           data-branches={node.evolves_to.length}
+          data-random-fork={randomFork}
           data-testid={`evo-children-${node.species_id}`}
         >
+          {randomFork && (
+            <li
+              className="evo-fork-random"
+              data-testid={`evo-fork-random-${node.species_id}`}
+              title={`Random: ${outcomeNames}. Nothing in the data decides which.`}
+            >
+              <img
+                src={evoConditionIconUrl('random-split')}
+                alt=""
+                width={20}
+                height={20}
+                loading="lazy"
+                className="evo-painted-icon"
+                data-evo-icon="random-split"
+              />
+              {/* aria-hidden so a screen reader gets the full sentence below once
+                  rather than "Random" and then "Random outcome: ..." twice. */}
+              <span className="evo-fork-random-text" aria-hidden>
+                Random
+              </span>
+              <span className="visually-hidden">{`Random outcome: ${outcomeNames}`}</span>
+            </li>
+          )}
           {node.evolves_to.map((child) => (
             <li className="evo-child" key={child.species_id}>
               <Arrow details={child.evolution_details} childId={child.species_id} />
