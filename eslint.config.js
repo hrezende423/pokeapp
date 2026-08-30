@@ -21,6 +21,41 @@ export default tseslint.config(
       globals: globals.browser,
     },
   },
+  /*
+    THE PAINTED GENDER ICONS ARE EVOLUTION-CHART-ONLY, and this is what enforces
+    it rather than a comment in the module.
+
+    src/modules/pokedex/evoGenderIcon.ts wraps icon-male.png / icon-female.png,
+    which are a distinct visual register from any general-purpose gender glyph and
+    must not become one. Importing it anywhere outside the evolution chart is a
+    lint error; the override below is the entire allowlist, so widening the scope
+    is a deliberate edit to this file and shows up in review.
+
+    Matched on the specifier the way callers actually write it -- relative within
+    the pokedex module, path-suffixed from anywhere else.
+  */
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/evoGenderIcon', '**/evoGenderIcon.ts'],
+              message:
+                'The painted male/female icons are scoped to the evolution chart. They are a different visual register from the app gender affordance and must not be reused as a general gender glyph. If the chart genuinely needs a new caller, add it to the allowlist in eslint.config.js.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The allowlist. Nothing else may reach the painted gender icons.
+    files: ['src/modules/pokedex/EvolutionTree.tsx', 'src/modules/pokedex/TriggerIcon.tsx'],
+    rules: { 'no-restricted-imports': 'off' },
+  },
   {
     files: ['**/*.{js,mjs,cjs}'],
     extends: [js.configs.recommended, prettier],

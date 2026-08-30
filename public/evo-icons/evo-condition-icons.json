@@ -1,0 +1,80 @@
+{
+  "$schema-note": "Semantic key -> exact filename, for the custom painted evolution-condition icons in this folder. Keys are the app's stable identifiers; filenames may be re-exported without touching calling code. src/modules/pokedex/evoConditionIcons.ts mirrors these keys as a TypeScript union and verify-evo-icons.mjs asserts the two agree and that every file listed here exists.",
+  "$render-context": "The evolution chart on the species detail page, and nowhere else. The two gender entries are additionally namespaced -- see the note on `gender` below.",
+  "icons": {
+    "day": {
+      "file": "icon-sun.png",
+      "condition": "Daytime evolution",
+      "data": "evolution_details.time_of_day === 'day'",
+      "gen1to4Uses": ["Chansey", "Espeon", "Roselia", "Lucario"]
+    },
+    "night": {
+      "file": "icon-moon.png",
+      "condition": "Night-time evolution",
+      "data": "evolution_details.time_of_day === 'night'",
+      "gen1to4Uses": ["Umbreon", "Gliscor", "Weavile", "Chimecho"]
+    },
+    "trade": {
+      "file": "icon-trade.png",
+      "condition": "Trade evolution",
+      "data": "evolution_details.trigger === 'trade'",
+      "gen1to4Uses": "17 details -- 3 plain trades (Alakazam, Machamp, Golem, Gengar) and 14 trade-holding-an-item"
+    },
+    "random-split": {
+      "file": "icon-dice.png",
+      "condition": "Random 50/50 branch (Wurmple line)",
+      "data": "NOT IN THE DATA -- see the warning below. Needs a hardcoded species-pair rule.",
+      "gen1to4Uses": ["Silcoon", "Cascoon"]
+    },
+    "location-moss-rock": {
+      "file": "icon-moss-rock.png",
+      "condition": "Level up near the Moss Rock",
+      "data": "evolution_details.location_id === 8 (Eterna Forest)",
+      "gen1to4Uses": ["Leafeon"]
+    },
+    "location-ice-rock": {
+      "file": "icon-ice-rock.png",
+      "condition": "Level up near the Ice Rock",
+      "data": "evolution_details.location_id === 48 (Route 217)",
+      "gen1to4Uses": ["Glaceon"]
+    },
+    "location-mount-coronet": {
+      "file": "icon-mount-coronet.png",
+      "condition": "Level up in the Mt. Coronet magnetic field",
+      "data": "evolution_details.location_id === 10 (Mt. Coronet)",
+      "gen1to4Uses": ["Magnezone", "Probopass"]
+    },
+    "beauty": {
+      "file": "icon-beauty.png",
+      "condition": "High beauty",
+      "data": "evolution_details.min_beauty != null",
+      "gen1to4Uses": ["Milotic (beauty 170)"]
+    },
+    "party-species-remoraid": {
+      "file": "icon-remoraid.png",
+      "condition": "Remoraid in the party",
+      "data": "evolution_details.party_species_id === Remoraid",
+      "gen1to4Uses": ["Mantine"]
+    },
+    "gender-male": {
+      "file": "icon-male.png",
+      "condition": "Male-only evolution",
+      "data": "evolution_details.gender === 2",
+      "gen1to4Uses": ["Gallade", "Mothim"],
+      "scope": "EVOLUTION CHART ONLY -- painted register, matching the other icons here. Reachable in code only through evoGenderIcon.ts, which ESLint forbids importing outside the evolution chart. Not a general-purpose gender glyph."
+    },
+    "gender-female": {
+      "file": "icon-female.png",
+      "condition": "Female-only evolution",
+      "data": "evolution_details.gender === 1",
+      "gen1to4Uses": ["Froslass", "Wormadam", "Vespiquen"],
+      "scope": "EVOLUTION CHART ONLY -- see gender-male."
+    }
+  },
+  "$warnings": {
+    "random-split": "The Wurmple 50/50 is NOT expressible from the bundle. Both branches carry byte-identical details (trigger level-up, min_level 7, every other field null) because the real split is decided by the personality value, which PokeAPI does not model. Verified against public/data/evolution-chains.json. Driving this icon needs an explicit Silcoon/Cascoon species-pair rule, the same shape as the fixed-damage-move resolver in src/data/moveDamage.ts.",
+    "location-naming": "moss-rock and ice-rock are named for the in-game objects; the bundle names the surrounding location instead (Eterna Forest, Route 217). One location maps to one icon in both cases, so the mapping is still unambiguous. mount-coronet is the one whose asset name matches the data's own location name.",
+    "dimensions": "The source files are NOT dimensionally consistent: 7 are 1024x1024, sun/moon are ~509x506 and 494x506, beauty/remoraid are 128x128. Content fill within the canvas also ranges 69-97%. Both need normalising before these render at a shared box size, or the chart will show uneven icon weights.",
+    "weight": "3.14 MB unoptimised, which the workbox png glob precaches in full. See the placement note in evoConditionIcons.ts."
+  }
+}
