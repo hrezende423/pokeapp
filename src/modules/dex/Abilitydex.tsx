@@ -5,7 +5,7 @@ import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell, LedgerList } from './DexPageShell'
 import { EntityDetailPage } from './EntityDetailPage'
-import { abilityEntries } from './entrySources'
+import { abilitiesHiddenFromList, abilityEntries } from './entrySources'
 
 /**
  * REGULAR / HIDDEN GROUPING: measured, and deliberately not applied.
@@ -43,11 +43,17 @@ export function Abilitydex() {
   // too: the list and a search over it were once scoped differently, which is the
   // leak that has to stay impossible.
   //
-  // abilitiesInList() and abilitiesHiddenFromList() used to be read here to build
-  // the "N of M abilities exist in Generation G" line. That line is gone with the
-  // rest of this pass's descriptive text; the clamp itself is unchanged and still
-  // lives in entrySources.
+  // THE CLAMP IS DISCLOSED AGAIN, as a caption at the end of the list rather than
+  // the header paragraph that used to carry it. Same fact, a tenth the furniture:
+  // a reader who scrolls to the bottom of 123 abilities and wonders where the rest
+  // went gets an answer exactly where the question occurs to them.
+  //
+  // The count is READ, not written: abilitiesHiddenFromList() is the same function
+  // the clamp itself uses, so the caption cannot drift from the list it describes.
+  // A literal "38" would have been silently wrong the first time the bundle gained
+  // a generation.
   const entries = useMemo(() => abilityEntries({ generation, isAll }), [generation, isAll])
+  const hiddenCount = useMemo(() => abilitiesHiddenFromList().length, [])
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 
   return (
@@ -63,16 +69,24 @@ export function Abilitydex() {
           : undefined
       }
       list={({ entries: visible, onSelect }) => (
-        <LedgerList
-          testId="abilitydex-rows"
-          rows={visible.map((a) => ({
-            id: a.id,
-            label: a.display_name,
-            meta: a.short_effect ?? undefined,
-          }))}
-          onSelect={onSelect}
-          emptyNote="No ability matches that search."
-        />
+        <>
+          <LedgerList
+            testId="abilitydex-rows"
+            rows={visible.map((a) => ({
+              id: a.id,
+              label: a.display_name,
+              meta: a.short_effect ?? undefined,
+            }))}
+            onSelect={onSelect}
+            emptyNote="No ability matches that search."
+          />
+          {hiddenCount > 0 && (
+            <p className="list-caption" data-testid="abilitydex-clamp-caption">
+              <span className="num">{hiddenCount}</span> later-generation abilities are kept for
+              species references but not listed here.
+            </p>
+          )}
+        </>
       )}
       detail={({ entry, onBack }) => (
         <AbilityDetail

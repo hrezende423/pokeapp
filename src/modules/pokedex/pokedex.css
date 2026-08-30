@@ -2098,6 +2098,24 @@
   background: var(--surface-hover);
 }
 
+/*
+  A caption at the end of a list, for something true about the list as a whole
+  that the rows cannot say -- currently only the Abilitydex's clamp.
+
+  NOT the header block that came back: no rule of its own, because the last row's
+  border-bottom is already there to sit under, and the same 52rem cap as the list
+  so it reads as that list's footnote rather than page-level text. Secondary tone
+  and label size keep it below the rows in the hierarchy; the padding is the row's
+  own horizontal padding, so its left edge lines up with the catalog numbers.
+*/
+.list-caption {
+  max-width: 52rem;
+  margin: 0.55rem 0 0;
+  padding: 0 0.35rem;
+  color: var(--text-secondary);
+  font-size: var(--font-size-label);
+}
+
 /* ------------------------------------------------- nature stat direction */
 
 /*

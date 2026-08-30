@@ -907,6 +907,43 @@ try {
     (await page.$('[data-testid="abilitydex-note"]')) == null,
   )
 
+  /*
+    THE CLAMP IS DISCLOSED AGAIN, at the END of the list this time rather than in a
+    header block. What went away with the header paragraph was the only place the
+    UI admitted that 38 abilities exist in the data and are not listed; the clamp
+    was still checked, the disclosure of it was not there to check. It is now a
+    one-line caption after the last row.
+
+    Asserted three ways -- that it exists, that its number is the real hidden
+    count, and that it sits BELOW the last row rather than above the first, since
+    "at the end of the list" is the whole point of the placement.
+  */
+  const clampCaption = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="abilitydex-clamp-caption"]')
+    if (!el) return null
+    const rows = document.querySelectorAll('[data-testid="abilitydex-rows"] .species-row')
+    const last = rows[rows.length - 1]
+    return {
+      text: el.textContent.trim(),
+      belowLastRow:
+        last != null && el.getBoundingClientRect().top >= last.getBoundingClientRect().bottom,
+      numericFace: getComputedStyle(el.querySelector('.num')).fontFamily,
+    }
+  })
+  log(`  clamp caption: ${JSON.stringify(clampCaption)}`)
+  check('the clamp is disclosed by a caption at the end of the list', clampCaption != null)
+  check(
+    'and it states the real hidden count, not a literal',
+    (clampCaption?.text ?? '').includes(String(abilitiesOutOfScope.length)),
+    `${clampCaption?.text} (expected ${abilitiesOutOfScope.length})`,
+  )
+  check('placed after the last row, not before the first', clampCaption?.belowLastRow === true)
+  check(
+    'with its count in --font-numeric like every other number',
+    /Martian Mono/.test(clampCaption?.numericFace ?? ''),
+    clampCaption?.numericFace,
+  )
+
   // Every listed row must be in scope, and named Gen 5 abilities must be absent.
   const listedAbilities = await page.$$eval(
     '[data-testid="abilitydex-rows"] .species-name',
