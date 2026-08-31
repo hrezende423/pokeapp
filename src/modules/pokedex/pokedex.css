@@ -2627,3 +2627,126 @@
   color: var(--text-secondary);
   letter-spacing: normal;
 }
+
+/* ============================================================ species page */
+
+/*
+  Two-column split: pinned left, scrolling right. Step 1 of the detail-page redo.
+
+  A GRID, NOT position:sticky. The left column is a track with its own
+  `overflow: hidden`, so it physically cannot scroll however long the right column
+  gets. Sticky would have been the reflex and is wrong here: it still moves once
+  its containing block scrolls, and the whole point of the app's viewport lock is
+  that only an inner region ever scrolls -- a sticky element inside a scrolling
+  parent is a weaker version of what a fixed track gives for free.
+
+  min-height: 0 on both tracks, because the grid row is the growing one and
+  without it a long panel pushes the row taller than the viewport and hands the
+  scroll back to the page.
+
+  420px matches .ds-hero's own max-width, so the pinned track is exactly the card
+  it holds rather than a guess that leaves a gap or clips it.
+*/
+.species-page {
+  display: grid;
+  grid-template-columns: 420px minmax(0, 1fr);
+  gap: var(--space-gap-lg);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.species-page-pinned {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+  min-height: 0;
+  /* The half of "never scrolls" that CSS has to say out loud. */
+  overflow: hidden;
+}
+
+/* The card must not stretch to the track height -- it is a card, not a panel. */
+.species-page-pinned .ds-hero {
+  flex: none;
+}
+
+/*
+  The katakana / romaji pair, under the name inside the hero card.
+
+  Kana at body size and romaji smaller and secondary: the Japanese name is the
+  thing being shown, the romanization is the pronunciation aid beneath it. Both are
+  --font-body, NOT --font-numeric -- they are names, and the numeric face is for
+  tabular data only.
+*/
+/*
+  Centred, because the card it sits in centres its own name and artwork -- that is
+  the reference treatment, and left-aligning just this pair put the kana under the
+  name's left edge while the artwork above stayed centred. Alignment is the card's
+  to decide, not this block's.
+*/
+.species-page-ja {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin: 0.35rem 0 0;
+}
+
+.species-page-ja-kana {
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+}
+
+.species-page-ja-roma {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* The right track. .scroll-area-outer inside it supplies the scroll model. */
+.species-page-scroll {
+  padding-right: var(--space-gap-md);
+}
+
+.species-page-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-md);
+  /* Capped for the same reason the ledger list is: a table whose row runs the
+     full 1600px does not read as one row. */
+  max-width: 60rem;
+}
+
+/*
+  PAGE-LOCAL SUB-NAV. Same treatment as the app nav's tabs by using the same
+  component -- .ds-tabs already carries the 1px --hairline under the row and the
+  2px --accent under the active tab.
+
+  What separates it from the app bar is position and scale, not colour: it sits
+  inside the scrolling column rather than in the fixed bar, and one step down in
+  size. Reading as page-local is the thing to verify by eye.
+*/
+.species-page-subnav .ds-tabs {
+  font-size: var(--font-size-label);
+}
+
+.species-page-subnav .ds-tab {
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.species-page-panel {
+  min-height: 0;
+}
+
+@media (max-width: 1100px) {
+  /* One column below the width the 420px track plus a readable panel needs. The
+     pinned column stops being pinned here -- it becomes the first thing in the
+     scrolling column, because two independent scroll regions on a narrow screen
+     is worse than one. */
+  .species-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}

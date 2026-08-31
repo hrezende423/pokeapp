@@ -2,12 +2,25 @@ import { IconArrowLeft } from '@tabler/icons-react'
 import { useDexSelection } from '../nav/navContext'
 import { ScrollArea } from '../../components/ScrollArea'
 import { SpeciesDetail } from './SpeciesDetail'
+import { SpeciesDetailPage } from './SpeciesDetailPage'
 import { SpeciesList } from './SpeciesList'
 // The grid card's type row is the validated TypeLabel/TypeRow pair, whose styles
 // live in the design-system sheet. Imported here so the Pokedex does not depend
 // on the design-system tab happening to be in the bundle.
 import '../../components/ds/ds.css'
 import './pokedex.css'
+
+/*
+  TEMPORARY, step 1 of the species-detail redo. ?detail=new renders the rebuilt
+  two-column page instead of the current rail-plus-detail view, so the new shell
+  is reviewable in the real app without replacing a page that still carries all
+  the content the new one's tabs have yet to be filled with. Removed in step 2,
+  when SpeciesDetailPage takes over unconditionally.
+
+  Read once at module scope: there is no router, and nothing toggles it at runtime.
+*/
+const NEW_DETAIL_PAGE =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('detail')
 
 /**
  * Pokedex shell, in the two states the reference frames describe.
@@ -43,7 +56,10 @@ export function Pokedex() {
         renders on its own when something is selected. Figma puts an
         "icon-page-back" instance at the top-left of both DetailPage frames.
       */}
-      {!browsing && (
+      {/* The rebuilt page carries its own back-link inside the pinned column, per
+          Part 1, so this one would be a second identical control on the same
+          screen -- measured as two .pokedex-back nodes before this guard. */}
+      {!browsing && !NEW_DETAIL_PAGE && (
         <div className="pokedex-back-row">
           <button
             type="button"
@@ -76,6 +92,15 @@ export function Pokedex() {
             </div>
           </ScrollArea>
         </div>
+      ) : NEW_DETAIL_PAGE ? (
+        /* The rebuilt page owns its own two-column split and its own single
+           scroll area, so it is NOT wrapped in .pokedex-body or a ScrollArea --
+           either would add a second scrolling ancestor and break the pinning. */
+        <SpeciesDetailPage
+          key={selectedId}
+          speciesId={selectedId}
+          onBack={() => setSelectedId(null)}
+        />
       ) : (
         <div className="pokedex-body">
           <ScrollArea

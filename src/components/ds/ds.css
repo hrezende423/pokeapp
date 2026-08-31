@@ -622,7 +622,20 @@
   margin: var(--space-gap-sm) auto 0;
 }
 
-.ds-root .ds-hero-name {
+/*
+  .ds-hero h2, not .ds-root h2: (0,2,1) rather than (0,2,0), and scoped to the
+  card instead of the design-system surface.
+
+  The card is now rendered by the real species page, which is NOT inside .ds-root.
+  The old selector therefore did not match there at all -- not a specificity loss,
+  a miss -- so the name fell through to App.css's `.panel h2` and rendered 14.4px
+  uppercase where the token says 38px. Measured, not guessed; it is the first
+  gotcha CLAUDE.md lists, and this is the first time the card left .ds-root.
+
+  Binding to the card instead means the name is right wherever the card is used,
+  which is the whole point of reusing the component.
+*/
+.ds-hero h2.ds-hero-name {
   margin: 0;
   text-transform: none;
   text-align: center;
@@ -796,8 +809,10 @@
 /* Scoped to .ds-root, i.e. (0,2,0), because App.css's `.panel h1` and `.panel h2`
    are (0,1,1) and would otherwise win: the shell renders headings inside .panel at
    0.8rem uppercase with its own letter-spacing. Only h1, h2 and section collide,
-   so only those three rules are scoped -- see also .ds-root .ds-hero-name,
-   .ds-root .ds-detail-drawer-name and .ds-root .ds-comp / .ds-root .ds-detail. */
+   so only those three rules are scoped -- see also .ds-hero h2.ds-hero-name
+   (bound to the card, not the DS surface, because the species page renders it
+   outside .ds-root), .ds-root .ds-detail-drawer-name and .ds-root .ds-comp /
+   .ds-root .ds-detail. */
 .ds-root .ds-cat-title {
   margin: 0;
   font-size: var(--font-size-title);

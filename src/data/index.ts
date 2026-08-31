@@ -74,6 +74,7 @@ export {
   MAX_SPECIES_ID,
   generationTag,
   getGenerationForSpecies,
+  getRegionForSpecies,
   isSpeciesInGeneration,
 } from './generations'
 export type { GenerationRange } from './generations'

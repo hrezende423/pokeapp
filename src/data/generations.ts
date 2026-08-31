@@ -22,13 +22,23 @@ export interface GenerationRange {
   generation: number
   first: number
   last: number
+  /**
+   * The region the generation introduced, for the species page's rotated
+   * micro-label ("Region: Sinnoh").
+   *
+   * Carried here rather than in a separate map so that adding a generation stays
+   * the one-line change the note below promises. It is the region a species was
+   * INTRODUCED in, which is not the same as everywhere it can be caught -- the
+   * regional-dex caveat at the top of this file applies unchanged.
+   */
+  region: string
 }
 
 export const GENERATION_RANGES: readonly GenerationRange[] = [
-  { generation: 1, first: 1, last: 151 },
-  { generation: 2, first: 152, last: 251 },
-  { generation: 3, first: 252, last: 386 },
-  { generation: 4, first: 387, last: 493 },
+  { generation: 1, first: 1, last: 151, region: 'Kanto' },
+  { generation: 2, first: 152, last: 251, region: 'Johto' },
+  { generation: 3, first: 252, last: 386, region: 'Hoenn' },
+  { generation: 4, first: 387, last: 493, region: 'Sinnoh' },
 ] as const
 
 /**
@@ -56,6 +66,16 @@ export function getGenerationForSpecies(id: number): number | null {
  * Whether a species is available under a given generation, using the cumulative
  * reading: a Gen 4 game includes everything introduced in Gens 1-4.
  */
+/**
+ * Region a species was introduced in, or null outside 1..493.
+ *
+ * Same contract as getGenerationForSpecies: null rather than a guess, so a caller
+ * passing an out-of-scope id gets a missing label instead of "Kanto".
+ */
+export function getRegionForSpecies(id: number): string | null {
+  return GENERATION_RANGES.find((r) => id >= r.first && id <= r.last)?.region ?? null
+}
+
 export function isSpeciesInGeneration(id: number, generation: number): boolean {
   const gen = getGenerationForSpecies(id)
   return gen != null && gen <= generation
