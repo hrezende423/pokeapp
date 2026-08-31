@@ -26,14 +26,6 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   `species-background-colors.json` lives in the same repo, fetched at
   runtime — applies ONLY to the species detail page's artwork panel,
   never the grid or any other screen.
-- **Japanese species names**: PokéAPI's `ja-roma` gives the real,
-  official Nintendo romanization, NOT a mechanical transliteration —
-  ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not
-  "rakkii". Never use a kana-to-romaji library for this (wanakana was
-  considered and rejected); `ja-roma` already carries the correct
-  trademark name for all 493 species in Gen 1–4 scope. Language codes
-  are lowercase: `ja-hrkt`, not `ja-Hrkt` — the documented casing
-  silently returns null rather than erroring.
 - **Sprite slot encoding**: 14 real slot variants exist across Gen 1–4
   (16,204 tiles for 493 species), stored as a per-game bitmask rather
   than a name array purely for install payload — 98 KiB against 638 KiB
@@ -51,6 +43,14 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   (not EVs/IVs), abilities and natures don't exist before Gen 3. Any
   component showing these fields must hide/adapt them per the active
   generation, not just always show the modern version.
+- **Japanese species names**: PokéAPI's `ja-roma` gives the real,
+  official Nintendo romanization, NOT a mechanical transliteration —
+  ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not
+  "rakkii". Never use a kana-to-romaji library for this (wanakana was
+  considered and rejected); `ja-roma` already carries the correct
+  trademark name for all 493 species in Gen 1–4 scope. Language codes
+  are lowercase: `ja-hrkt`, not `ja-Hrkt` — the documented casing
+  silently returns null rather than erroring.
 
 ## Verification discipline
 
