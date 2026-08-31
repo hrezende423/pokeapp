@@ -26,6 +26,20 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   `species-background-colors.json` lives in the same repo, fetched at
   runtime — applies ONLY to the species detail page's artwork panel,
   never the grid or any other screen.
+- **Japanese species names**: PokéAPI's `ja-roma` gives the real,
+  official Nintendo romanization, NOT a mechanical transliteration —
+  ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not
+  "rakkii". Never use a kana-to-romaji library for this (wanakana was
+  considered and rejected); `ja-roma` already carries the correct
+  trademark name for all 493 species in Gen 1–4 scope. Language codes
+  are lowercase: `ja-hrkt`, not `ja-Hrkt` — the documented casing
+  silently returns null rather than erroring.
+- **Sprite slot encoding**: 14 real slot variants exist across Gen 1–4
+  (16,204 tiles for 493 species), stored as a per-game bitmask rather
+  than a name array purely for install payload — 98 KiB against 638 KiB
+  on the eagerly precached `species.json`. Eager and NOT lazy-fetched on
+  purpose: the app is offline-first, and a lazy file would leave the
+  Sprites tab broken until someone opened it online first.
 
 ## Data sourcing (don't deviate without asking)
 
@@ -57,9 +71,12 @@ that isn't explicitly about design.)
 
 - **No `box-shadow`, anywhere, either theme.** Elevation is a tone-step:
   `--surface` vs `--surface-raised`.
-- **`--accent` (red) has exactly three uses**: active tab/nav state,
-  binary state indicators, error/validation emphasis. Never decoration.
-  App-wide, not namespaced.
+- **`--accent` (red) has exactly four uses**: active tab/nav state,
+  binary state indicators, error/validation emphasis, and stat magnitude
+  (the filled portion of a base-stat bar on the species detail page).
+  The fourth was added during the Detail Page redo and deliberately
+  reverses an earlier "plain data table" decision, confirmed against the
+  real Figma prototype. Never decoration. App-wide, not namespaced.
 - **`--font-numeric`** (Martian Mono primary, JetBrains Mono fallback,
   both self-hosted) for tabular/functional numbers only (stat tables, EV
   inputs, dex numbers in lists) — must lead the font stack, or a system
