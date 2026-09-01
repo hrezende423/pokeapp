@@ -13,7 +13,15 @@
  */
 
 import { getAbility, getType, listTypes } from './loader'
-import type { Ability, AbilitySlot, DamageRelations, PokemonType, TypeSlot, Variety } from './types'
+import type {
+  Ability,
+  AbilitySlot,
+  DamageRelations,
+  PokemonType,
+  StatEntry,
+  TypeSlot,
+  Variety,
+} from './types'
 
 /** Abilities did not exist before Gen 3 — no species had one in RBY or GSC. */
 export const ABILITIES_INTRODUCED_IN_GENERATION = 3
@@ -149,6 +157,73 @@ export function typeEffectivenessAgainst(
     return { type, multiplier }
   })
 }
+
+/**
+ * Base stats a species had in generation `generation`.
+ *
+ * RESOLVED PER STAT, not per entry, for the same reason abilities are: a variety
+ * can carry several past entries that each touch a different stat, and taking only
+ * the earliest applicable one would drop the others. 20 of the 493 in scope have
+ * exactly that shape -- Beedrill has a Gen 1 `special` entry AND a Gen 5 `attack`
+ * entry, and the Gen 5 one is what applied in Gen 1 too (Attack 80, not the
+ * current 90). Per-entry resolution would have shown the modern 90.
+ *
+ * THE GEN 1 SPECIAL IS A REPLACEMENT, NOT AN OVERRIDE. `past_stats` for Gen 1
+ * carries a single `special` value; the split Special Attack / Special Defense
+ * pair did not exist then, so they are removed rather than left beside it. That is
+ * safe to key on the presence of `special`, because no current-data variety has
+ * that stat -- it can only arrive from a Gen 1 entry.
+ */
+export function resolveStatsForGeneration(variety: Variety, generation: number): StatEntry[] {
+  const overrides = new Map<string, { generation_id: number; entry: StatEntry }>()
+  for (const past of variety.past_stats ?? []) {
+    const gen = past.generation_id
+    if (gen == null || gen < generation) continue
+    for (const entry of past.stats) {
+      if (entry.stat == null) continue
+      const existing = overrides.get(entry.stat)
+      // Earliest applicable entry wins for this stat.
+      if (existing && existing.generation_id <= gen) continue
+      overrides.set(entry.stat, { generation_id: gen, entry })
+    }
+  }
+
+  const merged = new Map<string, StatEntry>()
+  for (const entry of variety.stats) {
+    if (entry.stat != null) merged.set(entry.stat, entry)
+  }
+  for (const [stat, override] of overrides) merged.set(stat, override.entry)
+
+  if (merged.has('special')) {
+    merged.delete('special-attack')
+    merged.delete('special-defense')
+  }
+
+  return STAT_ORDER.filter((stat) => merged.has(stat)).map((stat) => merged.get(stat)!)
+}
+
+/**
+ * Canonical stat order, with Gen 1's combined Special sitting where the split
+ * pair would start. Anything the bundle grows that is not listed here would be
+ * dropped by resolveStatsForGeneration, which is the intent: an unrecognised
+ * stat is a data-build question, not something to render in an arbitrary slot.
+ */
+const STAT_ORDER = [
+  'hp',
+  'attack',
+  'defense',
+  'special',
+  'special-attack',
+  'special-defense',
+  'speed',
+] as const
+
+/**
+ * EVs (and their yield) arrived in Gen 3. Gens 1-2 had Stat Experience, which is
+ * a different mechanic with no per-species yield to show, so the field is hidden
+ * rather than relabelled.
+ */
+export const EFFORT_VALUES_INTRODUCED_IN_GENERATION = 3
 
 /** Gender split as percentages, or null for a genderless species. */
 export function genderRatio(genderRate: number | null): { male: number; female: number } | null {

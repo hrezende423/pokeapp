@@ -58,10 +58,12 @@ export type {
 
 export {
   ABILITIES_INTRODUCED_IN_GENERATION,
+  EFFORT_VALUES_INTRODUCED_IN_GENERATION,
   captureRatePercent,
   damageRelationsFor,
   genderRatio,
   resolveAbilitiesForGeneration,
+  resolveStatsForGeneration,
   resolveTypesForGeneration,
   typeEffectivenessAgainst,
   typesInGeneration,
@@ -114,6 +116,17 @@ export type { AbilityHolder } from './abilityHolders'
 
 export { availableSpriteGenders, getSpriteUrl, usesUnsuffixedMaleSprite } from './sprites'
 export type { SpriteGender, SpriteOptions } from './sprites'
+
+export {
+  SLOT_ORDER,
+  SPRITE_GAMES,
+  hasSlot,
+  slotLabel,
+  slotsFor,
+  spriteTiles,
+  versionSpriteUrl,
+} from './spriteSlots'
+export type { SpriteSlot, SpriteTile } from './spriteSlots'
 
 export { DATA_DIR, EAGER_DATA_FILES, PARTITION_DIRS } from './manifest'
 export type { EagerDataFile } from './manifest'
