@@ -2750,3 +2750,600 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 }
+
+/* ------------------------------------------------- species page: tab content */
+
+/*
+  Shared vocabulary for all four tabs, so a heading or a caption cannot drift
+  between them: .species-info-block is a titled section, .species-info-heading its
+  title with an optional count, .species-info-caption the secondary line under
+  content, .species-meta-aside a dimmed suffix inside a value.
+
+  No card backgrounds and no borders anywhere in here. The page is one --surface
+  plane and the sections are separated by space and by a hairline under each
+  heading -- boxing them would rebuild the old detail view's card grid inside the
+  new layout.
+*/
+
+.species-info,
+.species-learnset,
+.species-description,
+.species-sprites {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-lg);
+}
+
+.species-info-block {
+  min-width: 0;
+}
+
+.species-info-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* The count beside a heading: the number, not a bracketed aside. */
+.species-info-count {
+  color: var(--text-primary);
+  font-size: var(--font-size-label);
+}
+
+.species-info-caption,
+.species-info-note {
+  margin: 0.4rem 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.species-meta-aside {
+  margin-left: 0.4rem;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.species-meta-none {
+  color: var(--text-secondary);
+}
+
+.species-info-types {
+  font-size: var(--font-size-body);
+}
+
+/* ---- Info tab: the two metadata sub-columns */
+
+/*
+  Two columns of ds stat rows. They are independent lists rather than one
+  two-column grid, so a long value (seven abilities' worth, or four held items)
+  grows its own row without dragging the other column's rows out of alignment with
+  it -- the rows are not meant to line up across the gap, they are two lists that
+  happen to sit side by side.
+*/
+.species-info-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-gap-lg);
+  align-items: start;
+}
+
+/* A metadata value is often a small cluster, not one word -- let it wrap. */
+.species-info-cols .ds-stat-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.2rem 0.35rem;
+  text-align: right;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-regular);
+}
+
+.species-abilities,
+.species-egg-groups,
+.species-held-items,
+.species-ev-yield {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.15rem 0.4rem;
+}
+
+.species-held-items {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.species-ability {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+/*
+  "hidden" as a word, not a badge. A pill here would be the same colored-chip move
+  the type labels deliberately do not make.
+*/
+.species-ability-hidden {
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.species-held-rate {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.species-egg-sep {
+  margin: 0 0.15rem;
+  color: var(--text-secondary);
+}
+
+/* A link into the Breedingdex, styled as text with a hairline underline -- the
+   app's existing cross-navigation affordance, not a button shape. */
+.species-egg-group {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--hairline);
+  cursor: pointer;
+}
+
+.species-egg-group:hover:enabled {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.species-egg-group:disabled {
+  cursor: default;
+  border-bottom-color: transparent;
+}
+
+/* ---- Info tab: gender ratio bar */
+
+.species-gender {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.species-gender-track {
+  display: flex;
+  width: min(100%, 9rem);
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+
+/*
+  TWO TONE STEPS, NOT TWO HUES -- see the note in SpeciesInfoTab. The percentages
+  in the legend are what identify the segments; the bar carries the proportion.
+*/
+.species-gender-male {
+  background: var(--text-primary);
+}
+
+.species-gender-female {
+  background: var(--text-secondary);
+  opacity: 0.45;
+}
+
+.species-gender-legend {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* ---- Info tab: base stats and evolution, side by side */
+
+.species-info-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+  gap: var(--space-gap-lg);
+  align-items: start;
+}
+
+.species-stat-bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.species-stat-bars li {
+  display: grid;
+  grid-template-columns: 4.4rem minmax(0, 1fr) 2.6rem;
+  gap: 0.5rem;
+  align-items: center;
+  padding: var(--space-row-padding-block) 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--font-size-label);
+}
+
+.species-stat-bars li:last-child {
+  border-bottom: 0;
+}
+
+.species-stat-name {
+  color: var(--text-secondary);
+}
+
+.species-stat-track {
+  height: 0.4rem;
+  min-width: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+/* --accent's fourth sanctioned use: stat magnitude. */
+.species-stat-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.species-stat-value {
+  text-align: right;
+  color: var(--text-primary);
+}
+
+/* ---- Info tab: type matchup chart */
+
+.type-matchup-caption {
+  margin: 0 0 0.6rem;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.type-matchup-defender {
+  color: var(--text-primary);
+}
+
+/*
+  A grid, so every attacking type is on screen at once -- that is the difference
+  between a chart and the grouped list the old component renders. auto-fill rather
+  than a fixed column count: the panel width varies with the window, so the cells
+  reflow instead of clipping.
+*/
+.type-matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.type-matchup-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: var(--space-row-padding-block) 0.5rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* Neutral cells recede; anything that is not x1 is the thing worth reading. */
+.type-matchup-value {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.type-matchup-cell[data-neutral='true'] .type-matchup-value {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.type-matchup-times {
+  margin-right: 0.05em;
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+}
+
+/* ---- the species-local game scope control */
+
+/*
+  Segmented, and visually one step quieter than the sub-nav above it: this picks
+  data inside a tab, the tab row picks the tab. Same segmented-pill shape the theme
+  switcher uses, so the app has one segmented-control language.
+*/
+.species-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.species-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.species-scope-label {
+  min-width: 4.5rem;
+  font-size: var(--font-size-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.species-scope-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+}
+
+.species-scope-segment {
+  padding: 0.2rem 0.65rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+/* Scoped to :not([data-active]) so a later hover rule cannot outrank the active
+   state -- the gotcha this project has already hit once. */
+.species-scope-segment:not([data-active='true']):hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.species-scope-segment[data-active='true'] {
+  color: var(--text-primary);
+  background: var(--surface);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ---- Learnset tab */
+
+.species-learn-group {
+  min-width: 0;
+}
+
+.species-learn-move {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+/* ---- Description tab */
+
+.species-flavor-list {
+  margin: 0;
+}
+
+/*
+  Version label above the text, not beside it: the entries are two or three lines
+  of prose and a 6rem label column would leave the text in a narrow gutter.
+*/
+.species-flavor-entry {
+  padding: var(--space-row-padding-block) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.species-flavor-entry:last-child {
+  border-bottom: 0;
+}
+
+.species-flavor-version {
+  font-size: var(--font-size-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.species-flavor-text {
+  margin: 0.15rem 0 0;
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+}
+
+.species-encounter-place {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+/* ---- Sprites tab */
+
+.sprite-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--space-gap-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sprite-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--space-gap-sm);
+  border-radius: var(--radius-control);
+  /* The one tone-step in the tab: a card needs to read as a frame around an
+     image whose own background is transparent. */
+  background: var(--surface-raised);
+}
+
+.sprite-card-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 5.5rem;
+}
+
+.sprite-card-img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Game sprites are pixel art; scaling them smoothly is the one thing that makes
+   them look wrong. The artwork and the animated WebPs are not pixelated. */
+.sprite-card-img.is-pixelated {
+  image-rendering: pixelated;
+}
+
+.sprite-card-primary {
+  font-size: var(--font-size-label);
+  color: var(--text-primary);
+}
+
+.sprite-card-secondary {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* ---- species page: column widths for the reused DataTable */
+
+/*
+  THE SHARED WIDTHS ARE TUNED FOR THE MOVEDEX'S COLUMN ORDER -- name first, at
+  15rem -- because that is the only list that used this table before. These tables
+  reuse the component with a different order, so the widths have to be restated
+  or the narrow lead column inherits 15rem and the move name gets 6.5rem. (That is
+  exactly what it looked like first: a "LV" column three times wider than its
+  two-digit contents.)
+
+  Two shapes here: with a lead column (level-up has the level, TM/HM has the
+  machine number) and without (egg moves and tutor moves have nothing to lead
+  with, so that column is not rendered at all and everything shifts left by one).
+  The with-lead selectors are prefixed with .species-learn-group so they outrank
+  the without-lead defaults above them rather than losing on specificity.
+*/
+
+.species-learn-group .data-table th:first-child,
+.species-learn-group .data-table td:first-child {
+  width: 12rem;
+}
+
+.species-learn-group .data-table th:nth-child(2),
+.species-learn-group .data-table td:nth-child(2) {
+  width: 6rem;
+}
+
+.species-learn-group .data-table th:nth-child(3),
+.species-learn-group .data-table td:nth-child(3) {
+  width: 5.5rem;
+}
+
+.species-learn-group .data-table th:nth-child(4),
+.species-learn-group .data-table td:nth-child(4),
+.species-learn-group .data-table th:nth-child(5),
+.species-learn-group .data-table td:nth-child(5) {
+  width: 4rem;
+}
+
+.species-learn-group .data-table th:nth-child(6),
+.species-learn-group .data-table td:nth-child(6) {
+  width: 3.5rem;
+}
+
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:first-child,
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:first-child,
+.species-learn-group [data-testid='species-learn-machine-rows'] th:first-child,
+.species-learn-group [data-testid='species-learn-machine-rows'] td:first-child {
+  width: 4.5rem;
+}
+
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:nth-child(2),
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:nth-child(2),
+.species-learn-group [data-testid='species-learn-machine-rows'] th:nth-child(2),
+.species-learn-group [data-testid='species-learn-machine-rows'] td:nth-child(2) {
+  width: 12rem;
+}
+
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:nth-child(3),
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:nth-child(3),
+.species-learn-group [data-testid='species-learn-machine-rows'] th:nth-child(3),
+.species-learn-group [data-testid='species-learn-machine-rows'] td:nth-child(3) {
+  width: 6rem;
+}
+
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:nth-child(4),
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:nth-child(4),
+.species-learn-group [data-testid='species-learn-machine-rows'] th:nth-child(4),
+.species-learn-group [data-testid='species-learn-machine-rows'] td:nth-child(4) {
+  width: 5.5rem;
+}
+
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:nth-child(5),
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:nth-child(5),
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:nth-child(6),
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:nth-child(6),
+.species-learn-group [data-testid='species-learn-machine-rows'] th:nth-child(5),
+.species-learn-group [data-testid='species-learn-machine-rows'] td:nth-child(5),
+.species-learn-group [data-testid='species-learn-machine-rows'] th:nth-child(6),
+.species-learn-group [data-testid='species-learn-machine-rows'] td:nth-child(6) {
+  width: 4rem;
+}
+
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:nth-child(7),
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:nth-child(7),
+.species-learn-group [data-testid='species-learn-machine-rows'] th:nth-child(7),
+.species-learn-group [data-testid='species-learn-machine-rows'] td:nth-child(7) {
+  width: 3.5rem;
+}
+
+/* The locations table: place first and widest, then three narrow facts. */
+[data-testid='species-locations-rows'] th:first-child,
+[data-testid='species-locations-rows'] td:first-child {
+  width: 18rem;
+}
+
+[data-testid='species-locations-rows'] th:nth-child(2),
+[data-testid='species-locations-rows'] td:nth-child(2),
+[data-testid='species-locations-rows'] th:nth-child(3),
+[data-testid='species-locations-rows'] td:nth-child(3) {
+  width: 7rem;
+}
+
+[data-testid='species-locations-rows'] th:nth-child(4),
+[data-testid='species-locations-rows'] td:nth-child(4),
+[data-testid='species-locations-rows'] th:nth-child(5),
+[data-testid='species-locations-rows'] td:nth-child(5) {
+  width: 5rem;
+}
+
+/* A location cell wraps rather than truncating: the area and the condition are the
+   part that makes a row identifiable, and 18rem cannot always hold all three. */
+[data-testid='species-locations-rows'] td:first-child {
+  white-space: normal;
+}
+
+/* ---- narrow */
+
+@media (max-width: 1500px) {
+  /* Stats and the evolution chart stop fitting side by side well before the page
+     drops to one column -- the chart is the wide one, so it gets the full width. */
+  .species-info-wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .species-info-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

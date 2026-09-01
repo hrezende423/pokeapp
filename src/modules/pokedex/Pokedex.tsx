@@ -1,5 +1,5 @@
 import { IconArrowLeft } from '@tabler/icons-react'
-import { useDexSelection } from '../nav/navContext'
+import { useDexSelection, useNav } from '../nav/navContext'
 import { ScrollArea } from '../../components/ScrollArea'
 import { SpeciesDetail } from './SpeciesDetail'
 import { SpeciesDetailPage } from './SpeciesDetailPage'
@@ -11,11 +11,19 @@ import '../../components/ds/ds.css'
 import './pokedex.css'
 
 /*
-  TEMPORARY, step 1 of the species-detail redo. ?detail=new renders the rebuilt
-  two-column page instead of the current rail-plus-detail view, so the new shell
-  is reviewable in the real app without replacing a page that still carries all
-  the content the new one's tabs have yet to be filled with. Removed in step 2,
-  when SpeciesDetailPage takes over unconditionally.
+  ?detail renders the rebuilt two-column species page instead of the rail-plus-
+  detail view. All four of its tabs are now built, so what the flag still holds
+  open is the CUTOVER, not the content:
+
+    - the old page's four-axis artwork control (in-game/artwork, regular/shiny,
+      static/animated, male/female) has no equivalent in the new spec. The Sprites
+      tab shows every image at once instead of toggling between them, which is a
+      different answer to the same question and needs a call, not a guess.
+    - roughly a hundred suite assertions in verify-pokedex and verify-ux target the
+      old page's testids, most of them that artwork control.
+
+  Both are one review away. Until then this is the same mechanism the design-system
+  page uses, and the new page has its own suite (verify:species-page).
 
   Read once at module scope: there is no router, and nothing toggles it at runtime.
 */
@@ -42,6 +50,7 @@ const NEW_DETAIL_PAGE =
  */
 export function Pokedex() {
   const [selectedId, setSelectedId] = useDexSelection('pokedex')
+  const nav = useNav()
   const browsing = selectedId == null
 
   return (
@@ -100,6 +109,8 @@ export function Pokedex() {
           key={selectedId}
           speciesId={selectedId}
           onBack={() => setSelectedId(null)}
+          onSelectSpecies={setSelectedId}
+          onSelectEggGroup={(id) => nav.navigate('breedingdex', id)}
         />
       ) : (
         <div className="pokedex-body">
