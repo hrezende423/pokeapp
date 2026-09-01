@@ -40,9 +40,18 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
 - Trainer team data comes from **pret disassembly projects**, not PokéAPI.
 - **Genuine per-generation mechanical accuracy is required**, not a
   modern-only model: Gen 1's unsplit Special stat, Gen 1–2's DVs/Stat Exp
-  (not EVs/IVs), abilities and natures don't exist before Gen 3. Any
-  component showing these fields must hide/adapt them per the active
-  generation, not just always show the modern version.
+  (not EVs/IVs), abilities and natures don't exist before Gen 3, and
+  **hidden abilities don't exist before Gen 5**. Any component showing
+  these fields must hide/adapt them per the active generation, not just
+  always show the modern version.
+- **PokéAPI's `past_` arrays are incomplete, so era rules can't be left
+  to the data alone.** Two cases hit so far, both fixed in
+  `src/data/era.ts`: 17 species have no `past_abilities` entry emptying
+  their hidden slot (Koffing advertised Stench in HGSS), and 20 have a
+  Gen 1 `special` entry *plus* a later entry on a physical stat, so stats
+  must resolve per stat rather than per entry (Beedrill's Gen 1 Attack is
+  80, not the modern 90). Where a mechanic's start generation is a known
+  fact, encode it as a rule.
 - **Japanese species names**: PokéAPI's `ja-roma` gives the real,
   official Nintendo romanization, NOT a mechanical transliteration —
   ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not

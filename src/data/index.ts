@@ -59,6 +59,7 @@ export type {
 export {
   ABILITIES_INTRODUCED_IN_GENERATION,
   EFFORT_VALUES_INTRODUCED_IN_GENERATION,
+  HIDDEN_ABILITIES_INTRODUCED_IN_GENERATION,
   captureRatePercent,
   damageRelationsFor,
   genderRatio,

@@ -26,6 +26,21 @@ import type {
 /** Abilities did not exist before Gen 3 — no species had one in RBY or GSC. */
 export const ABILITIES_INTRODUCED_IN_GENERATION = 3
 
+/**
+ * Hidden abilities are a Generation 5 mechanic: the third slot, reachable only
+ * through Dream World and its successors, did not exist in Gen 1-4 at all.
+ *
+ * This is enforced as a rule rather than left to the data because PokeAPI is
+ * incomplete here. It empties a slot for a generation only when it carries a
+ * `past_abilities` entry saying so, and 17 of the 493 species in scope have no
+ * such entry for their hidden slot -- Koffing's Stench, Typhlosion's Flash Fire,
+ * Chikorita's Leaf Guard and 14 others. Those all reported themselves as present
+ * in HeartGold/SoulSilver, which is wrong: none of them was obtainable until
+ * Black/White. Bulbasaur's Chlorophyll is the well-formed case and disappeared
+ * correctly, which is exactly why the gap was easy to miss.
+ */
+export const HIDDEN_ABILITIES_INTRODUCED_IN_GENERATION = 5
+
 /** PokeAPI's non-battle pseudo-types (`???` and Shadow) are never shown. */
 const PSEUDO_TYPE_IDS = new Set([10001, 10002])
 
@@ -99,6 +114,12 @@ export function resolveAbilitiesForGeneration(
       ? override.entry
       : (variety.abilities.find((a) => a.slot === slot) ?? null)
     if (!source) continue // slot was empty in this generation
+
+    // The hidden slot did not exist before Gen 5, whatever the data says about
+    // the ability sitting in it -- see HIDDEN_ABILITIES_INTRODUCED_IN_GENERATION.
+    // The ability itself often DID exist (Stench is a Gen 3 ability), so the
+    // generation check below cannot catch this; the slot is the anachronism.
+    if (source.is_hidden && generation < HIDDEN_ABILITIES_INTRODUCED_IN_GENERATION) continue
 
     const ability = getAbility(source.ability_id)
     if (!ability) continue
