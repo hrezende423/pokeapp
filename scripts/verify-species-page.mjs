@@ -1,9 +1,10 @@
 /**
  * Scenario verification for the rebuilt species detail page and its four tabs.
  *
- * Serves the production build with `vite preview` and drives it with Playwright,
- * against ?detail — the flag Pokedex.tsx uses while the cutover from the old
- * detail view is still open.
+ * Serves the production build with `vite preview` and drives it with Playwright.
+ * This IS the live detail view now: the ?detail flag and the old rail-plus-cards
+ * page were retired once the four tabs landed and the old page's four-axis artwork
+ * control was folded into the Sprites tab.
  *
  * WHAT THIS SUITE IS FOR. Almost every claim the page makes is a number that can
  * be read back out of the DOM, so almost nothing here needs an eye: the era-
@@ -29,7 +30,7 @@ import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
 
 const PORT = 4183
-const APP_URL = `http://localhost:${PORT}/pokeapp/?detail=new`
+const APP_URL = `http://localhost:${PORT}/pokeapp/`
 const ORIGIN = `http://localhost:${PORT}`
 const SHOTS = 'scripts/.verify-shots'
 
@@ -742,6 +743,38 @@ try {
   log(`  sampled ${sampled.length} tile URLs, ${bad.length} not 200`)
   bad.forEach((b) => log(`    ${b.status} ${b.url}`))
   check('every sampled per-game sprite URL resolves', bad.length === 0)
+
+  /*
+    THE FOLDED ARTWORK CONTROL. Its own behaviour (availability per axis, the
+    unsuffixed Murkrow file, the shiny cache) is verified where it always was, in
+    verify-pokedex and verify-ux; what this suite owns is that it is HERE, on this
+    tab, with its axes intact and the grid filter beside them.
+  */
+  const featured = await page.evaluate(() => {
+    const block = document.querySelector('[data-testid="sprites-featured"]')
+    return {
+      present: block != null,
+      hasImage: block?.querySelector('[data-testid="artwork-img"]') != null,
+      axes: [...(block?.querySelectorAll('[data-testid^="toggle-"][role="switch"]') ?? [])].map(
+        (e) => e.getAttribute('data-testid'),
+      ),
+      firstInTab:
+        document.querySelector('[data-testid="species-sprites"]')?.firstElementChild ===
+        document.querySelector('[data-testid="sprites-featured"]'),
+    }
+  })
+  log(`  featured panel switches: ${featured.axes.join(', ')}`)
+  check(
+    'the four-axis artwork control is on the Sprites tab',
+    featured.present && featured.hasImage,
+  )
+  check(
+    'with all four axes plus the grid filter',
+    featured.axes.join(',') ===
+      'toggle-source,toggle-shiny,toggle-motion,toggle-gender,toggle-grid-filter',
+    featured.axes.join(','),
+  )
+  check('and it leads the tab rather than sitting under the catalogue', featured.firstInTab)
 
   await page.screenshot({ path: `${SHOTS}/species-page-sprites.png` })
 

@@ -13,6 +13,15 @@
  * flaky. See the comment on attemptsFor. The Cache Storage contents are then read
  * directly from the page, so "cached after" is proven rather than inferred.
  *
+ * THE DETAIL VIEW IS THE REBUILT TABBED PAGE. The old rail-plus-cards view and
+ * the ?detail flag that gated its replacement are both gone, so every assertion
+ * that used to read the old page's testids has been re-pointed at the tab that
+ * owns that fact now -- Info for the era-resolved fields, Learnset for the moves,
+ * Description for the encounters, Sprites for the four-axis artwork control. Two
+ * claims changed rather than moved, and both are commented where they appear: the
+ * learnset follows the page's own generation control rather than the app-wide
+ * selector, and the artwork control has a fifth switch.
+ *
  * Usage: node scripts/verify-pokedex.mjs
  */
 
@@ -197,17 +206,44 @@ try {
       { timeout: 30000 },
     )
   }
+  /*
+    THE DETAIL VIEW IS NOW THE REBUILT TABBED PAGE. `?detail` and the old
+    rail-plus-cards view are gone, so opening a species lands on the Info tab and
+    anything per-game lives one tab click away. No learnset wait here: the Info
+    tab loads no partition, which is the point of mounting one tab at a time.
+  */
   const openSpecies = async (id) => {
     await page.click(`[data-testid="species-row-${id}"]`)
-    await page.waitForSelector(`[data-testid="species-detail"][data-species-id="${id}"]`, {
+    await page.waitForSelector(`[data-testid="species-page"][data-species-id="${id}"]`, {
       timeout: 30000,
     })
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="learnset-loading"]'),
-      undefined,
-      { timeout: 60000 },
-    )
+    await page.waitForSelector('[data-testid="species-info"]', { timeout: 30000 })
   }
+
+  const openTab = async (tab) => {
+    await page.click(`[data-testid="species-page-subnav"] .ds-tab:text-is("${tab}")`)
+    await page.waitForSelector(`[data-testid="species-page-panel-${tab.toLowerCase()}"]`, {
+      timeout: 30000,
+    })
+  }
+
+  const backToGrid = async () => {
+    if ((await page.$('[data-testid="species-page-back"]')) == null) return
+    await page.click('[data-testid="species-page-back"]')
+    await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+  }
+
+  /** Wait for the Learnset tab to finish loading whichever partition it wants. */
+  const learnsetReady = () =>
+    page.waitForFunction(() => !document.querySelector('[data-testid="learnset-loading"]'), {
+      timeout: 60000,
+    })
+
+  /** Levels a move is learned at, from the level-up section of the Learnset tab. */
+  const levelsFor = (moveId) =>
+    page.$$eval(`[data-testid="species-learn-level-up"] [data-move-id="${moveId}"]`, (els) =>
+      els.map((e) => e.getAttribute('data-level')),
+    )
   const rowIds = () =>
     page.$$eval('[data-testid="species-rows"] [data-species-id]', (els) =>
       els.map((e) => Number(e.getAttribute('data-species-id'))),
@@ -239,54 +275,96 @@ try {
   check('plus one ungrouped "All" option', optionCount === 15, `(${optionCount} total)`)
   check('grouped by generation (4 optgroups)', optgroups.length === 4, `(${optgroups.length})`)
 
+  /*
+    WHAT THE APP SELECTOR DRIVES ON THE NEW PAGE, and what it no longer does.
+
+    It still re-resolves every era-sensitive field of an OPEN page in place --
+    types, abilities, base stats, the matchup chart. It no longer drives the
+    learnset, because the Learnset tab has its own species-local generation
+    control by design; that axis is proved in SCENARIO E through the control that
+    actually owns it.
+
+    Abilities are the sharpest probe available here: they did not exist before Gen
+    3, so a HGSS -> Gold/Silver switch has to empty the row on a page that never
+    reloaded.
+  */
   await selectVersionGroup('heartgold-soulsilver')
   await openSpecies(80) // Slowbro
-  const hgssHeadbutt = await page.$$eval(
-    '[data-testid="learn-level-up"] [data-move-id="29"]',
-    (els) => els.map((e) => e.getAttribute('data-level')),
+  const gen4Abilities = await page.$$eval('[data-testid^="species-ability-"]', (els) =>
+    els.map((e) => e.textContent.trim()),
   )
-  log(`  Slowbro/Headbutt level-up levels in heartgold-soulsilver: [${hgssHeadbutt.join(', ')}]`)
-
-  // Switch the game WITHOUT re-navigating or re-clicking the species.
   await selectVersionGroup('gold-silver')
-  await page.waitForFunction(
-    () => !document.querySelector('[data-testid="learnset-loading"]'),
-    undefined,
-    { timeout: 60000 },
+  await page.waitForSelector('[data-testid="abilities-none"]', { timeout: 30000 })
+  const gen2Abilities = await page.$$eval('[data-testid^="species-ability-"]', (els) =>
+    els.map((e) => e.textContent.trim()),
   )
-  const gsHeadbutt = await page.$$eval(
-    '[data-testid="learn-level-up"] [data-move-id="29"]',
-    (els) => els.map((e) => e.getAttribute('data-level')),
-  )
-  const stillOpen = await page.getAttribute('[data-testid="species-detail"]', 'data-species-id')
-  log(`  Slowbro/Headbutt level-up levels in gold-silver           : [${gsHeadbutt.join(', ')}]`)
-  log(`  detail view still open on species: ${stillOpen} (no re-navigation)`)
-  check('open detail followed the version-group switch', gsHeadbutt.join() !== hgssHeadbutt.join())
-  check('same detail view stayed open', stillOpen === '80')
+  const gen2Note = await page.textContent('[data-testid="abilities-none"]')
+  const stillOpen = await page.getAttribute('[data-testid="species-page"]', 'data-species-id')
+  log(`  Slowbro abilities in heartgold-soulsilver: ${JSON.stringify(gen4Abilities)}`)
+  log(`  Slowbro abilities in gold-silver         : ${JSON.stringify(gen2Abilities)}`)
+  log(`  Gen 2 note: ${JSON.stringify(gen2Note)}`)
+  log(`  detail page still open on species: ${stillOpen} (no re-navigation)`)
+  check('an open detail page follows the version-group switch', gen4Abilities.length > 0)
+  check('and Gen 2 correctly has none', gen2Abilities.length === 0)
+  check('with a reason rather than an empty row', /None in Gen 2/.test(gen2Note))
+  check('same detail page stayed open', stillOpen === '80')
   await page.screenshot({ path: `${SHOTS}/scenario1-vg-switch.png`, fullPage: false })
 
   // ------------------------------------------------------------ SCENARIO E
-  hr('SCENARIO E — Slowbro learnset is the selected generation, not another')
+  hr('SCENARIO E — the learnset is the generation the PAGE asks for')
+  /*
+    Driven through the Learnset tab's own control, which is what owns this axis
+    now. Headbutt on Slowbro separates the eras cleanly: level 25 in
+    HeartGold/SoulSilver, level 34 in Gold/Silver.
+  */
   await selectVersionGroup('heartgold-soulsilver')
-  await page.waitForFunction(
-    () => !document.querySelector('[data-testid="learnset-loading"]'),
-    undefined,
-    { timeout: 60000 },
+  await openTab('Learnset')
+  await learnsetReady()
+  const hgssHeadbutt = await levelsFor(29)
+  const hgssLevels = await page.$$eval(
+    '[data-testid="species-learn-level-up"] [data-level]',
+    (els) =>
+      [...new Set(els.map((e) => e.getAttribute('data-level')))].map(Number).sort((a, b) => a - b),
   )
-  const hgssLevels = await page.$$eval('[data-testid="learn-level-up"] [data-level]', (els) =>
-    [...new Set(els.map((e) => e.getAttribute('data-level')))].map(Number).sort((a, b) => a - b),
-  )
-  const methodSections = await page.$$eval('[data-testid="learnset"] .learn-group', (els) =>
+  const methodSections = await page.$$eval('.species-learn-group', (els) =>
     els.map((e) => e.getAttribute('data-testid')),
   )
-  log(`  Headbutt level in HGSS      : [${hgssHeadbutt.join(', ')}]  (Gen 2 value is 34)`)
-  log(`  method sections present     : ${methodSections.join(', ')}`)
-  log(`  level-up levels (first 12)  : ${hgssLevels.slice(0, 12).join(', ')}`)
+  const seeded = await page.getAttribute('[data-testid="species-learnset"]', 'data-version-group')
+
+  // Same page, same species: only the page-local scope moves.
+  await page.click('[data-testid="learnset-scope-generation-2"]')
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-testid="species-learnset"]')
+        ?.getAttribute('data-version-group') === 'crystal',
+    { timeout: 30000 },
+  )
+  await page.click('[data-testid="learnset-scope-game-gold-silver"]')
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-testid="species-learnset"]')
+        ?.getAttribute('data-version-group') === 'gold-silver',
+    { timeout: 30000 },
+  )
+  await learnsetReady()
+  const gsHeadbutt = await levelsFor(29)
+  const appStillHgss = await page.$eval('[data-testid="vg-select"]', (el) => el.value)
+
+  log(`  scope seeded from the app selection : ${seeded}`)
+  log(`  Headbutt level in HGSS       : [${hgssHeadbutt.join(', ')}]`)
+  log(`  Headbutt level in Gold/Silver: [${gsHeadbutt.join(', ')}]`)
+  log(`  method sections present      : ${methodSections.join(', ')}`)
+  log(`  level-up levels (first 12)   : ${hgssLevels.slice(0, 12).join(', ')}`)
+  check('the tab seeds from the app selection', seeded === 'heartgold-soulsilver')
   check('Headbutt is level 25 under heartgold-soulsilver', hgssHeadbutt.includes('25'))
   check('Headbutt is NOT level 34 under heartgold-soulsilver', !hgssHeadbutt.includes('34'))
-  check('Headbutt was level 34 under gold-silver', gsHeadbutt.includes('34'))
+  check('Headbutt is level 34 under gold-silver', gsHeadbutt.includes('34'))
   check('learnset is grouped by method', methodSections.length >= 2, methodSections.join('/'))
+  check('and the app-wide selector was not moved by it', appStillHgss === 'heartgold-soulsilver')
   await page.screenshot({ path: `${SHOTS}/scenarioE-learnset.png` })
+  await backToGrid()
 
   // ------------------------------------------------------------ SCENARIO A
   hr('SCENARIO A — red-blue lists only ids 1-151')
@@ -414,30 +492,69 @@ try {
   await page.waitForSelector('[data-testid="species-row-94"]', { timeout: 15000 })
   await openSpecies(94)
   const abilityNone = await page.textContent('[data-testid="abilities-none"]').catch(() => null)
-  const abilityItems = await page.$$('[data-testid="abilities"] li')
-  const detailText = await page.textContent('[data-testid="species-detail"]')
+  const abilityItems = await page.$$('[data-testid^="species-ability-"]')
+  const detailText = await page.textContent('[data-testid="species-page"]')
   log(`  abilities message : ${JSON.stringify(abilityNone)}`)
   log(`  ability entries   : ${abilityItems.length}`)
   log(`  "undefined" in detail text: ${detailText.includes('undefined')}`)
   log(`  "NaN" in detail text      : ${detailText.includes('NaN')}`)
   check('no ability entries rendered under red-blue', abilityItems.length === 0)
-  check('an explanatory message is shown instead', (abilityNone ?? '').includes('did not exist'))
+  check('an explanatory message is shown instead', /None in Gen 1/.test(abilityNone ?? ''))
   check('detail contains no "undefined"', !detailText.includes('undefined'))
   check('detail contains no "NaN"', !detailText.includes('NaN'))
 
   // And the same species DOES show its Gen 3-4 ability when that era is selected.
   await selectVersionGroup('firered-leafgreen')
-  await page.waitForFunction(
-    () => !document.querySelector('[data-testid="learnset-loading"]'),
-    undefined,
-    { timeout: 60000 },
-  )
-  const gen3Abilities = await page.$$eval('[data-testid="abilities"] li strong', (els) =>
-    els.map((e) => e.textContent.trim()),
+  await page.waitForSelector('[data-testid^="species-ability-"]', { timeout: 30000 })
+  const gen3Abilities = await page.$$eval('[data-testid^="species-ability-"]', (els) =>
+    els.map((e) => ({
+      name: e.textContent.trim(),
+      hidden: e.getAttribute('data-hidden-ability') === 'true',
+    })),
   )
   log(`  Gengar abilities under firered-leafgreen: ${JSON.stringify(gen3Abilities)}`)
-  check('Gengar shows exactly one Gen 3 ability', gen3Abilities.length === 1, gen3Abilities.join())
-  check('that ability is Levitate (not the Gen 5 Cursed Body)', gen3Abilities[0] === 'Levitate')
+  check(
+    'Gengar shows exactly one Gen 3 ability',
+    gen3Abilities.length === 1,
+    JSON.stringify(gen3Abilities),
+  )
+  check(
+    'that ability is Levitate (not the Gen 5 Cursed Body)',
+    gen3Abilities[0].name === 'Levitate',
+  )
+  /*
+    THE HIDDEN SLOT DID NOT EXIST BEFORE GEN 5, so nothing on a Gen 1-4 page may
+    report itself hidden. This used to leak for 17 species -- PokeAPI has no
+    past_abilities entry emptying their third slot, so Koffing advertised Stench in
+    HeartGold/SoulSilver. The rule now lives in era.ts and this is the whole-dex
+    check on it, run at the era where the leak was worst.
+  */
+  await selectVersionGroup('heartgold-soulsilver')
+  await backToGrid()
+  await withControls(() => page.fill('[data-testid="species-search"]', 'koffing'))
+  await page.waitForSelector('[data-testid="species-row-109"]', { timeout: 15000 })
+  await openSpecies(109)
+  const koffing = await page.$$eval('[data-testid^="species-ability-"]', (els) =>
+    els.map((e) => ({
+      name: e.textContent.trim(),
+      hidden: e.getAttribute('data-hidden-ability') === 'true',
+    })),
+  )
+  log(`  Koffing abilities under heartgold-soulsilver: ${JSON.stringify(koffing)}`)
+  check(
+    'Koffing shows only Levitate in Gen 4',
+    koffing.length === 1 && koffing[0].name === 'Levitate',
+    JSON.stringify(koffing),
+  )
+  check(
+    'no ability is reported hidden in Gen 4',
+    koffing.every((a) => !a.hidden),
+  )
+  await backToGrid()
+  await withControls(() => page.fill('[data-testid="species-search"]', 'gengar'))
+  await page.waitForSelector('[data-testid="species-row-94"]', { timeout: 15000 })
+  await openSpecies(94)
+  await selectVersionGroup('red-blue')
   await page.screenshot({ path: `${SHOTS}/scenarioF-gengar-abilities.png` })
 
   // ------------------------------------------- type chart, gen 1 has no dark/steel
@@ -448,7 +565,7 @@ try {
     undefined,
     { timeout: 60000 },
   )
-  const gen1Chart = await page.$eval('[data-testid="type-effectiveness"]', (el) => ({
+  const gen1Chart = await page.$eval('[data-testid="type-matchup-chart"]', (el) => ({
     attacking: Number(el.getAttribute('data-attacking-types')),
     types: [...el.querySelectorAll('[data-type]')].map((t) => t.getAttribute('data-type')),
   }))
@@ -462,14 +579,14 @@ try {
     () =>
       Number(
         document
-          .querySelector('[data-testid="type-effectiveness"]')
+          .querySelector('[data-testid="type-matchup-chart"]')
           ?.getAttribute('data-attacking-types'),
       ) === 17,
     undefined,
     { timeout: 30000 },
   )
   const gen4Attacking = await page.getAttribute(
-    '[data-testid="type-effectiveness"]',
+    '[data-testid="type-matchup-chart"]',
     'data-attacking-types',
   )
   log(`  attacking types under heartgold-soulsilver: ${gen4Attacking}`)
@@ -477,12 +594,21 @@ try {
 
   // ------------------------------------------------------------ SCENARIO H
   hr('SCENARIO H — no gender toggle for a species without a gender difference')
+  /*
+    THE FOUR-AXIS CONTROL LIVES ON THE SPRITES TAB NOW, folded in from the old
+    detail page rather than dropped. Same component, same testids, same
+    availability rules -- so what changed here is one openTab call, not the claim.
+    A fifth switch sits beside the four: it turns the same axes into a filter over
+    the sprite catalogue, and is why the count below is 5.
+  */
+  await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', 'bulbasaur'))
   await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 15000 })
   await openSpecies(1)
-  // The switch is now always rendered and DISABLED when unavailable, which is
-  // the batch-2 behaviour: a greyed control with a stated reason beats a control
-  // that silently disappears.
+  await openTab('Sprites')
+  await page.waitForSelector('[data-testid="artwork-img"]', { timeout: 30000 })
+  // The switch is always rendered and DISABLED when unavailable: a greyed control
+  // with a stated reason beats a control that silently disappears.
   const bulbaSwitches = await page.$$eval('[data-testid^="toggle-"][role="switch"]', (els) =>
     els.map((e) => ({
       id: e.getAttribute('data-testid'),
@@ -492,13 +618,22 @@ try {
   )
   log(`  Bulbasaur switches: ${JSON.stringify(bulbaSwitches)}`)
   const findSwitch = (id) => bulbaSwitches.find((s) => s.id === `toggle-${id}`)
-  check('all four switches render', bulbaSwitches.length === 4, `(${bulbaSwitches.length})`)
+  check(
+    'the four axes render, plus the grid filter',
+    bulbaSwitches.length === 5,
+    `(${bulbaSwitches.length})`,
+  )
+  check(
+    'all four axes are present by name',
+    ['source', 'shiny', 'motion', 'gender'].every((id) => findSwitch(id) != null),
+  )
   check('gender switch disabled for Bulbasaur', findSwitch('gender')?.disabled === true)
   check('shiny switch present and enabled', findSwitch('shiny')?.disabled === false)
   check(
     'motion switch present and enabled (artwork source)',
     findSwitch('motion')?.disabled === false,
   )
+  check('the grid filter defaults to off', findSwitch('grid-filter')?.value === 'All sprites')
 
   // ------------------------------------------------------------ SCENARIO G
   hr('SCENARIO G — shiny artwork fetched once, cached thereafter')
@@ -608,9 +743,12 @@ try {
 
   // ------------------------------------------------------------ SCENARIO I
   hr('SCENARIO I — Murkrow (#198) animated sprite uses the unsuffixed file')
+  await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', 'murkrow'))
   await page.waitForSelector('[data-testid="species-row-198"]', { timeout: 15000 })
   await openSpecies(198)
+  await openTab('Sprites')
+  await page.waitForSelector('[data-testid="artwork-img"]', { timeout: 30000 })
   // Murkrow opens on artwork+static, where no gendered image exists, so the
   // gender switch is disabled until motion is switched to animated.
   const murkrowGenderBefore = await page.getAttribute(
@@ -687,21 +825,35 @@ try {
 
   // -------------------------------------------------- detail completeness
   hr('DETAIL COMPLETENESS — every required section renders')
+  await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', 'eevee'))
   await page.waitForSelector('[data-testid="species-row-133"]', { timeout: 15000 })
   await openSpecies(133)
+  /*
+    Re-pointed at the Info tab's equivalents, one for one. Two entries from the old
+    list are deliberately absent rather than renamed:
+
+      breeding-partners  the old page's "N species share an egg group" count. Not
+                         in the DetailPage spec, so it did not come across. Logged
+                         in SPECIES-PAGE-PUNCH-LIST.md as a dropped fact.
+      the per-ability effect paragraph  now the ability's title attribute rather
+                         than body text, so there is no element to assert.
+  */
   const sections = {
-    'base stats': '[data-testid="base-stats"]',
+    'base stats': '[data-testid="species-base-stats"]',
     'stat total': '[data-testid="stat-total"]',
-    types: '[data-testid="detail-types"]',
+    types: '[data-testid="species-info-types"]',
     'growth rate': '[data-testid="growth-rate"]',
     'catch rate': '[data-testid="catch-rate"]',
     'base XP': '[data-testid="base-xp"]',
     'gender ratio': '[data-testid="gender-ratio"]',
-    'type effectiveness': '[data-testid="type-effectiveness"]',
+    'hatch time': '[data-testid="hatch-time"]',
+    'base friendship': '[data-testid="base-friendship"]',
+    shape: '[data-testid="shape"]',
+    'body colour': '[data-testid="body-colour"]',
+    'type matchup chart': '[data-testid="type-matchup-chart"]',
     'evolution tree': '[data-testid="evolution-tree"]',
     'egg groups': '[data-testid="egg-groups"]',
-    'breeding partners': '[data-testid="breeding-partners"]',
   }
   for (const [label, selector] of Object.entries(sections)) {
     const el = await page.$(selector)
@@ -720,10 +872,18 @@ try {
     'each branch carries a trigger condition',
     methods.every((m) => m.length > 0),
   )
+  /* Encounters moved to the Description tab, beside the flavour text they vary
+     with. Either a table or an explicit "not in the wild" line counts as
+     resolved; what must not happen is neither. */
+  await openTab('Description')
+  await page.waitForFunction(() => !document.querySelector('[data-testid="locations-loading"]'), {
+    timeout: 60000,
+  })
   const encounterTable = await page.$(
-    '[data-testid="encounters"], [data-testid="encounters-empty"]',
+    '[data-testid="species-locations-rows"], [data-testid="locations-empty"]',
   )
   check('encounters section resolved', encounterTable != null)
+  await openTab('Info')
   await page.screenshot({ path: `${SHOTS}/detail-eevee.png`, fullPage: true })
 
   // --------------------------------------------- painted condition icons
@@ -742,8 +902,7 @@ try {
     species rather than a stale filter. Scope also has to be "All": the cases span
     Gen 1 to Gen 4 (Machoke to Mantyke) and no single game holds them all.
   */
-  await page.click('[data-testid="back-to-grid"]')
-  await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+  await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', ''))
   await selectVersionGroup('all')
   await page.waitForFunction(
@@ -755,10 +914,7 @@ try {
   const paintedOn = async (id) => {
     // The detail replaces the grid rather than sitting beside it, so every case
     // after the first has to come back to the list before it can click a row.
-    if (await page.$('[data-testid="back-to-grid"]')) {
-      await page.click('[data-testid="back-to-grid"]')
-      await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
-    }
+    await backToGrid()
     // 'attached', not the default 'visible': the list scrolls inside a ScrollArea
     // and a row 349 deep is below the fold. page.click scrolls it in.
     await page.waitForSelector(`[data-testid="species-row-${id}"]`, {

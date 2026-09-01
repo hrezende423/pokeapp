@@ -69,7 +69,11 @@ function columnsFor(method: string): Column<MoveRow>[] {
       key: 'move',
       label: 'Move',
       render: (r) => (
-        <span className="species-learn-move">
+        /* The move id and the level ride on the cell rather than the row: the
+           shared DataTable owns the <tr> attributes, and these two are what makes
+           "Headbutt is level 25 in HGSS but 34 in Gold/Silver" assertable without
+           parsing a rendered string. */
+        <span className="species-learn-move" data-move-id={r.row.move_id} data-level={r.row.level}>
           {method === 'egg' && (
             <EggMoveMarker
               moveId={r.row.move_id}

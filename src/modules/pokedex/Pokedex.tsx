@@ -1,7 +1,5 @@
-import { IconArrowLeft } from '@tabler/icons-react'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { ScrollArea } from '../../components/ScrollArea'
-import { SpeciesDetail } from './SpeciesDetail'
 import { SpeciesDetailPage } from './SpeciesDetailPage'
 import { SpeciesList } from './SpeciesList'
 // The grid card's type row is the validated TypeLabel/TypeRow pair, whose styles
@@ -10,37 +8,23 @@ import { SpeciesList } from './SpeciesList'
 import '../../components/ds/ds.css'
 import './pokedex.css'
 
-/*
-  ?detail renders the rebuilt two-column species page instead of the rail-plus-
-  detail view. All four of its tabs are now built, so what the flag still holds
-  open is the CUTOVER, not the content:
-
-    - the old page's four-axis artwork control (in-game/artwork, regular/shiny,
-      static/animated, male/female) has no equivalent in the new spec. The Sprites
-      tab shows every image at once instead of toggling between them, which is a
-      different answer to the same question and needs a call, not a guess.
-    - roughly a hundred suite assertions in verify-pokedex and verify-ux target the
-      old page's testids, most of them that artwork control.
-
-  Both are one review away. Until then this is the same mechanism the design-system
-  page uses, and the new page has its own suite (verify:species-page).
-
-  Read once at module scope: there is no router, and nothing toggles it at runtime.
-*/
-const NEW_DETAIL_PAGE =
-  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('detail')
-
 /**
  * Pokedex shell, in the two states the reference frames describe.
  *
  * Nothing selected -> the browse grid (Figma MainPage-Light / MainPage-Dark):
- * three columns of ghost cards, the whole page. Something selected -> the
- * existing 240px rail beside the detail view, untouched by this pass; Figma
- * splits these across separate MainPage and DetailPage frames, and DetailPage's
- * own retrofit is not in scope here.
+ * three columns of ghost cards, the whole page. Something selected -> the rebuilt
+ * species detail page (Figma DetailPage), which owns its own two-column split.
  *
  * Both states render the same SpeciesList component, so the generation scope and
  * the filter controls cannot diverge between them.
+ *
+ * THE ?detail FLAG AND THE OLD RAIL-PLUS-DETAIL VIEW ARE GONE. The flag existed
+ * while the new page was being built a step at a time; it came out once the last
+ * of its four tabs landed and the old page's one unique feature -- the four-axis
+ * artwork control -- was folded into the Sprites tab rather than dropped. With
+ * that done there was nothing the old view could show that this one cannot, so
+ * SpeciesDetail, Learnset, Encounters and TypeEffectiveness were deleted rather
+ * than left as a second, unreachable answer to the same question.
  *
  * The selected species lives in the nav context rather than in a route: deep
  * links need a router, which is not worth pulling in yet, but the global search
@@ -61,50 +45,31 @@ export function Pokedex() {
         them, so the grid sitting directly under the app bar's own hairline is
         the reference, not a departure from it.
 
-        The way back from a detail view still needs somewhere to live, so it
-        renders on its own when something is selected. Figma puts an
-        "icon-page-back" instance at the top-left of both DetailPage frames.
-      */}
-      {/* The rebuilt page carries its own back-link inside the pinned column, per
-          Part 1, so this one would be a second identical control on the same
-          screen -- measured as two .pokedex-back nodes before this guard. */}
-      {!browsing && !NEW_DETAIL_PAGE && (
-        <div className="pokedex-back-row">
-          <button
-            type="button"
-            className="pokedex-back"
-            data-testid="back-to-grid"
-            onClick={() => setSelectedId(null)}
-          >
-            <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
-            All species
-          </button>
-        </div>
-      )}
-
-      {/*
-        Each pane scrolls itself, and the page does not scroll at all. In the
-        detail state that means TWO independent scroll areas side by side: the
-        240px species rail and the detail column are different lengths, and
-        making the page scroll both together was what previously forced the
-        rail to be sticky and height-capped.
-
-        The scroll-down indicator and the back-to-top control come from
-        ScrollArea, so the grid keeps the affordance it already had -- built for
-        exactly this -- and every other pane gains the same one.
+        The way back from a detail view lives inside the detail page's pinned
+        column, where Figma puts its "icon-page-back" instance, so there is no
+        back row here.
       */}
       {browsing ? (
         <div className="pokedex-body pokedex-body-grid">
+          {/*
+            The grid scrolls itself and the page does not scroll at all. The
+            scroll-down indicator and the back-to-top control come from
+            ScrollArea, which was built for exactly this.
+          */}
           <ScrollArea testId="pokedex-grid-scroll-area">
             <div className="pokedex-grid-wrap">
               <SpeciesList selectedId={selectedId} onSelect={setSelectedId} layout="grid" />
             </div>
           </ScrollArea>
         </div>
-      ) : NEW_DETAIL_PAGE ? (
-        /* The rebuilt page owns its own two-column split and its own single
-           scroll area, so it is NOT wrapped in .pokedex-body or a ScrollArea --
-           either would add a second scrolling ancestor and break the pinning. */
+      ) : (
+        /* NOT wrapped in .pokedex-body or a ScrollArea: the page owns its own
+           two-column split and its own single scroll area, and either wrapper
+           would add a second scrolling ancestor and break the pinning.
+
+           Keyed by species so the artwork view remounts -- each species opens on
+           regular static artwork rather than inheriting the previous one's
+           source/colour/motion/gender state. */
         <SpeciesDetailPage
           key={selectedId}
           speciesId={selectedId}
@@ -112,28 +77,6 @@ export function Pokedex() {
           onSelectSpecies={setSelectedId}
           onSelectEggGroup={(id) => nav.navigate('breedingdex', id)}
         />
-      ) : (
-        <div className="pokedex-body">
-          <ScrollArea
-            className="species-list-scroll"
-            testId="pokedex-rail-scroll-area"
-            hint={false}
-          >
-            <SpeciesList selectedId={selectedId} onSelect={setSelectedId} />
-          </ScrollArea>
-          <ScrollArea testId="pokedex-detail-scroll-area">
-            <div className="pokedex-detail">
-              {/* Keyed by species so the artwork toggles remount: each species
-                  opens on regular static artwork rather than inheriting the
-                  previous one's source/colour/motion/gender state. */}
-              <SpeciesDetail
-                key={selectedId}
-                speciesId={selectedId}
-                onSelectSpecies={setSelectedId}
-              />
-            </div>
-          </ScrollArea>
-        </div>
       )}
     </div>
   )

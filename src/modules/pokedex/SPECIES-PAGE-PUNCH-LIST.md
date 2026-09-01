@@ -5,9 +5,9 @@ Open items on the rebuilt page (`SpeciesDetailPage.tsx` and the four
 judgements that only make sense against the finished page with real content in
 it, which now exists.
 
-Nothing here is a bug in the data or a broken behaviour — `npm run
-verify:species-page` is green at 66 checks. These are the "it does not look
-right yet" list.
+Sections 4 and 5 are DONE and kept here as the record of what changed.
+Section 1 is the open list: layout judgements, not bugs. `npm run
+verify:species-page` is green at 69 checks and the other nine suites pass.
 
 ## 1 — Layout fix-up pass (raised at the end of Part 2–5, hold until reviewed)
 
@@ -60,38 +60,64 @@ right yet" list.
 - Both fold into the one Bulbapedia sourcing task: ~41 min rate-limited fetch, a
   wikitext parser, a lazy partition, CC BY-NC-SA attribution.
 
-## 4 — The cutover (needs a decision, blocks removing `?detail`)
+## 4 — The cutover — DONE
 
-The new page is still behind `?detail`. What is holding it there is not missing
-content — all four tabs are built — but one feature and one suite migration:
+`?detail` is gone and this is the live detail view. The old page
+(`SpeciesDetail.tsx`) and the three components only it used —
+`Learnset.tsx`, `Encounters.tsx`, `TypeEffectiveness.tsx` — were deleted
+rather than left as a second, unreachable answer to the same question.
 
-- **The old page's four-axis artwork control has no home in the new spec.**
-  `Artwork.tsx` lets you toggle source (in-game / official artwork), colour
-  (regular / shiny), motion (static / animated) and gender, with each axis
-  checked against what actually exists for that species. The new Sprites tab
-  shows every image at once instead, which answers the same question a different
-  way. Nothing in Parts 0–5 asks for the toggles. Options: drop them, keep them
-  on the Sprites tab, or put shiny back on the pinned card (the evolution chart
-  already takes a `shiny` prop and currently gets the default).
-- **~100 suite assertions target the old page's testids**, most of them that
-  artwork control: 32 `artwork` references in `verify-pokedex.mjs` and 72 in
-  `verify-ux.mjs`.
+The four-axis artwork control was **folded into the Sprites tab**, not
+dropped and not moved onto the pinned hero card. `Artwork.tsx` is reused
+unchanged, so its availability rules are the same verified code; a fifth
+switch beside the four turns the same axes into a filter over the sprite
+catalogue, opt-in so the tab still opens as the full catalogue. The colour
+axis still drives the evolution chart, which is why the view state is owned
+by `SpeciesDetailPage` rather than by the tab holding the switch.
 
-Until that is settled, `Pokedex.tsx` keeps both pages and the new one has its own
-suite (`npm run verify:species-page`).
+The suites were re-pointed rather than relaxed, and they grew in the move
+(`verify-app` 47→48, `verify-pokedex` 94→105, `verify-ux` 127→132,
+`verify-search` 184→185, `verify-eggmoves` 46→47, plus
+`verify-species-page` at 69). Three claims genuinely changed shape rather
+than moving, and each is commented where it appears:
 
-## 5 — Found while building, unrelated to layout (needs a decision)
+- **The app selector no longer drives the learnset.** It still re-resolves
+  every era-sensitive field of an open page in place; the learnset follows
+  the page's own generation control, by design.
+- **"All" no longer blanks the per-game tabs.** The old page asked you to
+  pick a game first because it had none of its own. The rebuilt page seeds
+  its scope at the newest era the species exists in, so the two
+  "pick a specific game" notes no longer exist.
+- **Opening a species now fetches nothing.** One tab is mounted at a time,
+  so the learnset partition loads when Learnset opens and the encounter
+  partition when Description does. The old page fired both on open.
 
-**17 species show a hidden ability under a Gen 4 selection, and hidden abilities
-are a Gen 5 mechanic.** 12 under Gen 3. Koffing shows "Levitate, Stench
-(hidden)" in HeartGold/SoulSilver; Stench was not on it until Black/White.
+### Two facts from the old page did not come across
 
-The cause is upstream: `resolveAbilitiesForGeneration` empties a slot when
-PokéAPI carries a `past_abilities` entry saying it was empty, and for these 17
-there is no such entry. Bulbasaur is the well-formed case — Chlorophyll does have
-one, so it correctly disappears in Gen 4.
+Both were outside the DetailPage spec, so neither was carried over
+silently — flagging them here rather than adding unrequested fields:
 
-The fix is one line in `src/data/era.ts` (drop `is_hidden` slots below Gen 5), but
-it changes what the OLD detail page shows too, so it is not being applied
-silently. `verify-species-page.mjs` logs it as a FINDING rather than asserting
-either behaviour.
+1. **Breeding partners** — the old page's "N species in Generation G share
+   an egg group" count, from `useBreedingPartners`. Gone with the page.
+2. **Ability effect text** — the old page printed each ability's
+   `short_effect` as body text under its name. The Info tab has it as the
+   ability's `title` attribute instead, so it is a hover rather than a read.
+
+## 5 — Hidden abilities in Gen 1–4 — FIXED
+
+Was: 17 species showed a slot-3 hidden ability under a Gen 4 selection (12
+under Gen 3), because PokéAPI carries no `past_abilities` entry emptying
+that slot for them. Koffing advertised Stench in HeartGold/SoulSilver.
+
+Now gated by `HIDDEN_ABILITIES_INTRODUCED_IN_GENERATION` in
+`src/data/era.ts`: the hidden SLOT did not exist before Gen 5, whatever the
+data says about the ability in it. The ability itself often did exist
+(Stench is a Gen 3 ability), so the existing generation check could not
+catch this — the slot is the anachronism, not its occupant.
+
+Applied at the resolver, so it reaches everything: the Info tab, and the
+Abilitydex's holder lists through `abilityHolders.ts`, which goes through
+the same function. Audited across all 493 species: 0 hidden abilities
+survive in Gens 1–4, and no ability lost all its holders, so the
+Abilitydex's own entry list (123 in Gen 4) is unchanged. The rule is now
+recorded in CLAUDE.md.

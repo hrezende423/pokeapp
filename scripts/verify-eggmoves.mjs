@@ -98,14 +98,36 @@ try {
   log(`preview ready at ${APP_URL}`)
   browser = await chromium.launch({ channel: 'chrome' })
 
+  /*
+    THE LEARNSET AND THE ENCOUNTERS ARE ON SEPARATE TABS NOW, and the isolation
+    this suite exists to prove got STRONGER for it: the two datasets are no longer
+    even mounted at the same time, so "a failing encounters partition must not
+    touch the learnset" is checked by looking at each in turn rather than at both
+    in one DOM. Every assertion below says which tab it is reading.
+
+    The version group is still set through the app selector, because the page's own
+    game scope seeds from it -- so `openDetail(page, 133, 'heartgold-soulsilver')`
+    still lands on the HGSS learnset.
+  */
   const openDetail = async (page, id, vg, name) => {
+    if (await page.$('[data-testid="species-page-back"]')) {
+      await page.click('[data-testid="species-page-back"]')
+      await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
+    }
     await withControlsOn(page, () => page.selectOption('[data-testid="vg-select"]', vg))
     await withControlsOn(page, () =>
       page.fill('[data-testid="species-search"]', name.toLowerCase()),
     )
     await page.waitForSelector(`[data-testid="species-row-${id}"]`, { timeout: 20000 })
     await page.click(`[data-testid="species-row-${id}"]`)
-    await page.waitForSelector(`[data-testid="species-detail"][data-species-id="${id}"]`, {
+    await page.waitForSelector(`[data-testid="species-page"][data-species-id="${id}"]`, {
+      timeout: 30000,
+    })
+  }
+
+  const openTab = async (page, tab) => {
+    await page.click(`[data-testid="species-page-subnav"] .ds-tab:text-is("${tab}")`)
+    await page.waitForSelector(`[data-testid="species-page-panel-${tab.toLowerCase()}"]`, {
       timeout: 30000,
     })
   }
@@ -126,16 +148,17 @@ try {
 
   for (const c of CASES) {
     await openDetail(page, c.id, c.vg, c.name)
-    await page.waitForSelector('[data-testid="learn-egg"]', { timeout: 60000 })
+    await openTab(page, 'Learnset')
+    await page.waitForSelector('[data-testid="species-learn-egg"]', { timeout: 60000 })
     const got = await page.evaluate(() => {
-      const s = document.querySelector('[data-testid="learn-egg"]')
+      const s = document.querySelector('[data-testid="species-learn-egg"]')
       const rows = [...s.querySelectorAll('tbody tr')]
       return {
-        heading: s.querySelector('h4')?.textContent.trim(),
+        heading: s.querySelector('h3')?.textContent.trim(),
         rows: rows.length,
         icons: s.querySelectorAll('svg[data-icon="IconEgg"]').length,
         buttons: s.querySelectorAll('button[data-testid^="egg-move-marker-"]').length,
-        groups: [...document.querySelectorAll('.learn-group')].map((g) =>
+        groups: [...document.querySelectorAll('.species-learn-group')].map((g) =>
           g.getAttribute('data-testid'),
         ),
         firstMove: rows[0]?.children[1]?.textContent.trim(),
@@ -154,9 +177,10 @@ try {
   // ============================================================ item 4: target
   hr('EGG MARKER — hover title and click popover respond')
   await openDetail(page, 133, 'heartgold-soulsilver', 'Eevee')
-  await page.waitForSelector('[data-testid="learn-egg"]', { timeout: 60000 })
+  await openTab(page, 'Learnset')
+  await page.waitForSelector('[data-testid="species-learn-egg"]', { timeout: 60000 })
   const firstMarker = await page.$eval(
-    '[data-testid="learn-egg"] button[data-testid^="egg-move-marker-"]',
+    '[data-testid="species-learn-egg"] button[data-testid^="egg-move-marker-"]',
     (el) => ({
       testid: el.getAttribute('data-testid'),
       title: el.getAttribute('title'),
@@ -204,7 +228,9 @@ try {
   check('Escape closes the popover', (await page.$$(`[data-testid="${noteId}"]`)).length === 0)
   await page.click(markerSel)
   await page.waitForSelector(`[data-testid="${noteId}"]`, { timeout: 10000 })
-  await page.click('[data-testid="card-stats"] h3')
+  // Somewhere outside the popover but on this tab -- the stats card it used to
+  // click lives on Info, which would unmount the marker along with the popover.
+  await page.click('[data-testid="species-learn-egg"] h3')
   await page.waitForSelector(`[data-testid="${noteId}"]`, { state: 'detached', timeout: 10000 })
   check('clicking elsewhere closes the popover', true)
   check(
@@ -230,26 +256,43 @@ try {
   await broken.goto(APP_URL, { waitUntil: 'load' })
   await broken.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
   await openDetail(broken, 133, 'heartgold-soulsilver', 'Eevee')
-  await broken.waitForSelector('[data-testid="encounters-error"]', { timeout: 60000 })
-  await broken.waitForSelector('[data-testid="learn-egg"]', { timeout: 60000 })
 
-  const underFailure = await broken.evaluate(() => ({
-    learnGroups: [...document.querySelectorAll('.learn-group')].map((g) =>
+  // The Description tab is what asks for the encounters file, so that is where
+  // the 503 surfaces.
+  await openTab(broken, 'Description')
+  await broken.waitForSelector('[data-testid="locations-error"]', { timeout: 60000 })
+  const failedSide = await broken.evaluate(() => ({
+    encountersErrorShown: document.querySelector('[data-testid="locations-error"]') != null,
+    encountersEmptyShown: document.querySelector('[data-testid="locations-empty"]') != null,
+    encountersAlert:
+      document
+        .querySelector('[data-testid="species-locations"] [role="alert"]')
+        ?.textContent.trim() ?? null,
+    retryOffered: document.querySelector('[data-testid="locations-retry"]') != null,
+    // The flavour text on the same tab comes from the eager bundle and must be
+    // unaffected -- a failed partition may not blank its neighbours either.
+    flavourEntries: document.querySelectorAll('[data-testid^="species-flavor-"]').length,
+  }))
+
+  // And the learnset, one tab over, must be untouched by it.
+  await openTab(broken, 'Learnset')
+  await broken.waitForSelector('[data-testid="species-learn-egg"]', { timeout: 60000 })
+  const learnSide = await broken.evaluate(() => ({
+    learnGroups: [...document.querySelectorAll('.species-learn-group')].map((g) =>
       g.getAttribute('data-testid'),
     ),
-    eggRows: document.querySelectorAll('[data-testid="learn-egg"] tbody tr').length,
+    eggRows: document.querySelectorAll('[data-testid="species-learn-egg"] tbody tr').length,
     eggIcons: document.querySelectorAll('svg[data-icon="IconEgg"]').length,
     learnsetEmptyShown: document.querySelector('[data-testid="learnset-empty"]') != null,
     learnsetErrorShown: document.querySelector('[data-testid="learnset-error"]') != null,
-    encountersErrorShown: document.querySelector('[data-testid="encounters-error"]') != null,
-    encountersEmptyShown: document.querySelector('[data-testid="encounters-empty"]') != null,
-    encountersAlert:
-      document
-        .querySelector('[data-testid="card-encounters"] [role="alert"]')
-        ?.textContent.trim() ?? null,
-    retryOffered: document.querySelector('[data-testid="encounters-retry"]') != null,
   }))
+  const underFailure = { ...failedSide, ...learnSide }
   log(`  ${JSON.stringify(underFailure, null, 2).replace(/\n/g, '\n  ')}`)
+  check(
+    'the flavour text beside the failure still renders',
+    underFailure.flavourEntries > 0,
+    `(${underFailure.flavourEntries})`,
+  )
   check('learnset still renders all four method groups', underFailure.learnGroups.length === 4)
   check(
     'egg-move section survives the encounters failure',
@@ -275,17 +318,32 @@ try {
   broken.on('request', (r) => {
     if (r.url().includes('/data/learnsets/')) learnsetRequests.push(r.url())
   })
+  /*
+    ORDER MATTERS HERE. Come back to the failing tab FIRST, while the route is
+    still returning 503, so the error and its retry are on screen -- then lift the
+    route and click. Unrouting first would make the tab's own remount succeed on
+    its way in, and there would be no retry left to test. (Which is itself worth
+    knowing: leaving and re-entering the tab is a second, implicit retry path.)
+  */
+  await openTab(broken, 'Description')
+  await broken.waitForSelector('[data-testid="locations-error"]', { timeout: 60000 })
   await broken.unroute('**/data/encounters/*.json')
-  await broken.click('[data-testid="encounters-retry"]')
-  await broken.waitForSelector('[data-testid="encounters"], [data-testid="encounters-empty"]', {
-    timeout: 60000,
-  })
-  const afterRetry = await broken.evaluate(() => ({
-    encounterRows:
-      document.querySelector('[data-testid="encounters"]')?.getAttribute('data-total-rows') ?? null,
-    errorGone: document.querySelector('[data-testid="encounters-error"]') == null,
-    eggRows: document.querySelectorAll('[data-testid="learn-egg"] tbody tr').length,
+  await broken.click('[data-testid="locations-retry"]')
+  await broken.waitForSelector(
+    '[data-testid="species-locations-rows"], [data-testid="locations-empty"]',
+    { timeout: 60000 },
+  )
+  const retried = await broken.evaluate(() => ({
+    encounterRows: document.querySelectorAll('[data-testid="species-locations-rows"] tbody tr')
+      .length,
+    errorGone: document.querySelector('[data-testid="locations-error"]') == null,
   }))
+  await openTab(broken, 'Learnset')
+  await broken.waitForSelector('[data-testid="species-learn-egg"]', { timeout: 60000 })
+  const afterRetry = {
+    ...retried,
+    eggRows: await broken.$$eval('[data-testid="species-learn-egg"] tbody tr', (els) => els.length),
+  }
   log(`  encounter fetch attempts while failing: ${attemptsBeforeRetry}`)
   log(`  after retry: ${JSON.stringify(afterRetry)}`)
   log(`  learnset re-requests during retry: ${learnsetRequests.length}`)
@@ -311,22 +369,29 @@ try {
   await inverse.goto(APP_URL, { waitUntil: 'load' })
   await inverse.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
   await openDetail(inverse, 133, 'heartgold-soulsilver', 'Eevee')
+  await openTab(inverse, 'Learnset')
   await inverse.waitForSelector('[data-testid="learnset-error"]', { timeout: 60000 })
-  // The learnset 503 fails fast while the 2.8 MiB encounters file is still on the
-  // wire, so wait for encounters to settle before judging it -- otherwise the
-  // assertion races the download it is meant to prove is unaffected.
-  await inverse.waitForSelector(
-    '[data-testid="encounters"], [data-testid="encounters-empty"], [data-testid="encounters-error"]',
-    { timeout: 60000 },
-  )
-  const inv = await inverse.evaluate(() => ({
+  const invLearn = await inverse.evaluate(() => ({
     learnsetErrorShown: document.querySelector('[data-testid="learnset-error"]') != null,
     learnsetEmptyShown: document.querySelector('[data-testid="learnset-empty"]') != null,
-    encounterRows:
-      document.querySelector('[data-testid="encounters"]')?.getAttribute('data-total-rows') ?? null,
-    encountersErrorShown: document.querySelector('[data-testid="encounters-error"]') != null,
     retryOffered: document.querySelector('[data-testid="learnset-retry"]') != null,
   }))
+  // The encounters file is 2.8 MiB and the learnset 503 fails fast, so settle the
+  // other tab before judging it -- otherwise the assertion races the download it
+  // is meant to prove is unaffected.
+  await openTab(inverse, 'Description')
+  await inverse.waitForSelector(
+    '[data-testid="species-locations-rows"], [data-testid="locations-empty"], [data-testid="locations-error"]',
+    { timeout: 60000 },
+  )
+  const inv = {
+    ...invLearn,
+    encounterRows: await inverse.$$eval(
+      '[data-testid="species-locations-rows"] tbody tr',
+      (els) => els.length,
+    ),
+    encountersErrorShown: (await inverse.$('[data-testid="locations-error"]')) != null,
+  }
   log(`  ${JSON.stringify(inv)}`)
   check('learnset reports its own failure', inv.learnsetErrorShown === true)
   check('learnset does not claim "no data"', inv.learnsetEmptyShown === false)

@@ -351,9 +351,13 @@ try {
   const goTo = async (id) => {
     await closePanel()
     await goToDex(page, id)
-    await page.waitForSelector(`[data-testid="dex-${id}"], [data-testid="species-rows"]`, {
-      timeout: 30000,
-    })
+    // species-page as well as species-rows: the Pokedex is EITHER the grid or the
+    // rebuilt detail page, never both, so arriving with a species already open
+    // shows neither the dex shell nor the row list.
+    await page.waitForSelector(
+      `[data-testid="dex-${id}"], [data-testid="species-rows"], [data-testid="species-page"]`,
+      { timeout: 30000 },
+    )
   }
   const selectGame = async (vg) => {
     await closePanel()
@@ -720,9 +724,12 @@ try {
       term: 'lickitung',
       entry: lickitung,
       moduleId: 'pokedex',
-      detail: 'species-detail',
+      detail: 'species-page',
       idAttr: 'data-species-id',
-      nameId: 'detail-name',
+      /* The rebuilt page's name is the shared hero card's, addressed by its
+         data-ds hook rather than a testid -- the component is the design system's
+         and does not carry page-specific ids. */
+      nameSel: '[data-ds="hero-name"]',
     },
     {
       key: 'moves',
@@ -731,7 +738,7 @@ try {
       moduleId: 'movedex',
       detail: 'movedex-detail',
       idAttr: 'data-entry-id',
-      nameId: 'movedex-name',
+      nameSel: '[data-testid="movedex-name"]',
     },
     {
       key: 'items',
@@ -740,7 +747,7 @@ try {
       moduleId: 'itemdex',
       detail: 'itemdex-detail',
       idAttr: 'data-entry-id',
-      nameId: 'itemdex-name',
+      nameSel: '[data-testid="itemdex-name"]',
     },
     {
       key: 'abilities',
@@ -749,7 +756,7 @@ try {
       moduleId: 'abilitydex',
       detail: 'abilitydex-detail',
       idAttr: 'data-entry-id',
-      nameId: 'abilitydex-name',
+      nameSel: '[data-testid="abilitydex-name"]',
     },
   ]
   // Start from a tab that is none of the four targets, so every case is a real
@@ -764,17 +771,17 @@ try {
     await page.click(hitSel)
     await page.waitForSelector(`[data-testid="${c.detail}"]`, { timeout: 20000 })
     const state = await page.evaluate(
-      ([moduleId, detail, idAttr, nameId]) => ({
+      ([moduleId, detail, idAttr, nameSel]) => ({
         tabCurrent:
           document
             .querySelector(`[data-testid="nav-${moduleId}"]`)
             ?.getAttribute('aria-current') === 'page',
         entryId: Number(document.querySelector(`[data-testid="${detail}"]`)?.getAttribute(idAttr)),
-        name: document.querySelector(`[data-testid="${nameId}"]`)?.textContent?.trim(),
+        name: document.querySelector(nameSel)?.textContent?.trim(),
         panelOpen: document.querySelector('[data-testid="global-search-results"]') != null,
         termKept: document.querySelector('[data-testid="global-search"]')?.value,
       }),
-      [c.moduleId, c.detail, c.idAttr, c.nameId],
+      [c.moduleId, c.detail, c.idAttr, c.nameSel],
     )
     log(
       `  ${c.key.padEnd(10)} -> ${c.moduleId.padEnd(11)} tab=${state.tabCurrent} id=${state.entryId} name="${state.name}"`,
@@ -811,19 +818,37 @@ try {
   await setTerm('slowbro')
   const slowbro = species.find((s) => s.name === 'slowbro')
   await page.click(`[data-testid="gs-hit-species-${slowbro.id}"]`)
-  await page.waitForSelector('[data-testid="species-detail"]', { timeout: 20000 })
+  await page.waitForSelector('[data-testid="species-page"]', { timeout: 20000 })
   const opened = await page.evaluate(() => ({
     id: Number(
-      document.querySelector('[data-testid="species-detail"]')?.getAttribute('data-species-id'),
+      document.querySelector('[data-testid="species-page"]')?.getAttribute('data-species-id'),
     ),
-    name: document.querySelector('[data-testid="detail-name"]')?.textContent?.trim(),
+    name: document.querySelector('[data-ds="hero-name"]')?.textContent?.trim(),
     localTerm: document.querySelector('[data-testid="species-search"]')?.value,
-    rows: document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length,
   }))
   log(`  ${JSON.stringify(opened)}`)
   check('the species detail opened anyway', opened.id === slowbro.id && opened.name === 'Slowbro')
   check("the dex's own search term was left alone", opened.localTerm === 'zzzq', opened.localTerm)
-  check('its row is genuinely still filtered out', opened.rows === 0)
+  /*
+    "The row is still filtered out" has to be checked on the LIST, and the rebuilt
+    detail page replaces the list rather than sitting beside it -- so reading a row
+    count while the detail is open would report 0 for the wrong reason and pass
+    vacuously. Going back is what makes the claim real: the term is still applied
+    and the row it hides is still hidden, after the search opened it anyway.
+  */
+  await page.click('[data-testid="species-page-back"]')
+  await page.waitForSelector('[data-testid="species-rows"]', { timeout: 20000 })
+  const backOnList = await page.evaluate(() => ({
+    localTerm: document.querySelector('[data-testid="species-search"]')?.value,
+    rows: document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length,
+  }))
+  log(`  back on the list: ${JSON.stringify(backOnList)}`)
+  check('the term survived the round trip', backOnList.localTerm === 'zzzq', backOnList.localTerm)
+  check(
+    'and its row is genuinely still filtered out',
+    backOnList.rows === 0,
+    `(${backOnList.rows})`,
+  )
   await withControls(() => page.fill('[data-testid="species-search"]', ''))
 
   // ================================================================ errors

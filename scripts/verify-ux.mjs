@@ -308,18 +308,45 @@ try {
     responses.push({ url: e.response.url, status: e.response.status })
   })
 
+  /*
+    THE DETAIL VIEW IS THE REBUILT TABBED PAGE. The old rail-plus-cards view and
+    the ?detail flag are gone, so a species opens on the Info tab and the rest is
+    one tab click away. The four-axis artwork control moved to the Sprites tab; the
+    evolution chart is on Info. Where a claim spans both -- "the tree follows the
+    colour toggle" -- the helpers below are what make that two-tab trip explicit
+    instead of hidden in a selector.
+  */
   const openSpecies = async (id) => {
     await page.click(`[data-testid="species-row-${id}"]`)
-    await page.waitForSelector(`[data-testid="species-detail"][data-species-id="${id}"]`, {
+    await page.waitForSelector(`[data-testid="species-page"][data-species-id="${id}"]`, {
       timeout: 30000,
     })
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="learnset-loading"]'),
-      undefined,
-      { timeout: 60000 },
-    )
+    await page.waitForSelector('[data-testid="species-info"]', { timeout: 30000 })
+  }
+
+  const openTab = async (tab) => {
+    await page.click(`[data-testid="species-page-subnav"] .ds-tab:text-is("${tab}")`)
+    await page.waitForSelector(`[data-testid="species-page-panel-${tab.toLowerCase()}"]`, {
+      timeout: 30000,
+    })
+  }
+
+  /** Open the species and land on the Sprites tab, where the artwork control is. */
+  const openSprites = async (id) => {
+    await openSpecies(id)
+    await openTab('Sprites')
+    await page.waitForSelector('[data-testid="artwork-img"]', { timeout: 30000 })
+  }
+
+  const backToGrid = async () => {
+    if ((await page.$('[data-testid="species-page-back"]')) == null) return
+    await page.click('[data-testid="species-page-back"]')
+    await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
   }
   const search = async (term, expectId) => {
+    // The detail page replaces the grid, so the search box only exists once the
+    // list is back on screen.
+    await backToGrid()
     await withControls(() => page.fill('[data-testid="species-search"]', term))
     await page.waitForSelector(`[data-testid="species-row-${expectId}"]`, { timeout: 15000 })
   }
@@ -365,7 +392,7 @@ try {
   // -------------------------------------------------------------- ITEM 1
   hr('ITEM 1 (DOM) — static artwork resolves to official artwork, not the in-game sprite')
   await search('bulbasaur', 1)
-  await openSpecies(1)
+  await openSprites(1)
   await waitLoaded()
   const defaultImg = await imgState()
   log(`  default src : ${defaultImg.src}`)
@@ -398,7 +425,7 @@ try {
   await waitLoaded()
 
   // -------------------------------------------------------------- ITEM 2
-  hr('ITEM 2 (DOM) — four real toggle switches with the specified defaults')
+  hr('ITEM 2 (DOM) — the four artwork axes, with the specified defaults')
   const switches = await page.$$eval('[data-testid^="toggle-"][role="switch"]', (els) =>
     els.map((e) => ({
       id: e.getAttribute('data-testid'),
@@ -410,24 +437,78 @@ try {
   )
   log(`  switches (in DOM order):`)
   switches.forEach((s) => log(`    ${s.id.padEnd(16)} value=${s.value.padEnd(9)} state=${s.state}`))
-  check('exactly four switches', switches.length === 4, `(${switches.length})`)
+  /*
+    FIVE, not four: the four axes came across from the old page unchanged, and the
+    fifth is new here -- it turns the same four axes into a filter over the sprite
+    catalogue below. The order assertion is therefore about the four axes leading,
+    with the grid filter last, rather than about the total.
+  */
   check(
-    'all four use role="switch" (not plain buttons)',
+    'five switches: the four axes plus the grid filter',
+    switches.length === 5,
+    `(${switches.length})`,
+  )
+  check(
+    'all of them use role="switch" (not plain buttons)',
     switches.every((s) => s.role === 'switch'),
   )
   const ids = switches.map((s) => s.id)
   check(
-    'switches are source, shiny, motion, gender in order',
-    JSON.stringify(ids) ===
+    'the four axes come first, in order source, shiny, motion, gender',
+    JSON.stringify(ids.slice(0, 4)) ===
       JSON.stringify(['toggle-source', 'toggle-shiny', 'toggle-motion', 'toggle-gender']),
     ids.join(','),
   )
+  check('and the grid filter is last', ids[4] === 'toggle-grid-filter', ids.join(','))
   const defaults = Object.fromEntries(switches.map((s) => [s.id, s.value]))
   log(`  defaults: ${JSON.stringify(defaults)}`)
   check('Source defaults to Artwork', defaults['toggle-source'] === 'Artwork')
   check('Color defaults to Regular', defaults['toggle-shiny'] === 'Regular')
   check('Motion defaults to Static', defaults['toggle-motion'] === 'Static')
   check('Gender defaults to Male', defaults['toggle-gender'] === 'Male')
+  check('the grid filter defaults to off', defaults['toggle-grid-filter'] === 'All sprites')
+
+  /*
+    THE FILTER IS OPT-IN, and this is the assertion that pins why. With it off the
+    grid is the whole catalogue; with it on the default axes (artwork, regular,
+    static, male) narrow it to the one official artwork. Applying it
+    unconditionally would have made that the tab's opening state.
+  */
+  const gridBefore = await page.$eval('[data-testid="species-sprites"]', (el) => ({
+    shown: Number(el.getAttribute('data-tiles')),
+    all: Number(el.getAttribute('data-all-tiles')),
+    filtered: el.getAttribute('data-filtered'),
+  }))
+  await page.click('[data-testid="toggle-grid-filter"]')
+  await page.waitForSelector('[data-testid="sprites-filter-count"]', { timeout: 15000 })
+  const gridAfter = await page.$eval('[data-testid="species-sprites"]', (el) => ({
+    shown: Number(el.getAttribute('data-tiles')),
+    all: Number(el.getAttribute('data-all-tiles')),
+    filtered: el.getAttribute('data-filtered'),
+  }))
+  const artworkCards = await page.$$eval('[data-testid^="sprite-artwork-"]', (e) => e.length)
+  log(
+    `  grid off: ${gridBefore.shown}/${gridBefore.all} tiles; on: ${gridAfter.shown}/${gridAfter.all}`,
+  )
+  check('the grid shows every tile while the filter is off', gridBefore.shown === gridBefore.all)
+  check('the filter is off by default', gridBefore.filtered === 'false')
+  check(
+    'turning it on narrows the grid',
+    gridAfter.shown < gridBefore.all && gridAfter.filtered === 'true',
+  )
+  check(
+    'and the default axes leave exactly the one regular official artwork',
+    gridAfter.shown === 0 && artworkCards === 1,
+    `${gridAfter.shown} tiles, ${artworkCards} artwork card(s)`,
+  )
+  await page.click('[data-testid="toggle-grid-filter"]')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="species-sprites"]')?.getAttribute('data-filtered') ===
+      'false',
+    undefined,
+    { timeout: 15000 },
+  )
 
   // Source = In-game must disable Motion and force it to Static.
   await page.click('[data-testid="toggle-motion"]')
@@ -485,7 +566,7 @@ try {
 
   // Venusaur (#3) DOES have gendered in-game and animated images.
   await search('venusaur', 3)
-  await openSpecies(3)
+  await openSprites(3)
   await waitLoaded()
   const venusaurModes = {}
   venusaurModes['artwork-static'] = await switchState('gender')
@@ -631,8 +712,12 @@ try {
   const hexToRgb = (h) =>
     `rgb(${parseInt(h.slice(1, 3), 16)}, ${parseInt(h.slice(3, 5), 16)}, ${parseInt(h.slice(5, 7), 16)})`
 
-  // Clear the name search first: a leftover term would make both counts equal
-  // and the "Any restores the list" assertion vacuous.
+  // Back to the grid first. The rebuilt detail page REPLACES the list rather than
+  // sitting beside it, so the row counts this block compares do not exist while a
+  // species is open -- the old rail-plus-detail layout always had both on screen.
+  await backToGrid()
+  // Clear the name search too: a leftover term would make both counts equal and
+  // the "Any restores the list" assertion vacuous.
   await withControls(() => page.fill('[data-testid="species-search"]', ''))
   await page.waitForFunction(
     () => document.querySelectorAll('[data-testid="species-rows"] [data-species-id]').length > 100,
@@ -741,131 +826,217 @@ try {
   check('all 493 species listed', allIds.length === 493, `(${allIds.length})`)
   check('ids run 1..493', Math.min(...allIds) === 1 && Math.max(...allIds) === 493)
 
-  // Under "All" there is no single version group, so per-game data says so
-  // rather than silently showing one game's rows.
+  /*
+    WHAT "ALL" MEANS ON THE DETAIL PAGE CHANGED, and this is the assertion that
+    records it. The old page asked the reader to pick a game before it would show a
+    learnset or an encounter list, because it had no game of its own to fall back
+    on. The rebuilt page does: the Learnset and Description tabs carry a
+    species-local generation control, so "All" seeds them at the newest era the
+    species exists in and they show real rows immediately.
+
+    That is a deliberate improvement, not a silently dropped guard -- the two
+    "pick a specific game" notes no longer exist because nothing is ever left
+    without a game.
+  */
   await search('eevee', 133)
   await openSpecies(133)
-  const perGameNotes = await page.$$('[data-testid="needs-version-group"]')
-  const learnHeading = await page.textContent('[data-testid="card-learnset"] h3')
-  log(`  learnset heading under All: ${JSON.stringify(learnHeading)}`)
-  log(`  per-game "pick a game" notes: ${perGameNotes.length}`)
-  check('learnset and encounters both ask for a specific game', perGameNotes.length === 2)
-  check('heading carries no version group under All', learnHeading.trim() === 'Learnset')
+  await openTab('Learnset')
+  await page.waitForFunction(() => !document.querySelector('[data-testid="learnset-loading"]'), {
+    timeout: 60000,
+  })
+  const underAll = await page.evaluate(() => ({
+    versionGroup: document
+      .querySelector('[data-testid="species-learnset"]')
+      ?.getAttribute('data-version-group'),
+    rows: [...document.querySelectorAll('.species-learn-group')].reduce(
+      (n, e) => n + Number(e.getAttribute('data-rows')),
+      0,
+    ),
+    needsGame: document.querySelectorAll('[data-testid="needs-version-group"]').length,
+    activeGeneration: document
+      .querySelector('[data-testid^="learnset-scope-generation-"][data-active="true"]')
+      ?.getAttribute('data-testid'),
+  }))
+  log(`  under All: scope=${underAll.versionGroup}, ${underAll.rows} learnset rows`)
+  log(`  active generation segment: ${underAll.activeGeneration}`)
+  check(
+    'under All the page falls back to its own newest era',
+    underAll.versionGroup === 'heartgold-soulsilver',
+    underAll.versionGroup,
+  )
+  check(
+    'and shows real rows rather than asking for a game',
+    underAll.rows > 0,
+    `(${underAll.rows})`,
+  )
+  check('so no "pick a specific game" note is needed', underAll.needsGame === 0)
 
-  // Switching back must restore real per-game rows.
+  // Switching the app selector back must not disturb a page that already has a
+  // game of its own.
   await withControls(() => page.selectOption('[data-testid="vg-select"]', 'heartgold-soulsilver'))
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="learnset"]') != null,
+    () => document.querySelector('[data-testid="vg-select"]')?.value === 'heartgold-soulsilver',
     undefined,
     { timeout: 30000 },
   )
-  const restoredRows = await page.getAttribute('[data-testid="learnset"]', 'data-total-rows')
+  await page.waitForFunction(() => !document.querySelector('[data-testid="learnset-loading"]'), {
+    timeout: 60000,
+  })
+  const restoredRows = await page.evaluate(() =>
+    [...document.querySelectorAll('.species-learn-group')].reduce(
+      (n, e) => n + Number(e.getAttribute('data-rows')),
+      0,
+    ),
+  )
   log(`  after switching back to heartgold-soulsilver: learnset rows=${restoredRows}`)
-  check('per-game learnset returns after leaving All', Number(restoredRows) > 0)
+  check('per-game learnset still resolves after leaving All', restoredRows > 0)
+  await openTab('Info')
   await page.screenshot({ path: `${SHOTS}/ux-item5-all.png` })
 
   // -------------------------------------------------------------- ITEM 6
-  hr('ITEM 6 (DOM) — 240px sidebar, card sections, stats chart inside its card')
+  hr('ITEM 6 (DOM) — pinned left track, scrolling right column, nothing overflows')
+  /*
+    THE LAYOUT CLAIM CHANGED SHAPE, not standard. It used to be "a 240px species
+    rail that never flex-grows, beside a detail column of bordered cards". The
+    rebuilt page has no rail and no cards: it is a 420px pinned track holding the
+    hero, beside the one region on the page that scrolls. So the assertions are
+    re-derived from the new geometry rather than renamed onto it.
+
+    420px is not a magic number here either -- it is .ds-hero's own max-width, so
+    the track is exactly the card it holds.
+  */
   const layout = await page.evaluate(() => {
-    const body = document.querySelector('.pokedex-body')
-    const list = document.querySelector('.species-list')
-    const detail = document.querySelector('.pokedex-detail')
+    const page_ = document.querySelector('.species-page')
+    const pinned = document.querySelector('[data-testid="species-page-pinned"]')
+    const scroll = document.querySelector('[data-testid="species-page-scroll"]')
     return {
-      bodyWidth: Math.round(body.getBoundingClientRect().width),
-      listWidth: Math.round(list.getBoundingClientRect().width),
-      detailWidth: Math.round(detail.getBoundingClientRect().width),
-      gridColumns: getComputedStyle(body).gridTemplateColumns,
+      gridColumns: getComputedStyle(page_).gridTemplateColumns,
+      pageWidth: Math.round(page_.getBoundingClientRect().width),
+      pinnedWidth: Math.round(pinned.getBoundingClientRect().width),
+      scrollWidth: Math.round(scroll.getBoundingClientRect().width),
+      pinnedOverflow: getComputedStyle(pinned).overflow,
     }
   })
   log(`  grid-template-columns: ${layout.gridColumns}`)
-  log(`  body=${layout.bodyWidth}px  list=${layout.listWidth}px  detail=${layout.detailWidth}px`)
-  check('species list is exactly 240px wide', layout.listWidth === 240, `(${layout.listWidth}px)`)
-  // body = 240 rail + 20px gap + detail, allowing 2px of sub-pixel grid rounding.
-  const expectedDetail = layout.bodyWidth - 240 - 20
+  log(
+    `  page=${layout.pageWidth}px  pinned=${layout.pinnedWidth}px  scrolling=${layout.scrollWidth}px`,
+  )
   check(
-    'detail area takes all the remaining width',
-    Math.abs(layout.detailWidth - expectedDetail) <= 2,
-    `(${layout.detailWidth}, expected ~${expectedDetail} of ${layout.bodyWidth})`,
+    'the pinned track is exactly 420px',
+    layout.pinnedWidth === 420,
+    `(${layout.pinnedWidth}px)`,
+  )
+  check('and cannot scroll itself', layout.pinnedOverflow === 'hidden', layout.pinnedOverflow)
+  check(
+    'the right column takes the rest',
+    layout.scrollWidth > layout.pageWidth - 420 - 40 && layout.scrollWidth < layout.pageWidth,
+    `(${layout.scrollWidth} of ${layout.pageWidth})`,
   )
 
-  // The sidebar must stay 240px when the window grows: "not flex-growing".
+  // The pinned track must stay 420px when the window grows: "not flex-growing".
   await page.setViewportSize({ width: 1900, height: 1000 })
   await page.waitForTimeout(200)
   const wideLayout = await page.evaluate(() => ({
-    listWidth: Math.round(document.querySelector('.species-list').getBoundingClientRect().width),
-    detailWidth: Math.round(
-      document.querySelector('.pokedex-detail').getBoundingClientRect().width,
+    pinnedWidth: Math.round(
+      document.querySelector('[data-testid="species-page-pinned"]').getBoundingClientRect().width,
+    ),
+    scrollWidth: Math.round(
+      document.querySelector('[data-testid="species-page-scroll"]').getBoundingClientRect().width,
     ),
   }))
-  log(`  at 1900px viewport: list=${wideLayout.listWidth}px detail=${wideLayout.detailWidth}px`)
-  check('sidebar stays 240px at a wider viewport', wideLayout.listWidth === 240)
-  check('detail absorbed the extra width', wideLayout.detailWidth > layout.detailWidth)
+  log(
+    `  at 1900px viewport: pinned=${wideLayout.pinnedWidth}px scrolling=${wideLayout.scrollWidth}px`,
+  )
+  check('pinned track stays 420px at a wider viewport', wideLayout.pinnedWidth === 420)
+  check('the right column absorbed the extra width', wideLayout.scrollWidth > layout.scrollWidth)
   await page.setViewportSize({ width: 1500, height: 1000 })
   await page.waitForTimeout(200)
 
-  const cards = await page.$$eval('.detail > .card, .detail > .card-grid > .card', (els) =>
-    els.map((e) => ({
-      id: e.getAttribute('data-testid'),
-      width: Math.round(e.getBoundingClientRect().width),
-      top: Math.round(e.getBoundingClientRect().top),
-      bordered: getComputedStyle(e).borderTopWidth !== '0px',
-    })),
+  /*
+    EXACTLY ONE SCROLLING REGION, which is the whole app's scroll model: the page
+    is viewport-locked and only an inner region ever moves. Measured at this
+    viewport rather than trusting the species-page suite's measurement at another.
+  */
+  const scrollables = await page.$$eval('*', (els) =>
+    els
+      .filter((el) => {
+        const cs = getComputedStyle(el)
+        if (cs.display === 'inline') return false
+        const scrolls = ['auto', 'scroll']
+        return (
+          (scrolls.includes(cs.overflowY) && el.scrollHeight - el.clientHeight > 8) ||
+          (scrolls.includes(cs.overflowX) && el.scrollWidth - el.clientWidth > 8)
+        )
+      })
+      .map((el) => `${el.tagName}.${el.className?.toString().split(' ').join('.')}`),
   )
-  log('  cards:')
-  cards.forEach((c) => log(`    ${(c.id ?? '?').padEnd(20)} ${c.width}px wide, top=${c.top}`))
-  const cardIds = cards.map((c) => c.id)
-  for (const id of [
-    'card-head',
-    'card-stats',
-    'card-traits',
-    'card-evolution',
-    'card-learnset',
-    'card-encounters',
-  ]) {
-    check(`${id} rendered as its own card`, cardIds.includes(id))
-  }
+  log(`  scrollable elements: ${scrollables.join(' | ') || 'none'}`)
   check(
-    'every card has a visible border',
-    cards.every((c) => c.bordered),
-  )
-  const byId = Object.fromEntries(cards.map((c) => [c.id, c]))
-  check(
-    'stats and traits cards sit side by side',
-    byId['card-stats'].top === byId['card-traits'].top &&
-      byId['card-stats'].width < layout.detailWidth * 0.75,
-    `tops ${byId['card-stats'].top}/${byId['card-traits'].top}`,
-  )
-  check(
-    'learnset and encounters cards sit side by side',
-    byId['card-learnset'].top === byId['card-encounters'].top,
-    `tops ${byId['card-learnset'].top}/${byId['card-encounters'].top}`,
-  )
-  check(
-    'evolution card is full width',
-    byId['card-evolution'].width > byId['card-stats'].width * 1.7,
-    `${byId['card-evolution'].width} vs ${byId['card-stats'].width}`,
+    'the right column is the only scrolling region',
+    scrollables.length === 1 && scrollables[0].includes('species-page-scroll'),
+    `(${scrollables.length})`,
   )
 
-  const chart = await page.evaluate(() => {
-    const card = document.querySelector('[data-testid="card-stats"]')
-    const bars = document.querySelector('[data-testid="base-stats"]')
-    const cr = card.getBoundingClientRect()
-    const br = bars.getBoundingClientRect()
+  const pinnedTopBefore = await page.$eval('[data-testid="species-page-pinned"]', (el) =>
+    Math.round(el.getBoundingClientRect().top),
+  )
+  await page.$eval('[data-testid="species-page-scroll"]', (el) => el.scrollTo({ top: 1200 }))
+  await page.waitForTimeout(150)
+  const pinnedTopAfter = await page.$eval('[data-testid="species-page-pinned"]', (el) =>
+    Math.round(el.getBoundingClientRect().top),
+  )
+  const scrolledBy = await page.$eval('[data-testid="species-page-scroll"]', (el) => el.scrollTop)
+  log(
+    `  scrolled the right column by ${scrolledBy}px; pinned top ${pinnedTopBefore} -> ${pinnedTopAfter}`,
+  )
+  check('the pinned track does not move with it', pinnedTopBefore === pinnedTopAfter)
+  check('and the right column really moved', scrolledBy > 100, `(${scrolledBy}px)`)
+  await page.$eval('[data-testid="species-page-scroll"]', (el) => el.scrollTo({ top: 0 }))
+
+  /*
+    THE SUB-NAV IS PAGE-LOCAL AND SCROLLS WITH ITS PANEL -- it belongs to the
+    content, not to the app bar, and that is what stops it reading as a second
+    level of app navigation.
+  */
+  const subnav = await page.evaluate(() => {
+    const nav = document.querySelector('[data-testid="species-page-subnav"]')
+    const scroll = document.querySelector('[data-testid="species-page-scroll"]')
     return {
-      cardRight: Math.round(cr.right),
-      barsRight: Math.round(br.right),
-      barsWidth: Math.round(br.width),
-      cardWidth: Math.round(cr.width),
+      insideScroller: scroll.contains(nav),
+      tabs: [...nav.querySelectorAll('.ds-tab')].map((e) => e.textContent.trim()),
+      activeUnderline: getComputedStyle(nav.querySelector('.ds-tab[aria-selected="true"]'))
+        .borderBottomWidth,
+    }
+  })
+  log(`  sub-nav tabs: ${subnav.tabs.join(' | ')}  activeUnderline=${subnav.activeUnderline}`)
+  check('the sub-nav lives inside the scrolling column', subnav.insideScroller)
+  check(
+    'and carries the four page tabs',
+    subnav.tabs.join(',') === 'Info,Learnset,Description,Sprites',
+    subnav.tabs.join(','),
+  )
+  check('the active tab has the 2px accent underline', subnav.activeUnderline === '2px')
+
+  /* The stat bars must fit the column they are in, not spill past it. */
+  const chart = await page.evaluate(() => {
+    const block = document.querySelector('[data-testid="species-base-stats"]')
+    const bars = block.querySelector('.species-stat-bars')
+    const scroll = document.querySelector('[data-testid="species-page-scroll"]')
+    return {
+      blockRight: Math.round(block.getBoundingClientRect().right),
+      barsRight: Math.round(bars.getBoundingClientRect().right),
+      barsWidth: Math.round(bars.getBoundingClientRect().width),
+      columnWidth: Math.round(scroll.getBoundingClientRect().width),
     }
   })
   log(
-    `  stats card ${chart.cardWidth}px, chart ${chart.barsWidth}px (right edges ${chart.barsRight} <= ${chart.cardRight})`,
+    `  stat bars ${chart.barsWidth}px inside a ${chart.columnWidth}px column (right edges ${chart.barsRight} <= ${chart.blockRight})`,
   )
-  check('base-stats chart fits inside its card', chart.barsRight <= chart.cardRight)
+  check('stat bars fit inside their block', chart.barsRight <= chart.blockRight)
   check(
-    'chart is sized to the card, not the page',
-    chart.barsWidth <= chart.cardWidth && chart.barsWidth < layout.detailWidth * 0.6,
-    `(${chart.barsWidth} vs detail ${layout.detailWidth})`,
+    'and are sized to the block, not the column',
+    chart.barsWidth < chart.columnWidth,
+    `(${chart.barsWidth} vs ${chart.columnWidth})`,
   )
   const hOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -879,7 +1050,7 @@ try {
   // has not loaded yet. Scroll the card into view and wait, so the assertion
   // tests "the thumbnail loads" and not "it loads while off-screen".
   const settleEvolutionThumbs = async () => {
-    await page.$eval('[data-testid="card-evolution"]', (el) =>
+    await page.$eval('[data-testid="species-evolution"]', (el) =>
       el.scrollIntoView({ block: 'center' }),
     )
     await page.waitForFunction(
@@ -1022,6 +1193,9 @@ try {
   ]
   const seenKinds = new Map()
   for (const stop of TRIGGER_TOUR) {
+    // The detail page replaces the grid, so each stop has to return to the list
+    // before it can search for the next one.
+    await backToGrid()
     await withControls(() => page.fill('[data-testid="species-search"]', stop.name.toLowerCase()))
     await page.waitForSelector(`[data-testid="species-row-${stop.id}"]`, { timeout: 15000 })
     await openSpecies(stop.id)
@@ -1079,6 +1253,7 @@ try {
   )
 
   // Shiny follows the detail toggle; the node stays static and default-gender.
+  await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', 'eevee'))
   await page.waitForSelector('[data-testid="species-row-133"]', { timeout: 15000 })
   await openSpecies(133)
@@ -1093,7 +1268,24 @@ try {
   const regularNodes = await page.$$eval(THUMB_SELECTOR, (els) =>
     els.map((e) => e.getAttribute('src')),
   )
+  /*
+    TWO TABS FOR ONE CLAIM. The colour toggle is on the Sprites tab and the chart
+    is on Info, so this is now a round trip -- which is exactly the behaviour worth
+    asserting: the artwork view is owned by the PAGE, not by the tab that shows the
+    switch, so a shiny selection survives the tab change and reaches the chart.
+    Held in tab-local state it would not.
+  */
+  await openTab('Sprites')
+  await page.waitForSelector('[data-testid="toggle-shiny"]', { timeout: 30000 })
   await page.click('[data-testid="toggle-shiny"]')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="toggle-shiny"]')?.getAttribute('data-value') ===
+      'Shiny',
+    undefined,
+    { timeout: 10000 },
+  )
+  await openTab('Info')
   await page.waitForFunction(
     () =>
       document.querySelector('[data-testid="evolution-tree"]')?.getAttribute('data-shiny') ===
@@ -1101,6 +1293,7 @@ try {
     undefined,
     { timeout: 10000 },
   )
+  check('the colour axis survives the tab change and reaches the chart', true)
   await settleEvolutionThumbs()
   const shinyNodes = await page.$$eval(THUMB_SELECTOR, (els) =>
     els.map((e) => ({ src: e.getAttribute('src'), loaded: e.naturalWidth > 0 })),
@@ -1132,7 +1325,9 @@ try {
     'nodes stay on static official artwork (no animated webp)',
     shinyNodes.every((n) => !n.src.endsWith('.webp')),
   )
-  // Turning on animation for the main image must NOT animate the tree.
+  // Turning on animation for the featured image must NOT animate the tree. Same
+  // round trip: switch it on Sprites, then come back and look at the chart.
+  await openTab('Sprites')
   await page.click('[data-testid="toggle-motion"]')
   await page.waitForFunction(
     () =>
@@ -1141,6 +1336,8 @@ try {
     undefined,
     { timeout: 10000 },
   )
+  await openTab('Info')
+  await settleEvolutionThumbs()
   // Same narrowing as above: compare thumbnails against thumbnails, or the
   // painted icons make the two lists different lengths and the claim never holds.
   const afterMotion = await page.$$eval(THUMB_SELECTOR, (els) =>
@@ -1152,13 +1349,20 @@ try {
       JSON.stringify(afterMotion) === JSON.stringify(shinyNodes.map((n) => n.src)),
     `${afterMotion.length} thumbs vs ${shinyNodes.length}`,
   )
+  await openTab('Sprites')
   await page.click('[data-testid="toggle-motion"]')
+  await openTab('Info')
   await page.screenshot({ path: `${SHOTS}/ux-item7-evolution.png`, fullPage: true })
 
   // -------------------------------------------------------------- ITEM 8
   hr('ITEM 8 (DOM) — egg-move rows carry an icon')
+  /* The learnset is a tab now, and its sections are prefixed species-learn-. */
+  await openTab('Learnset')
+  await page.waitForFunction(() => !document.querySelector('[data-testid="learnset-loading"]'), {
+    timeout: 60000,
+  })
   const eggInfo = await page.evaluate(() => {
-    const eggSection = document.querySelector('[data-testid="learn-egg"]')
+    const eggSection = document.querySelector('[data-testid="species-learn-egg"]')
     if (!eggSection) return null
     const rows = [...eggSection.querySelectorAll('tbody tr')]
     return {
@@ -1179,7 +1383,7 @@ try {
 
   // Non-egg methods must NOT get the marker.
   const otherMethods = await page.evaluate(() =>
-    ['learn-level-up', 'learn-machine', 'learn-tutor'].map((id) => {
+    ['species-learn-level-up', 'species-learn-machine', 'species-learn-tutor'].map((id) => {
       const s = document.querySelector(`[data-testid="${id}"]`)
       return {
         id,

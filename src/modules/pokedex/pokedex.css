@@ -3332,6 +3332,79 @@
   white-space: normal;
 }
 
+/* ---- Sprites tab: the folded artwork control */
+
+/*
+  The resolved image beside its switches. Two columns rather than the old page's
+  stacked panel, because here it sits at the top of a scrolling tab and a stacked
+  version pushed the catalogue a full viewport down.
+
+  .artwork and .artwork-toggles keep their own styles from the old detail view --
+  the component moved, its CSS did not, so the switches look and behave exactly as
+  they were verified to.
+*/
+.sprites-featured {
+  display: grid;
+  grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+  gap: var(--space-gap-lg);
+  align-items: start;
+}
+
+/*
+  The component stacks its frame above its switches, which is right in a narrow
+  panel and wrong here -- stacked, the four switches ran down a 16rem column with
+  the whole right half of the row empty. Image beside switches instead; the
+  component is untouched, only this page's arrangement of it.
+*/
+.species-sprites .artwork {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: var(--space-gap-md);
+  align-items: start;
+  min-width: 0;
+}
+
+/* Capped so a 475px official artwork does not set the row height. */
+.species-sprites .artwork-frame {
+  max-height: 14rem;
+}
+
+.species-sprites .artwork-frame img {
+  max-height: 14rem;
+  object-fit: contain;
+}
+
+/*
+  The frame's own background is --code-bg, from the old detail view's card
+  palette. On this page that reads as a stray cream box on a flat --surface plane,
+  so it is re-toned to the same --surface-raised step the sprite cards use --
+  scoped here, leaving the component's own styles alone.
+*/
+.species-sprites .artwork-frame {
+  background: var(--surface-raised);
+  border-color: var(--hairline);
+}
+
+.sprites-featured-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* The fifth switch is about the grid, not about the image, so it is separated
+   from the four axes by a hairline rather than sitting flush against them. */
+.sprites-featured-filter .toggle {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+@media (max-width: 1200px) {
+  .sprites-featured {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ---- narrow */
 
 @media (max-width: 1500px) {

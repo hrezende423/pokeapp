@@ -146,6 +146,7 @@ export function SpeciesInfoTab({
   variety,
   generation,
   versionGroup,
+  shiny = false,
   onSelectSpecies,
   onSelectEggGroup,
 }: {
@@ -153,6 +154,8 @@ export function SpeciesInfoTab({
   variety: Variety
   generation: number
   versionGroup: VersionGroup | null
+  /** Follows the colour axis of the Sprites tab's artwork control. */
+  shiny?: boolean
   onSelectSpecies?: (id: number) => void
   onSelectEggGroup?: (id: number) => void
 }) {
@@ -420,7 +423,12 @@ export function SpeciesInfoTab({
         <section className="species-info-block" data-testid="species-evolution">
           <h3 className="species-info-heading">Evolution</h3>
           {chain ? (
-            <EvolutionTree chain={chain.chain} currentId={species.id} onSelect={onSelectSpecies} />
+            <EvolutionTree
+              chain={chain.chain}
+              currentId={species.id}
+              shiny={shiny}
+              onSelect={onSelectSpecies}
+            />
           ) : (
             <p className="species-info-caption">No evolution chain data.</p>
           )}

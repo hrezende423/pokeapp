@@ -153,9 +153,57 @@ try {
     page.waitForFunction(
       () =>
         !document.querySelector('[data-testid="learnset-loading"]') &&
-        !document.querySelector('[data-testid="encounters-loading"]'),
+        !document.querySelector('[data-testid="locations-loading"]'),
       undefined,
       { timeout: 60000 },
+    )
+
+  /*
+    WHICH TAB TRIGGERS WHICH FETCH is the thing that changed under the rebuilt
+    detail page, and it is a real improvement worth stating: opening a species now
+    fetches NOTHING. Only one tab is mounted at a time, so the learnset partition
+    loads when the Learnset tab opens and the encounter partition when Description
+    does. The old page mounted both and fired both on open.
+  */
+  const openSpecies = async (id) => {
+    await page.click(`[data-testid="species-row-${id}"]`)
+    await page.waitForSelector(`[data-testid="species-page"][data-species-id="${id}"]`, {
+      timeout: 30000,
+    })
+    await page.waitForSelector('[data-testid="species-info"]', { timeout: 30000 })
+  }
+
+  const openTab = async (tab) => {
+    await page.click(`[data-testid="species-page-subnav"] .ds-tab:text-is("${tab}")`)
+    await page.waitForSelector(`[data-testid="species-page-panel-${tab.toLowerCase()}"]`, {
+      timeout: 30000,
+    })
+    await settle()
+  }
+
+  /** Point the page's OWN game scope at a version group, by generation then game. */
+  const selectPageGroup = async (testId, generation, group) => {
+    await page.click(`[data-testid="${testId}-scope-generation-${generation}"]`)
+    const gameBtn = `[data-testid="${testId}-scope-game-${group}"]`
+    if (await page.$(gameBtn)) await page.click(gameBtn)
+    await page.waitForFunction(
+      (g) =>
+        document
+          .querySelector('[data-testid="species-learnset"], [data-testid="species-description"]')
+          ?.getAttribute('data-version-group') === g,
+      group,
+      { timeout: 30000 },
+    )
+    await settle()
+  }
+
+  /** Total learnset rows currently rendered, across the method sections. */
+  const learnsetRows = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.species-learn-group')].reduce(
+        (n, e) => n + Number(e.getAttribute('data-rows')),
+        0,
+      ),
     )
 
   // ---------------------------------------------------------------- STEP 1
@@ -237,9 +285,16 @@ try {
   // ---------------------------------------------------------------- STEP 3
   hr(`STEP 3 — open a species under "${GROUP_A}": expect exactly 1 fetch per partition`)
   let before = mark()
-  await page.click(`[data-testid="species-row-${SPECIES}"]`)
-  await page.waitForSelector('[data-testid="species-detail"]', { timeout: 30000 })
-  await settle()
+  await openSpecies(SPECIES)
+  const onOpen = requests
+    .slice(before)
+    .filter((r) => /\/data\/(learnsets|encounters)\//.test(r.url))
+  log(`  partition fetches on opening the species: ${onOpen.length} (the Info tab needs none)`)
+  check('opening a species fetches no partition at all', onOpen.length === 0, `(${onOpen.length})`)
+
+  // Each per-game tab pulls exactly its own partition, when it is opened.
+  await openTab('Learnset')
+  await openTab('Description')
   let newReqs = requests.slice(before)
   const aLearn = newReqs.filter((r) => r.url.includes(`/data/learnsets/${GROUP_A}.json`))
   const aEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_A}.json`))
@@ -252,9 +307,8 @@ try {
     `  encounters/${GROUP_A}.json requests=${aEnc.length}  wire=${kib(encWire.bytes)} (${encWire.enc})`,
   )
   log(`  combined wire cost for this group: ${kib(learnWire.bytes + encWire.bytes)}`)
-  log(
-    `  learnset rows rendered: ${await page.getAttribute('[data-testid="learnset"]', 'data-total-rows')}`,
-  )
+  await openTab('Learnset')
+  log(`  learnset rows rendered: ${await learnsetRows()}`)
   check(`exactly 1 fetch for learnsets/${GROUP_A}.json`, aLearn.length === 1, `(${aLearn.length})`)
   check(`exactly 1 fetch for encounters/${GROUP_A}.json`, aEnc.length === 1, `(${aEnc.length})`)
   const otherPartitions = newReqs.filter(
@@ -264,9 +318,20 @@ try {
 
   // ---------------------------------------------------------------- STEP 4
   hr(`STEP 4 — switch to "${GROUP_B}" then back: expect 0 refetches for ${GROUP_A}`)
+  /*
+    DRIVEN THROUGH THE PAGE'S OWN GAME CONTROL, not the app-wide selector. The
+    learnset is species-local by design now, so the app selector no longer moves
+    it -- but the claim under test never was about which control fires the fetch.
+    It is about the LOADER: a partition is fetched once and served from memory
+    afterwards, however the request arrives.
+  */
   before = mark()
-  await selectGroup(GROUP_B)
-  await settle()
+  await selectPageGroup('learnset', 1, GROUP_B)
+  // Both tabs, because both partitions are the claim: the scope is shared, but a
+  // tab that is not mounted has nothing to fetch, so the encounter file only moves
+  // when Description is on screen.
+  await openTab('Description')
+  await openTab('Learnset')
   newReqs = requests.slice(before)
   const bLearn = newReqs.filter((r) => r.url.includes(`/data/learnsets/${GROUP_B}.json`))
   const bEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_B}.json`))
@@ -275,8 +340,7 @@ try {
   check(`exactly 1 fetch for encounters/${GROUP_B}.json`, bEnc.length === 1)
 
   before = mark()
-  await selectGroup(GROUP_A)
-  await settle()
+  await selectPageGroup('learnset', 4, GROUP_A)
   newReqs = requests.slice(before)
   const refetch = newReqs.filter((r) => /\/data\//.test(r.url))
   log(`  returning to ${GROUP_A}: ${refetch.length} data request(s)`)
@@ -315,18 +379,20 @@ try {
   )
   check('eager bundle resolves offline (493 species)', offlineCount === 493, String(offlineCount))
 
-  await page.click(`[data-testid="species-row-${SPECIES}"]`)
-  await page.waitForSelector('[data-testid="species-detail"]', { timeout: 30000 })
-  await settle()
-  const offlineRows = await page.getAttribute('[data-testid="learnset"]', 'data-total-rows')
+  await openSpecies(SPECIES)
+  await openTab('Learnset')
+  const offlineRows = await learnsetRows()
   log(`  offline ${GROUP_A} learnset rows for #${SPECIES}: ${offlineRows}`)
-  check(`${GROUP_A} partitions resolve offline`, Number(offlineRows) > 0, `(${offlineRows} rows)`)
+  check(`${GROUP_A} partitions resolve offline`, offlineRows > 0, `(${offlineRows} rows)`)
 
   // A group never visited online must NOT be available offline — proves the
-  // partitions really are cache-on-first-use rather than precached.
-  await selectGroup(NEVER_VISITED)
-  await page.waitForSelector('[data-testid="species-detail"] [role="alert"]', { timeout: 30000 })
-  const alert = await page.textContent('[data-testid="species-detail"] [role="alert"]')
+  // partitions really are cache-on-first-use rather than precached. Asked for
+  // through the page's own control, which is what selects a partition now.
+  await page.click('[data-testid="learnset-scope-generation-3"]')
+  const neverBtn = `[data-testid="learnset-scope-game-${NEVER_VISITED}"]`
+  if (await page.$(neverBtn)) await page.click(neverBtn)
+  await page.waitForSelector('[data-testid="species-page"] [role="alert"]', { timeout: 30000 })
+  const alert = await page.textContent('[data-testid="species-page"] [role="alert"]')
   log(`  offline "${NEVER_VISITED}" (never visited online) -> ${JSON.stringify(alert)}`)
   check(
     `un-visited group "${NEVER_VISITED}" is NOT available offline (confirms on-demand caching)`,

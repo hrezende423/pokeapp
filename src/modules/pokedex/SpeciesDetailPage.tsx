@@ -41,6 +41,10 @@
  *   StatRow/StatList the ds label-left / value-right hairline row, which IS the
  *                    metadata treatment the two Info sub-columns need.
  *   spriteTiles      the bitmask decoder from e15b347, for the Sprites tab.
+ *   Artwork          the four-axis artwork control, folded into the Sprites tab
+ *                    from the old page rather than rewritten -- see the note in
+ *                    SpeciesSpritesTab for why it moved there and not onto this
+ *                    card, and why the view state is held here.
  *   usePartitionRows the four-state loader for the two on-demand datasets.
  *
  * NEW: TypeMatchupChart (the grid form the old grouped list cannot express),
@@ -57,8 +61,8 @@ import { useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
 import { HeroDetailCard } from '../../components/ds/HeroDetailCard'
 import { Tabs } from '../../components/ds/Navigation'
-import { getRegionForSpecies, getSpecies } from '../../data'
-import type { Species } from '../../data'
+import { DEFAULT_ARTWORK_VIEW, getRegionForSpecies, getSpecies } from '../../data'
+import type { ArtworkView, Species } from '../../data'
 import { SpeciesDescriptionTab } from './SpeciesDescriptionTab'
 import { SpeciesInfoTab } from './SpeciesInfoTab'
 import { SpeciesLearnsetTab } from './SpeciesLearnsetTab'
@@ -100,6 +104,14 @@ export function SpeciesDetailPage({
     back on the app's era.
   */
   const gameScope = useSpeciesGameScope(speciesId)
+  /*
+    THE ARTWORK VIEW IS THE PAGE'S TOO, for the reason the old detail page held it:
+    the colour axis drives the evolution chart as well as the image, and those are
+    now on two different tabs. Reset per species by the key in Pokedex, so every
+    species opens on regular static artwork.
+  */
+  const [view, setView] = useState<ArtworkView>(DEFAULT_ARTWORK_VIEW)
+  const [matchGrid, setMatchGrid] = useState(false)
   const species = getSpecies(speciesId)
 
   if (!species) {
@@ -194,6 +206,7 @@ export function SpeciesDetailPage({
                 variety={variety}
                 generation={generation}
                 versionGroup={versionGroup}
+                shiny={view.shiny}
                 onSelectSpecies={onSelectSpecies}
                 onSelectEggGroup={onSelectEggGroup}
               />
@@ -205,7 +218,14 @@ export function SpeciesDetailPage({
               <SpeciesDescriptionTab species={species} variety={variety} scope={gameScope} />
             )}
             {variety && tab === 'Sprites' && (
-              <SpeciesSpritesTab species={species} variety={variety} />
+              <SpeciesSpritesTab
+                species={species}
+                variety={variety}
+                view={view}
+                onViewChange={setView}
+                matchGrid={matchGrid}
+                onMatchGridChange={setMatchGrid}
+              />
             )}
             {!variety && (
               <p className="subtitle" data-testid="species-page-no-variety">
