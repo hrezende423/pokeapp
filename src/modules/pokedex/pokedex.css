@@ -2925,48 +2925,67 @@
 }
 
 /*
-  NO LONGER ROTATED, and no longer at the bottom of the column.
+  ROTATED AGAIN, back to the frame: a 78 x 313 box at (17, 604) turned -90deg, so
+  the text runs upward along the column's left edge from y=917 to y=604.
 
-  The frame had it as a 78 x 313 box at (17, 604) turned -90deg, running upward
-  from y=917 to y=604. It is a horizontal line under the watermark now, which is
-  a deliberate departure: a rotated label is a strong graphic gesture and it was
-  competing with the watermark for the same left edge.
+  It spent one round as a horizontal line under the watermark, on the reasoning
+  that a rotated label competes with the watermark for the same left edge. It was
+  asked back, and the smaller type is what makes it work: at 20px it reads as a
+  spine label rather than as a second headline.
 
-  LEFT: 0, i.e. the WATERMARK's left edge rather than the artwork's or the name
-  column's 11.533%. "Aligned at the left side" is ambiguous between the three, and
-  sharing an edge with the block directly above it is the one that reads as
-  intentional -- the two top elements form one left-aligned stack.
-
-  TOP: 26%, which is where the watermark's own box ends (29 raw + 341 x 0.78 x
-  0.883 = 264 raw of 1031). It sits over the artwork's box, which starts at 20.66%
-  -- but the artwork is object-fit: contain in a 500 x 500 square and every
-  official-artwork PNG has transparent margin at that corner, so nothing collides
-  in practice. z-index 2 rather than 1 so it stays above the artwork if one ever
-  does.
+  transform-origin: left top with rotate(-90deg) means the box pivots about the
+  point given by left/top, so `top: 88.943%` is where the text BEGINS and it runs
+  up from there -- the anchor is the bottom of the visual line, not its top.
 */
 .species-hero-region {
   position: absolute;
-  left: 0;
-  top: 26%;
+  left: 2.307%;
+  top: 88.943%;
+  transform-origin: left top;
+  transform: rotate(-90deg);
   white-space: nowrap;
   z-index: 2;
   /* Light, i.e. Plex Sans at 300. The variable font is bundled at 100-700, so
      this is a real weight and not a synthesised one; there is no --font-weight
      token below 400 and one rule does not earn one. */
   font-weight: 300;
-  font-size: calc(43 * var(--ht));
+  /* 34.07 raw = 20.00px at the 1400px cap, the size asked for. Raw units rather
+     than `20px` for the same reason as the watermark's 341: the frame still has
+     to scale on a narrower window, and --dp-s still has to move it. */
+  font-size: calc(34.07 * var(--ht));
   letter-spacing: 0.02em;
   color: var(--hero-quiet);
   opacity: 0.8;
 }
 
-/* Name-kata 57:841: 557 x 146 at (85, 717). ABOVE the Latin names, not below. */
+/*
+  Name-kata 57:841, ABOVE the Latin names rather than below.
+
+  CENTRED ON THE SPRITE, not on the column and not on the frame's x=85. The
+  column reads as three rows -- artwork, katakana, Latin names -- and the two text
+  rows are now centred on the artwork's own box: left 12.89% and width 67.843% are
+  .species-hero-art's exact left and width, so `text-align: center` centres this
+  line on the same axis the sprite sits on. The sprite itself did not move.
+
+  NO TRACKING COMPENSATION, and that is worth writing down because it looks like
+  it needs one. letter-spacing is NOT applied after the last character of a line
+  (CSS Text 4 says so, and Chrome measures it that way -- checked: the glyph run's
+  centre lands exactly on the artwork's centre with nothing added), so 0.2em of
+  tracking does not push a centred line half a step left. An 0.2em padding-left
+  "correction" was tried and made it worse in both directions at once: `width`
+  here is a content-box width, so the padding widened the element by 0.2em AND
+  moved its centre 0.1em right.
+*/
 .species-hero-kana {
   position: absolute;
-  left: 11.533%;
+  left: 12.89%;
+  width: 67.843%;
   top: 69.544%;
   z-index: 1;
-  font-size: calc(111 * var(--ht));
+  /* 42.58 raw = 25.00px at the cap. See the region label for why raw units. */
+  font-size: calc(42.58 * var(--ht));
+  letter-spacing: 0.2em;
+  text-align: center;
   line-height: 1.15;
   white-space: nowrap;
   color: var(--hero-quiet);
@@ -2986,12 +3005,16 @@
 */
 .species-hero-names {
   position: absolute;
-  left: 11.533%;
+  /* The artwork's own box, so this row is centred on the same axis as the sprite
+     and the katakana line above it. See .species-hero-kana. */
+  left: 12.89%;
+  width: 67.843%;
   top: 85.257%;
   margin: 0;
   z-index: 1;
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: calc(24 * var(--hu));
   /*
     THE ROW MAY WRAP, AND THAT IS THE FIX FOR THE CLIPPED NAME.
@@ -3004,10 +3027,11 @@
     to give way. Each NAME still refuses to break internally, so the wrap always
     happens at the gap between them.
 
-    max-width is the column minus the left inset: 652/737.
+    The row is the artwork's width now rather than the column minus an inset, so
+    the wrap point moved in with it -- and at 25px a pair has far more room than
+    it had at 66 raw, so in practice it wraps for almost nothing.
   */
   flex-wrap: wrap;
-  max-width: 88.46%;
 }
 
 .species-hero-name,
@@ -3031,19 +3055,24 @@
 */
 .species-hero-name {
   font-family: var(--font-body);
-  font-size: calc(66 * var(--ht));
+  /* 42.58 raw = 25.00px at the cap, the same size as the katakana and the
+     romanisation: the three names are one treatment now, not a hierarchy. */
+  font-size: calc(42.58 * var(--ht));
   font-weight: var(--font-weight-bold);
   line-height: 1.05;
-  letter-spacing: -0.01em;
+  /* Positive tracking, where it used to be -0.01em. A tightened bold headline and
+     a letter-spaced label are opposite gestures and the column is now the label. */
+  letter-spacing: 0.2em;
   color: var(--hero-quiet);
   opacity: 0.8;
 }
 
-/* 52, not the frame's 66: the romanised name is the quieter of the two and the
-   pair has to fit one row for the common case. See the wrap note above.
-   Light italic -- 300, the same real variable weight the region label uses. */
+/* The same 25px as the other two -- it is no longer a step quieter by size, only
+   by weight and slope. Light italic: 300, the same real variable weight the region
+   label uses. */
 .species-hero-roma {
-  font-size: calc(52 * var(--ht));
+  font-size: calc(42.58 * var(--ht));
+  letter-spacing: 0.2em;
   font-style: italic;
   font-weight: 300;
   line-height: 1.05;
@@ -3336,10 +3365,23 @@
   grid-row: 1 / span 7;
 }
 
-/* The row is a grid item now, so the hairline needs it to fill its track rather
-   than sit at its content height. */
+/*
+  The row is a grid item now, so the hairline needs it to fill its track rather
+  than sit at its content height -- and its CONTENTS are centred in that track.
+
+  CENTRED, NOT BASELINED, which is the point of this rule now. A row's track is as
+  tall as the taller of the two columns' cells, so the shorter one had empty space
+  under it and its label hung at the top: "Base friendship" sat against the top of
+  a track that "EV yield" had made two lines tall. Baseline alignment also only
+  ever aligns the FIRST line, so a two-line value pinned its own label to the top
+  as well -- that is what put "Gender ratio" above its bar instead of beside it.
+
+  The gender bar is a flex COLUMN of bar-then-legend (see .species-gender), so it
+  centres as one object rather than as two independently-placed pieces, which is
+  what was asked for.
+*/
 .species-info-cols > .ds-stat-list > .ds-stat-row {
-  align-items: baseline;
+  align-items: center;
 }
 
 /*
@@ -3358,11 +3400,20 @@
   padding: calc(9 * var(--dp-t)) calc(12 * var(--dp-t));
 }
 
-/* A metadata value is often a small cluster, not one word -- let it wrap. */
+/*
+  A metadata value is often a small cluster, not one word -- let it wrap.
+
+  align-content: center keeps a WRAPPED cluster centred as a block: align-items
+  aligns the items within one line, align-content stacks the lines, and a
+  three-line list of held items has to sit in the middle of its row like
+  everything else. align-items stays baseline so the pieces of one line -- the
+  number and its unit, the ability and its "hidden" -- still sit on one baseline.
+*/
 .species-info-cols .ds-stat-value {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  align-content: center;
   justify-content: flex-end;
   gap: 0.2rem 0.35rem;
   text-align: right;
@@ -3654,7 +3705,10 @@
   display: grid;
   grid-template-columns: 5em minmax(0, 1fr);
   gap: 0.75em;
-  align-items: baseline;
+  /* Centred for the same reason as the metadata rows: a tier's type list wraps to
+     two or three lines and the multiplier belongs beside the whole list, not
+     against its first line. */
+  align-items: center;
   padding: var(--space-row-padding-block) 0;
   border-bottom: 1px solid var(--hairline);
   font-size: var(--font-size-label);

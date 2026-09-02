@@ -187,9 +187,10 @@ try {
    * WHICH TAB PULLS THE ENCOUNTER PARTITION MOVED. It used to be Description;
    * locations now live on the Info tab, under the stat and evolution charts. And
    * because Info is the DEFAULT tab, that section deliberately does not fetch
-   * until it is scrolled to -- otherwise every species open would pull up to
-   * 2.8 MB for a visit that only wanted the stat line, which is the exact cost the
-   * one-tab-at-a-time rule exists to avoid.
+   * until it is scrolled to -- otherwise every species open would pull ALL FOURTEEN
+   * encounter partitions, 9.6 MiB raw, for a visit that only wanted the stat line,
+   * which is the exact cost the one-tab-at-a-time rule exists to avoid. The
+   * section is game-agnostic now, so that gate went from important to essential.
    *
    * So the trigger for that partition is now a scroll, not a click, and this is
    * what performs it. `data-loaded` is the section's own record of having been
@@ -205,7 +206,7 @@ try {
       () =>
         document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true' &&
         !document.querySelector('[data-testid="locations-loading"]'),
-      { timeout: 60000 },
+      { timeout: 120000 },
     )
     await settle()
   }
@@ -327,7 +328,8 @@ try {
   /*
     Each partition is pulled by exactly one trigger: the learnset by opening the
     Learnset tab, the encounters by scrolling the Info tab down to the locations
-    section. Both are on-demand; only the trigger differs.
+    section. Both are on-demand; only the trigger differs -- and the encounters
+    are ALL FOURTEEN files, because that section shows every game.
   */
   await openTab('Learnset')
   await revealLocations()
@@ -347,26 +349,63 @@ try {
   log(`  learnset rows rendered: ${await learnsetRows()}`)
   check(`exactly 1 fetch for learnsets/${GROUP_A}.json`, aLearn.length === 1, `(${aLearn.length})`)
   check(`exactly 1 fetch for encounters/${GROUP_A}.json`, aEnc.length === 1, `(${aEnc.length})`)
-  const otherPartitions = newReqs.filter(
-    (r) => /\/data\/(learnsets|encounters)\//.test(r.url) && !r.url.includes(`${GROUP_A}.json`),
+  /*
+    EVERY ENCOUNTER PARTITION, EACH EXACTLY ONCE -- which is a change, and the
+    reason for it is that the locations section is game-agnostic by request. What
+    still has to hold is the de-duplication: fourteen files pulled in parallel by
+    one Promise.allSettled must not become twenty-eight, and the loader's
+    `inflight` map is what prevents that. A repeat count here would be a real
+    regression hiding behind an unchanged row count.
+
+    THE LEARNSET SIDE IS UNCHANGED and is asserted separately: exactly one
+    learnset file, the selected one. If the two datasets' scoping ever got
+    conflated, this is the check that would say so.
+  */
+  const encFetched = newReqs
+    .filter((r) => /\/data\/encounters\//.test(r.url))
+    .map((r) => r.url.split('/').pop())
+  const encCounts = new Map()
+  for (const f of encFetched) encCounts.set(f, (encCounts.get(f) ?? 0) + 1)
+  const encWireAll = (
+    await Promise.all(
+      [...encCounts.keys()].map((f) => wireBytes(`${ORIGIN}/pokeapp/data/encounters/${f}`)),
+    )
+  ).reduce((n, r) => n + r.bytes, 0)
+  log(
+    `  encounters: ${encCounts.size} distinct files, ${encFetched.length} requests, ${kib(encWireAll)} on the wire`,
   )
-  check('no other partition files fetched', otherPartitions.length === 0)
+  check(
+    'the locations section pulls every encounter partition',
+    encCounts.size === 14,
+    `(${encCounts.size} of 14)`,
+  )
+  check(
+    'and each of them exactly once, not once per component',
+    [...encCounts.values()].every((n) => n === 1),
+    [...encCounts.entries()]
+      .filter(([, n]) => n !== 1)
+      .map(([f, n]) => `${f}x${n}`)
+      .join(' ') || 'all once',
+  )
+  const otherLearnsets = newReqs.filter(
+    (r) => /\/data\/learnsets\//.test(r.url) && !r.url.includes(`${GROUP_A}.json`),
+  )
+  check('no learnset partition but the selected one', otherLearnsets.length === 0)
 
   // ---------------------------------------------------------------- STEP 4
   hr(`STEP 4 — switch to "${GROUP_B}" then back: expect 0 refetches for ${GROUP_A}`)
   /*
-    TWO CONTROLS NOW, and which one drives which partition is the point.
+    TWO CONTROLS AND ONE DATASET THAT ANSWERS TO NEITHER, which is the point.
 
     The learnset follows the PAGE's own generation control, by design. The Info
-    tab's locations section follows the APP-WIDE selector, which is the
-    architecture rule in CLAUDE.md -- it lost its own selector when the Description
-    tab was changed to show every game's Pokedex entry at once, and it kept
-    following the app selector when the section itself moved to the Info tab.
+    tab's locations section follows NOTHING: it is game-agnostic by request, so it
+    has already loaded all fourteen encounter partitions and no selector on either
+    control can make it want another one.
 
-    So driving only the page control moved the learnset partition and left the
-    encounter one where the app selector had it. That is not a caching failure, it
-    is the two scopes doing what they are each for -- and the claim under test is
-    unchanged: each partition is fetched exactly once, whichever control asks.
+    That is what turns the encounter assertions in this step into ZEROES, and they
+    are worth keeping as zeroes rather than deleting: a refetch after a selector
+    change would mean the section had quietly become scope-dependent again, which
+    is exactly the regression the game-agnostic change could suffer.
   */
   before = mark()
   await selectPageGroup('learnset', 1, GROUP_B)
@@ -384,13 +423,15 @@ try {
 
   before = mark()
   await selectGroup(GROUP_B)
-  // A section that has not been reached has nothing to fetch, so the encounter
-  // file only moves once the Info tab is scrolled down to the locations block.
   await revealLocations()
   newReqs = requests.slice(before)
-  const bEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_B}.json`))
-  log(`  app selector -> ${GROUP_B}: encounters=${bEnc.length} fetch(es)`)
-  check(`exactly 1 fetch for encounters/${GROUP_B}.json`, bEnc.length === 1)
+  const bEncAll = newReqs.filter((r) => /\/data\/encounters\//.test(r.url))
+  log(`  app selector -> ${GROUP_B}: ${bEncAll.length} encounter fetch(es)`)
+  check(
+    'moving the app selector fetches no encounter partition at all',
+    bEncAll.length === 0,
+    bEncAll.map((r) => r.url.split('/').pop()).join(' ') || '(0)',
+  )
 
   before = mark()
   await selectGroup(GROUP_A)

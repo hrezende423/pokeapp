@@ -173,7 +173,6 @@ export function SpeciesDetailPage({
                     variety={variety}
                     generation={generation}
                     versionGroup={versionGroup}
-                    scope={gameScope}
                     onSelectSpecies={onSelectSpecies}
                     onSelectEggGroup={onSelectEggGroup}
                   />

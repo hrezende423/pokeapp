@@ -595,9 +595,152 @@ whether upstream has grown a counterpart for any of the ten we key, and samples
 the hosted set. It does NOT decode pixels — that lives in the suite, where a
 browser is the cheapest PNG decoder this project has.
 
-## 9 — OPEN
+## 9 — The third polish pass — DONE
 
-### 9a — A real per-generation accuracy bug, found while verifying FIX 5
+Six items, three on the pinned column and three on the Info tab. The first two
+are pure type; the third is an alignment change that had to leave the sprite
+alone; the last is the one real architecture change in the pass.
+
+### 9.1 — The region label is a rotated spine again
+
+Back to the frame: a −90° box at `left: 2.307%; top: 88.943%` with
+`transform-origin: left top`, so the text runs UPWARD from y=917 to y=604. It
+spent one pass as a horizontal line under the watermark on the reasoning that a
+rotated label competes with the watermark for the same left edge; the smaller
+type is what makes the original work — at 20px it reads as a spine label rather
+than as a second headline.
+
+`top` is the point the text BEGINS and it runs up from there, which is worth
+writing down: with `transform-origin: left top` the anchor is the bottom of the
+visual line, not its top.
+
+### 9.2 — 20px and 25px, written as raw units
+
+`34.07` raw for the region label and `42.58` for the three names, which draw at
+exactly 20.00px and 25.00px at the 1400px cap. NOT written as `20px` and `25px`,
+for the same reason the watermark's 200px is written as 341: the frame still has
+to scale on a narrower window, and `--dp-s` still has to move it. One raw unit
+of type is 0.5871px at the cap, so the conversion is `px ÷ 0.5871`.
+
+The three names are ONE TREATMENT now, where they were a 65 / 39 / 30 hierarchy:
+same 25px, same 0.2em of tracking, and only weight and slope separate them —
+bold, upright, light italic. The main name also flipped from −0.01em to +0.2em,
+which is the real change of intent: a tightened bold headline and a letter-spaced
+label are opposite gestures, and the column is now the label.
+
+**No tracking compensation, and this was measured rather than reasoned.**
+`letter-spacing` is not applied after the last character of a line, so 0.2em of
+tracking does not push a centred line half a step left — checked with a Range
+over the glyphs, which lands exactly on the artwork's centre with nothing added.
+An 0.2em `padding-left` "correction" was tried first and made it worse in both
+directions at once: `width` here is a content-box width, so the padding widened
+the element by 0.2em AND moved its centre 0.1em right, which is precisely the
+2.5px the suite then reported.
+
+### 9.3 — The two text rows are centred on the sprite
+
+The column reads as three rows — artwork, katakana, Latin names — and the two
+text rows now centre on the artwork's own axis. `left: 12.89%; width: 67.843%`
+is `.species-hero-art`'s exact left and width, so `text-align: center` on the
+katakana and `justify-content: center` on the name row centre them on the same
+line the sprite sits on.
+
+**The sprite did not move**, which is half the requirement and the half that
+could regress silently, so the suite asserts its box against the frame's
+percentages independently.
+
+The name row's `max-width: 88.46%` went away with this: the row IS the artwork's
+width now, so the wrap point moved in with it — and at 25px a pair has far more
+room than it had at 66 raw, so in practice it wraps for almost nothing. The
+five-widest-pairs containment check moved from the row's own rect to the UNION OF
+ITS CHILDREN, because a fixed-width centred row can no longer overflow the column
+itself; only its contents can.
+
+### 9.4 — Every Info row is centred in its track
+
+`align-items: center` where the metadata rows had `baseline`, plus
+`align-content: center` on the value cluster and `center` on the type tiers.
+
+Why it showed up at all: the two metadata columns share their row tracks via
+subgrid, so a track is as tall as the taller of its two cells and the shorter one
+hung from the top of it. Baseline alignment also only ever aligns the FIRST line,
+so a two-line value pinned its own label to the top — which is what put "Gender
+ratio" above its bar instead of beside it.
+
+`align-items` vs `align-content` on the value is not interchangeable here:
+`align-items` aligns the pieces of ONE line, so the number and its unit still
+share a baseline, and `align-content` stacks the LINES, so a three-line held-item
+list sits in the middle of its row.
+
+**The gender bar centres as one object**, requested explicitly. It was already a
+flex column of bar-then-legend, so nothing new was needed — but the suite asserts
+the WRAPPER's centre rather than the bar's, because if the two pieces were ever
+placed independently that is the assertion that would fail.
+
+Horizontally nothing moved, and the suite says so: label flush left, value flush
+right, on all fourteen rows.
+
+### 9.5 — Locations are game-agnostic
+
+`getEncountersForSpeciesAllGames(speciesId)` loads all fourteen partitions with
+`Promise.allSettled` and returns the species' rows in chronological game order.
+The Game column's `sortValue` is a release position rather than the label, and it
+is the table's default sort, so the table reads as one contiguous block per game
+— Red (JP), Green (JP), Red, Blue, Yellow, Gold, Silver, Crystal, … Sorting is
+stable, so within a game the rows keep the partition's own order, which is by
+area.
+
+**What it costs, stated plainly**: 9.6 MiB of raw JSON, 278.7 KiB on the wire
+(measured by verify-app), where one game was 1 KiB to 2.8 MiB. Which is why the
+`IntersectionObserver` gate went from important to load-bearing: Info is the
+DEFAULT tab. The loader's `inflight` map means fourteen parallel asks are
+fourteen fetches and not twenty-eight, and each file is indexed once per session,
+so the second species is free — verify-app asserts 14 files / 14 requests, then
+asserts that moving the app selector afterwards fetches NOTHING.
+
+**This is the one place on the page that ignores the global game selector**, and
+that is a deliberate exception to an architecture rule, recorded in CLAUDE.md
+rather than left to be rediscovered. It takes no scope props at all now:
+`SpeciesInfoTab` lost its `scope` prop and `SpeciesDetailPage` stopped passing
+`gameScope`.
+
+**Not `usePartitionRows`**, and the difference is the reason a local hook exists:
+that hook loads ONE partition and its `ready` carries rows alone. Fourteen files
+settle independently, so `ready` has to carry the list of the ones that did not
+arrive — a table quietly missing three games' rows would read as "not found in
+those games", the exact false claim the `LoadState` split was written to prevent.
+A partial failure names the missing games; only a total failure is an `error`
+with a retry.
+
+### 9.6 — Two things the data said that the wording had wrong
+
+Both found while verifying 9.5, both corrected in the app rather than in the
+assertion:
+
+- **PokéAPI puts GIFT and EVENT encounters in the encounters table.** Bulbasaur
+  has nine rows across nine games, every one of them method "Gift". So the empty
+  state cannot say "not found in the wild" — it says "No recorded encounter in
+  any game". The suite's empty-state case moved from Bulbasaur to **Ivysaur**:
+  97 of the 493 have no encounter row anywhere, and every one of them is a mid
+  or final evolution.
+- **The denominator is 21, not 14.** Fourteen partitions, but twenty-one
+  versions, and the table's rows are per version — Gold and Silver are two
+  games. The caption counts versions because the badges do.
+
+### 9.7 — Section H stopped failing on other people's rate limits
+
+Eight `net::ERR_FAILED` console lines failed the suite while naming no URL:
+`page.on('response')` never sees a request that got no response at all. A
+`requestfailed` listener now records URL and failure text, and the assertion
+split in two — console errors that are NOT resource loads, plus dropped requests
+to OUR OWN origin. All eight turned out to be raw.githubusercontent throttling
+sprite images, which section H already declines to assert on when the same host
+answers 429 with a status code. Now they are printed with their URLs instead of
+being an anonymous count.
+
+## 10 — OPEN
+
+### 10a — A real per-generation accuracy bug, found while verifying FIX 5
 
 **Raised twice, still unanswered.**
 
@@ -618,7 +761,7 @@ five fixes, and it touches the Movedex, which CLAUDE.md keeps as an
 untouched pre-redesign module. Needs a decision. **Raised once and still
 unanswered.**
 
-### 9b — Smaller things, no decision needed to ship
+### 10b — Smaller things, no decision needed to ship
 
 - **Flavour text carries the games' own hyphenation.** Umbreon's Gold entry
   reads "this POKéMON pro tects itself" — PokéAPI's `flavor_text` preserves
@@ -634,7 +777,7 @@ unanswered.**
   artwork by a few units on tight chains (Tyrogue). The reference avoids it
   by hand-placing; see the `VGAP_WIDE` note.
 
-### 9c — Two facts from the pre-cutover page that never came back
+### 10c — Two facts from the pre-cutover page that never came back
 
 Both outside the DetailPage spec, both still absent, both still needing a
 yes/no rather than being added unrequested:
@@ -645,7 +788,7 @@ yes/no rather than being added unrequested:
    `short_effect` as body text. The Info tab has it as the ability's `title`
    attribute, so it is a hover rather than a read.
 
-### 9d — Coverage that changed shape in the polish pass
+### 10d — Coverage that changed shape in the polish pass
 
 `verify-species-page` went 122 → 164 checks; the other nine are unchanged in
 what they claim. Three suites had assertions RE-POINTED rather than removed,
@@ -667,7 +810,7 @@ One assertion became growth-tolerant rather than being weakened: section A's
 locations fetch (it failed once at 694 of 787). It scrolls, waits for the
 section to settle, and scrolls again.
 
-### 9e — Crystal and Emerald are still static, and here is what it would take
+### 10e — Crystal and Emerald are still static, and here is what it would take
 
 Raised as "Crystal and Emerald sprites still are static", which is true, and
 PokéAPI is not going to fix it — audited twice now: its only animated set is
@@ -691,7 +834,7 @@ rather than a dead end. The two are not equally tractable:
 Not started. Needs a yes/no, and the honest split is "Crystal yes, Emerald
 probably not worth it".
 
-### 9f — Still deferred by prior decision
+### 10f — Still deferred by prior decision
 
 - **Pokéathlon stats** — Gen 4 only, absent from PokéAPI at species level.
   The Info tab renders a one-line sourcing note under a Gen 4 selection.

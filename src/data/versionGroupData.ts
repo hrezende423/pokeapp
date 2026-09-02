@@ -261,6 +261,51 @@ export async function loadAllLearnsets(): Promise<{
   return { partitions, failed }
 }
 
+/**
+ * Every game's encounter rows for one species, in chronological game order.
+ *
+ * THE COUNTERPART TO loadAllLearnsets, and the same warning applies with
+ * different numbers: 14 files, 9.6 MiB raw / ~287 KiB gzipped, and once parsed the
+ * rows stay indexed in memory for the rest of the session.
+ *
+ * WHO CALLS IT: the species page's Locations section, which is game-agnostic --
+ * every game's locations in one table. It is called when that section is scrolled
+ * to and never on page open, which is what keeps the cost off the default tab.
+ * Every partition already in memory is reused, so the second species is free.
+ *
+ * THE ORDER IS LOAD-BEARING rather than incidental: it is the table's default
+ * sort, and it comes from listVersionGroups (generation, then the bundle's own
+ * `order`), so Red/Blue's rows precede Yellow's precede Gold/Silver's without the
+ * component knowing anything about release dates. Promise.allSettled resolves in
+ * argument order regardless of which file arrives first, so the sequence survives
+ * the parallel fetch.
+ *
+ * PARTITIONS THAT FAIL ARE REPORTED rather than silently dropped: a table missing
+ * three games' rows must not read as "this species is not in those games". If ALL
+ * of them fail it THROWS instead, because zero rows and zero games loaded is an
+ * error state and not an empty result -- the same distinction LoadState draws
+ * between `error` and a `ready` empty array.
+ */
+export async function getEncountersForSpeciesAllGames(
+  speciesId: number,
+): Promise<{ rows: EncounterRow[]; failed: string[] }> {
+  const groups = listVersionGroups().map((v) => v.name)
+  const settled = await Promise.allSettled(groups.map((vg) => loadEncounters(vg)))
+  const rows: EncounterRow[] = []
+  const failed: string[] = []
+  settled.forEach((result, i) => {
+    if (result.status !== 'fulfilled') {
+      failed.push(groups[i])
+      return
+    }
+    rows.push(...(result.value.bySpecies.get(speciesId) ?? []))
+  })
+  if (failed.length === groups.length) {
+    throw new Error(`no encounter partition could be loaded (${failed.length} files failed)`)
+  }
+  return { rows, failed }
+}
+
 /** True when every version group's learnset partition is already in memory. */
 export const areAllLearnsetsLoaded = (): boolean =>
   listVersionGroups().every((v) => learnsetStore.cache.has(v.name))

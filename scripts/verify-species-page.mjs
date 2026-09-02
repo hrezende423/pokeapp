@@ -106,6 +106,15 @@ try {
   page.on('response', (r) => {
     if (r.status() >= 400) failedResponses.push({ status: r.status(), url: r.url() })
   })
+  /* A request that never got a response at all -- DNS, CORS, a rate limiter that
+     drops the connection. It has no status, so the `response` handler above never
+     sees it; all it leaves in the console is an anonymous "Failed to load
+     resource", which is why section H could count eight of those and not be able
+     to say what they were. */
+  const failedRequests = []
+  page.on('requestfailed', (r) =>
+    failedRequests.push({ url: r.url(), failure: r.failure()?.errorText ?? 'unknown' }),
+  )
 
   const { withControls } = controls(page)
 
@@ -155,7 +164,7 @@ try {
       () =>
         document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true' &&
         !document.querySelector('[data-testid="locations-loading"]'),
-      { timeout: 60000 },
+      { timeout: 120000 },
     )
   }
 
@@ -788,18 +797,20 @@ try {
   await page.screenshot({ path: `${SHOTS}/species-page-description.png` })
 
   // ======================================================================= E2
-  hr('E2 — locations moved to the Info tab, under the two charts')
+  hr('E2 — locations on the Info tab, every game in one table')
 
   /*
-    WHERE IT LIVES NOW, and it is an ORDER claim as much as a presence one: below
-    the base-stat and evolution charts, above the type-effectiveness table. That
-    is the position it was asked for and it is the reason this is not just the
-    same section with a different parent.
+    WHERE IT LIVES, and it is an ORDER claim as much as a presence one: below the
+    base-stat and evolution charts, above the type-effectiveness table. That is
+    the position it was asked for and it is the reason this is not just the same
+    section with a different parent.
 
-    LOCATIONS STILL FOLLOW THE APP-WIDE SELECTOR, which is the architecture rule
-    in CLAUDE.md; the page's own scope only stands in when that selector is on
-    "All". The app is on HeartGold/SoulSilver here even though the Learnset tab
-    was left on Yellow, so this also proves the page scope does not reach it.
+    LOCATIONS ARE GAME-AGNOSTIC, and that makes them the ONE EXCEPTION to the
+    app-wide selector rule in CLAUDE.md -- so this section now asserts the
+    opposite of what it used to. The app is on HeartGold/SoulSilver here and the
+    Learnset tab was left on Yellow, and the table must show neither of those in
+    particular: it must show every game, sorted into release order, with each row
+    badged by the game it belongs to.
   */
   await openTab('Info')
   /* Before it is scrolled to, the section exists and has fetched nothing -- which
@@ -828,11 +839,24 @@ try {
       const section = document.querySelector('[data-testid="species-locations"]')
       return {
         present: section != null,
-        versionGroup: section?.getAttribute('data-version-group') ?? null,
+        scope: section?.getAttribute('data-scope') ?? null,
+        games: Number(section?.getAttribute('data-games')),
         rows: document.querySelectorAll('[data-testid="species-locations-rows"] tbody tr').length,
         empty: document.querySelector('[data-testid="locations-empty"]') != null,
+        emptyNote:
+          document.querySelector('[data-testid="locations-empty"]')?.textContent?.trim() ?? null,
+        partial: document.querySelector('[data-testid="locations-partial"]') != null,
         scopeNote:
           document.querySelector('[data-testid="locations-scope"]')?.textContent?.trim() ?? null,
+        distinctVersions: [
+          ...new Set(
+            [
+              ...document.querySelectorAll(
+                '[data-testid="species-locations-rows"] .species-game-badge',
+              ),
+            ].map((b) => b.dataset.game ?? ''),
+          ),
+        ],
         atWide: idx('.species-info-wide'),
         atLocations: idx('[data-testid="species-locations"]'),
         atMatchups: idx('[data-testid="species-type-matchups"]'),
@@ -853,23 +877,95 @@ try {
   )
   check('locations either listed or explicitly empty', loc.rows > 0 || loc.empty)
   check(
-    'it names the app-selected game, not the page-local one',
-    loc.versionGroup === 'heartgold-soulsilver',
-    loc.versionGroup,
+    'it is scoped to every game, not to the selected one',
+    loc.scope === 'all-games',
+    loc.scope ?? '',
   )
-  check('and says which game it is showing', /HeartGold/.test(loc.scopeNote ?? ''), loc.scopeNote)
+  check('and says so', /every game/i.test(loc.scopeNote ?? ''), loc.scopeNote)
+  /* Every game means every game LOADED, so a partial answer must not pass as a
+     complete one -- the caption that would say so must be absent. */
+  check('with no partition missing from the answer', !loc.partial, loc.scopeNote)
 
   await backToGrid()
   await openSpecies(16) // Pidgey — common wild encounter in every Gen 1-4 game
   await revealLocations()
   const pidgey = await locate()
-  log(`  Pidgey in ${pidgey.versionGroup}: ${pidgey.rows} location rows`)
+  log(
+    `  Pidgey: ${pidgey.rows} rows across ${pidgey.games} games, ${pidgey.distinctVersions.length} distinct badges`,
+  )
   check('a wild-encounterable species lists real locations', pidgey.rows > 0, `(${pidgey.rows})`)
   check(
-    'and every row badges its version',
+    'and every row badges its game',
     pidgey.badgedVersions === pidgey.rows,
     `${pidgey.badgedVersions} of ${pidgey.rows}`,
   )
+  /*
+    THE POINT OF THE WHOLE CHANGE: one table, many games. Pidgey is in the wild in
+    most of Gen 1-4, so a single-game table would show one or two badges here --
+    the count is what separates "game-agnostic" from "still filtered, different
+    default".
+  */
+  check(
+    'the table spans many games at once, not one',
+    pidgey.distinctVersions.length >= 8,
+    `${pidgey.distinctVersions.length} versions: ${pidgey.distinctVersions.join(' ')}`,
+  )
+  check(
+    'and the section’s own count agrees with the badges',
+    pidgey.games === pidgey.distinctVersions.length,
+    `data-games ${pidgey.games} vs ${pidgey.distinctVersions.length}`,
+  )
+  /*
+    SORTED INTO RELEASE ORDER, which is the Game column's sortValue rather than
+    its label -- alphabetical would open with Colosseum and end with Yellow. The
+    check is that the badge sequence down the table is non-decreasing against the
+    bundle's own version order, read out of the app rather than hard-coded, so
+    this stays true if the scope ever grows.
+  */
+  const gameSort = await page.evaluate(() => ({
+    seq: [...document.querySelectorAll('[data-testid="species-locations-rows"] tbody tr')].map(
+      (tr) => tr.querySelector('.species-game-badge')?.dataset.game ?? '',
+    ),
+  }))
+  const firstSeen = new Map()
+  gameSort.seq.forEach((v, i) => {
+    if (!firstSeen.has(v)) firstSeen.set(v, i)
+  })
+  const blocks = [...firstSeen.keys()]
+  log(`  game blocks in table order: ${blocks.join(' → ')}`)
+  check(
+    'the table opens grouped by game, one contiguous block each',
+    gameSort.seq.every((v, i) => i === 0 || v === gameSort.seq[i - 1] || firstSeen.get(v) === i),
+    `${blocks.length} blocks in ${gameSort.seq.length} rows`,
+  )
+  check(
+    'and the blocks are in release order, not alphabetical',
+    blocks.join(' ') !== [...blocks].sort().join(' ') && blocks[0].startsWith('red'),
+    `${blocks[0]} … ${blocks[blocks.length - 1]}`,
+  )
+
+  /*
+    A SPECIES IN NO GAME'S WILD ENCOUNTERS says so ONCE, for every game, rather
+    than fourteen times -- which is the "empty" state of a game-agnostic table and
+    a different sentence from the per-game one it replaced.
+
+    Ivysaur, not Bulbasaur. Bulbasaur was the obvious pick and it is wrong: it has
+    nine encounter rows (both Japanese Reds, Red/Blue, Yellow, FireRed/LeafGreen,
+    HeartGold/SoulSilver), because PokeAPI records gift and event encounters in
+    the same table as wild ones. 97 of the 493 have none at all, and every one of
+    them is a mid or final evolution -- Ivysaur is the first.
+  */
+  await backToGrid()
+  await openSpecies(2)
+  await revealLocations()
+  const evolved = await locate()
+  log(`  Ivysaur: ${evolved.rows} rows, empty note ${JSON.stringify(evolved.emptyNote)}`)
+  check(
+    'an evolution-only species says it is in no game’s wild encounters',
+    evolved.rows === 0 && /any game/.test(evolved.emptyNote ?? ''),
+    evolved.emptyNote ?? `${evolved.rows} rows`,
+  )
+  check('and says it once rather than per game', evolved.games === 0, `data-games ${evolved.games}`)
 
   // ======================================================================== F
   hr('F — Sprites tab: every tile the bitmask claims, each labelled')
@@ -1351,13 +1447,28 @@ try {
     Math.abs(hero.name.y - hero.roma.y) < 0.03 && hero.roma.x > hero.name.x,
     `main y ${hero.name.y.toFixed(3)} roma y ${hero.roma.y.toFixed(3)}`,
   )
+  /*
+    THE VERTICAL POSITIONS ARE STILL THE FRAME'S; the horizontal one is NOT any
+    more, and that is the one change here. The frame insets all three name lines
+    to x=85, and they are now centred on the ARTWORK instead -- the column reads
+    as three rows and the two text rows align to the sprite's axis, by request.
+
+    So this asserts the frame's y for both rows and leaves x to the ink-centre
+    check in section N, which measures where the glyphs actually landed rather
+    than where a box was placed. What is asserted here is only that neither row
+    sits at the old left inset any more -- a regression to 85/737 would otherwise
+    pass silently, since the boxes overlap.
+  */
   check(
-    'all three name lines at the frame’s left inset and vertical positions',
-    near(hero.kana.x, 85 / 737) &&
-      near(hero.name.x, 85 / 737) &&
-      near(hero.kana.y, 717 / 1031, 0.03) &&
-      near(hero.name.y, 879 / 1031, 0.03),
-    `kana ${hero.kana.x.toFixed(3)}/${hero.kana.y.toFixed(3)} name ${hero.name.x.toFixed(3)}/${hero.name.y.toFixed(3)}`,
+    'the two name rows keep the frame’s vertical positions',
+    near(hero.kana.y, 717 / 1031, 0.03) && near(hero.name.y, 879 / 1031, 0.03),
+    `kana y ${hero.kana.y.toFixed(3)} name y ${hero.name.y.toFixed(3)}`,
+  )
+  check(
+    'and are centred on the sprite rather than at the frame’s left inset',
+    Math.abs(hero.kana.x + hero.kana.w / 2 - (hero.art.x + hero.art.w / 2)) < 0.01 &&
+      hero.kana.x > 85 / 737 + 0.005,
+    `kana centre ${(hero.kana.x + hero.kana.w / 2).toFixed(3)} vs art centre ${(hero.art.x + hero.art.w / 2).toFixed(3)}`,
   )
   check(
     'the rotated region label is at the frame’s left edge',
@@ -1880,18 +1991,29 @@ try {
       const hero = document.querySelector('.species-hero')
       const n = names.getBoundingClientRect()
       const h = hero.getBoundingClientRect()
+      /*
+        THE CHILDREN, NOT THE ROW. The row is a fixed 67.843%-wide box now (it is
+        centred on the artwork), so its own rect can no longer overflow the column
+        and measuring it would assert nothing. A name wider than that box would
+        overflow the ROW, in both directions, since the row centres its items --
+        so the union of the two spans is what has to be inside the column.
+      */
+      const kids = [...names.children].map((c) => c.getBoundingClientRect())
       return {
         text: names.textContent.trim(),
-        overRight: Math.round(n.right - h.right),
-        overBottom: Math.round(n.bottom - h.bottom),
+        overRight: Math.round(Math.max(n.right, ...kids.map((k) => k.right)) - h.right),
+        overLeft: Math.round(h.left - Math.min(n.left, ...kids.map((k) => k.left))),
+        overBottom: Math.round(Math.max(n.bottom, ...kids.map((k) => k.bottom)) - h.bottom),
         clipped: [...names.children].some((c) => c.scrollWidth - c.clientWidth > 1),
       }
     })
-    log(`  #${id} ${fit.text}: right ${fit.overRight}px bottom ${fit.overBottom}px`)
+    log(
+      `  #${id} ${fit.text}: right ${fit.overRight}px left ${fit.overLeft}px bottom ${fit.overBottom}px`,
+    )
     check(
       `#${id}'s name row is inside the column`,
-      fit.overRight <= 0 && fit.overBottom <= 0 && !fit.clipped,
-      `right ${fit.overRight} bottom ${fit.overBottom} clipped ${fit.clipped}`,
+      fit.overRight <= 0 && fit.overLeft <= 0 && fit.overBottom <= 0 && !fit.clipped,
+      `right ${fit.overRight} left ${fit.overLeft} bottom ${fit.overBottom} clipped ${fit.clipped}`,
     )
   }
 
@@ -2041,6 +2163,30 @@ try {
     }
     const hero = document.querySelector('[data-testid="species-hero"]').getBoundingClientRect()
     const ghost = document.querySelector('.species-hero-ghost').getBoundingClientRect()
+    /*
+      THE INK, NOT THE BOX. The two text rows are absolutely positioned ON the
+      artwork's box, so comparing their element rects to the artwork's would be
+      circular -- it would restate the CSS. A Range over the text nodes measures
+      where the GLYPHS actually landed instead, which is the claim: "centred on
+      the sprite" is about what a reader sees, not about a box.
+
+      No allowance for the 0.2em of tracking, deliberately. letter-spacing is not
+      applied after the last character of a line, so the run's rect ends at the
+      last glyph and its centre needs no correction -- an earlier version of this
+      check subtracted one tracking step and was wrong by exactly that.
+    */
+    const inkCentre = (sel, fromSel, toSel) => {
+      const from = document.querySelector(fromSel ?? sel)
+      const to = document.querySelector(toSel ?? sel)
+      if (!from || !to) return null
+      const range = document.createRange()
+      range.selectNodeContents(from)
+      const a = range.getBoundingClientRect()
+      range.selectNodeContents(to)
+      const b = range.getBoundingClientRect()
+      return (a.left + b.right) / 2
+    }
+    const art = document.querySelector('.species-hero-art').getBoundingClientRect()
     return {
       pageWidth: Math.round(document.querySelector('.species-page').getBoundingClientRect().width),
       heroLeft: Math.round(hero.left),
@@ -2051,6 +2197,9 @@ try {
       name: read('.species-hero-name'),
       roma: read('.species-hero-roma'),
       bannerName: read('.species-banner-name'),
+      artCentre: (art.left + art.right) / 2,
+      kanaCentre: inkCentre('.species-hero-kana'),
+      namesCentre: inkCentre(null, '.species-hero-name', '.species-hero-roma'),
     }
   })
   log(`  column: ${JSON.stringify(column, null, 1).replace(/\n/g, '\n  ')}`)
@@ -2079,6 +2228,23 @@ try {
     `${column.bannerName.color} @ ${column.bannerName.opacity}`,
   )
 
+  /* The sprite is the row the other two align TO, so its own box is asserted
+     against the frame's percentages -- 12.89% left, 67.843% wide of a 737-unit
+     column. "Align the names to the sprite" is only true if the sprite stayed. */
+  const artBox = await page.evaluate(() => {
+    const hero = document.querySelector('.species-hero').getBoundingClientRect()
+    const art = document.querySelector('.species-hero-art').getBoundingClientRect()
+    return {
+      left: (art.left - hero.left) / hero.width,
+      width: art.width / hero.width,
+    }
+  })
+  check(
+    'the sprite itself did not move',
+    Math.abs(artBox.left - 0.1289) < 0.002 && Math.abs(artBox.width - 0.67843) < 0.002,
+    `left ${(artBox.left * 100).toFixed(3)}% width ${(artBox.width * 100).toFixed(3)}%`,
+  )
+
   check(
     'the watermark is 200px at the frame’s cap width',
     column.pageWidth === 1400 && Math.abs(column.ghost.fontSize - 200) <= 1,
@@ -2097,27 +2263,43 @@ try {
   )
 
   /*
-    THE REGION LABEL IS NO LONGER ROTATED. It was a -90deg box at the bottom-left;
-    it is a horizontal line under the watermark now, sharing the watermark's left
-    edge. Both halves are asserted, because "un-rotated" alone would pass if it
-    had simply been left at the bottom.
+    THE REGION LABEL IS ROTATED AGAIN, back to the frame's -90deg spine along the
+    left edge. rotate(-90deg) computes to matrix(0, -1, 1, 0, 0, 0), so the matrix
+    is asserted rather than the declaration: it is the resolved value, and it also
+    proves the direction (anti-clockwise, b = -1) rather than only that some
+    rotation is applied.
   */
   check(
-    'the region label is not rotated any more',
-    column.region.transform === 'none',
+    'the region label is rotated 90° anti-clockwise',
+    /^matrix\(0,\s*-1,\s*1,\s*0/.test(column.region.transform),
     column.region.transform,
   )
   check(
-    'it sits below the watermark',
-    column.region.top >= column.ghostBottom - 4,
-    `region ${column.region.top} vs watermark bottom ${column.ghostBottom}`,
+    'it runs up the column’s left edge',
+    column.region.left < column.heroLeft + column.pageWidth * 0.03,
+    `${column.region.left} vs hero left ${column.heroLeft}`,
+  )
+  check('at 20px', Math.abs(column.region.fontSize - 20) <= 0.5, `${column.region.fontSize}px`)
+  check('and in Plex Sans Light', column.region.weight === '300', column.region.weight)
+
+  /*
+    THE THREE NAMES ARE ONE TREATMENT NOW: 25px and 0.2em of tracking on all of
+    them, where they used to be a 65 / 39 / 30 hierarchy. Weight and slope carry
+    what size used to -- bold, upright, light italic -- so those are asserted
+    alongside, since "all three at 25px" would also pass if they had all become
+    the same face.
+  */
+  const named = ['kana', 'name', 'roma']
+  check(
+    'the katakana, the name and the romanisation are all 25px',
+    named.every((k) => Math.abs(column[k].fontSize - 25) <= 0.5),
+    named.map((k) => `${k}=${column[k].fontSize}`).join(' '),
   )
   check(
-    'on the watermark’s left edge',
-    column.region.left === column.heroLeft,
-    `${column.region.left} vs ${column.heroLeft}`,
+    'each with 20% letter spacing',
+    named.every((k) => Math.abs(parseFloat(column[k].tracking) - column[k].fontSize * 0.2) < 0.5),
+    named.map((k) => `${k}=${column[k].tracking}`).join(' '),
   )
-  check('and in Plex Sans Light', column.region.weight === '300', column.region.weight)
   check(
     'the romanisation is light italic',
     column.roma.weight === '300' && column.roma.style === 'italic',
@@ -2127,6 +2309,30 @@ try {
     'and the main name is bold',
     column.name.weight === '700' && column.name.family === 'IBM Plex Sans',
     `${column.name.weight} ${column.name.family}`,
+  )
+
+  /*
+    CENTRED ON THE SPRITE, which is the requirement in its own words: the column
+    is three rows -- artwork, katakana, Latin names -- and the two text rows centre
+    on the artwork WITHOUT the artwork moving. So this is two claims, and the
+    second one is the one that could regress silently.
+
+    Measured from the ink (see inkCentre above) against the artwork's own box
+    centre, which comes out exact -- 0.75px of tolerance is for sub-pixel layout
+    rounding, not for slack.
+  */
+  log(
+    `  centres: art ${column.artCentre.toFixed(1)} kana ${column.kanaCentre.toFixed(1)} names ${column.namesCentre.toFixed(1)}`,
+  )
+  check(
+    'the katakana row is centred on the sprite',
+    Math.abs(column.kanaCentre - column.artCentre) <= 0.75,
+    `${column.kanaCentre.toFixed(1)} vs ${column.artCentre.toFixed(1)}`,
+  )
+  check(
+    'and so is the name + romanisation row',
+    Math.abs(column.namesCentre - column.artCentre) <= 0.75,
+    `${column.namesCentre.toFixed(1)} vs ${column.artCentre.toFixed(1)}`,
   )
 
   // ------------------------------------------------- the Info tab is shorter
@@ -2188,6 +2394,108 @@ try {
     'and the gap between sections came down with it',
     Math.abs(rhythm2.gap - rhythm2.unit * 26) < 0.6 && rhythm2.gap < 20,
     `${rhythm2.gap.toFixed(2)}px`,
+  )
+
+  // ------------------------------------- every info row is centred in its track
+  /*
+    VERTICALLY CENTRED, HORIZONTALLY UNTOUCHED. Both halves matter: the ask was
+    "center vertically (not horizontally)", so the label staying hard left and the
+    value staying hard right is as much the requirement as the centring is.
+
+    WHY IT SHOWS UP AT ALL: the two metadata columns share their row tracks via
+    subgrid, so a track is as tall as the taller of its two cells -- and the
+    shorter cell used to hang from the top of it. That is only visible on the
+    ROWS THAT DIFFER, so a whole-block average would hide it; every pair is
+    checked, and the log names the tallest one.
+
+    THE GENDER BAR IS ONE OBJECT, requested explicitly: the bar and the "88% male
+    · 12% female" legend centre together, not each on its own. It is a flex column
+    in the CSS, so the check is that the WRAPPER's centre is the row's centre --
+    if the two pieces were being placed independently, the wrapper's own box would
+    not be what sits in the middle.
+  */
+  const centred = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.species-info-cols .ds-stat-row')]
+    const mid = (el) => {
+      const r = el.getBoundingClientRect()
+      return (r.top + r.bottom) / 2
+    }
+    const measured = rows.map((row) => {
+      const label = row.querySelector('.ds-stat-label')
+      const value = row.querySelector('.ds-stat-value')
+      const r = row.getBoundingClientRect()
+      return {
+        label: label.textContent.trim(),
+        height: Math.round(r.height),
+        rowMid: mid(row),
+        labelOff: mid(label) - mid(row),
+        valueOff: mid(value) - mid(row),
+        /* Horizontal: the label's left edge and the value's right edge against
+           the row's own, which is what must NOT have changed. */
+        labelLeft: Math.round(label.getBoundingClientRect().left - r.left),
+        valueRight: Math.round(r.right - value.getBoundingClientRect().right),
+      }
+    })
+    const gender = document.querySelector('.species-gender')
+    const genderRow = gender?.closest('.ds-stat-row')
+    return {
+      rows: measured,
+      alignItems: getComputedStyle(rows[0]).alignItems,
+      valueAlignContent: getComputedStyle(rows[0].querySelector('.ds-stat-value')).alignContent,
+      tierAlignItems: getComputedStyle(document.querySelector('.type-matchup-tier')).alignItems,
+      genderOff: gender && genderRow ? mid(gender) - mid(genderRow) : null,
+      genderHeight: gender ? Math.round(gender.getBoundingClientRect().height) : null,
+      genderRowHeight: genderRow ? Math.round(genderRow.getBoundingClientRect().height) : null,
+    }
+  })
+  const tallest = [...centred.rows].sort((a, b) => b.height - a.height)[0]
+  const worst = [...centred.rows].sort(
+    (a, b) =>
+      Math.max(Math.abs(b.labelOff), Math.abs(b.valueOff)) -
+      Math.max(Math.abs(a.labelOff), Math.abs(a.valueOff)),
+  )[0]
+  log(
+    `  ${centred.rows.length} metadata rows, tallest "${tallest.label}" at ${tallest.height}px; worst offset "${worst.label}" label ${worst.labelOff.toFixed(2)} value ${worst.valueOff.toFixed(2)}`,
+  )
+  check(
+    'the metadata rows centre their contents rather than baselining them',
+    centred.alignItems === 'center',
+    centred.alignItems,
+  )
+  check(
+    'every label sits on its row’s centreline',
+    centred.rows.every((r) => Math.abs(r.labelOff) <= 0.75),
+    `worst ${worst.labelOff.toFixed(2)}px on "${worst.label}"`,
+  )
+  check(
+    'and so does every value, including the two-line ones',
+    centred.rows.every((r) => Math.abs(r.valueOff) <= 0.75),
+    `worst ${worst.valueOff.toFixed(2)}px on "${worst.label}"`,
+  )
+  check(
+    'a wrapped value cluster centres as a block, not from its first line',
+    centred.valueAlignContent === 'center',
+    centred.valueAlignContent,
+  )
+  /* The row that made this visible: the gender bar is two lines tall and every
+     other row in the pair is one, so it is the case with real slack to sit in. */
+  check(
+    'the gender bar and its % legend centre as one unit',
+    centred.genderOff != null && Math.abs(centred.genderOff) <= 0.75,
+    `${centred.genderOff?.toFixed(2)}px, ${centred.genderHeight}px inside a ${centred.genderRowHeight}px row`,
+  )
+  check(
+    'and nothing moved horizontally: labels left, values right',
+    centred.rows.every((r) => r.labelLeft === 0 && r.valueRight === 0),
+    centred.rows
+      .filter((r) => r.labelLeft !== 0 || r.valueRight !== 0)
+      .map((r) => `${r.label} ${r.labelLeft}/${r.valueRight}`)
+      .join(' ') || 'all flush',
+  )
+  check(
+    'the type-effectiveness rows centre too',
+    centred.tierAlignItems === 'center',
+    centred.tierAlignItems,
   )
 
   // ------------------------------------------------ the wedge’s gradient
@@ -2511,18 +2819,48 @@ try {
   hr('H — CONSOLE / PAGE / HTTP')
   const sameOrigin = failedResponses.filter((r) => r.url.startsWith(ORIGIN))
   const external = failedResponses.filter((r) => !r.url.startsWith(ORIGIN))
-  log(`  console errors : ${consoleErrors.length}`)
+  const localDrops = failedRequests.filter((r) => r.url.startsWith(ORIGIN))
+  const externalDrops = failedRequests.filter((r) => !r.url.startsWith(ORIGIN))
+  /*
+    "Failed to load resource" IS NOT AN APP ERROR, and separating the two is the
+    point of this split. Chrome logs one for every image the sprite hosts drop,
+    and raw.githubusercontent rate-limits hard enough to drop several in a run of
+    this length -- which had this suite failing on eight anonymous console lines
+    that named no URL. Section H already declines to assert on external >=400
+    responses for exactly that reason; a dropped connection to the same host is
+    the same fact arriving without a status code.
+
+    So the ASSERTION is now on console errors that are NOT resource loads, plus
+    dropped requests to OUR OWN origin -- a real JS error and a missing local
+    asset both still fail. The third-party drops are printed with their URLs and
+    their failure text, so a genuine problem there is visible rather than hidden.
+  */
+  const realConsoleErrors = consoleErrors.filter((t) => !/Failed to load resource/i.test(t))
+  log(`  console errors : ${consoleErrors.length} (${realConsoleErrors.length} not resource loads)`)
   consoleErrors.slice(0, 10).forEach((e) => log(`    ${e}`))
   log(`  page errors    : ${pageErrors.length}`)
   pageErrors.slice(0, 10).forEach((e) => log(`    ${e}`))
   log(`  same-origin >=400 : ${sameOrigin.length}`)
   sameOrigin.slice(0, 10).forEach((r) => log(`    ${r.status} ${r.url}`))
+  log(`  same-origin dropped requests : ${localDrops.length}`)
+  localDrops.slice(0, 10).forEach((r) => log(`    ${r.failure} ${r.url}`))
   /* External failures are reported but not asserted: the sprite hosts are
      third-party and a rate-limit there is not a defect in this page. The sampled
      URL check above is what proves the paths are right. */
   log(`  external >=400 (not asserted) : ${external.length}`)
   external.slice(0, 6).forEach((r) => log(`    ${r.status} ${r.url}`))
-  check('no console errors', consoleErrors.length === 0)
+  log(`  external dropped requests (not asserted) : ${externalDrops.length}`)
+  externalDrops.slice(0, 8).forEach((r) => log(`    ${r.failure} ${r.url}`))
+  check(
+    'no console errors other than third-party resource loads',
+    realConsoleErrors.length === 0,
+    realConsoleErrors.slice(0, 3).join(' | '),
+  )
+  check(
+    'and nothing on our own origin failed to load',
+    localDrops.length === 0,
+    localDrops.map((r) => r.url).join(' '),
+  )
   check('no uncaught page errors', pageErrors.length === 0)
   check('no failed same-origin responses', sameOrigin.length === 0)
 

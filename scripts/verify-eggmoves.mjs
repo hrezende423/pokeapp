@@ -244,12 +244,17 @@ try {
   /**
    * Open the Info tab and scroll its locations section into view.
    *
-   * THE ENCOUNTERS FILE IS ASKED FOR BY A SCROLL NOW, not by a tab click. The
+   * THE ENCOUNTERS FILES ARE ASKED FOR BY A SCROLL, not by a tab click. The
    * locations section moved from the Description tab to the Info tab, and because
    * Info is the DEFAULT tab it deliberately does not fetch until it is reached --
-   * otherwise every species open would pull up to 2.8 MB for a visit that only
-   * wanted the stat line. So a suite that wants the partition to be requested has
-   * to do what a reader does.
+   * otherwise every species open would pull all FOURTEEN partitions, 9.6 MiB raw,
+   * for a visit that only wanted the stat line. So a suite that wants them
+   * requested has to do what a reader does.
+   *
+   * Which also means the 503 route below fails fourteen requests rather than one,
+   * and the loader only reports `error` when EVERY one of them failed -- a partial
+   * failure is a named caption instead. Blanket-routing the directory is what
+   * makes this the total-failure case.
    */
   const revealLocations = async (pg) => {
     await openTab(pg, 'Info')
@@ -259,7 +264,7 @@ try {
     )
     await pg.waitForFunction(
       () => document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true',
-      { timeout: 60000 },
+      { timeout: 120000 },
     )
   }
 
@@ -406,9 +411,9 @@ try {
     learnsetEmptyShown: document.querySelector('[data-testid="learnset-empty"]') != null,
     retryOffered: document.querySelector('[data-testid="learnset-retry"]') != null,
   }))
-  // The encounters file is 2.8 MiB and the learnset 503 fails fast, so settle the
-  // other tab before judging it -- otherwise the assertion races the download it
-  // is meant to prove is unaffected.
+  // The encounters are 9.6 MiB across fourteen files and the learnset 503 fails
+  // fast, so settle the other tab before judging it -- otherwise the assertion
+  // races the download it is meant to prove is unaffected.
   await revealLocations(inverse)
   await inverse.waitForSelector(
     '[data-testid="species-locations-rows"], [data-testid="locations-empty"], [data-testid="locations-error"]',

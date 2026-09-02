@@ -81,10 +81,10 @@ try {
   */
   const ROWS = [
     ['watermark', '.species-hero-ghost', 341, 'hu'],
-    ['katakana', '.species-hero-kana', 111, 'hu'],
-    ['hero name', '.species-hero-name', 66, 'hu'],
-    ['hero romanisation', '.species-hero-roma', 52, 'hu'],
-    ['region label', '.species-hero-region', 43, 'hu'],
+    ['katakana', '.species-hero-kana', 42.58, 'hu'],
+    ['hero name', '.species-hero-name', 42.58, 'hu'],
+    ['hero romanisation', '.species-hero-roma', 42.58, 'hu'],
+    ['region label', '.species-hero-region', 34.07, 'hu'],
     ['banner dex number', '.species-banner-number', 43, 'dp'],
     ['banner name', '.species-banner-name', 66, 'dp'],
     ['banner genus', '.species-banner-genus', 40, 'dp'],

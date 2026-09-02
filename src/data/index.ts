@@ -37,6 +37,7 @@ export type { BootStats, FileLoadStat } from './loader'
 
 export {
   getEncountersForSpecies,
+  getEncountersForSpeciesAllGames,
   getLearnsetsForSpecies,
   getVersionGroupStats,
   isVersionGroupLoaded,

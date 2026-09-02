@@ -42,12 +42,23 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   reached that way and are overridden inside `.species-page` —
   `.ds-stat-row`'s `padding: 8px 0` and `.data-table`'s `5px 7px`. If a
   spacing value on that page is in `rem` or `px`, it is a bug.
-- **The Info tab's locations section must stay lazy.** Info is the default
-  tab and the encounter partitions run to 2.8 MB, so it gates its own
-  `versionGroup` argument behind an `IntersectionObserver` — the whole point
-  of mounting one tab at a time is that opening a species costs no partition
-  fetch, and an eager section there spends it silently. Three suites drive
-  a scroll rather than a tab click because of this.
+- **The Info tab's locations section is the ONE EXCEPTION to the global
+  game selector**, by explicit request: it shows every game's locations in
+  one table, with a `--game-*` badge per row and release order as the
+  default sort. Nothing else on the page may follow it in ignoring the
+  selector — every other era-sensitive field still goes through a resolver.
+- **And it must stay lazy — that gate is now essential, not an
+  optimisation.** Info is the DEFAULT tab and being game-agnostic means all
+  fourteen encounter partitions, 9.6 MiB raw / ~280 KiB gzipped, so an
+  eager section there would spend that on every species open for a visit
+  that only wanted the stat line. It gates its own fetch behind an
+  `IntersectionObserver`; `getEncountersForSpeciesAllGames` de-duplicates
+  in-flight loads and indexes each file once per session, so the second
+  species is free. Four suites drive a scroll rather than a tab click
+  because of this, and verify-app asserts 14 files / 14 requests.
+  It reports partitions that FAILED rather than dropping them — a table
+  missing three games must never read as "not in those games" — and throws
+  only when every one of them failed.
 - Sprites: GitHub Release assets in `hrezende423/pokeapp-sprites`,
   runtime-cached, NOT precached (648MB total, too large to bundle).
   `species-background-colors.json` lives in the same repo, fetched at
@@ -105,7 +116,7 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   table, not one page. Same class as the hidden-ability case and the data
   is already in the bundle; needs a `resolveMoveTypeForGeneration` and a
   decision, since it touches a pre-redesign module. See
-  `src/modules/pokedex/SPECIES-PAGE-PUNCH-LIST.md` §9a.
+  `src/modules/pokedex/SPECIES-PAGE-PUNCH-LIST.md` §10a.
 - **Japanese species names**: PokéAPI's `ja-roma` gives the real,
   official Nintendo romanization, NOT a mechanical transliteration —
   ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not

@@ -14,7 +14,6 @@ import {
 } from '../../data'
 import type { Species, Variety, VersionGroup } from '../../data'
 import { BREEDING_INTRODUCED_IN_GENERATION } from '../dex/entrySources'
-import type { SpeciesGameScope } from './useSpeciesGameScope'
 import { EvolutionTree } from './EvolutionTree'
 import { SpeciesLocations } from './SpeciesLocations'
 import { TypeMatchupChart } from './TypeMatchupChart'
@@ -54,10 +53,12 @@ import {
  * and the sprite URLs 404.
  *
  * THE TAB'S ORDER, top to bottom: the two metadata columns, then base stats and
- * the evolution chart side by side, then WHERE TO FIND IT, then type
- * effectiveness, then the Pokeathlon note. Locations moved here from the
- * Description tab -- see SpeciesLocations for why -- and they sit under the two
- * charts and above the type table, which is where they were asked for.
+ * the evolution chart side by side, then LOCATIONS, then type effectiveness, then
+ * the Pokeathlon note. Locations moved here from the Description tab -- see
+ * SpeciesLocations for why -- and they sit under the two charts and above the type
+ * table, which is where they were asked for. That section is also the one thing on
+ * the tab that ignores the game scope entirely, by request; every era-sensitive
+ * field around it still goes through a resolver.
  *
  * THE EVOLUTION HEADING IS A TOGGLE, and while it is on, the chart IS the tab.
  * The chart normally gets half of a half-page column, which is enough for a
@@ -219,7 +220,6 @@ export function SpeciesInfoTab({
   variety,
   generation,
   versionGroup,
-  scope,
   onSelectSpecies,
   onSelectEggGroup,
 }: {
@@ -227,8 +227,6 @@ export function SpeciesInfoTab({
   variety: Variety
   generation: number
   versionGroup: VersionGroup | null
-  /** The page's own game scope -- the locations section's fallback. */
-  scope: SpeciesGameScope | null
   onSelectSpecies?: (id: number) => void
   onSelectEggGroup?: (id: number) => void
 }) {
@@ -526,13 +524,9 @@ export function SpeciesInfoTab({
         </section>
       </div>
 
-      {/* WHERE TO FIND IT: under the two charts, above type effectiveness. */}
-      <SpeciesLocations
-        species={species}
-        variety={variety}
-        versionGroup={versionGroup}
-        scope={scope}
-      />
+      {/* LOCATIONS: under the two charts, above type effectiveness. Every game's,
+          not the selected one's -- it takes no scope props at all. */}
+      <SpeciesLocations species={species} variety={variety} />
 
       <section className="species-info-block" data-testid="species-type-matchups">
         <h3 className="species-info-heading">Type effectiveness</h3>

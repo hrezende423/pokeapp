@@ -865,10 +865,11 @@ try {
     paragraphs of flavour text.
 
     And they load on SCROLL, not on tab open: Info is the default tab, so an eager
-    fetch there would pull up to 2.8 MB of encounters for every species anyone
-    looks at. So this scrolls the section into view the way a reader would, and
-    then asserts what it always asserted -- either a table or an explicit "not in
-    the wild" line, never neither.
+    fetch there would pull all fourteen encounter partitions -- 9.6 MiB raw, since
+    the section is game-agnostic -- for every species anyone looks at. So this
+    scrolls the section into view the way a reader would, and then asserts what it
+    always asserted: either a table or an explicit "not in the wild" line, never
+    neither.
   */
   await page.waitForSelector('[data-testid="species-locations"]', { timeout: 30000 })
   await page.$eval('[data-testid="species-locations"]', (el) =>
@@ -878,7 +879,7 @@ try {
     () =>
       document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true' &&
       !document.querySelector('[data-testid="locations-loading"]'),
-    { timeout: 60000 },
+    { timeout: 120000 },
   )
   const encounterTable = await page.$(
     '[data-testid="species-locations-rows"], [data-testid="locations-empty"]',
