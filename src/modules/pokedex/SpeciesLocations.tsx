@@ -7,8 +7,7 @@ import {
   listVersionGroups,
 } from '../../data'
 import type { EncounterRow, Species, Variety } from '../../data'
-import { GameBadge } from './GameBadge'
-import { titleCase, versionGroupLabel } from './speciesFacts'
+import { titleCase, versionGroupLabel, versionLabel } from './speciesFacts'
 
 /**
  * Where a species is found in the wild, in every game.
@@ -24,7 +23,7 @@ import { titleCase, versionGroupLabel } from './speciesFacts'
  * CLAUDE.md requires of every module; this section deliberately does not, because
  * "where do I catch this" is a question about the series rather than about the
  * cartridge in the slot, and the answer is only useful next to the alternatives.
- * The Version column says which game each row belongs to, and it is the default
+ * The Game column says which game each row belongs to, and it is the default
  * sort, so the table reads as one block per game in release order.
  *
  * WHAT THAT COSTS, stated plainly because it is the largest single fetch in the
@@ -119,9 +118,14 @@ const ENCOUNTER_COLUMNS: Column<GroupedEncounter>[] = [
   {
     key: 'version',
     label: 'Game',
-    // The badge, not the bare label: with every game in one table this is the
-    // column that separates them, so it has to be legible at a glance.
-    render: (g) => <GameBadge version={g.version} />,
+    /*
+      PLAIN TEXT. It was a coloured badge for two passes and the badge is gone,
+      app-wide -- see the note in SpeciesDescriptionTab. The data-game attribute
+      stays because it is not decoration: it carries the version SLUG, where the
+      cell shows the display name, and the suites read it to check the release
+      ordering without having to map "HeartGold" back to `heartgold`.
+    */
+    render: (g) => <span data-game={g.version}>{versionLabel(g.version)}</span>,
     /*
       RELEASE ORDER, NOT ALPHABETICAL, and it is the table's default sort. Sorting
       the Game column by name would interleave Crystal with Colosseum and put

@@ -683,17 +683,17 @@ try {
          group wrappers are species-flavor-group-N and match that prefix too, so the
          prefix form counted four wrappers as four extra versions. */
       flavour: [...document.querySelectorAll('.species-flavor-entry[data-testid]')].map((e) => {
-        const badge = e.querySelector('.species-flavor-version')
-        const cs = badge ? getComputedStyle(badge) : null
+        const label = e.querySelector('.species-flavor-version')
+        const cs = label ? getComputedStyle(label) : null
         return {
           version: e.getAttribute('data-testid').replace('species-flavor-', ''),
           text: e.querySelector('.species-flavor-text')?.textContent?.trim() ?? '',
-          badgeGame: badge?.getAttribute('data-game') ?? null,
-          badgeColored: badge?.getAttribute('data-colored') ?? null,
-          badgeColor: cs?.color ?? null,
-          badgeFill: cs?.backgroundColor ?? null,
-          badgeRadius: cs?.borderTopLeftRadius ?? null,
-          badgeTransform: cs?.textTransform ?? null,
+          gameLabel: label?.textContent?.trim() ?? null,
+          labelColor: cs?.color ?? null,
+          labelFill: cs?.backgroundColor ?? null,
+          labelRadius: cs?.borderTopLeftRadius ?? null,
+          labelTransform: cs?.textTransform ?? null,
+          labelPadding: cs?.padding ?? null,
         }
       }),
       /* Both must be absent from this tab now: its own selector, which was
@@ -757,41 +757,47 @@ try {
   )
 
   /*
-    THE GAME NAME IS A COLOURED BADGE, and the colour comes from a per-game token
-    rather than from --text-secondary. PokeAPI has no colour for a version -- see
-    GameBadge.tsx -- so the palette is the community version-colour set corrected
-    per theme, and what is assertable is that every in-scope version resolves to
-    one, that no two adjacent generations collapse to the same colour, and that
-    the badge is a real badge: a radius and a fill, not just tinted text.
+    THE GAME NAME IS PLAIN TEXT, and this section used to assert the opposite --
+    a per-game colour, a 12% fill and a 5px radius. The badge was reversed on
+    request and the --game-* palette went with it, so what is asserted now is the
+    ABSENCE: no fill, no radius, and one shared colour rather than sixteen.
+
+    THE NEGATIVE IS THE WHOLE POINT HERE. "No fill" is the app's general rule --
+    the same reason type indicators are bare coloured text -- and the game badge
+    was its one sanctioned exception. An exception that has been removed is worth
+    a check, or it grows back.
   */
-  const badges = desc.flavour.filter((f) => f.badgeGame)
-  const colors = new Set(badges.map((f) => f.badgeColor))
-  log(`  badges: ${badges.map((f) => `${f.badgeGame}=${f.badgeColor}`).join(' ')}`)
+  const labels = desc.flavour.filter((f) => f.gameLabel)
+  const labelColors = new Set(labels.map((f) => f.labelColor))
+  log(`  game labels: ${labels.map((f) => f.gameLabel).join(' · ')}`)
+  log(`  colour(s): ${[...labelColors].join(' ')} fill ${labels[0]?.labelFill}`)
   check(
-    'every entry names its game in a badge',
-    badges.length === desc.flavour.length,
-    `${badges.length} of ${desc.flavour.length}`,
+    'every entry still names its game',
+    labels.length === desc.flavour.length,
+    `${labels.length} of ${desc.flavour.length}`,
   )
   check(
-    'and every in-scope version has a colour token',
-    badges.every((f) => f.badgeColored === 'true'),
-    badges
-      .filter((f) => f.badgeColored !== 'true')
-      .map((f) => f.badgeGame)
-      .join(',') || 'all coloured',
+    'as plain text: no fill and no radius',
+    labels.every(
+      (f) => f.labelFill === 'rgba(0, 0, 0, 0)' && parseFloat(f.labelRadius ?? '0') === 0,
+    ),
+    `${labels[0]?.labelFill} r=${labels[0]?.labelRadius}`,
   )
-  /* Not one colour repeated: 16 entries across 12 distinct games, and Gold/
-     HeartGold plus Silver/SoulSilver deliberately share, so >=8 is the floor. */
-  check('the colours actually differ per game', colors.size >= 8, `${colors.size} distinct`)
   check(
-    'the badge has a fill and a radius, not just coloured text',
-    badges.every((f) => f.badgeFill !== 'rgba(0, 0, 0, 0)' && parseFloat(f.badgeRadius ?? '0') > 0),
-    `${badges[0]?.badgeFill} r=${badges[0]?.badgeRadius}`,
+    'and no padding left over from the badge',
+    labels.every((f) => parseFloat(f.labelPadding ?? '0') === 0),
+    labels[0]?.labelPadding ?? '',
+  )
+  /* ONE colour for all sixteen, where the badge had one per game. */
+  check(
+    'in a single shared colour, not one per game',
+    labelColors.size === 1,
+    `${labelColors.size} distinct: ${[...labelColors].join(' ')}`,
   )
   check(
     'and it is not upper-cased',
-    badges.every((f) => f.badgeTransform === 'none'),
-    badges[0]?.badgeTransform ?? '',
+    labels.every((f) => f.labelTransform === 'none'),
+    labels[0]?.labelTransform ?? '',
   )
 
   await page.screenshot({ path: `${SHOTS}/species-page-description.png` })
@@ -810,25 +816,81 @@ try {
     opposite of what it used to. The app is on HeartGold/SoulSilver here and the
     Learnset tab was left on Yellow, and the table must show neither of those in
     particular: it must show every game, sorted into release order, with each row
-    badged by the game it belongs to.
+    naming the game it belongs to.
   */
+
+  /*
+    THE LAZY GATE, MEASURED WHERE IT ACTUALLY APPLIES -- which is a correction,
+    and the reason for it is a side effect of centring the metadata rows.
+
+    Removing that grid's row gap took ~92px off the block, so on a 950px-tall
+    window the locations section is now 124px INSIDE the viewport when the Info
+    tab opens. It therefore loads on open, correctly: a section the reader can
+    see must not sit behind "Loads when you scroll to it". The old assertion --
+    "has fetched nothing before it is reached" -- was true only because the
+    section used to start below the fold on this particular viewport, so it was
+    measuring the layout and calling it the gate.
+
+    So the gate is exercised at a viewport where the section IS off-screen, which
+    is the only place the claim means anything. 700px: the section's top sits at
+    ~773px, i.e. below the fold with the 200px rootMargin still clear of it. The
+    species is re-opened after each resize because `seen` is sticky per mount --
+    an already-loaded section would say nothing about a fresh one.
+  */
+  await page.setViewportSize({ width: 1600, height: 700 })
+  await backToGrid()
+  await openSpecies(1)
   await openTab('Info')
-  /* Before it is scrolled to, the section exists and has fetched nothing -- which
-     is the property that keeps the default tab free, so it is asserted rather
-     than skipped past. */
-  const beforeScroll = await page.evaluate(() => ({
-    present: document.querySelector('[data-testid="species-locations"]') != null,
-    loaded: document.querySelector('[data-testid="species-locations"]')?.dataset.loaded,
-    idle: document.querySelector('[data-testid="locations-idle"]') != null,
-    rows: document.querySelectorAll('[data-testid="species-locations-rows"] tbody tr').length,
-  }))
-  log(`  before scrolling to it: ${JSON.stringify(beforeScroll)}`)
+  const offScreen = await page.evaluate(() => {
+    const sec = document.querySelector('[data-testid="species-locations"]')
+    return {
+      present: sec != null,
+      topBelowFold: Math.round(sec.getBoundingClientRect().top - window.innerHeight),
+      loaded: sec?.dataset.loaded,
+      idle: document.querySelector('[data-testid="locations-idle"]') != null,
+      rows: document.querySelectorAll('[data-testid="species-locations-rows"] tbody tr').length,
+    }
+  })
+  log(`  at a 700px viewport: ${JSON.stringify(offScreen)}`)
   check(
-    'the section is on the tab but has fetched nothing before it is reached',
-    beforeScroll.present && beforeScroll.loaded === 'false' && beforeScroll.rows === 0,
-    JSON.stringify(beforeScroll),
+    'off-screen, the section is on the tab and really is below the fold',
+    offScreen.present && offScreen.topBelowFold > 0,
+    `${offScreen.topBelowFold}px below the fold`,
   )
-  check('and says so instead of showing an empty block', beforeScroll.idle)
+  check(
+    'and it has fetched nothing',
+    offScreen.loaded === 'false' && offScreen.rows === 0,
+    JSON.stringify(offScreen),
+  )
+  check('saying so instead of showing an empty block', offScreen.idle)
+
+  /* Back to the suite's own viewport, where the section is visible on open --
+     and where the opposite has to hold: no idle message on something in view. */
+  await page.setViewportSize({ width: 1600, height: 950 })
+  await backToGrid()
+  await openSpecies(1)
+  await openTab('Info')
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true' &&
+      !document.querySelector('[data-testid="locations-loading"]'),
+    { timeout: 120000 },
+  )
+  const onScreen = await page.evaluate(() => {
+    const sec = document.querySelector('[data-testid="species-locations"]')
+    return {
+      topBelowFold: Math.round(sec.getBoundingClientRect().top - window.innerHeight),
+      loaded: sec?.dataset.loaded,
+      idle: document.querySelector('[data-testid="locations-idle"]') != null,
+    }
+  })
+  log(`  at the suite's 950px viewport: ${JSON.stringify(onScreen)}`)
+  check(
+    'on screen, it loads without being scrolled to',
+    onScreen.topBelowFold < 0 && onScreen.loaded === 'true',
+    JSON.stringify(onScreen),
+  )
+  check('and never shows the idle message while visible', !onScreen.idle)
 
   await revealLocations()
   const locate = () =>
@@ -851,20 +913,26 @@ try {
         distinctVersions: [
           ...new Set(
             [
-              ...document.querySelectorAll(
-                '[data-testid="species-locations-rows"] .species-game-badge',
-              ),
+              ...document.querySelectorAll('[data-testid="species-locations-rows"] [data-game]'),
             ].map((b) => b.dataset.game ?? ''),
           ),
         ],
         atWide: idx('.species-info-wide'),
         atLocations: idx('[data-testid="species-locations"]'),
         atMatchups: idx('[data-testid="species-type-matchups"]'),
-        /* The Version column is a badge here too, so the table and the prose tab
-           name a game the same way. */
-        badgedVersions: document.querySelectorAll(
-          '[data-testid="species-locations-rows"] .species-game-badge',
+        /* Plain text here too, so the table and the prose tab name a game the
+           same way -- which is now "the same plain way". data-game carries the
+           slug the display name hides. */
+        namedVersions: document.querySelectorAll(
+          '[data-testid="species-locations-rows"] [data-game]',
         ).length,
+        gameFills: [
+          ...new Set(
+            [
+              ...document.querySelectorAll('[data-testid="species-locations-rows"] [data-game]'),
+            ].map((e) => getComputedStyle(e).backgroundColor),
+          ),
+        ],
       }
     })
   const loc = await locate()
@@ -895,9 +963,15 @@ try {
   )
   check('a wild-encounterable species lists real locations', pidgey.rows > 0, `(${pidgey.rows})`)
   check(
-    'and every row badges its game',
-    pidgey.badgedVersions === pidgey.rows,
-    `${pidgey.badgedVersions} of ${pidgey.rows}`,
+    'and every row names its game',
+    pidgey.namedVersions === pidgey.rows,
+    `${pidgey.namedVersions} of ${pidgey.rows}`,
+  )
+  /* No badge left in the table either -- same absence as the Description tab. */
+  check(
+    'with no badge fill anywhere in the table',
+    pidgey.gameFills.every((f) => f === 'rgba(0, 0, 0, 0)'),
+    [...new Set(pidgey.gameFills)].join(' '),
   )
   /*
     THE POINT OF THE WHOLE CHANGE: one table, many games. Pidgey is in the wild in
@@ -924,7 +998,7 @@ try {
   */
   const gameSort = await page.evaluate(() => ({
     seq: [...document.querySelectorAll('[data-testid="species-locations-rows"] tbody tr')].map(
-      (tr) => tr.querySelector('.species-game-badge')?.dataset.game ?? '',
+      (tr) => tr.querySelector('[data-game]')?.dataset.game ?? '',
     ),
   }))
   const firstSeen = new Map()
@@ -2500,10 +2574,15 @@ try {
       const label = row.querySelector('.ds-stat-label')
       const value = row.querySelector('.ds-stat-value')
       const r = row.getBoundingClientRect()
+      const border = parseFloat(getComputedStyle(row).borderBottomWidth)
       return {
         label: label.textContent.trim(),
         height: Math.round(r.height),
+        top: r.top,
+        bottom: r.bottom,
+        border,
         rowMid: mid(row),
+        labelMid: mid(label),
         labelOff: mid(label) - mid(row),
         valueOff: mid(value) - mid(row),
         /* Horizontal: the label's left edge and the value's right edge against
@@ -2516,6 +2595,10 @@ try {
     const genderRow = gender?.closest('.ds-stat-row')
     return {
       rows: measured,
+      rowGap: parseFloat(getComputedStyle(document.querySelector('.species-info-cols')).rowGap),
+      columnGap: parseFloat(
+        getComputedStyle(document.querySelector('.species-info-cols')).columnGap,
+      ),
       alignItems: getComputedStyle(rows[0]).alignItems,
       valueAlignContent: getComputedStyle(rows[0].querySelector('.ds-stat-value')).alignContent,
       tierAlignItems: getComputedStyle(document.querySelector('.type-matchup-tier')).alignItems,
@@ -2572,6 +2655,53 @@ try {
     'the type-effectiveness rows centre too',
     centred.tierAlignItems === 'center',
     centred.tierAlignItems,
+  )
+
+  /*
+    CENTRED BETWEEN THE HAIRLINES, which is the check the previous pass needed
+    and did not have. Everything above measures content against the ROW BOX, and
+    all of it passed to within half a pixel while every row visibly sat ~8px low
+    -- because a 26-unit row gap on the grid landed INSIDE the band a reader
+    sees. The hairline is a row's own border-bottom, so the visible band runs
+    from the previous hairline to this one, and the gap was being added above
+    each row's box rather than between two rows.
+
+    So the band is reconstructed from the hairlines themselves: bandTop is the
+    previous row's bottom edge, bandBottom the top of this row's own border. If
+    a row gap ever comes back, this fails by half of it.
+  */
+  const bands = centred.rows
+    .map((r, i) => ({ ...r, prev: centred.rows[i - 1] }))
+    .filter((r) => r.prev && Math.abs(r.top - r.prev.bottom) < 40 && r.top > r.prev.top)
+    .map((r) => ({
+      label: r.label,
+      off: r.labelMid - (r.prev.bottom + (r.bottom - r.border)) / 2,
+      contiguous: Math.abs(r.top - r.prev.bottom) < 0.5,
+    }))
+  const worstBand = [...bands].sort((a, b) => Math.abs(b.off) - Math.abs(a.off))[0]
+  log(
+    `  ${bands.length} hairline-to-hairline bands, worst offset "${worstBand?.label}" ${worstBand?.off.toFixed(2)}px`,
+  )
+  check(
+    'the grid has no row gap to fall inside the bands',
+    centred.rowGap === 0,
+    `row-gap ${centred.rowGap}px`,
+  )
+  check(
+    'so each row box starts where the last hairline ended',
+    bands.every((b) => b.contiguous),
+    `${bands.filter((b) => !b.contiguous).length} of ${bands.length} not contiguous`,
+  )
+  check(
+    'and the content is centred between the hairlines, not just in its box',
+    bands.every((b) => Math.abs(b.off) <= 0.75),
+    `worst ${worstBand?.off.toFixed(2)}px on "${worstBand?.label}"`,
+  )
+  /* The column gap is unrelated to the hairlines and has to survive the fix. */
+  check(
+    'while the two columns keep their gap',
+    centred.columnGap > 8,
+    `column-gap ${centred.columnGap.toFixed(2)}px`,
   )
 
   // ------------------------------------------------ the wedge’s gradient

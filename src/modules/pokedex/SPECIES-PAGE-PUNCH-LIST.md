@@ -820,6 +820,64 @@ its italic face is legitimately `unloaded` there. Asserting "loaded" would have
 forced italic content onto a page with no reason to carry any; the species page
 uses it, and that is where "loaded and rendered" is asserted.
 
+### 9.9 — The game badges are gone, and the rows are centred for real
+
+Two reversals of things this file records as done, both on request.
+
+**The badge.** Section 6 asked for game names in a coloured badge; this removes
+it. `GameBadge.tsx`, the `--game-*` palette (21 entries per mode, both themes),
+`--game-badge-tint` and `scripts/calibrate-game-colors.mjs` all went with it —
+a contrast-calibrated palette that nothing renders is dead weight that reads as
+live, and `git log` has the whole thing if it is ever wanted back.
+`--radius-badge-square` stays as a token `design-tokens.json` sanctions and
+nothing uses, which is the honest state and is what it was before the badge.
+
+What that buys is **one rule instead of a rule with an exception**. "Type is
+data, not decoration" is why type indicators are bare coloured text, and the
+badge was the single sanctioned exception, argued on the grounds that a version
+is a NAME rather than a value. Nothing on the page carries a fill now.
+
+The suite's assertions inverted rather than being deleted: no fill, no radius, no
+leftover padding, and ONE shared colour where there were sixteen. An exception
+that has been removed is worth a check, or it grows back.
+
+**The centring, properly this time.** §9.4 set `align-items: center` and every
+measurement agreed — label and value within half a pixel of their row's centre,
+on all fourteen rows. The rows still visibly sat ~8px low, and the reason is that
+**the row box is not the band a reader sees**. Each row draws its own hairline as
+a `border-bottom`, so the visible band runs from one hairline to the next; the
+grid's 26-unit `row-gap` landed INSIDE that band, above the next row's box rather
+than between two rows. Content centred in its box therefore sat a half-gap low in
+its band. Nothing was wrong in the box model, which is exactly why the previous
+pass called it done.
+
+`row-gap: 0` (column gap kept — it separates the two lists and has nothing to do
+with hairlines). The other two row families on this page, `.species-stat-bars li`
+and `.type-matchup-tier`, are plain ungapped lists where each row owns its own
+padding and hairline, and they were centred all along; this grid was the odd one
+out. The fix makes the three consistent and leaves `--space-row-padding-block`
+as the only thing setting the rhythm.
+
+**The check now reconstructs the band from the hairlines** — previous row's
+bottom edge to the top of this row's border — and comes out at 0.00px. The
+box-relative checks stay, because they are still true; they were just not
+sufficient, and that is worth having both of on the record.
+
+**It shortened the block by ~92px, which had a consequence worth naming.** The
+locations section moved up with it, and on a 950px-tall window it is now 124px
+INSIDE the viewport when the Info tab opens — so it loads on open rather than on
+scroll. That is correct behaviour (a visible section must not sit behind "Loads
+when you scroll to it") but it means the lazy gate no longer defers anything on a
+tall window: the ~280 KiB lands on the first species open, once per session,
+instead of on the first scroll. At the 1280x720 default it still defers, which is
+what verify-app measures.
+
+The E2 assertion was measuring the LAYOUT and calling it the gate — "has fetched
+nothing before it is reached" was true only because the section used to start
+below the fold at that one viewport. It now tests both branches explicitly:
+off-screen at 700px it must be idle and unfetched, on-screen at 950px it must
+have loaded and must not show the idle message.
+
 ## 10 — OPEN
 
 ### 10a — A real per-generation accuracy bug, found while verifying FIX 5

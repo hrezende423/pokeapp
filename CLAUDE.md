@@ -51,8 +51,13 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   optimisation.** Info is the DEFAULT tab and being game-agnostic means all
   fourteen encounter partitions, 9.6 MiB raw / ~280 KiB gzipped, so an
   eager section there would spend that on every species open for a visit
-  that only wanted the stat line. It gates its own fetch behind an
-  `IntersectionObserver`; `getEncountersForSpeciesAllGames` de-duplicates
+  that only wanted the stat line. **The gate is "is it on screen", NOT "has
+  the reader scrolled"** — since the metadata rows lost their row gap the
+  block is ~92px shorter, so on a window taller than ~800px the section is
+  already visible when Info opens and correctly loads then. A section the
+  reader can see must never sit behind "Loads when you scroll to it". The
+  cost lands once per session, not once per species. It gates its own fetch
+  behind an `IntersectionObserver`; `getEncountersForSpeciesAllGames` de-duplicates
   in-flight loads and indexes each file once per session, so the second
   species is free. Four suites drive a scroll rather than a tab click
   because of this, and verify-app asserts 14 files / 14 requests.
@@ -155,20 +160,15 @@ that isn't explicitly about design.)
   a fifth use — a gender split is a binary indicator, the same use that
   covers caught/not-caught. Its male share is `--text-primary`, i.e. the
   theme's version of "white", never a literal `#fff`.
-- **`--game-*` is a real palette now**: one colour per version, because
-  PokéAPI has none (`version` carries id / name / names / version_group and
-  nothing else). Source is the community version-colour set, corrected per
-  theme by `scripts/calibrate-game-colors.mjs` to clear 4:1 against the 12%
-  self-tint a badge paints behind it — same method as the type palette.
-  Blue, Sapphire and Blue (JP) are TINTED toward white rather than scaled,
-  because pure blue's luminance saturates at 2.3:1 on black.
-- **A version label is the one thing that gets a badge.** Type indicators
-  stay bare coloured text ("type is data, not decoration"); a game name is
-  a NAME that repeats down a column and needs a shape to be scannable. It
-  uses `--radius-badge-square`, which `design-tokens.json` sanctions and
-  `TypeLabel` deliberately left unimplemented for want of a fill and
-  text-colour spec. Do not generalise the badge to anything else without
-  asking.
+- **NOTHING gets a badge. No fill, no pill, no chip, anywhere.** "Type is
+  data, not decoration" is now the whole rule rather than a rule with one
+  exception: game names were badged for two passes, in a `--game-*` colour
+  at a 12% self-tint, and the badge was removed on request along with the
+  palette and `scripts/calibrate-game-colors.mjs`. A version name is set in
+  the label size and `--text-secondary`, the same as every other small
+  label. `--radius-badge-square` remains a sanctioned token that nothing
+  uses; do not reach for it without asking, and if a badge is ever wanted
+  again, `git log -- src/modules/pokedex/GameBadge.tsx` has the whole thing.
 - **No ALL-CAPS on the species detail page.** One block in `pokedex.css`
   scoped to `.species-page` turns `text-transform: uppercase` into
   `capitalize` and drops the tracking to 0.01em. Scoped, not global: the

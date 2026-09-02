@@ -3394,7 +3394,34 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(7, auto);
-  gap: var(--space-gap-lg);
+  /*
+    NO ROW GAP, AND THAT IS THE VERTICAL-CENTRING FIX.
+
+    Each row draws its own hairline as a `border-bottom`, so the band a reader
+    sees is "from one hairline to the next" -- and a row gap lands INSIDE that
+    band, above the next row's box rather than between two rows. Every row's
+    content was therefore centred in its own box and sat a half-gap LOW in its
+    apparent band: 26 raw units of gap meant 13 units, ~8px, of drop on all
+    fourteen rows. Nothing was wrong in the box model, which is exactly why the
+    row measurements all read as centred to within half a pixel and the previous
+    pass called this done.
+
+    The other two row families on this page -- .species-stat-bars li and
+    .type-matchup-tier -- are plain ungapped lists where each row owns its own
+    padding and its own hairline, and they were centred all along. This grid was
+    the odd one out; dropping the row gap makes the three consistent and leaves
+    the shared --space-row-padding-block as the only thing setting the rhythm.
+
+    IT SHORTENS THE BLOCK by six gaps, ~92px, which is a real change and not a
+    side effect worth hiding. The alternative was to fold the pitch into the row
+    padding instead, but that puts the hairline in the middle of empty space and
+    breaks the padding these rows share with the other two families.
+
+    COLUMN GAP STAYS. It separates the two lists and has nothing to do with the
+    hairlines, so `gap` had to become two declarations rather than one.
+  */
+  row-gap: 0;
+  column-gap: var(--space-gap-lg);
   align-items: start;
 }
 
@@ -3937,53 +3964,31 @@
 }
 
 /*
-  THE GAME NAME IS A COLOURED BADGE.
+  THE GAME NAME IS PLAIN TEXT.
 
-  Asked for as "check if each game has an associated colour and if so, put the
-  game names in a colored badge instead of plain text". The data says no -- see
-  the block comment on --game-* in design-tokens.css -- so the palette is the
-  community version-colour set, contrast-corrected per theme by
-  scripts/calibrate-game-colors.mjs.
+  It was a coloured badge for two passes -- fill at a 12% self-tint of a
+  per-version colour, text at the colour itself -- and it is gone, reversed on
+  request. The --game-* palette and scripts/calibrate-game-colors.mjs went with
+  it, because a contrast-calibrated palette that nothing renders is dead weight
+  that reads as live.
 
-  A BADGE HERE AND NOT ON A TYPE, and the difference is deliberate rather than
-  inconsistent. "Type is data, not decoration" is why type indicators are
-  coloured text with no shape; a version label is a NAME, the thing a reader
-  scans this list by, and 16 of them stacked down a column need something to
-  scan. It uses --radius-badge-square, the badge radius design-tokens.json
-  sanctions and TypeLabel deliberately left unimplemented for want of a fill and
-  text-colour spec: this is that spec, decided and measured.
+  WHAT THAT BUYS: one rule instead of an exception. "Type is data, not
+  decoration" is why type indicators are coloured text with no shape, and the
+  badge was the one sanctioned exception to it, argued on the grounds that a
+  version is a NAME rather than a value. Now nothing on the page carries a fill,
+  and --radius-badge-square goes back to being a token design-tokens.json
+  sanctions and nothing uses.
 
-  Both colours come from the one --game-c custom property set inline, so the
-  fill is always a 12% self-tint of the text colour and the pair can never drift.
-  colour-mix against --surface rather than transparent, so the tint does not
-  double up over the flavour entry's own background.
+  The dt is the label now rather than a wrapper around one, so
+  .species-flavor-version-row went with the badge: a dt could not be an
+  inline-block badge and stay a dt, which is the only reason it existed.
 */
 .species-flavor-version {
-  display: inline-block;
-  padding: 0.1em 0.45em;
-  border-radius: var(--radius-badge-square);
-  background: color-mix(in srgb, var(--game-c, var(--text-secondary)) 12%, var(--surface));
-  color: var(--game-c, var(--text-secondary));
+  margin: 0;
   font-size: var(--font-size-label);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.01em;
-  text-transform: none;
-}
-
-/* The same badge inside the locations table's Version cell, where it is one of
-   five columns and has to stay on one line. */
-.species-game-badge {
-  display: inline-block;
-  max-width: 100%;
-  padding: 0.1em 0.4em;
-  border-radius: var(--radius-badge-square);
-  background: color-mix(in srgb, var(--game-c, var(--text-secondary)) 12%, var(--surface));
-  color: var(--game-c, var(--text-secondary));
-  font-family: var(--font-body);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text-secondary);
 }
 
 .species-flavor-text {

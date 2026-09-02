@@ -1,10 +1,8 @@
 /*
   Pokeapp design tokens — consolidated v1.
   Moved verbatim from design-system/design-tokens.css, which stays the handoff
-  copy. Values are the source of truth and are not edited here; seven deltas
-  from that file. Six of them sync it to design-tokens.json; the seventh
-  (--game-*) is a NEW palette that neither file had, because the data it would
-  have come from does not exist -- see its own note below:
+  copy. Values are the source of truth and are not edited here; six deltas from
+  that file, all of them syncing it to design-tokens.json:
 
     - @font-face rules added for the bundled IBM Plex Sans (the file asked for
       them once the assets existed). Self-hosted, no CDN: an offline-first PWA
@@ -29,19 +27,14 @@
       ledger-dim-rule) and every value is either var(--accent) or a plain
       number, so neither needs a per-mode value.
     - --radius-badge-square: 5px added, from radius.badge-square in the JSON.
-      It was missing here, which left the sanctioned solid-square type badge
-      unbuildable from tokens. It is BUILT now, and not on a type: the game
-      badge on the species page's Description tab and locations table uses it.
-      See the --game-* block below for why a version label gets a shape where
-      a type never does.
-    - --game-* added, 21 entries per mode: one colour per Pokemon version.
-      Not in design-tokens.json and not in PokeAPI either -- `version` carries
-      id / name / names / version_group and nothing else -- so this is a new
-      palette rather than a sync, derived from the community version-colour set
-      and contrast-corrected per theme by scripts/calibrate-game-colors.mjs
-      using the same equal-channel-scaling method the type palette already
-      uses. --game-badge-tint records the 12% self-tint the badge paints, so
-      the fill and the text can never drift apart.
+      It was missing here, which left the sanctioned solid-square badge
+      unbuildable from tokens. NOTHING USES IT, which is the honest state: it
+      was built for the game badge on the species page, that badge was removed
+      on request, and the --game-* palette (21 entries per mode, derived from
+      the community version-colour set and contrast-corrected by
+      scripts/calibrate-game-colors.mjs) was removed with it rather than left
+      calibrated and unrendered. The token stays because the JSON sanctions it;
+      a use would need a fill and text-colour spec decided first.
 
   Toggle theme via data-theme="light" | "dark" on :root or any ancestor.
   src/theme.ts sets it from the OS preference at boot.
@@ -246,30 +239,6 @@
   --type-dragon: #7038f8;
   --type-dark: #705848;
   --type-steel: #7b7b8b;
-
-  /* per-game colours — see the block comment above the dark set. */
-  --game-red: #dd0f0f;
-  --game-blue: #1111ff;
-  --game-yellow: #8e771c;
-  --game-gold: #947016;
-  --game-silver: #787878;
-  --game-crystal: #2f8198;
-  --game-ruby: #a00000;
-  --game-sapphire: #0000a0;
-  --game-emerald: #008500;
-  --game-firered: #bd551d;
-  --game-leafgreen: #008900;
-  --game-diamond: #7171aa;
-  --game-pearl: #9e6969;
-  --game-platinum: #757575;
-  --game-heartgold: #867400;
-  --game-soulsilver: #787878;
-  --game-colosseum: #aa602f;
-  --game-xd: #7b3fa0;
-  --game-red-japan: #dd0f0f;
-  --game-green-japan: #008500;
-  --game-blue-japan: #1111ff;
-  --game-badge-tint: 0.12;
 }
 
 [data-theme='dark'] {
@@ -319,51 +288,6 @@
   --type-dragon: #8556f9;
   --type-dark: #887467;
   --type-steel: #b8b8d0;
-
-  /*
-    PER-GAME COLOURS. Asked for as "check if each game has an associated colour
-    and if so, badge it" -- and the answer is split. PokeAPI has NO colour for a
-    version: `version` carries id / name / names / version_group and nothing
-    else, and neither does this app's version-groups.json. Every game does have
-    a box-art colour a reader recognises, though, and the community's
-    version-colour set is the de-facto table, so those hexes are the input.
-
-    Corrected exactly the way the type palette was: scale all three channels
-    equally, which preserves the hue, until the colour clears 4:1 against the
-    12% self-tint the badge paints behind it. Light mode darkens, dark mode
-    lightens. 16 of the 21 need no change on dark and 5 need none on light.
-
-    THREE OF THEM CANNOT BE FIXED BY SCALING, and they are all blue: #1111ff
-    keeps nearly all its luminance in the 7.2%-weighted channel, so scaling
-    saturates that channel at 2.3:1 and stops. Blue, Sapphire and Blue (JP)
-    are therefore tinted toward white instead, which is what the community
-    palette itself did for --type-water. See scripts/calibrate-game-colors.mjs;
-    it prints both blocks and the measured ratio for every entry.
-
-    Gold/HeartGold and Silver/SoulSilver land on near-identical values on
-    purpose: the remakes are named after the originals and share their colour.
-  */
-  --game-red: #ff1111;
-  --game-blue: #6262ff;
-  --game-yellow: #ffd733;
-  --game-gold: #daa520;
-  --game-silver: #c0c0c0;
-  --game-crystal: #4fd9ff;
-  --game-ruby: #f00000;
-  --game-sapphire: #6b6bc8;
-  --game-emerald: #00a000;
-  --game-firered: #ff7327;
-  --game-leafgreen: #00dd00;
-  --game-diamond: #aaaaff;
-  --game-pearl: #ffaaaa;
-  --game-platinum: #999999;
-  --game-heartgold: #b69e00;
-  --game-soulsilver: #c0c0c0;
-  --game-colosseum: #c87137;
-  --game-xd: #a655d8;
-  --game-red-japan: #ff1111;
-  --game-green-japan: #00a000;
-  --game-blue-japan: #6262ff;
 }
 
 :root {

@@ -1,8 +1,7 @@
 import { useMemo } from 'react'
 import { listVersionGroups } from '../../data'
 import type { Species } from '../../data'
-import { GameBadge } from './GameBadge'
-import { generationLabel } from './speciesFacts'
+import { generationLabel, versionLabel } from './speciesFacts'
 
 /**
  * The Description tab: every game's Pokedex entry, in sequence.
@@ -19,9 +18,12 @@ import { generationLabel } from './speciesFacts'
  * between the two versions of one pair, so the generation is the unit a reader is
  * actually comparing.
  *
- * THE GAME NAME IS A COLOURED BADGE, not a small-caps label -- see GameBadge for
- * where the colours come from, and why a version gets a badge where a type never
- * does. Sixteen entries down one column is exactly the case a badge is for.
+ * THE GAME NAME IS PLAIN TEXT. It was a coloured badge for two passes and the
+ * badge is gone -- reversed on request, app-wide, along with the --game-* palette
+ * that fed it and the calibration script behind that. Which leaves the app with
+ * ONE consistent rule instead of an exception: no data label anywhere gets a
+ * fill or a shape, types included. A version name is a name; it is set in the
+ * label size and the secondary colour and that is all.
  *
  * LOCATIONS MOVED OUT, to the Info tab under the stat and evolution charts. A
  * sortable five-column encounter table under sixteen paragraphs of prose was two
@@ -97,11 +99,7 @@ export function SpeciesDescriptionTab({ species }: { species: Species }) {
                     className="species-flavor-entry"
                     data-testid={`species-flavor-${entry.version}`}
                   >
-                    {/* The dt is the row, the badge inside it is the shape. A dt
-                        cannot be an inline-block badge and stay a dt. */}
-                    <dt className="species-flavor-version-row">
-                      <GameBadge version={entry.version} className="species-flavor-version" />
-                    </dt>
+                    <dt className="species-flavor-version">{versionLabel(entry.version)}</dt>
                     <dd className="species-flavor-text">{entry.text}</dd>
                   </div>
                 ))}
