@@ -601,32 +601,43 @@ Six items, three on the pinned column and three on the Info tab. The first two
 are pure type; the third is an alignment change that had to leave the sprite
 alone; the last is the one real architecture change in the pass.
 
-### 9.1 — The region label is a rotated spine again
+### 9.1 — The region label is a rotated spine again, at the top
 
-Back to the frame: a −90° box at `left: 2.307%; top: 88.943%` with
-`transform-origin: left top`, so the text runs UPWARD from y=917 to y=604. It
-spent one pass as a horizontal line under the watermark on the reasoning that a
-rotated label competes with the watermark for the same left edge; the smaller
-type is what makes the original work — at 20px it reads as a spine label rather
-than as a second headline.
+Rotated −90° at `left: 2.307%` with `transform-origin: left top`, so the text
+runs upward. It spent one pass as a horizontal line under the watermark on the
+reasoning that a rotated label competes with the watermark for the same left
+edge; the smaller type is what makes the original work — at 20px it reads as a
+spine label rather than as a second headline.
 
-`top` is the point the text BEGINS and it runs up from there, which is worth
-writing down: with `transform-origin: left top` the anchor is the bottom of the
-visual line, not its top.
+**It hangs from the watermark rather than sitting at the frame's bottom-left**
+(`top: 27%`, one percent below where the watermark's own box ends at 25.6%),
+which was asked for separately with the direction explicitly unchanged.
 
-### 9.2 — 20px and 25px, written as raw units
+`transform: rotate(-90deg) translateX(-100%)` is what makes `top` mean the TOP.
+With the origin at left top, `rotate(-90deg)` alone pivots the box about that
+point and the text runs up FROM it, so `top` was the bottom end of the visual
+line and the top end moved with the length of the string. The extra
+`translateX(-100%)` shifts the box back down along its own (now vertical) reading
+axis by its own width, so "Region: Sinnoh" starts under the watermark at exactly
+the same place "Region: Kanto" does, and the reading direction is untouched.
 
-`34.07` raw for the region label and `42.58` for the three names, which draw at
-exactly 20.00px and 25.00px at the 1400px cap. NOT written as `20px` and `25px`,
+### 9.2 — 20px and 30px, written as raw units
+
+`34.07` raw for the region label and `51.1` for the three names, which draw at
+exactly 20.00px and 30.00px at the 1400px cap. NOT written as `20px` and `30px`,
 for the same reason the watermark's 200px is written as 341: the frame still has
 to scale on a narrower window, and `--dp-s` still has to move it. One raw unit
 of type is 0.5871px at the cap, so the conversion is `px ÷ 0.5871`.
 
-The three names are ONE TREATMENT now, where they were a 65 / 39 / 30 hierarchy:
-same 25px, same 0.2em of tracking, and only weight and slope separate them —
-bold, upright, light italic. The main name also flipped from −0.01em to +0.2em,
-which is the real change of intent: a tightened bold headline and a letter-spaced
-label are opposite gestures, and the column is now the label.
+The names went to 25px first and came back up to 30 — one step too far down. The
+30 is the ROMANISATION's original size, which is the useful way to read it: the
+quietest of the three set the level for all three.
+
+The three names are ONE TREATMENT, where they were a 65 / 39 / 30 hierarchy: same
+30px, same 0.2em of tracking, and only weight and slope separate them — bold,
+upright, light italic. The main name also flipped from −0.01em to +0.2em, which is
+the real change of intent: a tightened bold headline and a letter-spaced label are
+opposite gestures, and the column is now the label.
 
 **No tracking compensation, and this was measured rather than reasoned.**
 `letter-spacing` is not applied after the last character of a line, so 0.2em of
@@ -640,21 +651,47 @@ the element by 0.2em AND moved its centre 0.1em right, which is precisely the
 ### 9.3 — The two text rows are centred on the sprite
 
 The column reads as three rows — artwork, katakana, Latin names — and the two
-text rows now centre on the artwork's own axis. `left: 12.89%; width: 67.843%`
-is `.species-hero-art`'s exact left and width, so `text-align: center` on the
-katakana and `justify-content: center` on the name row centre them on the same
-line the sprite sits on.
+text rows centre on the artwork's own axis: `left: 46.811%` (12.89 + 67.843/2,
+the artwork's centre) with `transform: translateX(-50%)`.
+
+That replaced a first version which used the artwork's BOX — `left: 12.89%;
+width: 67.843%` plus `text-align: center` — the same axis by a different route,
+but it also fixed the row's width at the artwork's, and at 30px the widest name
+pair does not fit in that. Centring on the axis and letting the row size to its
+own text is the version that does not make the type size and the wrap point the
+same decision.
+
+**`width: max-content`, not `auto`, and that is the trap.** With `left` set and
+`right: auto`, an auto width shrink-to-fits against the space from `left` to the
+containing block's RIGHT edge — 53.2% of the column, because the transform moves
+the box after layout and cannot widen it. So the row wrapped at 295px instead of
+at its real limit, and every one of the five widest pairs reported identical
+containment numbers, which is what gave it away. `max-content` sizes to the text
+and leaves the capping to `max-width: 93.622%` — twice the 46.811% centre, i.e.
+the widest box still symmetric about the sprite's axis AND inside the column.
 
 **The sprite did not move**, which is half the requirement and the half that
 could regress silently, so the suite asserts its box against the frame's
 percentages independently.
 
-The name row's `max-width: 88.46%` went away with this: the row IS the artwork's
-width now, so the wrap point moved in with it — and at 25px a pair has far more
-room than it had at 66 raw, so in practice it wraps for almost nothing. The
-five-widest-pairs containment check moved from the row's own rect to the UNION OF
-ITS CHILDREN, because a fixed-width centred row can no longer overflow the column
-itself; only its contents can.
+The five-widest-pairs containment check moved from the row's own rect to the
+UNION OF ITS CHILDREN, because a centred row sized to its content can overflow
+in BOTH directions; measuring the box alone would have missed it. Bellsprout /
+Madatsubomi, the widest pair in the dex, clears the column by 24px on the left
+and 59px on the right — asymmetric because the row is centred on the sprite's
+axis rather than on the column's.
+
+### 9.3b — The gap between the two name rows
+
+`top: 76%`, where the frame said 85.257%, i.e. the gap closed by two thirds. The
+frame's 162 raw units between the rows were spaced for katakana at 111 raw; at
+51.1 the line is less than half that tall and the same gap read as a hole.
+
+**The katakana did not move.** It sits directly under the artwork, which ends at
+69.157%, and pulling it down to meet the names would have opened the same hole
+one row higher up. The suite asserts the gap as a RELATION — less than half the
+katakana's own line box — rather than as a percentage, so it stays meaningful if
+the type scale moves again.
 
 ### 9.4 — Every Info row is centred in its track
 

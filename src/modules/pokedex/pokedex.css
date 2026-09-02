@@ -2925,24 +2925,31 @@
 }
 
 /*
-  ROTATED AGAIN, back to the frame: a 78 x 313 box at (17, 604) turned -90deg, so
-  the text runs upward along the column's left edge from y=917 to y=604.
+  ROTATED, and now at the TOP of the column rather than the bottom.
 
-  It spent one round as a horizontal line under the watermark, on the reasoning
-  that a rotated label competes with the watermark for the same left edge. It was
-  asked back, and the smaller type is what makes it work: at 20px it reads as a
-  spine label rather than as a second headline.
+  The frame put it at the bottom-left (a 78 x 313 box at (17, 604) turned -90deg,
+  running upward from y=917 to y=604). It was asked up against the watermark
+  instead, direction unchanged, so it now hangs from just under the watermark's
+  own box and reads upward from there.
 
-  transform-origin: left top with rotate(-90deg) means the box pivots about the
-  point given by left/top, so `top: 88.943%` is where the text BEGINS and it runs
-  up from there -- the anchor is the bottom of the visual line, not its top.
+  translateX(-100%) IS WHAT MAKES `top` MEAN THE TOP. With transform-origin at
+  left top, rotate(-90deg) alone pivots the box about that point and the text
+  runs UP from it, so `top` was the BOTTOM end of the visual line and the top end
+  moved with the length of the string. Appending translateX(-100%) shifts the box
+  back down along its own (now vertical) reading axis by its own width, which
+  puts the visual TOP at `top` and leaves the reading direction alone -- so
+  "Region: Sinnoh" starts under the watermark at exactly the same place
+  "Region: Kanto" does.
+
+  26% is where the watermark's box ends: 29 raw + 341 x 0.78 x 0.883 = 264 of
+  1031. 27% is one percent of clear air below it.
 */
 .species-hero-region {
   position: absolute;
   left: 2.307%;
-  top: 88.943%;
+  top: 27%;
   transform-origin: left top;
-  transform: rotate(-90deg);
+  transform: rotate(-90deg) translateX(-100%);
   white-space: nowrap;
   z-index: 2;
   /* Light, i.e. Plex Sans at 300. The variable font is bundled at 100-700, so
@@ -2963,29 +2970,41 @@
 
   CENTRED ON THE SPRITE, not on the column and not on the frame's x=85. The
   column reads as three rows -- artwork, katakana, Latin names -- and the two text
-  rows are now centred on the artwork's own box: left 12.89% and width 67.843% are
-  .species-hero-art's exact left and width, so `text-align: center` centres this
-  line on the same axis the sprite sits on. The sprite itself did not move.
+  rows centre on the artwork's own axis. The sprite itself did not move.
+
+  46.811% IS THE ARTWORK'S CENTRE (12.89 + 67.843/2) and translateX(-50%) puts
+  this line's own centre on it. That replaced "the artwork's box plus text-align:
+  center", which was the same axis by a different route -- but it also FIXED the
+  row's width at the artwork's 67.843%, and at 30px the widest name pair no longer
+  fits in that. Shrink-to-fit and centre is the version that does not make the
+  type size and the wrap point the same decision.
 
   NO TRACKING COMPENSATION, and that is worth writing down because it looks like
   it needs one. letter-spacing is NOT applied after the last character of a line
   (CSS Text 4 says so, and Chrome measures it that way -- checked: the glyph run's
   centre lands exactly on the artwork's centre with nothing added), so 0.2em of
   tracking does not push a centred line half a step left. An 0.2em padding-left
-  "correction" was tried and made it worse in both directions at once: `width`
-  here is a content-box width, so the padding widened the element by 0.2em AND
-  moved its centre 0.1em right.
+  "correction" was tried and made it worse in both directions at once.
 */
 .species-hero-kana {
   position: absolute;
-  left: 12.89%;
-  width: 67.843%;
+  left: 46.811%;
+  transform: translateX(-50%);
+  /*
+    max-content, NOT auto, and this is the trap in centring an absolutely
+    positioned box by its own transform. With `left` set and `right: auto`, an
+    auto width shrink-to-fits against the space from `left` to the containing
+    block's RIGHT edge -- 53.2% of the column, not the whole of it, because the
+    transform moves the box after layout and cannot widen it. A wrapping row
+    therefore wrapped at 295px instead of at its real limit. max-content sizes to
+    the text and lets max-width do the capping.
+  */
+  width: max-content;
   top: 69.544%;
   z-index: 1;
-  /* 42.58 raw = 25.00px at the cap. See the region label for why raw units. */
-  font-size: calc(42.58 * var(--ht));
+  /* 51.1 raw = 30.00px at the cap. See the region label for why raw units. */
+  font-size: calc(51.1 * var(--ht));
   letter-spacing: 0.2em;
-  text-align: center;
   line-height: 1.15;
   white-space: nowrap;
   color: var(--hero-quiet);
@@ -3005,11 +3024,27 @@
 */
 .species-hero-names {
   position: absolute;
-  /* The artwork's own box, so this row is centred on the same axis as the sprite
-     and the katakana line above it. See .species-hero-kana. */
-  left: 12.89%;
-  width: 67.843%;
-  top: 85.257%;
+  /* The artwork's centre, so this row shares an axis with the sprite and with the
+     katakana line above it. See .species-hero-kana for why it is a centre rather
+     than a box. */
+  left: 46.811%;
+  transform: translateX(-50%);
+  /* See .species-hero-kana: auto would shrink-to-fit against the space to the
+     RIGHT of 46.811% and wrap far too early. */
+  width: max-content;
+  /*
+    76%, WHERE THE FRAME SAID 85.257%, i.e. the gap to the katakana closed by two
+    thirds. The frame's 162 raw units between the two rows were spaced for
+    katakana at 111 raw; at 51.1 the line is less than half that tall and the same
+    gap read as a hole. The katakana's own box ends at 73.99% (69.544 + 51.1 x
+    0.78 x 1.15 / 1031), so this leaves ~20 raw units -- about half a line --
+    between them.
+
+    THE KATAKANA DID NOT MOVE, deliberately: it sits directly under the artwork,
+    which ends at 69.157%, and moving it down to meet the names would have opened
+    the same hole one row higher up.
+  */
+  top: 76%;
   margin: 0;
   z-index: 1;
   display: flex;
@@ -3027,11 +3062,14 @@
     to give way. Each NAME still refuses to break internally, so the wrap always
     happens at the gap between them.
 
-    The row is the artwork's width now rather than the column minus an inset, so
-    the wrap point moved in with it -- and at 25px a pair has far more room than
-    it had at 66 raw, so in practice it wraps for almost nothing.
+    max-width is 93.622%, i.e. twice the 46.811% centre -- the widest box that is
+    still symmetric about the sprite's axis AND inside the column, so the row can
+    never overflow the left edge no matter how long a pair is. "Bulbasaur
+    Fushigidane" is the common worst case and it fits on one line at 30px with
+    room to spare; the wrap is there for the genuinely long pairs.
   */
   flex-wrap: wrap;
+  max-width: 93.622%;
 }
 
 .species-hero-name,
@@ -3055,9 +3093,10 @@
 */
 .species-hero-name {
   font-family: var(--font-body);
-  /* 42.58 raw = 25.00px at the cap, the same size as the katakana and the
-     romanisation: the three names are one treatment now, not a hierarchy. */
-  font-size: calc(42.58 * var(--ht));
+  /* 51.1 raw = 30.00px at the cap, the same size as the katakana and the
+     romanisation: the three names are one treatment, not a hierarchy. Back up
+     from 25px, which was a step too far down. */
+  font-size: calc(51.1 * var(--ht));
   font-weight: var(--font-weight-bold);
   line-height: 1.05;
   /* Positive tracking, where it used to be -0.01em. A tightened bold headline and
@@ -3067,11 +3106,11 @@
   opacity: 0.8;
 }
 
-/* The same 25px as the other two -- it is no longer a step quieter by size, only
+/* The same 30px as the other two -- it is no longer a step quieter by size, only
    by weight and slope. Light italic: 300, the same real variable weight the region
    label uses. */
 .species-hero-roma {
-  font-size: calc(42.58 * var(--ht));
+  font-size: calc(51.1 * var(--ht));
   letter-spacing: 0.2em;
   font-style: italic;
   font-weight: 300;

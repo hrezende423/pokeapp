@@ -1459,16 +1459,44 @@ try {
     sits at the old left inset any more -- a regression to 85/737 would otherwise
     pass silently, since the boxes overlap.
   */
+  /*
+    THE KATAKANA KEEPS THE FRAME'S y AND THE NAME ROW NO LONGER DOES, which is the
+    tightening: the frame's 162 raw units between the two rows were spaced for
+    katakana at 111 raw, and at 51.1 the same gap read as a hole. So the name row
+    came up to 76% and the katakana stayed put, directly under the artwork.
+
+    The gap is asserted as a RELATION -- less than half the katakana's own line
+    box -- rather than as a percentage, so it stays meaningful if the type scale
+    moves again.
+  */
   check(
-    'the two name rows keep the frame’s vertical positions',
-    near(hero.kana.y, 717 / 1031, 0.03) && near(hero.name.y, 879 / 1031, 0.03),
-    `kana y ${hero.kana.y.toFixed(3)} name y ${hero.name.y.toFixed(3)}`,
+    'the katakana keeps the frame’s vertical position',
+    near(hero.kana.y, 717 / 1031, 0.03),
+    `kana y ${hero.kana.y.toFixed(3)}`,
+  )
+  check(
+    'and the name row came up to close the gap',
+    near(hero.name.y, 0.76, 0.02) && hero.name.y < 879 / 1031 - 0.05,
+    `name y ${hero.name.y.toFixed(3)} vs the frame’s ${(879 / 1031).toFixed(3)}`,
+  )
+  check(
+    'leaving less than half a katakana line between them',
+    hero.name.y - hero.kana.bottom > 0 && hero.name.y - hero.kana.bottom < hero.kana.h / 2,
+    `gap ${(hero.name.y - hero.kana.bottom).toFixed(4)} vs half a line ${(hero.kana.h / 2).toFixed(4)}`,
   )
   check(
     'and are centred on the sprite rather than at the frame’s left inset',
     Math.abs(hero.kana.x + hero.kana.w / 2 - (hero.art.x + hero.art.w / 2)) < 0.01 &&
       hero.kana.x > 85 / 737 + 0.005,
     `kana centre ${(hero.kana.x + hero.kana.w / 2).toFixed(3)} vs art centre ${(hero.art.x + hero.art.w / 2).toFixed(3)}`,
+  )
+  /* Shrink-to-fit, not the artwork's box: the row is centred on the artwork's
+     AXIS and sized to its own text, so a 30px pair is not clipped by a 67.843%
+     box. A row still at that fixed width would report exactly 0.67843 here. */
+  check(
+    'and each row is sized to its own text, not to the artwork’s box',
+    hero.kana.w < 0.6 && hero.kana.w > 0.1,
+    `kana width ${hero.kana.w.toFixed(3)} of the column`,
   )
   check(
     'the rotated region label is at the frame’s left edge',
@@ -2279,20 +2307,32 @@ try {
     column.region.left < column.heroLeft + column.pageWidth * 0.03,
     `${column.region.left} vs hero left ${column.heroLeft}`,
   )
+  /*
+    AND IT HANGS FROM THE WATERMARK, which is where it was asked to move. Both
+    bounds matter: `top` only means the top of the visual line because of the
+    translateX(-100%) in the transform, so if that were dropped the label would
+    flip to running upward OUT of the column and this would catch it -- the
+    element's top would land a whole string-length above the watermark's bottom.
+  */
+  check(
+    'and hangs from just under the watermark',
+    column.region.top >= column.ghostBottom - 4 && column.region.top <= column.ghostBottom + 24,
+    `region top ${column.region.top} vs watermark bottom ${column.ghostBottom}`,
+  )
   check('at 20px', Math.abs(column.region.fontSize - 20) <= 0.5, `${column.region.fontSize}px`)
   check('and in Plex Sans Light', column.region.weight === '300', column.region.weight)
 
   /*
-    THE THREE NAMES ARE ONE TREATMENT NOW: 25px and 0.2em of tracking on all of
-    them, where they used to be a 65 / 39 / 30 hierarchy. Weight and slope carry
-    what size used to -- bold, upright, light italic -- so those are asserted
-    alongside, since "all three at 25px" would also pass if they had all become
+    THE THREE NAMES ARE ONE TREATMENT: 30px and 0.2em of tracking on all of them,
+    where they used to be a 65 / 39 / 30 hierarchy. Weight and slope carry what
+    size used to -- bold, upright, light italic -- so those are asserted
+    alongside, since "all three at 30px" would also pass if they had all become
     the same face.
   */
   const named = ['kana', 'name', 'roma']
   check(
-    'the katakana, the name and the romanisation are all 25px',
-    named.every((k) => Math.abs(column[k].fontSize - 25) <= 0.5),
+    'the katakana, the name and the romanisation are all 30px',
+    named.every((k) => Math.abs(column[k].fontSize - 30) <= 0.5),
     named.map((k) => `${k}=${column[k].fontSize}`).join(' '),
   )
   check(
