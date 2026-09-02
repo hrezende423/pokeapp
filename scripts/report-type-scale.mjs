@@ -80,7 +80,7 @@ try {
     wherever it is written.
   */
   const ROWS = [
-    ['watermark', '.species-hero-ghost', 389, 'hu'],
+    ['watermark', '.species-hero-ghost', 341, 'hu'],
     ['katakana', '.species-hero-kana', 111, 'hu'],
     ['hero name', '.species-hero-name', 66, 'hu'],
     ['hero romanisation', '.species-hero-roma', 52, 'hu'],
@@ -159,6 +159,46 @@ try {
   console.log('  ' + '-'.repeat(64))
   console.log('  RAW is the number to edit. --dp-s scales all of them at once.')
   console.log('  The page also stops growing at 1400px, or sooner on a short window.')
+
+  /*
+    The SPACING is in the same units, which is not a footnote: absolute padding
+    against a face --dp-s had shrunk 22% is what made the Info tab read twice as
+    tall as its content. If a spacing value on that page is in rem or px, it is a
+    bug -- so the resolved values are printed beside the type they have to match.
+  */
+  const space = await page.evaluate(() => {
+    const inner = getComputedStyle(document.querySelector('.species-page-inner'))
+    const probe = document.createElement('div')
+    document.querySelector('.species-page-inner').appendChild(probe)
+    const out = {}
+    for (const name of [
+      '--space-row-padding-block',
+      '--space-gap-sm',
+      '--space-gap-md',
+      '--space-gap-lg',
+      '--space-gap-xl',
+    ]) {
+      probe.style.height = `var(${name})`
+      out[name] = parseFloat(getComputedStyle(probe).height).toFixed(1)
+    }
+    probe.remove()
+    out.scale = inner.getPropertyValue('--dp-s').trim()
+    return out
+  })
+  const SPACE_RAW = {
+    '--space-row-padding-block': 10,
+    '--space-gap-sm': 12,
+    '--space-gap-md': 20,
+    '--space-gap-lg': 26,
+    '--space-gap-xl': 42,
+  }
+  console.log('')
+  console.log('  SPACING on the same page, in the same units')
+  console.log('  ' + '-'.repeat(64))
+  for (const [name, raw] of Object.entries(SPACE_RAW)) {
+    console.log('  ' + name.padEnd(31) + String(raw).padStart(5) + '          ' + space[name])
+  }
+  console.log('  ' + '-'.repeat(64))
   console.log('')
 } finally {
   await browser.close()
