@@ -2340,10 +2340,46 @@ try {
     named.every((k) => Math.abs(parseFloat(column[k].tracking) - column[k].fontSize * 0.2) < 0.5),
     named.map((k) => `${k}=${column[k].tracking}`).join(' '),
   )
+  /*
+    LIGHT ITALIC, AND THE SECOND HALF NEEDED A SECOND CHECK. `font-style: italic`
+    in a computed style is what the CSS asked for, not what the font did: it read
+    "italic" here while "Fushigidane" drew perfectly upright, because the bundle
+    had no italic face and Chrome did not synthesise a slant either. So the face
+    is now measured -- a real italic has its own advance widths, where a fallback
+    to the Roman or a synthesised oblique would measure identically.
+  */
   check(
     'the romanisation is light italic',
     column.roma.weight === '300' && column.roma.style === 'italic',
     `${column.roma.weight} ${column.roma.style}`,
+  )
+  const italicFace = await page.evaluate(async () => {
+    await document.fonts.ready
+    const c = document.createElement('canvas').getContext('2d')
+    const advance = (font, text) => {
+      c.font = font
+      return c.measureText(text).width
+    }
+    const roma = document.querySelector('.species-hero-roma')
+    const cs = getComputedStyle(roma)
+    const spec = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+    return {
+      text: roma.textContent.trim(),
+      upright: advance(spec, roma.textContent.trim()),
+      italic: advance(`italic ${spec}`, roma.textContent.trim()),
+      registered: [...document.fonts]
+        .filter((f) => f.family.includes('IBM Plex Sans'))
+        .map((f) => `${f.style}/${f.status}`),
+    }
+  })
+  log(
+    `  "${italicFace.text}" at the roma spec: upright ${italicFace.upright.toFixed(2)} vs italic ${italicFace.italic.toFixed(2)}`,
+  )
+  log(`  Plex faces: ${italicFace.registered.join(' ')}`)
+  check(
+    'and it is a real italic FACE, not an upright fallback',
+    Math.abs(italicFace.upright - italicFace.italic) > 0.5,
+    `${italicFace.upright.toFixed(2)} vs ${italicFace.italic.toFixed(2)}`,
   )
   check(
     'and the main name is bold',

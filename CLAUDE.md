@@ -181,6 +181,14 @@ that isn't explicitly about design.)
 - **`--font-body`** (IBM Plex Sans, self-hosted variable font) for
   everything else, including decorative display numbers. This is now the
   actual app-wide default, not just a per-component opt-in.
+  **Roman AND italic faces are bundled** — four `@font-face` blocks, two
+  subsets x two styles. The italic was missing for months and the failure
+  was invisible: `font-style: italic` fell back to the Roman and Chrome
+  synthesised nothing, so the romanised name, the banner genus and the
+  Naturedex's neutral cell all drew upright. A real italic, never an
+  `oblique`/`skewX` fake: Plex Italic is a redrawn face. Never assert
+  italic from a computed style — measure the advance width, because a
+  fallback and a synthesised oblique both report `font-style: italic`.
 - **Icons**: Tabler, 24px grid, 1.5px stroke, outline default.
 - **Type indicators**: colored text label only, no fill/badge/icon — same
   treatment in list and detail contexts.

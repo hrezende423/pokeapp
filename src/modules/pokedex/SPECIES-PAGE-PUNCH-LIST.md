@@ -775,6 +775,51 @@ sprite images, which section H already declines to assert on when the same host
 answers 429 with a status code. Now they are printed with their URLs instead of
 being an anonymous count.
 
+### 9.8 — The italic was never rendering, anywhere in the app
+
+The romanised name has said `font-style: italic; font-weight: 300` since the
+column was built, and it drew perfectly upright. **The bundle had no italic
+face** — only two `font-style: normal` `@font-face` blocks for IBM Plex Sans —
+and Chrome did not synthesise an oblique either, so the declaration was a silent
+no-op. Measured before the fix: the canvas advance for `italic 300 30px` was
+_identical_ to `300 30px`, and so was `oblique 12deg`.
+
+**This was app-wide, not one rule.** Three places ask for italic and none of them
+was getting it:
+
+- `.species-hero-roma` — the romanised name.
+- `.species-banner-genus` — "Seed Pokémon", which is _supposed_ to be italic and
+  is one of the few pieces of genuinely editorial type on the page.
+- `.nature-cell-btn` in the Naturedex's neutral cell — a pre-redesign module,
+  which CLAUDE.md keeps untouched. This is the same class of exception as the
+  app-wide Plex Sans default: the module already asked for italic and was being
+  denied it, so honouring it is a fix rather than a restyle.
+
+**A real italic, not an oblique**, which is why this is two bundled files rather
+than a `transform: skewX` or `oblique 12deg`. IBM Plex Sans Italic is a redrawn
+face — single-storey _a_, a different _g_, entry and exit strokes on the
+lowercase — so a synthesised slant would have been the wrong typeface, not a
+cheaper version of the right one. Same variable axis range (wght 100–700,
+wdth 100%) and the same two `unicode-range` subsets as the Roman, so nothing else
+about the stack changes. 84 KiB, precached with the rest.
+
+`IBM-Plex-OFL.txt` went in beside the files while I was there — the other two
+bundled families carried their OFL text and Plex did not.
+
+**The check that let this through was the computed style.** Section N asserted
+`column.roma.style === 'italic'`, which is what the CSS asked for and says
+nothing about what the font did. Both suites now measure the FACE instead: a real
+italic has its own advance widths, where a fallback to the Roman or a synthesised
+oblique measures identically. verify-design-system additionally parses the
+`@font-face` blocks (rather than counting `font-style: italic` anywhere in the
+file, which the three _usages_ also match — a face was what was missing, so a
+face is what gets counted).
+
+One deliberate non-check: the design-system reference page has no italic text, so
+its italic face is legitimately `unloaded` there. Asserting "loaded" would have
+forced italic content onto a page with no reason to carry any; the species page
+uses it, and that is where "loaded and rendered" is asserted.
+
 ## 10 — OPEN
 
 ### 10a — A real per-generation accuracy bug, found while verifying FIX 5

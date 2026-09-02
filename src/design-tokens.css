@@ -8,7 +8,9 @@
 
     - @font-face rules added for the bundled IBM Plex Sans (the file asked for
       them once the assets existed). Self-hosted, no CDN: an offline-first PWA
-      cannot depend on fonts.gstatic.com.
+      cannot depend on fonts.gstatic.com. The ITALIC face was added later, on
+      finding that `font-style: italic` had been a silent no-op app-wide -- see
+      the rules themselves for the measurement.
     - @font-face rules added for Martian Mono and JetBrains Mono, both now
       leading --font-numeric with Martian Mono first. Every entry the stack had
       before ('SF Mono', Consolas, monospace) is an unbundled system font, so on
@@ -110,6 +112,55 @@
   font-stretch: 100%;
   font-display: swap;
   src: url('./assets/fonts/ibm-plex-sans-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/*
+  THE ITALIC FACE, and until now there was none -- which is a bug rather than a
+  gap, because three rules in the app already ASK for italic and none of them was
+  getting it.
+
+  WHAT WAS RENDERING: nothing slanted at all. Only `font-style: normal` faces were
+  declared, and Chrome did not synthesise an oblique either -- measured: the
+  canvas advance for `italic 300 30px` was identical to `300 30px` AND the glyphs
+  drew upright, so `font-style: italic` was silently a no-op. The species page's
+  romanised name, the banner's genus and the Naturedex's neutral cell were all
+  quietly upright.
+
+  A REAL ITALIC, NOT AN OBLIQUE, and that is the reason to bundle a file rather
+  than lean on synthesis or reach for `oblique 12deg`. IBM Plex Sans Italic is a
+  redrawn face, not a slanted Roman -- single-storey a, a different g, entry and
+  exit strokes on the lowercase -- so a synthesised slant would have been a
+  different typeface's worth of wrong. It is the same variable axis range
+  (wght 100-700, wdth 100%) and the same two unicode-range subsets as the Roman
+  above, so nothing else about the stack changes.
+
+  84 KiB for the pair, precached with the rest (vite.config.ts's globPatterns
+  includes woff2 because this app is offline-first and a font that arrives over
+  the network is a font that does not arrive offline).
+*/
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: italic;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('./assets/fonts/ibm-plex-sans-italic-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: italic;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('./assets/fonts/ibm-plex-sans-italic-latin-ext.woff2') format('woff2');
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
     U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,

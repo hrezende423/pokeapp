@@ -279,8 +279,21 @@ const changed = Object.keys(handoffDecls).filter(
 log(`  declarations changed from the handoff copy: ${changed.length ? changed.join(', ') : 'none'}`)
 check('no token value was altered', changed.length === 0, changed.join(','))
 
-// Fonts: self-hosted files, and no CDN URL left anywhere in the source.
-const fontFiles = ['ibm-plex-sans-latin.woff2', 'ibm-plex-sans-latin-ext.woff2']
+/*
+  Fonts: self-hosted files, and no CDN URL left anywhere in the source.
+
+  THE ITALIC PAIR IS IN THIS LIST NOW. It was missing entirely, and its absence
+  was invisible: `font-style: italic` fell back to the Roman face and Chrome did
+  not even synthesise an oblique, so three rules in the app asked for italic and
+  drew upright text. A file list is the cheapest place to catch that -- the
+  browser-side check below is what proves the face actually resolves.
+*/
+const fontFiles = [
+  'ibm-plex-sans-latin.woff2',
+  'ibm-plex-sans-latin-ext.woff2',
+  'ibm-plex-sans-italic-latin.woff2',
+  'ibm-plex-sans-italic-latin-ext.woff2',
+]
 for (const f of fontFiles) {
   const bytes = readFileSync(`src/assets/fonts/${f}`)
   const magic = bytes.subarray(0, 4).toString('latin1')
@@ -296,8 +309,27 @@ check(
 )
 const swJs = readFileSync('dist/sw.js', 'utf8')
 check(
-  'both font files are in the precache manifest',
+  'every font file is in the precache manifest',
   fontFiles.every((f) => new RegExp(f.replace('.woff2', '-[A-Za-z0-9_-]+\\.woff2')).test(swJs)),
+  fontFiles
+    .filter((f) => !new RegExp(f.replace('.woff2', '-[A-Za-z0-9_-]+\\.woff2')).test(swJs))
+    .join(' '),
+)
+/*
+  Both STYLES are declared, not just both subsets -- and this parses the @font-face
+  blocks rather than counting `font-style: italic` anywhere in the file, because
+  the three RULES that ask for italic match that string too. What was missing was
+  a FACE, so a face is what gets counted.
+*/
+const faceBlocks = appCss.match(/@font-face\s*\{[^}]*\}/g) ?? []
+const italicFaces = faceBlocks.filter(
+  (b) => /font-style:\s*italic/.test(b) && /IBM Plex Sans/.test(b),
+)
+check(
+  'the stylesheet declares italic Plex FACES, not only Roman ones',
+  italicFaces.length === 2 &&
+    italicFaces.every((b) => /ibm-plex-sans-italic-latin(-ext)?\.woff2/.test(b)),
+  `${italicFaces.length} of ${faceBlocks.length} @font-face blocks`,
 )
 
 // No shadow, in source as well as in the browser.
@@ -527,9 +559,24 @@ try {
       return w
     }
     const el = document.querySelector('[data-ds="hero-name"]')
+    /*
+      A REAL ITALIC FACE, PROVED BY ADVANCE WIDTHS. `font-style: italic` in a
+      computed style says nothing about what rendered -- it read "italic" for
+      months while the glyphs were upright, because only Roman faces were
+      declared and Chrome did not synthesise a slant. A separate face has its own
+      metrics, so a genuine italic measures DIFFERENTLY from the Roman at the same
+      size; a synthesised oblique or a silent fallback measures identically.
+    */
+    const canvas = document.createElement('canvas').getContext('2d')
+    const advance = (font) => {
+      canvas.font = font
+      return canvas.measureText('Charizard Gengar').width
+    }
     return {
-      faces: faces.map((f) => ({ weight: f.weight, status: f.status })),
+      faces: faces.map((f) => ({ style: f.style, weight: f.weight, status: f.status })),
       check14: document.fonts.check('14px "IBM Plex Sans"'),
+      romanAdvance: advance('300 30px "IBM Plex Sans"'),
+      italicAdvance: advance('italic 300 30px "IBM Plex Sans"'),
       plexWidth: measure('"IBM Plex Sans"'),
       fallbackWidth: measure('-apple-system, "Segoe UI", Roboto, sans-serif'),
       heroFontFamily: el ? getComputedStyle(el).fontFamily : null,
@@ -548,6 +595,28 @@ try {
     fontState.faces.some((f) => f.status === 'loaded'),
   )
   check('document.fonts.check passes for it', fontState.check14)
+  log(
+    `  advance at 300 30px: roman ${fontState.romanAdvance.toFixed(2)} vs italic ${fontState.italicAdvance.toFixed(2)}`,
+  )
+  check(
+    'an italic face is registered, not just the Roman',
+    fontState.faces.some((f) => f.style === 'italic'),
+    fontState.faces.map((f) => `${f.style}/${f.status}`).join(' '),
+  )
+  /*
+    NOT "and one of them is loaded". A face loads when something on the page uses
+    it, and the design-system reference page has no italic text -- so `unloaded`
+    here is correct rather than broken, and asserting otherwise would have forced
+    italic content onto a page that has no reason to carry any. The species page
+    DOES use it, and verify-species-page section N asserts the loaded, rendered
+    face there. What matters here is that it is declared and measurable, which the
+    two checks either side of this cover.
+  */
+  check(
+    'italic really renders as its own face, not as an upright fallback',
+    Math.abs(fontState.romanAdvance - fontState.italicAdvance) > 0.5,
+    `roman ${fontState.romanAdvance.toFixed(2)} vs italic ${fontState.italicAdvance.toFixed(2)}`,
+  )
   check(
     'text really renders in Plex, not the fallback stack',
     Math.abs(fontState.plexWidth - fontState.fallbackWidth) > 1,
