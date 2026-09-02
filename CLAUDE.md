@@ -35,6 +35,13 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   otherwise be the same control. `npm run report:type-scale` prints every
   size in the app — the fixed tokens and this page's raw units, measured in
   a browser — and the RAW column is the number to edit.
+  **The SPACING tokens are redefined in those units too** (`--space-gap-*`,
+  `--space-row-padding-block`), which is not decoration: the type dropped 22%
+  when `--dp-s` landed and absolute padding did not come with it, so every
+  row kept the rhythm of a larger face. Two values in shared CSS cannot be
+  reached that way and are overridden inside `.species-page` —
+  `.ds-stat-row`'s `padding: 8px 0` and `.data-table`'s `5px 7px`. If a
+  spacing value on that page is in `rem` or `px`, it is a bug.
 - **The Info tab's locations section must stay lazy.** Info is the default
   tab and the encounter partitions run to 2.8 MB, so it gates its own
   `versionGroup` argument behind an `IntersectionObserver` — the whole point
@@ -46,6 +53,17 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   `species-background-colors.json` lives in the same repo, fetched at
   runtime — applies ONLY to the species detail page's artwork panel,
   never the grid or any other screen.
+- **PokéAPI serves the Gen 1–2 sprites on an opaque WHITE background**, and
+  it is inconsistent about what it also serves transparently. 2,110 of those
+  slots have a `transparent/` counterpart upstream and are simply not
+  rendered; 2,110 have none (both gray slots on red-blue/yellow,
+  front_shiny/back_default/back_shiny on gold/silver) and are keyed to
+  transparency by us, hosted at
+  `pokeapp-sprites/transparent/{game}/{slot}/{id}.png`. The keying is a
+  **border flood fill, never a global colour key** — these sprites use the
+  same `#ffffff` for eyes and teeth as for the background. `npm run
+  audit:white-sprites` re-derives the table; the pixel proof is in
+  verify-species-page section N, which decodes every Gen 1–2 tile in a canvas.
 - **Two animated sets live in that repo, under separate release tags.**
   `gen1`…`gen4` are the high-resolution animated WebP artwork (1,174 files).
   `bw-gen1`…`bw-gen4` are PokéAPI's Black/White animated GIFs converted to
@@ -87,7 +105,7 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   table, not one page. Same class as the hidden-ability case and the data
   is already in the bundle; needs a `resolveMoveTypeForGeneration` and a
   decision, since it touches a pre-redesign module. See
-  `src/modules/pokedex/SPECIES-PAGE-PUNCH-LIST.md` §6a.
+  `src/modules/pokedex/SPECIES-PAGE-PUNCH-LIST.md` §9a.
 - **Japanese species names**: PokéAPI's `ja-roma` gives the real,
   official Nintendo romanization, NOT a mechanical transliteration —
   ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not

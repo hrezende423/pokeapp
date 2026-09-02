@@ -972,30 +972,61 @@ try {
     Do the URLs the path table builds actually resolve? Sampled rather than
     exhaustive: the transparent-back path was the one that would 404, so the
     sample deliberately includes whatever transparent and gray tiles this species
-    has. Requested through the browser so the SW/runtime caching path is the one
-    under test.
+    has -- which now also means the keyed copies hosted in pokeapp-sprites, since
+    those replace the white-backgrounded slots that have no upstream counterpart.
+
+    FETCHED FROM NODE, NOT FROM THE PAGE, and that is a correction rather than a
+    convenience. In-page it failed four of twelve with `TypeError: Failed to
+    fetch` on URLs that curl served 200 -- raw.githubusercontent rate-limits and
+    answers WITHOUT CORS headers, so the browser reports a throttle as a CORS
+    failure, and it logged four console errors on the way, tripping the
+    no-console-errors check as well. The question here is "does the asset exist",
+    which is not a browser question.
+
+    404 IS THE ASSERTION, not "anything other than 200". A 404 means the path
+    table is wrong, which is this check's whole purpose; a network-level failure
+    against a third-party host is not a defect in this page -- the same reasoning
+    section H already applies to external responses. A run where NOTHING resolved
+    would still fail, via the floor below.
   */
-  const sampled = await page.evaluate(async () => {
-    const all = [...document.querySelectorAll('[data-testid^="sprite-tile-"] img')].map(
-      (i) => i.src,
-    )
+  const sampleUrls = await page.$$eval('[data-testid^="sprite-tile-"] img', (els) => {
+    const all = els.map((i) => i.src)
     const odd = all.filter((u) => /transparent|gray/.test(u))
-    const pick = [...new Set([...odd, ...all.slice(0, 6)])].slice(0, 12)
-    const results = []
-    for (const url of pick) {
+    return [...new Set([...odd, ...all.slice(0, 6)])].slice(0, 12)
+  })
+  const sampled = []
+  for (const url of sampleUrls) {
+    let status = null
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const res = await fetch(url, { method: 'GET' })
-        results.push({ url, status: res.status })
+        status = (await fetch(url)).status
+        break
       } catch (err) {
-        results.push({ url, status: String(err) })
+        status = String(err)
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
       }
     }
-    return results
-  })
-  const bad = sampled.filter((r) => r.status !== 200)
-  log(`  sampled ${sampled.length} tile URLs, ${bad.length} not 200`)
-  bad.forEach((b) => log(`    ${b.status} ${b.url}`))
-  check('every sampled per-game sprite URL resolves', bad.length === 0)
+    sampled.push({ url, status })
+  }
+  const missing = sampled.filter((r) => r.status === 404)
+  const unreachable = sampled.filter((r) => r.status !== 200 && r.status !== 404)
+  log(
+    `  sampled ${sampled.length} tile URLs: ${missing.length} missing, ${unreachable.length} unreachable`,
+  )
+  ;[...missing, ...unreachable].forEach((b) => log(`    ${b.status} ${b.url}`))
+  check('no sampled per-game sprite URL 404s', missing.length === 0, `(${missing.length})`)
+  check(
+    'and most of the sample resolved, i.e. the host answered at all',
+    sampled.filter((r) => r.status === 200).length >= Math.ceil(sampled.length * 0.6),
+    `${sampled.filter((r) => r.status === 200).length} of ${sampled.length}`,
+  )
+  /* At least one of them must be one of OUR keyed copies, or this species'
+     sample never exercised the white-background replacement at all. */
+  check(
+    'and the sample includes a keyed copy from pokeapp-sprites',
+    sampled.some((r) => r.url.includes('pokeapp-sprites/main/transparent/')),
+    sampled.map((r) => r.url.split('/').slice(-3).join('/')).join(' '),
+  )
 
   /*
     THE SAME QUESTION FOR THE BLACK/WHITE SET, and it is the one that would go
@@ -1970,6 +2001,511 @@ try {
   )
 
   await page.screenshot({ path: `${SHOTS}/species-page-fixes.png` })
+
+  // ======================================================================== N
+  hr('N — the quiet left column, the arrow’s gradient, and no white anywhere')
+
+  await backToGrid()
+  await openSpecies(1)
+  await page.waitForSelector('[data-testid="species-info"]', { timeout: 30000 })
+
+  // ------------------------------------------------------- the left column
+  /*
+    ONE GREY FOR THE WHOLE COLUMN. Every text element in it -- watermark, region
+    label, katakana, both names -- is #999999 at 0.8, which is what turns the
+    column from a second headline into the quiet half of the page. The banner
+    still carries the name in --text-primary, so this also asserts that the
+    species is stated at full strength exactly once.
+
+    The watermark is checked in PIXELS, not units: 200px was the size asked for,
+    and it is written as 341 raw so that it still scales -- so the thing worth
+    asserting is that the two agree at the frame's cap width.
+  */
+  const column = await page.evaluate(() => {
+    const read = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const cs = getComputedStyle(el)
+      return {
+        color: cs.color,
+        opacity: cs.opacity,
+        fontSize: Math.round(Number(cs.fontSize.replace('px', '')) * 10) / 10,
+        weight: cs.fontWeight,
+        style: cs.fontStyle,
+        family: cs.fontFamily.split(',')[0].replace(/["']/g, ''),
+        tracking: cs.letterSpacing,
+        transform: cs.transform,
+        left: Math.round(el.getBoundingClientRect().left),
+        top: Math.round(el.getBoundingClientRect().top),
+      }
+    }
+    const hero = document.querySelector('[data-testid="species-hero"]').getBoundingClientRect()
+    const ghost = document.querySelector('.species-hero-ghost').getBoundingClientRect()
+    return {
+      pageWidth: Math.round(document.querySelector('.species-page').getBoundingClientRect().width),
+      heroLeft: Math.round(hero.left),
+      ghostBottom: Math.round(ghost.bottom),
+      ghost: read('.species-hero-ghost'),
+      region: read('.species-hero-region'),
+      kana: read('.species-hero-kana'),
+      name: read('.species-hero-name'),
+      roma: read('.species-hero-roma'),
+      bannerName: read('.species-banner-name'),
+    }
+  })
+  log(`  column: ${JSON.stringify(column, null, 1).replace(/\n/g, '\n  ')}`)
+
+  const quiet = ['ghost', 'region', 'kana', 'name', 'roma']
+  check(
+    'every text element in the pinned column is the same grey',
+    quiet.every((k) => column[k].color === 'rgb(153, 153, 153)'),
+    quiet.map((k) => `${k}=${column[k].color}`).join(' '),
+  )
+  /* The watermark's is its own per-mode ghost opacity times 0.8, so it is the one
+     that is not a flat 0.8 -- see the note in pokedex.css. */
+  check(
+    'the four text lines are 20% transparent',
+    ['region', 'kana', 'name', 'roma'].every((k) => column[k].opacity === '0.8'),
+    ['region', 'kana', 'name', 'roma'].map((k) => `${k}=${column[k].opacity}`).join(' '),
+  )
+  check(
+    'and the watermark is 20% more transparent than its own ghost token',
+    Number(column.ghost.opacity) > 0 && Number(column.ghost.opacity) < 0.09,
+    column.ghost.opacity,
+  )
+  check(
+    'the banner still names the species at full strength',
+    column.bannerName.color !== 'rgb(153, 153, 153)' && column.bannerName.opacity === '1',
+    `${column.bannerName.color} @ ${column.bannerName.opacity}`,
+  )
+
+  check(
+    'the watermark is 200px at the frame’s cap width',
+    column.pageWidth === 1400 && Math.abs(column.ghost.fontSize - 200) <= 1,
+    `${column.ghost.fontSize}px at a ${column.pageWidth}px page`,
+  )
+  check(
+    'with 20% letter spacing, bold, in the body face',
+    column.ghost.tracking === `${(column.ghost.fontSize * 0.2).toFixed(3)}px` ||
+      Math.abs(parseFloat(column.ghost.tracking) - column.ghost.fontSize * 0.2) < 0.5,
+    `${column.ghost.tracking} on ${column.ghost.fontSize}px`,
+  )
+  check(
+    'and it is left-aligned at the column’s own edge',
+    column.ghost.left === column.heroLeft,
+    `${column.ghost.left} vs ${column.heroLeft}`,
+  )
+
+  /*
+    THE REGION LABEL IS NO LONGER ROTATED. It was a -90deg box at the bottom-left;
+    it is a horizontal line under the watermark now, sharing the watermark's left
+    edge. Both halves are asserted, because "un-rotated" alone would pass if it
+    had simply been left at the bottom.
+  */
+  check(
+    'the region label is not rotated any more',
+    column.region.transform === 'none',
+    column.region.transform,
+  )
+  check(
+    'it sits below the watermark',
+    column.region.top >= column.ghostBottom - 4,
+    `region ${column.region.top} vs watermark bottom ${column.ghostBottom}`,
+  )
+  check(
+    'on the watermark’s left edge',
+    column.region.left === column.heroLeft,
+    `${column.region.left} vs ${column.heroLeft}`,
+  )
+  check('and in Plex Sans Light', column.region.weight === '300', column.region.weight)
+  check(
+    'the romanisation is light italic',
+    column.roma.weight === '300' && column.roma.style === 'italic',
+    `${column.roma.weight} ${column.roma.style}`,
+  )
+  check(
+    'and the main name is bold',
+    column.name.weight === '700' && column.name.family === 'IBM Plex Sans',
+    `${column.name.weight} ${column.name.family}`,
+  )
+
+  // ------------------------------------------------- the Info tab is shorter
+  /*
+    THE RHYTHM FOLLOWS THE TYPE. --dp-s took the type down 22% and the spacing did
+    not come with it, so every row kept the padding of a larger face. The spacing
+    tokens are redefined in the page's own units now, which is checked as a
+    RELATION rather than as a pixel value: a row's padding has to be a multiple of
+    the same unit its type is, or the two have drifted apart again.
+  */
+  const rhythm2 = await page.evaluate(() => {
+    const page_ = document.querySelector('.species-page').getBoundingClientRect()
+    const inner = getComputedStyle(document.querySelector('.species-page-inner'))
+    /*
+      COMPUTED, NOT READ. getPropertyValue('--dp-u') hands back the literal
+      `calc(100cqw / 1860)` -- custom properties are substituted, not resolved --
+      so the unit has to be derived from the width the same way the CSS does.
+    */
+    const unit = (page_.width / 1860) * Number(inner.getPropertyValue('--dp-s'))
+    const row = document.querySelector('.species-page .ds-stat-row')
+    const label = document.querySelector('.species-page .ds-stat-label')
+    return {
+      unit,
+      labelSize: parseFloat(getComputedStyle(label).fontSize),
+      statRowPad: parseFloat(getComputedStyle(row).paddingTop),
+      statBarPad: parseFloat(
+        getComputedStyle(document.querySelector('.species-stat-bars li')).paddingTop,
+      ),
+      tierPad: parseFloat(
+        getComputedStyle(document.querySelector('.type-matchup-tier')).paddingTop,
+      ),
+      gap: parseFloat(getComputedStyle(document.querySelector('.species-info')).rowGap),
+    }
+  })
+  log(`  rhythm: ${JSON.stringify(rhythm2)}`)
+  check(
+    'the row padding is 10 of the page’s own units, not 8 absolute px',
+    Math.abs(rhythm2.statRowPad - rhythm2.unit * 10) < 0.5 && rhythm2.statRowPad < 8,
+    `${rhythm2.statRowPad.toFixed(2)}px vs ${(rhythm2.unit * 10).toFixed(2)} expected`,
+  )
+  check(
+    'and the stat bars and type tiers share it',
+    Math.abs(rhythm2.statBarPad - rhythm2.statRowPad) < 0.5 &&
+      Math.abs(rhythm2.tierPad - rhythm2.statRowPad) < 0.5,
+    `${rhythm2.statBarPad} / ${rhythm2.tierPad}`,
+  )
+  /*
+    THE RELATION IS THE POINT, not the pixel value. What was wrong was absolute
+    padding against a face that --dp-s had shrunk 22%, so the padding-to-type
+    ratio is the thing that has to hold: 10 raw units of padding against a 26-unit
+    label is 0.385, at any width and at any type scale.
+  */
+  check(
+    'so the padding is a fixed fraction of the type, not an absolute px value',
+    Math.abs(rhythm2.statRowPad / rhythm2.labelSize - 10 / 26) < 0.03,
+    `${(rhythm2.statRowPad / rhythm2.labelSize).toFixed(3)} vs ${(10 / 26).toFixed(3)}`,
+  )
+  check(
+    'and the gap between sections came down with it',
+    Math.abs(rhythm2.gap - rhythm2.unit * 26) < 0.6 && rhythm2.gap < 20,
+    `${rhythm2.gap.toFixed(2)}px`,
+  )
+
+  // ------------------------------------------------ the wedge’s gradient
+  /*
+    "TRANSPARENT TO OPAQUE WHERE THE CHEVRON POINTS." Three separate facts: the
+    wedge is filled with a gradient rather than a flat colour, the gradient runs
+    along the arrow rather than across it, and it runs the right way round.
+
+    The last one is the one worth asserting: a gradient reversed tail-for-head
+    would still be "a gradient" and would look like the arrow fading INTO its own
+    source.
+  */
+  const gradient = await page.evaluate(() => {
+    const svg = document.querySelector('[data-testid="evo-arrow-2"]')
+    const wedge = svg.querySelector('.evo-arrow-wedge')
+    const fill = wedge.getAttribute('fill') ?? getComputedStyle(wedge).fill
+    const id = /url\(#?["']?([^)"']+)/.exec(fill)?.[1]
+    const grad = id ? svg.querySelector(`#${id}`) : null
+    const stops = grad
+      ? [...grad.querySelectorAll('stop')].map((st) => ({
+          offset: st.getAttribute('offset'),
+          opacity: st.getAttribute('stop-opacity'),
+          color: st.getAttribute('stop-color'),
+        }))
+      : []
+    return {
+      fill,
+      id,
+      x1: grad?.getAttribute('x1'),
+      x2: grad?.getAttribute('x2'),
+      y1: grad?.getAttribute('y1'),
+      y2: grad?.getAttribute('y2'),
+      stops,
+      wedgeOpacity: getComputedStyle(wedge).opacity,
+      /* One gradient per arrow: a shared id across seven arrows on a radial chart
+         is seven references to whichever one mounted first. */
+      ids: [...document.querySelectorAll('.evo-arrow linearGradient')].map((g) => g.id),
+    }
+  })
+  log(`  gradient: ${JSON.stringify(gradient)}`)
+  check(
+    'the wedge is filled with a gradient, not a flat colour',
+    /^url\(/.test(gradient.fill) && gradient.stops.length === 2,
+    gradient.fill,
+  )
+  check(
+    'it runs along the arrow, not across it',
+    gradient.x1 === '0' && gradient.x2 === '1' && gradient.y1 === gradient.y2,
+    `x ${gradient.x1}->${gradient.x2}, y ${gradient.y1}->${gradient.y2}`,
+  )
+  check(
+    'from transparent at the tail to opaque at the head the chevrons point to',
+    gradient.stops[0]?.opacity === '0' && gradient.stops[1]?.opacity === '1',
+    gradient.stops.map((st) => `${st.offset}:${st.opacity}`).join(' '),
+  )
+  check(
+    'and every arrow owns its own gradient id',
+    new Set(gradient.ids).size === gradient.ids.length && gradient.ids.length > 0,
+    gradient.ids.join(','),
+  )
+
+  // ------------------------------------------- the expandable evolution chart
+  /*
+    The heading IS the control, and expanding REPLACES the rest of the tab rather
+    than pushing it down -- which is also why the locations section must be gone
+    while it is open: a mounted-but-unreachable section would still be fetching
+    its 2.8 MB partition behind a chart nobody can scroll past.
+  */
+  const expand = async () => {
+    await page.click('[data-testid="species-evolution-toggle"]')
+    await page.waitForTimeout(250)
+    return page.evaluate(() => ({
+      expanded: document.querySelector('[data-testid="species-info"]')?.dataset.evoExpanded,
+      blocks: document.querySelectorAll('[data-testid="species-info"] > *').length,
+      tree: document.querySelector('[data-testid="evolution-tree"]') != null,
+      stats: document.querySelector('[data-testid="species-base-stats"]') != null,
+      locations: document.querySelector('[data-testid="species-locations"]') != null,
+      matchups: document.querySelector('[data-testid="species-type-matchups"]') != null,
+      treeWidth: Math.round(
+        document.querySelector('[data-testid="evolution-tree"]')?.getBoundingClientRect().width ??
+          0,
+      ),
+      ariaExpanded: document
+        .querySelector('[data-testid="species-evolution-toggle"]')
+        ?.getAttribute('aria-expanded'),
+    }))
+  }
+  const collapsedState = await page.evaluate(() => ({
+    treeWidth: Math.round(
+      document.querySelector('[data-testid="evolution-tree"]').getBoundingClientRect().width,
+    ),
+    isButton: document
+      .querySelector('[data-testid="species-evolution-toggle"]')
+      ?.tagName.toLowerCase(),
+  }))
+  check(
+    'the Evolution heading is a real control',
+    collapsedState.isButton === 'button',
+    collapsedState.isButton ?? 'missing',
+  )
+  const opened = await expand()
+  log(`  expanded: ${JSON.stringify(opened)}`)
+  check('expanding hands the tab to the chart', opened.expanded === 'true' && opened.tree)
+  check(
+    'and takes the other blocks away rather than pushing them down',
+    !opened.stats && !opened.locations && !opened.matchups && opened.blocks === 1,
+    `${opened.blocks} block(s)`,
+  )
+  check(
+    'the chart is genuinely wider for it',
+    opened.treeWidth > collapsedState.treeWidth * 1.4,
+    `${collapsedState.treeWidth} -> ${opened.treeWidth}`,
+  )
+  check('and it says so to a screen reader', opened.ariaExpanded === 'true')
+  const closed = await expand()
+  check(
+    'clicking it again puts the tab back',
+    closed.expanded === 'false' && closed.stats && closed.matchups && closed.blocks > 1,
+    `${closed.blocks} block(s)`,
+  )
+
+  // --------------------------------------------------- the Lv / TM-HM columns
+  await openTab('Learnset')
+  await page.waitForSelector('[data-testid="species-learn-machine-rows"]', { timeout: 60000 })
+  const lead = await page.evaluate(() => {
+    const cols = (t) =>
+      [...document.querySelectorAll(`[data-testid="${t}"] thead th`)].map((th) => ({
+        label: th.textContent.trim().replace('▲', '').replace('▼', ''),
+        left: Math.round(th.getBoundingClientRect().left),
+        width: Math.round(th.getBoundingClientRect().width),
+        align: getComputedStyle(th).textAlign,
+      }))
+    const cell = (t) => {
+      const td = document.querySelector(`[data-testid="${t}"] tbody td:first-child`)
+      return {
+        align: getComputedStyle(td).textAlign,
+        font: getComputedStyle(td).fontFamily.split(',')[0],
+      }
+    }
+    return {
+      lv: cols('species-learn-level-up-rows'),
+      tm: cols('species-learn-machine-rows'),
+      lvCell: cell('species-learn-level-up-rows'),
+      tmCell: cell('species-learn-machine-rows'),
+    }
+  })
+  log(`  lead column: Lv ${JSON.stringify(lead.lv[0])} / TM ${JSON.stringify(lead.tm[0])}`)
+  check(
+    'the Lv column is exactly where the TM/HM column is',
+    lead.lv[0].left === lead.tm[0].left &&
+      lead.lv[0].width === lead.tm[0].width &&
+      lead.lv[0].align === lead.tm[0].align,
+    `${JSON.stringify(lead.lv[0])} vs ${JSON.stringify(lead.tm[0])}`,
+  )
+  check(
+    'and its cells align the same way too',
+    lead.lvCell.align === lead.tmCell.align,
+    `${lead.lvCell.align} vs ${lead.tmCell.align}`,
+  )
+  /* ALIGNMENT ONLY: the column is still the numeric face, so it still reads as a
+     number and still sorts by the real level. */
+  check(
+    'while keeping the numeric face',
+    /Martian|JetBrains|Mono/i.test(lead.lvCell.font),
+    lead.lvCell.font,
+  )
+  /* "Don't change any other column position/alignment" -- so every other column
+     has to be identical between the two tables, which it was before. */
+  const others = lead.lv.slice(1).map((c, i) => {
+    const o = lead.tm[i + 1]
+    return c.left === o.left && c.width === o.width && c.align === o.align
+  })
+  check(
+    'and no other column moved',
+    others.every(Boolean) && others.length === 6,
+    `${others.filter(Boolean).length} of ${others.length} identical`,
+  )
+
+  // ------------------------------------------------ no white-backgrounded tiles
+  await openTab('Sprites')
+  await page.waitForSelector('[data-testid="species-sprites"]', { timeout: 30000 })
+  const cards = await page.evaluate(() => {
+    const card = document.querySelector('.sprite-card')
+    const cs = getComputedStyle(card)
+    return {
+      background: cs.backgroundColor,
+      radius: cs.borderTopLeftRadius,
+      labels: [...document.querySelectorAll('.sprite-card-primary')].map((e) => e.textContent),
+      crystal: [
+        ...document.querySelectorAll('[data-testid="sprites-game-crystal"] .sprite-card-primary'),
+      ].map((e) => e.textContent),
+      redBlue: [
+        ...document.querySelectorAll('[data-testid="sprites-game-red-blue"] .sprite-card-primary'),
+      ].map((e) => e.textContent),
+    }
+  })
+  log(`  card: bg=${cards.background} radius=${cards.radius}`)
+  log(`  red-blue: ${cards.redBlue.join(' | ')}`)
+  log(`  crystal:  ${cards.crystal.join(' | ')}`)
+  check(
+    'the sprite cards have no background and no rounded box',
+    cards.background === 'rgba(0, 0, 0, 0)' && parseFloat(cards.radius) === 0,
+    `${cards.background} r=${cards.radius}`,
+  )
+  /* "Transparent" was only ever a label because the white version sat beside it.
+     Every tile is transparent now, so the word distinguishes nothing. */
+  check(
+    'no card is labelled "Transparent" any more',
+    cards.labels.every((l) => !/transparent/i.test(l ?? '')),
+    cards.labels.filter((l) => /transparent/i.test(l ?? '')).join(','),
+  )
+  check(
+    'and the slots read front-to-back, plain-before-shiny',
+    cards.crystal.join(' | ') === 'Front · Normal | Front · Shiny | Back · Normal | Back · Shiny',
+    cards.crystal.join(' | '),
+  )
+  check(
+    'Gen 1 keeps its grayscale renderings, now keyed',
+    cards.redBlue.join(' | ') === 'Front · Normal | Front · Gray | Back · Normal | Back · Gray',
+    cards.redBlue.join(' | '),
+  )
+
+  /*
+    THE ACTUAL CLAIM, DECODED. Every one of the Gen 1-2 tiles is drawn into a
+    canvas and its four corners are read: alpha 0 means transparent, an opaque
+    white corner is the defect. This is the only check that can tell the
+    difference, because "the URL says transparent" is exactly the assumption that
+    was wrong -- PokeAPI's `front_default` for gold is white and its
+    `front_transparent` is not, and both are 200s.
+
+    crossOrigin on a fresh Image, because the rendered <img> tags have no CORS
+    mode and an un-tainted canvas cannot be read back. raw.githubusercontent sends
+    Access-Control-Allow-Origin: *, for its own files and for ours.
+  */
+  const corners = await page.evaluate(async () => {
+    const urls = [
+      ...document.querySelectorAll(
+        '[data-testid^="sprites-game-red-blue"] img, [data-testid^="sprites-game-yellow"] img, ' +
+          '[data-testid^="sprites-game-gold"] img, [data-testid^="sprites-game-silver"] img, ' +
+          '[data-testid^="sprites-game-crystal"] img',
+      ),
+    ].map((i) => i.src)
+    const out = []
+    for (const url of urls) {
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        await new Promise((resolve, reject) => {
+          img.onload = resolve
+          img.onerror = () => reject(new Error('load'))
+          img.src = url
+        })
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth
+        c.height = img.naturalHeight
+        const ctx = c.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const px = (x, y) => ctx.getImageData(x, y, 1, 1).data
+        const cs = [
+          px(0, 0),
+          px(c.width - 1, 0),
+          px(0, c.height - 1),
+          px(c.width - 1, c.height - 1),
+        ]
+        out.push({
+          url: url.split('/').slice(-4).join('/'),
+          opaque: cs.every((p) => p[3] > 200),
+          white: cs.every((p) => p[3] > 200 && p[0] > 240 && p[1] > 240 && p[2] > 240),
+        })
+      } catch {
+        out.push({ url: url.split('/').slice(-4).join('/'), error: true })
+      }
+    }
+    return out
+  })
+  const whiteBacked = corners.filter((c) => c.white)
+  const readable = corners.filter((c) => !c.error)
+  log(`  decoded ${readable.length} of ${corners.length} Gen 1-2 tiles`)
+  whiteBacked.forEach((c) => log(`    WHITE ${c.url}`))
+  check(
+    'every Gen 1-2 tile actually decodes to a transparent background',
+    readable.length >= 12 && whiteBacked.length === 0,
+    `${whiteBacked.length} white of ${readable.length} decoded`,
+  )
+  check(
+    'and none of them has an opaque background of any colour',
+    readable.every((c) => !c.opaque),
+    readable
+      .filter((c) => c.opaque)
+      .map((c) => c.url)
+      .join(','),
+  )
+
+  // ---------------------------------------------------- the back-to-top icon
+  const topIcon = await page.evaluate(() => {
+    const btn = document.querySelector('[data-testid="scroll-top"]')
+    if (!btn) return null
+    const svg = btn.querySelector('svg')
+    return {
+      icon: svg?.getAttribute('class') ?? '',
+      /* IconArrowBarToUp draws the bar as a fourth path segment; IconArrowUp is a
+         shaft plus two head strokes and nothing else. Counting the path commands
+         is what separates them without shipping a snapshot of the glyph. */
+      paths: [...(svg?.querySelectorAll('path') ?? [])].map((pth) => pth.getAttribute('d')),
+    }
+  })
+  if (topIcon) {
+    log(`  back-to-top icon class: ${topIcon.icon}`)
+    check(
+      'the back-to-top control is a plain arrow, with no bar over it',
+      /icon-tabler-arrow-up(\s|$)/.test(topIcon.icon) && !/arrow-bar/.test(topIcon.icon),
+      topIcon.icon,
+    )
+  } else {
+    log('  (no back-to-top control on screen — the panel is not scrolled)')
+  }
+
+  await page.screenshot({ path: `${SHOTS}/species-page-round2.png` })
 
   // ======================================================================== H
   hr('H — CONSOLE / PAGE / HTTP')
