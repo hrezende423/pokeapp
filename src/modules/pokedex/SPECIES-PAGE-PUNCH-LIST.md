@@ -3,8 +3,8 @@
 State of the rebuilt page (`SpeciesDetailPage.tsx`, `SpeciesHero.tsx`,
 `SpeciesBanner.tsx` and the four `Species*Tab.tsx` files).
 
-Sections 1–5 are DONE and kept as the record of what changed and why.
-Section 6 is the open list. `npm run verify:species-page` is green at 122
+Sections 1–7 are DONE and kept as the record of what changed and why.
+Section 8 is the open list. `npm run verify:species-page` is green at 164
 checks and the other nine suites pass.
 
 ## 1 — The five-item fix pass — DONE
@@ -156,13 +156,17 @@ solid var(--border) }` reached every `<section>` on all four tabs, because
 - **Sprites tab** — no control. One sequence, per-game headings kept because
   labelling every card was the original brief for the tab.
 
-## 2 — Animated sprites: what PokéAPI actually has
+## 2 — Animated sprites: what PokéAPI actually has — SHIPPED
 
-Asked as part of FIX 5 and audited across all 493 in-scope records in the
-local `api-data` snapshot rather than assumed:
+Audited as part of FIX 5, then acted on in the polish pass. Re-audited
+directly against the eight GitHub directory listings by
+`scripts/audit-bw-sprites.mjs`, which is now a repeatable check rather than
+a one-off finding:
 
-- **One game has an `animated` object: `generation-v/black-white`** — 493
-  species × 8 slots. Gen 5, out of scope.
+- **One game has animated sprites: `generation-v/black-white`.** They are
+  GIF, at `sprites/pokemon/versions/generation-v/black-white/animated`,
+  across eight directories (front/back × regular/shiny × ±female). 2,340
+  files cover all 493 in-scope species.
 - **Emerald has none.** Nor does Crystal. Both animated in-game; PokéAPI
   carries static slots only for every Gen 1–4 game.
 - The only other animated source upstream is `sprites.other.showdown` (493
@@ -170,10 +174,37 @@ local `api-data` snapshot rather than assumed:
   modern style rather than per-game, and not a sanctioned source in
   CLAUDE.md.
 
-So the animated WebPs in `pokeapp-sprites` (94/493) remain the only animated
-content in scope, and the app's existing note in `src/data/artwork.ts`
-("there are no in-game animated sprites in scope") is now proven rather than
-asserted.
+**All 2,340 are converted to animated WebP and hosted**, in
+`pokeapp-sprites` under four release tags of their own (`bw-gen1`…`bw-gen4`,
+688/488/612/552 assets — GitHub caps a release at 1000). The Sprites tab
+shows them as a "Black / White animated" section, which names the game
+deliberately: the species are in scope, the game they were drawn for is not.
+
+Two findings worth keeping, because both contradict the assumption behind
+the request:
+
+- **The source GIFs are already transparent.** Audited across 18 species:
+  every corner pixel is alpha 0. There was no white background to strip. The
+  white that GIF conversion is notorious for is the RGB _under_ those pixels,
+  which only surfaces if something interpolates them — lossless WebP rewrites
+  the colour of fully-transparent pixels while compressing, and the tab draws
+  these nearest-neighbour, so nothing does.
+- **WebP bought no bytes.** 90.0 MiB of GIF became 86.3 MiB of WebP: −4%. For
+  sprites this small the format is a wash. What it did buy is one animated
+  format across the whole tab and 8-bit alpha instead of GIF's 1 bit.
+
+**Four species have no front-shiny animated GIF upstream** — 96 Drowzee,
+97 Hypno, 98 Krabby, 99 Kingler. Encoded in the 8-bit-per-species
+availability bitmask in `src/data/animatedSprites.ts`, so those cards are
+absent rather than broken. Eevee (133) is flagged
+`has_gender_differences` but has no female animated file either; the mask
+wins over the flag, since the flag says the species differs and the mask
+says which files exist.
+
+The bitmask, the upstream listing and the release assets are three records
+of one census, and `audit-bw-sprites.mjs` cross-checks all three — a mask
+entry with no asset is a broken image, an asset with no mask entry is dead
+weight nobody requests.
 
 ## 3 — The cutover — DONE (earlier pass)
 
@@ -206,9 +237,182 @@ lost all its holders, Abilitydex entry list unchanged at 123 in Gen 4.
   `.panel section` leak described under FIX 5 rather than this page's own
   spacing.
 
-## 6 — OPEN
+## 6 — The polish pass — DONE
 
-### 6a — A real per-generation accuracy bug, found while verifying FIX 5
+Ten items, all visual complaints against the shipped five-fix page.
+
+### 6.1 — Type scale: one knob, and the clipped name fixed
+
+`--dp-s` on `.species-page-inner`, default **0.78**, multiplied into every
+font size on the page. It is a SEPARATE knob from the 1400px width cap on
+purpose: every length on this page is one raw unit, so "smaller text" and
+"narrower page" were the same control, and they are two different requests.
+The layout keeps the frame's proportions; only the type shrinks.
+
+`scripts/report-type-scale.mjs` prints the whole table — the app-wide tokens
+read out of `design-tokens.css`, and the species page measured in a real
+browser at a real width. The RAW column is the number to edit.
+
+**The clipped name was a wrap problem, not a size problem.** "Bulbasaur
+Fushigidane" rendered as "…Fushigidan" because `.species-hero-names` was
+`white-space: nowrap` inside a column with `overflow: hidden`. A smaller
+scale alone would only have moved which pair clips — the romanised names are
+data and some are long. The row can wrap now (each name still refuses to
+break internally), and the romanisation dropped from the frame's 66 raw to
+52 so the common case stays on one line. Verified against the five widest
+name pairs in the dex, computed rather than sampled: 69 Bellsprout /
+Madatsubomi at 21 characters, then 1, 12, 73, 449 at 20.
+
+### 6.2 — No ALL-CAPS type
+
+One block in `pokedex.css`, scoped to `.species-page`, turning
+`text-transform: uppercase` into `capitalize` for `.ds-stat-label`,
+`.ds-type`, `.species-info-heading`, `.species-scope-label`,
+`.species-flavor-gen-label` and `.species-ability-hidden`, plus `none` for
+`.data-table-sort` (its labels are authored, and "TM/HM" and "PP" are
+initialisms). Letter-spacing drops to 0.01em with it — 0.05–0.08em is
+tracking for caps and reads as a gap on mixed case.
+
+`capitalize`, not `none`, because the source strings are a mix of Title Case
+("Abilities"), sentence case ("Base stats") and lowercase data ("grass"), so
+leaving it to the strings would give three different answers.
+
+**Scoped, not global.** The five pre-redesign dexes and the design-system
+reference page keep their own typography, per the standing rule — the DS page
+in particular is a handoff artefact that has to keep matching its spec. Say
+the word if you want it app-wide.
+
+### 6.3 — The arrow's actual geometry
+
+The wedge was already the right shape: an isosceles trapezoid on its side,
+`0,22 280,0 280,61.5 0,39.5` — parallel sides vertical, legs equal and
+mirrored about the centreline. The chevrons were the problem: stroked
+`polyline`s with `stroke-linecap: round` and `stroke-linejoin: round`, i.e. a
+generic arrow glyph sitting on top of the wedge.
+
+They are six-point filled polygons now, derived from the wedge's own numbers
+in `EvolutionTree.tsx`: tip on the centreline, arms at 45°, constant
+horizontal thickness, and **each arm end cut along the leg it meets**, 2.5
+units inside it. That last property is the one that was asked for and is
+what makes them read as part of the shape — a chevron is as tall as the band
+is wherever it sits, so the three grow toward the head (33.2 → 39.3 → 45.4
+units) as the band widens. The suite asserts it as two gradients that have to
+match: −0.0788 against the leg's −0.0786.
+
+### 6.4 — No dimmed stages
+
+`.evo-art-btn[data-current='false'] .evo-art { opacity: 0.7 }` is gone. It
+read as focus but made two thirds of a linear chart — and seven of eight on
+Eevee's radial — look unavailable. Hover is a 1.05 scale now, since there is
+no opacity left to lift from.
+
+### 6.5 — Gender ratio: two hues
+
+`--accent` for the female share, `--text-primary` for the male one.
+Genderless is a full bar in the grey the female segment used to be, rather
+than the bare word — the row used to be a different SHAPE for the 19
+genderless species, which broke the metadata columns' shared rows for exactly
+those species.
+
+**Not a fifth use of `--accent`.** Its sanctioned list is active tab/nav
+state, **binary indicators**, error emphasis and base-stat magnitude, and a
+gender split is the second of those — the same use that already covers
+caught/not-caught. Recorded because the count is a rule in CLAUDE.md and a
+reader will check it.
+
+`--text-primary` rather than a literal white: "white for male" is what that
+token is in the dark theme the page was designed in, and `#fff` would vanish
+into the light theme's white track.
+
+### 6.6 — The two metadata columns share their rows
+
+They were two independent lists, on the reasoning that a long value should
+grow its own row without dragging its neighbour. That is exactly what went
+wrong: the Gender ratio row is two lines tall, so every row below it on the
+left sat a step lower than its pair on the right and seven hairlines drifted
+apart down the block.
+
+The outer grid owns seven rows now and each `.ds-stat-list` is a
+`grid-template-rows: subgrid` participant in them. Both lists have exactly
+seven rows and are read as pairs, so a shared row track is what the content
+already meant. Subgrid rather than one flat four-track grid, so `.ds-stat-row`
+keeps owning its own hairline and its own `space-between`. The gender legend
+also dropped to 18 raw units, which is the readable half of the same fix.
+
+The narrow container query resets it to two stacked lists — 14 rows in 7
+tracks would overlap.
+
+### 6.7 — Learnset rhythm, second pass
+
+The first pass overcorrected: `--space-gap-sm` plus a 0.35rem step ran
+consecutive tables together with no break between the end of one and the
+heading of the next. `--space-gap-md` now, with most of the separation in the
+group-to-group margin, because a heading is what starts a section. The suite
+asserts a BAND rather than a ceiling (16–44px between tables); both bounds
+have failed once.
+
+### 6.8 — Locations moved to the Info tab
+
+Under the base-stat and evolution charts, above type effectiveness, as
+`SpeciesLocations.tsx`. A sortable five-column encounter table under sixteen
+paragraphs of prose was two different kinds of reading in one tab.
+
+**It fetches only when scrolled to, and that is load-bearing.** Info is the
+default tab, so moving the section here would otherwise have made every
+species open pull an encounter partition — 2.8 MB for Diamond/Pearl — for a
+visit that only wanted the stat line, which is the exact cost the
+one-tab-mounted-at-a-time rule exists to avoid. An `IntersectionObserver`
+with a 200px margin gates the `versionGroup` argument, so `idle` stays a real
+state in `usePartitionRows` rather than becoming a second code path.
+
+It still follows the APP-WIDE game selector, with the page-local scope only
+as the "All" fallback. Three suites had to learn that the trigger is a scroll
+and not a tab click (`verify-app` step 3/4, `verify-pokedex`,
+`verify-eggmoves`).
+
+### 6.9 — Game names as coloured badges
+
+**PokéAPI has no colour for a version.** `version` carries id / name / names
+/ version_group and nothing else, and neither does this app's
+`version-groups.json`. So the palette is the community version-colour set,
+corrected per theme by `scripts/calibrate-game-colors.mjs` the same way the
+type palette was: scale all three channels equally — which preserves the hue
+— until the colour clears 4:1 against the 12% self-tint the badge paints
+behind it. 16 of 21 need no change on dark, 5 need none on light.
+
+**Three cannot be fixed by scaling, and they are all blue.** `#1111ff` keeps
+nearly all its luminance in the 7.2%-weighted channel, so scaling saturates
+it at 2.3:1 and stops. Blue, Sapphire and Blue (JP) are tinted toward white
+instead — which is what the community palette itself did for `--type-water`.
+
+**A badge here where a type is never one**, deliberately. "Type is data, not
+decoration" still holds; a version label is a NAME, the thing a reader scans
+a sixteen-entry Pokédex history by, and it repeats down a column where a
+shape is what makes it findable. It uses `--radius-badge-square`, the badge
+radius `design-tokens.json` sanctions and `TypeLabel` deliberately left
+unimplemented for want of a fill and text-colour spec. This is that spec.
+
+Gold/HeartGold and Silver/SoulSilver land on near-identical values on
+purpose: the remakes are named after the originals.
+
+### 6.10 — Sprites: the API's animated set
+
+See §2. Shipped as a "Black / White animated" section with front and back,
+regular and shiny, plus female where upstream has a file.
+
+## 7 — Where the reference was deliberately narrowed
+
+Unchanged from the five-fix pass and repeated here so it is not re-litigated:
+the nine `layout-evo-*` frames are hand-composed (Tyrogue's third branch is
+drawn to the LEFT with a left-pointing arrow), so the renderer follows only
+the rules that generalise — linear left-to-right, 2–3 branches fanning right,
+≥4 becoming the Eevee circle — plus two spacing deviations (`VGAP` 0.40 A,
+and 0.80 A for a three-way fan) that buy clearance the reference gets by
+hand.
+
+## 8 — OPEN
+
+### 8a — A real per-generation accuracy bug, found while verifying FIX 5
 
 **Three moves render as Fairy under a Gen 1–4 selection.** Charm, Sweet Kiss
 and Moonlight are `type_id: 18` (Fairy) in the bundle, each with a
@@ -224,21 +428,28 @@ This is the same class as the hidden-ability bug in §4 and the data to fix
 it is already in the bundle — a `resolveMoveTypeForGeneration` in
 `src/data/era.ts` plus its call sites. NOT fixed here: it is outside the
 five fixes, and it touches the Movedex, which CLAUDE.md keeps as an
-untouched pre-redesign module. Needs a decision.
+untouched pre-redesign module. Needs a decision. **Raised once and still
+unanswered.**
 
-### 6b — Smaller things, no decision needed to ship
+### 8b — Smaller things, no decision needed to ship
 
 - **Flavour text carries the games' own hyphenation.** Umbreon's Gold entry
   reads "this POKéMON pro tects itself" — PokéAPI's `flavor_text` preserves
   the line breaks and soft hyphens of the original 8-character-wide game
   text. A de-hyphenation pass in `build-data.ts` would fix it for all 493 ×
   16 entries; risky to do blindly, since some breaks are legitimate spaces.
-- **Sprite-card tone step in light mode** (carried from §5).
+- **Sprite-card tone step in light mode** (carried from §5). More visible now
+  that the Sprites tab has a fourth section: `--surface-raised` is `#fff`
+  against `--surface` `#fafafa`, so a light-mode sprite card is a white box on
+  a near-white page.
+- **Location names are not links yet.** Confirmed as wanted — each should open
+  the corresponding map — but there is no map module to open, so they stay
+  text rather than becoming buttons that do nothing.
 - **The middle branch of a three-way fan** still overlaps the parent's
   artwork by a few units on tight chains (Tyrogue). The reference avoids it
   by hand-placing; see the `VGAP_WIDE` note.
 
-### 6c — Two facts from the pre-cutover page that never came back
+### 8c — Two facts from the pre-cutover page that never came back
 
 Both outside the DetailPage spec, both still absent, both still needing a
 yes/no rather than being added unrequested:
@@ -249,7 +460,29 @@ yes/no rather than being added unrequested:
    `short_effect` as body text. The Info tab has it as the ability's `title`
    attribute, so it is a hover rather than a read.
 
-### 6d — Still deferred by prior decision
+### 8d — Coverage that changed shape in the polish pass
+
+`verify-species-page` went 122 → 164 checks; the other nine are unchanged in
+what they claim. Three suites had assertions RE-POINTED rather than removed,
+all for the same reason — the encounter partition is now requested by a
+scroll on the Info tab instead of by a click on the Description tab:
+
+- `verify-app` steps 3 and 4 drive `revealLocations()` instead of
+  `openTab('Description')`. The claim is unchanged: each partition is fetched
+  exactly once, whichever control asks. "Opening a species fetches no
+  partition at all" is TRUE again, which the eager version would have broken.
+- `verify-pokedex`'s encounters check scrolls the Info tab.
+- `verify-eggmoves`' root-cause section checked "the flavour text beside the
+  failure still renders"; the neighbours changed with the section, so it now
+  checks the stat bars, the evolution chart and the type tiers — all three
+  from the eager bundle, which is the same point.
+
+One assertion became growth-tolerant rather than being weakened: section A's
+"the right column really did scroll to its own end" was a race against the
+locations fetch (it failed once at 694 of 787). It scrolls, waits for the
+section to settle, and scrolls again.
+
+### 8e — Still deferred by prior decision
 
 - **Pokéathlon stats** — Gen 4 only, absent from PokéAPI at species level.
   The Info tab renders a one-line sourcing note under a Gen 4 selection.

@@ -181,15 +181,47 @@ try {
     await settle()
   }
 
+  /**
+   * Open the Info tab and scroll its locations section into view.
+   *
+   * WHICH TAB PULLS THE ENCOUNTER PARTITION MOVED. It used to be Description;
+   * locations now live on the Info tab, under the stat and evolution charts. And
+   * because Info is the DEFAULT tab, that section deliberately does not fetch
+   * until it is scrolled to -- otherwise every species open would pull up to
+   * 2.8 MB for a visit that only wanted the stat line, which is the exact cost the
+   * one-tab-at-a-time rule exists to avoid.
+   *
+   * So the trigger for that partition is now a scroll, not a click, and this is
+   * what performs it. `data-loaded` is the section's own record of having been
+   * reached, so this waits on the app's state rather than on a timeout.
+   */
+  const revealLocations = async () => {
+    await openTab('Info')
+    await page.waitForSelector('[data-testid="species-locations"]', { timeout: 30000 })
+    await page.$eval('[data-testid="species-locations"]', (el) =>
+      el.scrollIntoView({ block: 'center' }),
+    )
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true' &&
+        !document.querySelector('[data-testid="locations-loading"]'),
+      { timeout: 60000 },
+    )
+    await settle()
+  }
+
   /** Point the page's OWN game scope at a version group, by generation then game. */
   const selectPageGroup = async (testId, generation, group) => {
     await page.click(`[data-testid="${testId}-scope-generation-${generation}"]`)
     const gameBtn = `[data-testid="${testId}-scope-game-${group}"]`
     if (await page.$(gameBtn)) await page.click(gameBtn)
+    /* .species-description no longer carries data-version-group -- the tab has no
+       game scope at all now that it shows every game's entry. The learnset is the
+       only page-scoped partition left, so it is the only thing to wait on. */
     await page.waitForFunction(
       (g) =>
         document
-          .querySelector('[data-testid="species-learnset"], [data-testid="species-description"]')
+          .querySelector('[data-testid="species-learnset"]')
           ?.getAttribute('data-version-group') === g,
       group,
       { timeout: 30000 },
@@ -292,9 +324,13 @@ try {
   log(`  partition fetches on opening the species: ${onOpen.length} (the Info tab needs none)`)
   check('opening a species fetches no partition at all', onOpen.length === 0, `(${onOpen.length})`)
 
-  // Each per-game tab pulls exactly its own partition, when it is opened.
+  /*
+    Each partition is pulled by exactly one trigger: the learnset by opening the
+    Learnset tab, the encounters by scrolling the Info tab down to the locations
+    section. Both are on-demand; only the trigger differs.
+  */
   await openTab('Learnset')
-  await openTab('Description')
+  await revealLocations()
   let newReqs = requests.slice(before)
   const aLearn = newReqs.filter((r) => r.url.includes(`/data/learnsets/${GROUP_A}.json`))
   const aEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_A}.json`))
@@ -321,11 +357,11 @@ try {
   /*
     TWO CONTROLS NOW, and which one drives which partition is the point.
 
-    The learnset follows the PAGE's own generation control, by design. The
-    Description tab's locations follow the APP-WIDE selector, which is the
-    architecture rule in CLAUDE.md -- it lost its own selector when the tab was
-    changed to show every game's Pokedex entry at once, since a full sequence of
-    flavour text needs no game picked but a 2.8 MB encounter partition still does.
+    The learnset follows the PAGE's own generation control, by design. The Info
+    tab's locations section follows the APP-WIDE selector, which is the
+    architecture rule in CLAUDE.md -- it lost its own selector when the Description
+    tab was changed to show every game's Pokedex entry at once, and it kept
+    following the app selector when the section itself moved to the Info tab.
 
     So driving only the page control moved the learnset partition and left the
     encounter one where the app selector had it. That is not a caching failure, it
@@ -348,9 +384,9 @@ try {
 
   before = mark()
   await selectGroup(GROUP_B)
-  // A tab that is not mounted has nothing to fetch, so the encounter file only
-  // moves once Description is on screen.
-  await openTab('Description')
+  // A section that has not been reached has nothing to fetch, so the encounter
+  // file only moves once the Info tab is scrolled down to the locations block.
+  await revealLocations()
   newReqs = requests.slice(before)
   const bEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_B}.json`))
   log(`  app selector -> ${GROUP_B}: encounters=${bEnc.length} fetch(es)`)
@@ -362,7 +398,7 @@ try {
   // screen to reach it -- one tab is mounted at a time.
   await openTab('Learnset')
   await selectPageGroup('learnset', 4, GROUP_A)
-  await openTab('Description')
+  await revealLocations()
   newReqs = requests.slice(before)
   const refetch = newReqs.filter((r) => /\/data\//.test(r.url))
   log(`  returning to ${GROUP_A} on both controls: ${refetch.length} data request(s)`)

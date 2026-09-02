@@ -859,17 +859,31 @@ try {
     'each branch carries a trigger condition',
     methods.every((m) => m.length > 0),
   )
-  /* Encounters moved to the Description tab, beside the flavour text they vary
-     with. Either a table or an explicit "not in the wild" line counts as
-     resolved; what must not happen is neither. */
-  await openTab('Description')
-  await page.waitForFunction(() => !document.querySelector('[data-testid="locations-loading"]'), {
-    timeout: 60000,
-  })
+  /*
+    ENCOUNTERS ARE ON THE INFO TAB NOW, under the stat and evolution charts and
+    above type effectiveness -- they were on the Description tab, under sixteen
+    paragraphs of flavour text.
+
+    And they load on SCROLL, not on tab open: Info is the default tab, so an eager
+    fetch there would pull up to 2.8 MB of encounters for every species anyone
+    looks at. So this scrolls the section into view the way a reader would, and
+    then asserts what it always asserted -- either a table or an explicit "not in
+    the wild" line, never neither.
+  */
+  await page.waitForSelector('[data-testid="species-locations"]', { timeout: 30000 })
+  await page.$eval('[data-testid="species-locations"]', (el) =>
+    el.scrollIntoView({ block: 'center' }),
+  )
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true' &&
+      !document.querySelector('[data-testid="locations-loading"]'),
+    { timeout: 60000 },
+  )
   const encounterTable = await page.$(
     '[data-testid="species-locations-rows"], [data-testid="locations-empty"]',
   )
-  check('encounters section resolved', encounterTable != null)
+  check('encounters section resolved, on the Info tab', encounterTable != null)
   await openTab('Info')
   await page.screenshot({ path: `${SHOTS}/detail-eevee.png`, fullPage: true })
 

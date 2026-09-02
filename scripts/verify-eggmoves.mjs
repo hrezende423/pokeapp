@@ -241,6 +241,28 @@ try {
   check('no page errors on the happy path', pageErrors.length === 0, pageErrors.join(' | '))
   await ctx.close()
 
+  /**
+   * Open the Info tab and scroll its locations section into view.
+   *
+   * THE ENCOUNTERS FILE IS ASKED FOR BY A SCROLL NOW, not by a tab click. The
+   * locations section moved from the Description tab to the Info tab, and because
+   * Info is the DEFAULT tab it deliberately does not fetch until it is reached --
+   * otherwise every species open would pull up to 2.8 MB for a visit that only
+   * wanted the stat line. So a suite that wants the partition to be requested has
+   * to do what a reader does.
+   */
+  const revealLocations = async (pg) => {
+    await openTab(pg, 'Info')
+    await pg.waitForSelector('[data-testid="species-locations"]', { timeout: 60000 })
+    await pg.$eval('[data-testid="species-locations"]', (el) =>
+      el.scrollIntoView({ block: 'center' }),
+    )
+    await pg.waitForFunction(
+      () => document.querySelector('[data-testid="species-locations"]')?.dataset.loaded === 'true',
+      { timeout: 60000 },
+    )
+  }
+
   // ============================================================ root cause
   hr('ROOT CAUSE — a failing encounters partition must not touch the learnset')
   // serviceWorkers: 'block' so the route actually sees the request. With the SW
@@ -257,9 +279,9 @@ try {
   await broken.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
   await openDetail(broken, 133, 'heartgold-soulsilver', 'Eevee')
 
-  // The Description tab is what asks for the encounters file, so that is where
-  // the 503 surfaces.
-  await openTab(broken, 'Description')
+  // The Info tab's locations section is what asks for the encounters file, so
+  // that is where the 503 surfaces.
+  await revealLocations(broken)
   await broken.waitForSelector('[data-testid="locations-error"]', { timeout: 60000 })
   const failedSide = await broken.evaluate(() => ({
     encountersErrorShown: document.querySelector('[data-testid="locations-error"]') != null,
@@ -269,9 +291,17 @@ try {
         .querySelector('[data-testid="species-locations"] [role="alert"]')
         ?.textContent.trim() ?? null,
     retryOffered: document.querySelector('[data-testid="locations-retry"]') != null,
-    // The flavour text on the same tab comes from the eager bundle and must be
-    // unaffected -- a failed partition may not blank its neighbours either.
-    flavourEntries: document.querySelectorAll('.species-flavor-entry').length,
+    /*
+      THE NEIGHBOURS CHANGED WITH THE SECTION. This used to count flavour entries,
+      because locations sat under the Pokedex text; they now sit between the two
+      charts and the type table, so the blocks a failed partition must not blank
+      are the stat bars above it and the type tiers below it. Both come from the
+      eager bundle, which is the point: one on-demand file failing may not take
+      out anything that was already there.
+    */
+    statRows: document.querySelectorAll('[data-testid="species-base-stats"] li').length,
+    evoNodes: document.querySelectorAll('[data-testid^="evo-node-"]').length,
+    typeTiers: document.querySelectorAll('.type-matchup-tier').length,
   }))
 
   // And the learnset, one tab over, must be untouched by it.
@@ -289,9 +319,9 @@ try {
   const underFailure = { ...failedSide, ...learnSide }
   log(`  ${JSON.stringify(underFailure, null, 2).replace(/\n/g, '\n  ')}`)
   check(
-    'the flavour text beside the failure still renders',
-    underFailure.flavourEntries > 0,
-    `(${underFailure.flavourEntries})`,
+    'the blocks around the failure still render',
+    underFailure.statRows > 0 && underFailure.evoNodes > 0 && underFailure.typeTiers > 0,
+    `stats ${underFailure.statRows} evo ${underFailure.evoNodes} tiers ${underFailure.typeTiers}`,
   )
   check('learnset still renders all four method groups', underFailure.learnGroups.length === 4)
   check(
@@ -325,7 +355,7 @@ try {
     its way in, and there would be no retry left to test. (Which is itself worth
     knowing: leaving and re-entering the tab is a second, implicit retry path.)
   */
-  await openTab(broken, 'Description')
+  await revealLocations(broken)
   await broken.waitForSelector('[data-testid="locations-error"]', { timeout: 60000 })
   await broken.unroute('**/data/encounters/*.json')
   await broken.click('[data-testid="locations-retry"]')
@@ -379,7 +409,7 @@ try {
   // The encounters file is 2.8 MiB and the learnset 503 fails fast, so settle the
   // other tab before judging it -- otherwise the assertion races the download it
   // is meant to prove is unaffected.
-  await openTab(inverse, 'Description')
+  await revealLocations(inverse)
   await inverse.waitForSelector(
     '[data-testid="species-locations-rows"], [data-testid="locations-empty"], [data-testid="locations-error"]',
     { timeout: 60000 },

@@ -29,11 +29,32 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   shared components (`DataTable`, `StatRow`, `Tabs`) scale with the page
   without per-component work — and why an element there cannot query its
   own container, which is what the `-inner` wrapper exists for.
+  **It has exactly two tunable numbers**, and they are separate on purpose:
+  the 1400px width cap, and `--dp-s` (0.78) which multiplies only the TYPE.
+  Because every length is one unit, "smaller text" and "narrower page" would
+  otherwise be the same control. `npm run report:type-scale` prints every
+  size in the app — the fixed tokens and this page's raw units, measured in
+  a browser — and the RAW column is the number to edit.
+- **The Info tab's locations section must stay lazy.** Info is the default
+  tab and the encounter partitions run to 2.8 MB, so it gates its own
+  `versionGroup` argument behind an `IntersectionObserver` — the whole point
+  of mounting one tab at a time is that opening a species costs no partition
+  fetch, and an eager section there spends it silently. Three suites drive
+  a scroll rather than a tab click because of this.
 - Sprites: GitHub Release assets in `hrezende423/pokeapp-sprites`,
   runtime-cached, NOT precached (648MB total, too large to bundle).
   `species-background-colors.json` lives in the same repo, fetched at
   runtime — applies ONLY to the species detail page's artwork panel,
   never the grid or any other screen.
+- **Two animated sets live in that repo, under separate release tags.**
+  `gen1`…`gen4` are the high-resolution animated WebP artwork (1,174 files).
+  `bw-gen1`…`bw-gen4` are PokéAPI's Black/White animated GIFs converted to
+  animated WebP (2,340 files, `{iii}-bw-{front|back}-{n|s}[-f].webp`) — the
+  ONLY animated sprites the API has, and Gen 5 art of Gen 1–4 species, so
+  the section showing them names the game. Which of the eight slots exists
+  per species is an 8-bit mask in `src/data/animatedSprites.ts`;
+  `npm run audit:bw-sprites` cross-checks upstream, the mask and the
+  releases, because a mask entry with no asset is a broken image.
 - **Sprite slot encoding**: 14 real slot variants exist across Gen 1–4
   (16,204 tiles for 493 species), stored as a per-game bitmask rather
   than a name array purely for install payload — 98 KiB against 638 KiB
@@ -101,6 +122,29 @@ that isn't explicitly about design.)
   The fourth was added during the Detail Page redo and deliberately
   reverses an earlier "plain data table" decision, confirmed against the
   real Figma prototype. Never decoration. App-wide, not namespaced.
+  The **gender-ratio bar's female share** is the second of those four, not
+  a fifth use — a gender split is a binary indicator, the same use that
+  covers caught/not-caught. Its male share is `--text-primary`, i.e. the
+  theme's version of "white", never a literal `#fff`.
+- **`--game-*` is a real palette now**: one colour per version, because
+  PokéAPI has none (`version` carries id / name / names / version_group and
+  nothing else). Source is the community version-colour set, corrected per
+  theme by `scripts/calibrate-game-colors.mjs` to clear 4:1 against the 12%
+  self-tint a badge paints behind it — same method as the type palette.
+  Blue, Sapphire and Blue (JP) are TINTED toward white rather than scaled,
+  because pure blue's luminance saturates at 2.3:1 on black.
+- **A version label is the one thing that gets a badge.** Type indicators
+  stay bare coloured text ("type is data, not decoration"); a game name is
+  a NAME that repeats down a column and needs a shape to be scannable. It
+  uses `--radius-badge-square`, which `design-tokens.json` sanctions and
+  `TypeLabel` deliberately left unimplemented for want of a fill and
+  text-colour spec. Do not generalise the badge to anything else without
+  asking.
+- **No ALL-CAPS on the species detail page.** One block in `pokedex.css`
+  scoped to `.species-page` turns `text-transform: uppercase` into
+  `capitalize` and drops the tracking to 0.01em. Scoped, not global: the
+  five pre-redesign dexes and the design-system reference page keep their
+  own typography.
 - **`--font-numeric`** (Martian Mono primary, JetBrains Mono fallback,
   both self-hosted) for tabular/functional numbers only (stat tables, EV
   inputs, dex numbers in lists) — must lead the font stack, or a system
