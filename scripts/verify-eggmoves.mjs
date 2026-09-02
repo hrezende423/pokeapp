@@ -271,7 +271,7 @@ try {
     retryOffered: document.querySelector('[data-testid="locations-retry"]') != null,
     // The flavour text on the same tab comes from the eager bundle and must be
     // unaffected -- a failed partition may not blank its neighbours either.
-    flavourEntries: document.querySelectorAll('[data-testid^="species-flavor-"]').length,
+    flavourEntries: document.querySelectorAll('.species-flavor-entry').length,
   }))
 
   // And the learnset, one tab over, must be untouched by it.

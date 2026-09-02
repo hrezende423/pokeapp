@@ -28,6 +28,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
+import { goToDex } from './lib/nav.mjs'
 
 const PORT = 4183
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
@@ -258,7 +259,11 @@ try {
       ev: t('ev-yield'),
       xp: t('base-xp'),
       pokeathlon: t('pokeathlon-pending') != null,
-      types: [...document.querySelectorAll('[data-testid="species-info-types"] [data-type]')].map(
+      /* The types are in the BANNER now, not inside the Info tab -- which is
+         where the frame puts them (group-TypeText 57:735 is a child of
+         container-poke-name) and what makes them visible on all four tabs. Still
+         era-resolved through the same resolveTypesForGeneration. */
+      types: [...document.querySelectorAll('[data-testid="species-banner-types"] [data-type]')].map(
         (e) => e.getAttribute('data-type'),
       ),
       evolutionInsideInfo: !!document.querySelector(
@@ -397,7 +402,13 @@ try {
       heldNone: t('held-items-none'),
       pokeathlon: t('pokeathlon-pending'),
       specialAside: document.querySelector('[data-testid="stat-total"]')?.textContent?.trim(),
-      matchupCells: document.querySelectorAll('[data-testid^="matchup-cell-"]').length,
+      /* Grouped by multiplier now, so the per-type count is the sum over the
+         tiers rather than a cell count -- the claim is unchanged: fifteen
+         attacking types in Gen 1, not seventeen. */
+      matchupCells: document.querySelectorAll('[data-testid^="matchup-type-"]').length,
+      matchupGrouped: Number(
+        document.querySelector('[data-testid="type-matchup-chart"]')?.dataset.groupedTypes,
+      ),
     }
   })
   log(`  ${JSON.stringify(gen1Gating)}`)
@@ -418,12 +429,25 @@ try {
     gen1Gating.matchupCells === 15,
     `(${gen1Gating.matchupCells})`,
   )
+  /* Every type lands in exactly one tier: the component counts what it grouped,
+     so a multiplier outside the six known tiers cannot vanish silently. */
+  check(
+    'every attacking type is in exactly one tier',
+    gen1Gating.matchupGrouped === gen1Gating.matchupCells,
+    `${gen1Gating.matchupGrouped} of ${gen1Gating.matchupCells}`,
+  )
 
   await page.screenshot({ path: `${SHOTS}/species-page-info-gen1.png` })
 
   // ======================================================================== C
-  hr('C — the type matchup chart, against known matchups')
+  hr('C — the type chart, grouped by multiplier, against known matchups')
 
+  /*
+    RESTRUCTURED FROM PER-TYPE CELLS TO PER-MULTIPLIER TIERS, so the multiplier is
+    now read off the type's TIER rather than off its own cell. The numbers asserted
+    are the same published matchups as before -- the regrouping must not change a
+    single one of them, which is the point of keeping these three species.
+  */
   const matchups = async (id, expect) => {
     await backToGrid()
     await openSpecies(id)
@@ -435,7 +459,7 @@ try {
             t,
             Number(
               document
-                .querySelector(`[data-testid="matchup-cell-${t}"]`)
+                .querySelector(`[data-testid="matchup-type-${t}"]`)
                 ?.getAttribute('data-multiplier'),
             ),
           ]),
@@ -454,12 +478,35 @@ try {
      is about typing. */
   await matchups(94, { normal: 0, ground: 2, psychic: 2, dark: 2, poison: 0.25 })
 
-  const neutralDim = await page.$$eval(
-    '[data-testid^="matchup-cell-"]',
-    (els) => els.filter((e) => e.getAttribute('data-neutral') === 'true').length,
+  const tiers = await page.evaluate(() => ({
+    present: [...document.querySelectorAll('[data-testid^="matchup-tier-"]')].map((e) => ({
+      m: e.getAttribute('data-multiplier'),
+      n: Number(e.getAttribute('data-count')),
+    })),
+    declared: Number(document.querySelector('[data-testid="type-matchup-chart"]')?.dataset.tiers),
+  }))
+  log(`  Gengar tiers: ${tiers.present.map((t) => `${t.m}x:${t.n}`).join('  ')}`)
+  check(
+    'a neutral tier exists and is populated',
+    tiers.present.some((t) => t.m === '1' && t.n > 0),
   )
-  log(`  neutral (x1) cells on Gengar: ${neutralDim}`)
-  check('neutral cells are marked so they can recede', neutralDim > 0)
+  check(
+    'the declared tier count matches the rendered rows',
+    tiers.declared === tiers.present.length,
+  )
+  /* Nothing hits ghost/poison for quadruple -- Psychic and Dark and Ghost and
+     Ground are all x2 and none of them doubles up -- so Gengar genuinely has no x4
+     tier, and the row must be absent rather than rendered empty. Same rule as the
+     Movedex learn-method grouping. */
+  check(
+    'no empty x4 tier is rendered for Gengar',
+    !tiers.present.some((t) => t.m === '4'),
+    tiers.present.map((t) => t.m).join(','),
+  )
+  check(
+    'every rendered tier has at least one type in it',
+    tiers.present.every((t) => t.n > 0),
+  )
 
   // ======================================================================== D
   hr('D — Learnset tab: the page has its own generation scope')
@@ -589,58 +636,84 @@ try {
       versionGroup: document
         .querySelector('[data-testid="species-description"]')
         ?.getAttribute('data-version-group'),
-      flavour: [...document.querySelectorAll('[data-testid^="species-flavor-"]')]
-        .filter((e) => e.getAttribute('data-testid') !== 'species-flavor-none')
-        .map((e) => ({
-          version: e.getAttribute('data-testid').replace('species-flavor-', ''),
-          text: e.querySelector('.species-flavor-text')?.textContent?.trim() ?? '',
-        })),
+      /* .species-flavor-entry, not the [data-testid^=] prefix: the per-generation
+         group wrappers are species-flavor-group-N and match that prefix too, so the
+         prefix form counted four wrappers as four extra versions. */
+      flavour: [...document.querySelectorAll('.species-flavor-entry[data-testid]')].map((e) => ({
+        version: e.getAttribute('data-testid').replace('species-flavor-', ''),
+        text: e.querySelector('.species-flavor-text')?.textContent?.trim() ?? '',
+      })),
       rows: document.querySelectorAll('[data-testid="species-locations-rows"] tbody tr').length,
       empty: document.querySelector('[data-testid="locations-empty"]') != null,
+      /* The tab's own generation/game control, which must no longer exist. */
+      scopeControl: document.querySelector('[data-testid^="description-scope-"]') != null,
+      declared: Number(
+        document.querySelector('[data-testid="species-description"]')?.dataset.flavorEntries,
+      ),
+      genLabels: [...document.querySelectorAll('.species-flavor-gen-label')].map((e) =>
+        e.textContent.trim().toUpperCase(),
+      ),
+      scopeNote:
+        document.querySelector('[data-testid="locations-scope"]')?.textContent?.trim() ?? null,
     }))
 
   const desc = await describe()
   log(`  ${desc.versionGroup}: ${desc.flavour.length} entries, ${desc.rows} location rows`)
-  desc.flavour.forEach((f) => log(`    ${f.version}: ${f.text.slice(0, 60)}…`))
+  desc.flavour.slice(0, 4).forEach((f) => log(`    ${f.version}: ${f.text.slice(0, 60)}…`))
+
   /*
-    Yellow, NOT the app's HeartGold/SoulSilver -- the page owns one game scope that
-    both tabs read, so the Gen 1 pick made on the Learnset tab is still in force
-    here. Two independent per-tab scopes was the first shape and it was wrong: it
-    also reset every time a tab was left, since only one tab is mounted at a time.
+    THE TAB HAS NO GAME SELECTOR ANY MORE, so the claims here changed shape rather
+    than moving. What used to be asserted -- "the Description tab inherits the
+    Learnset tab's scope" and "switching the game switches both halves together" --
+    described a control that has been removed; asserting it against the new page
+    would be asserting the old design.
+
+    What replaces it is stronger, because it is about the data rather than the
+    control: EVERY in-scope version that has an entry is on screen, in bundle order,
+    grouped by generation. Bulbasaur has one in all 16.
+  */
+  check('no game selector on the Description tab', desc.scopeControl === false)
+  check(
+    'every version with an entry is rendered, not one',
+    desc.flavour.length === desc.declared && desc.flavour.length > 10,
+    `${desc.flavour.length} rendered, ${desc.declared} declared`,
+  )
+  check(
+    'they are grouped by generation, oldest first',
+    desc.genLabels.join(',') === 'GENERATION I,GENERATION II,GENERATION III,GENERATION IV',
+    desc.genLabels.join(','),
+  )
+  /* Bundle order, not Object.keys order: red before blue before yellow, and gold
+     before the Gen 3 entries. A JSON object's key order is whatever the build
+     wrote, which is why listVersionGroups drives this. */
+  check(
+    'and in chronological order inside a generation',
+    desc.flavour
+      .slice(0, 4)
+      .map((f) => f.version)
+      .join(',') === 'red,blue,yellow,gold',
+    desc.flavour
+      .slice(0, 4)
+      .map((f) => f.version)
+      .join(','),
+  )
+  check(
+    'with real text in every one of them',
+    desc.flavour.every((f) => f.text.length > 20),
+  )
+  check('locations either listed or explicitly empty', desc.rows > 0 || desc.empty)
+  /*
+    LOCATIONS FOLLOW THE APP-WIDE SELECTOR, which is the architecture rule in
+    CLAUDE.md, and the page's own scope only stands in when that selector is on
+    "All". The app is on HeartGold/SoulSilver here even though the Learnset tab was
+    left on Yellow -- the page scope no longer reaches this section.
   */
   check(
-    'the Description tab inherits the scope set on the Learnset tab',
-    desc.versionGroup === 'yellow',
+    'the locations section names the app-selected game',
+    desc.versionGroup === 'heartgold-soulsilver',
     desc.versionGroup,
   )
-  check(
-    'one flavour entry per version in the selected group',
-    desc.flavour.length === 1 && desc.flavour[0].version === 'yellow',
-    desc.flavour.map((f) => f.version).join(','),
-  )
-  check('with real text in it', desc.flavour[0]?.text.length > 20)
-  check('locations either listed or explicitly empty', desc.rows > 0 || desc.empty)
-
-  // A species that IS found in the wild, to prove the table renders rows.
-  await page.click('[data-testid="description-scope-generation-4"]')
-  await page.waitForFunction(
-    () =>
-      document
-        .querySelector('[data-testid="species-description"]')
-        ?.getAttribute('data-version-group') === 'heartgold-soulsilver',
-    { timeout: 30000 },
-  )
-  await page.waitForFunction(() => !document.querySelector('[data-testid="locations-loading"]'), {
-    timeout: 60000,
-  })
-  const descGen4 = await describe()
-  log(`  ${descGen4.versionGroup}: ${descGen4.flavour.length} entries, ${descGen4.rows} rows`)
-  check(
-    'switching the game switches both halves together',
-    descGen4.flavour.length === 2 &&
-      descGen4.flavour.map((f) => f.version).join(',') === 'heartgold,soulsilver',
-    descGen4.flavour.map((f) => f.version).join(','),
-  )
+  check('and says which game it is showing', /HeartGold/.test(desc.scopeNote ?? ''), desc.scopeNote)
 
   await backToGrid()
   await openSpecies(16) // Pidgey — common wild encounter in every Gen 1-4 game
@@ -745,36 +818,65 @@ try {
   check('every sampled per-game sprite URL resolves', bad.length === 0)
 
   /*
-    THE FOLDED ARTWORK CONTROL. Its own behaviour (availability per axis, the
-    unsuffixed Murkrow file, the shiny cache) is verified where it always was, in
-    verify-pokedex and verify-ux; what this suite owns is that it is HERE, on this
-    tab, with its axes intact and the grid filter beside them.
+    THE ARTWORK CONTROL IS GONE FROM THIS TAB, and that is a reversal of the
+    previous pass rather than a regression -- it was folded in here, and this build
+    removes it. Artwork.tsx is deleted, not left unreferenced.
+
+    WHAT THE CONTROL'S RULES BECAME. Its four axes encoded real facts about the
+    data (94/493 species have a gendered in-game sprite, 0/493 have gendered
+    official artwork, 94/493 ship a gendered animated file). Those facts are now
+    assertions about WHICH CARDS EXIST, which is a stronger claim than "the toggle
+    was disabled" -- the toggle could be disabled for the wrong reason and still
+    pass. Section L asserts the control's absence; this asserts the rules survived
+    it.
   */
-  const featured = await page.evaluate(() => {
-    const block = document.querySelector('[data-testid="sprites-featured"]')
+  const genderRules = await page.evaluate(() => {
+    const ids = (sel) => document.querySelectorAll(sel).length
     return {
-      present: block != null,
-      hasImage: block?.querySelector('[data-testid="artwork-img"]') != null,
-      axes: [...(block?.querySelectorAll('[data-testid^="toggle-"][role="switch"]') ?? [])].map(
-        (e) => e.getAttribute('data-testid'),
-      ),
-      firstInTab:
-        document.querySelector('[data-testid="species-sprites"]')?.firstElementChild ===
-        document.querySelector('[data-testid="sprites-featured"]'),
+      /* Pidgey (16) has no gender differences: no female tile, no female animated
+         card, and the artwork section is the flat two. */
+      femaleTiles: ids('[data-testid^="sprite-tile-"][data-testid*="_female"]'),
+      femaleAnimated: ids('[data-testid$="-female"]'),
+      artworkCards: ids('[data-testid^="sprite-artwork-"]'),
+      animatedCards: ids('[data-testid^="sprite-animated-"]'),
     }
   })
-  log(`  featured panel switches: ${featured.axes.join(', ')}`)
+  log(`  Pidgey gender rules: ${JSON.stringify(genderRules)}`)
   check(
-    'the four-axis artwork control is on the Sprites tab',
-    featured.present && featured.hasImage,
+    'a species with no gender differences has no female card of any kind',
+    genderRules.femaleTiles === 0 && genderRules.femaleAnimated === 0,
+    JSON.stringify(genderRules),
   )
   check(
-    'with all four axes plus the grid filter',
-    featured.axes.join(',') ===
-      'toggle-source,toggle-shiny,toggle-motion,toggle-gender,toggle-grid-filter',
-    featured.axes.join(','),
+    'official artwork is always exactly the two colours, never gendered',
+    genderRules.artworkCards === 2,
+    `(${genderRules.artworkCards})`,
   )
-  check('and it leads the tab rather than sitting under the catalogue', featured.firstInTab)
+  check(
+    'and the animated set is the two colours for it',
+    genderRules.animatedCards === 2,
+    `(${genderRules.animatedCards})`,
+  )
+
+  /* And a species that DOES have gender differences gets the extra cards, from
+     the same bitmask -- so the 94/399 split is a property of the data, not a rule
+     applied twice. Unfezant is Gen 5; Hippopotas (449) is the in-scope case. */
+  await backToGrid()
+  await openSpecies(449)
+  await openTab('Sprites')
+  await page.waitForSelector('[data-testid="species-sprites"]', { timeout: 30000 })
+  const gendered = await page.evaluate(() => ({
+    femaleTiles: [...document.querySelectorAll('[data-testid^="sprite-tile-"]')].filter((e) =>
+      (e.getAttribute('data-testid') || '').includes('_female'),
+    ).length,
+    femaleAnimated: document.querySelectorAll('[data-testid$="-female"]').length,
+  }))
+  log(`  Hippopotas gender rules: ${JSON.stringify(gendered)}`)
+  check(
+    'a species with gender differences does get female cards',
+    gendered.femaleTiles > 0 && gendered.femaleAnimated === 2,
+    JSON.stringify(gendered),
+  )
 
   await page.screenshot({ path: `${SHOTS}/species-page-sprites.png` })
 
@@ -796,6 +898,469 @@ try {
     landedOn === groupId,
     `${groupId} -> ${landedOn}`,
   )
+
+  // ======================================================================== I
+  hr('I — the pinned column against the Figma frame (FIX 1)')
+
+  /*
+    THE FRAME IS THE EXPECTATION, not the screenshot.
+
+    container-sprite (57:837) is 737 x 1031 raw units and every child sits at a
+    known percentage of it, so each one is checkable as a ratio -- which is what
+    makes this a suite entry rather than an eye. Positions are read as fractions of
+    the hero's own box so the assertions hold at any rendered size.
+
+      node            x     y     w    h      -> fraction of 737 x 1031
+      shadow-number   0     29    701  344       0.000 / 0.028 / 0.951 / 0.334
+      poke-artwork    95    213   500  500       0.129 / 0.207 / 0.678 / 0.485
+      Region          17    604   78   313       0.023 / 0.586
+      Name-kata       85    717   557  146       0.115 / 0.696
+      Name-main       85    879   284  78        0.115 / 0.853
+      Name-roma       369   882   305  78        0.501 / 0.855
+  */
+  /*
+    Section G ended on the Breedingdex, so there is no species page to go back
+    from -- the Pokedex has to be re-entered first. And re-entering it lands in
+    whichever of its two states it was left in: the Pokedex is EITHER the grid or a
+    detail page, not both, and it kept the species that was open. So wait for
+    either, then close the detail if that is what came back.
+  */
+  await goToDex(page, 'pokedex')
+  /*
+    THE POINTER HAS TO LEAVE THE NAV. The Pokepedia dropdown opens on hover and
+    stays open while the pointer rests on it, and it overlays the top-left of the
+    content area -- which is where the back link now sits, absolutely positioned to
+    the frame. Playwright leaves the mouse wherever it last clicked, so without this
+    the next click on the back link is intercepted by the still-open dropdown. An
+    artefact of driving a hover menu, not a defect in the page: elementFromPoint at
+    the back link's centre returns the back link once the menu closes.
+  */
+  await page.mouse.move(10, 600)
+  await page.waitForSelector('[data-testid="nav-dropdown-pokepedia"]', {
+    state: 'hidden',
+    timeout: 15000,
+  })
+  await page.waitForSelector('[data-testid="species-rows"], [data-testid="species-page"]', {
+    timeout: 30000,
+  })
+  if (await page.$('[data-testid="species-page-back"]')) await backToGrid()
+  await selectVersionGroup('heartgold-soulsilver')
+  await openSpecies(197) // the species the frame itself draws
+  await page.waitForSelector('[data-testid="species-hero"]', { timeout: 30000 })
+
+  const hero = await page.evaluate(() => {
+    const box = document.querySelector('[data-testid="species-hero"]').getBoundingClientRect()
+    const at = (id) => {
+      const el = document.querySelector(`[data-testid="${id}"]`)
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      return {
+        x: (r.left - box.left) / box.width,
+        y: (r.top - box.top) / box.height,
+        w: r.width / box.width,
+        h: r.height / box.height,
+        right: (r.right - box.left) / box.width,
+        bottom: (r.bottom - box.top) / box.height,
+      }
+    }
+    return {
+      aspect: box.width / box.height,
+      ghost: at('species-hero-ghost'),
+      art: at('species-hero-art'),
+      region: at('species-hero-region'),
+      kana: at('species-page-kana'),
+      name: at('species-hero-name'),
+      roma: at('species-page-romaji'),
+      /* The genus must NOT be in this column -- punch-list item 4. */
+      genusInHero:
+        document.querySelector(
+          '[data-testid="species-hero"] [data-testid="species-banner-genus"]',
+        ) != null,
+      /* Nothing else either: the brief is sprite, three names, ghost number,
+         region label, and that is all. FIX 1 says "nothing else". */
+      strayText: [...document.querySelectorAll('[data-testid="species-hero"] *')]
+        .filter((e) => e.children.length === 0 && (e.textContent || '').trim().length > 0)
+        .map((e) => e.getAttribute('data-testid') || e.className || e.tagName),
+    }
+  })
+  const near = (got, want, tol = 0.02) => Math.abs(got - want) <= tol
+  log(`  hero aspect ${hero.aspect.toFixed(3)} (frame 737/1031 = 0.715)`)
+  log(`  ghost  ${JSON.stringify(hero.ghost)}`)
+  log(`  art    ${JSON.stringify(hero.art)}`)
+  log(`  names  main ${JSON.stringify(hero.name)}  roma ${JSON.stringify(hero.roma)}`)
+  log(`  stray text nodes: ${hero.strayText.join(', ')}`)
+
+  check(
+    'the column has the frame’s aspect ratio',
+    near(hero.aspect, 737 / 1031, 0.01),
+    hero.aspect.toFixed(3),
+  )
+
+  /*
+    PUNCH-LIST ITEM 1. Not "the watermark is smaller" -- "the watermark is inside
+    the card". The frame puts shadow-number at x=0 y=29 in a 737-wide column, so it
+    is left-aligned and fully contained, where the design-system hero card's
+    watermark genuinely does bleed off the top-right and the previous build used
+    that treatment here.
+  */
+  check(
+    'the ghost number is fully inside the column',
+    hero.ghost.x >= -0.005 && hero.ghost.right <= 1.005 && hero.ghost.bottom <= 1,
+    `x ${hero.ghost.x.toFixed(3)} right ${hero.ghost.right.toFixed(3)} bottom ${hero.ghost.bottom.toFixed(3)}`,
+  )
+  check(
+    'and at the frame’s position and size',
+    near(hero.ghost.x, 0) && near(hero.ghost.y, 29 / 1031) && near(hero.ghost.h, 344 / 1031, 0.04),
+    `y ${hero.ghost.y.toFixed(3)} h ${hero.ghost.h.toFixed(3)}`,
+  )
+
+  /*
+    PUNCH-LIST ITEM 2, as a number: the artwork's TOP, not a judgement about "dead
+    band". The frame starts it 20.7% down a column it fills 48.5% of.
+  */
+  check(
+    'the artwork sits where the frame puts it, and is 500 of 737 wide',
+    near(hero.art.y, 213 / 1031) && near(hero.art.w, 500 / 737) && near(hero.art.h, 500 / 1031),
+    `y ${hero.art.y.toFixed(3)} w ${hero.art.w.toFixed(3)} h ${hero.art.h.toFixed(3)}`,
+  )
+
+  /*
+    PUNCH-LIST ITEM 3, and the ordering the prose spec got wrong: the katakana is
+    ABOVE the Latin names, and the two Latin names share ONE ROW rather than
+    stacking. Name-roma's box starts at x=369, exactly where Name-main's ends.
+  */
+  check(
+    'katakana above the name row',
+    hero.kana.bottom <= hero.name.y + 0.01,
+    `kana bottom ${hero.kana.bottom.toFixed(3)} vs name top ${hero.name.y.toFixed(3)}`,
+  )
+  check(
+    'main name and romanisation on one row, roma to the right',
+    Math.abs(hero.name.y - hero.roma.y) < 0.03 && hero.roma.x > hero.name.x,
+    `main y ${hero.name.y.toFixed(3)} roma y ${hero.roma.y.toFixed(3)}`,
+  )
+  check(
+    'all three name lines at the frame’s left inset and vertical positions',
+    near(hero.kana.x, 85 / 737) &&
+      near(hero.name.x, 85 / 737) &&
+      near(hero.kana.y, 717 / 1031, 0.03) &&
+      near(hero.name.y, 879 / 1031, 0.03),
+    `kana ${hero.kana.x.toFixed(3)}/${hero.kana.y.toFixed(3)} name ${hero.name.x.toFixed(3)}/${hero.name.y.toFixed(3)}`,
+  )
+  check(
+    'the rotated region label is at the frame’s left edge',
+    near(hero.region.x, 17 / 737, 0.03),
+    hero.region.x.toFixed(3),
+  )
+  check('the genus is NOT in the pinned column', hero.genusInHero === false)
+  /* Exactly five text-bearing leaves: ghost, region, kana, name, roma. A sixth
+     means something crept back in. */
+  check(
+    'the column carries nothing but the six specified elements',
+    hero.strayText.length === 5,
+    `${hero.strayText.length}: ${hero.strayText.join(', ')}`,
+  )
+
+  /*
+    THE WATERMARK MUST FIT FOR ALL 493, not just for #197. Plex Sans draws
+    proportional digits by default, so a wide number renders wider than a narrow
+    one; tabular-nums is what makes the containment above true in general, and 888
+    is the widest three-digit case.
+  */
+  for (const id of [1, 111, 289, 388, 493]) {
+    await backToGrid()
+    await openSpecies(id)
+    await page.waitForSelector('[data-testid="species-hero-ghost"]', { timeout: 30000 })
+    const fit = await page.evaluate(() => {
+      const box = document.querySelector('[data-testid="species-hero"]').getBoundingClientRect()
+      const g = document.querySelector('[data-testid="species-hero-ghost"]').getBoundingClientRect()
+      return { right: (g.right - box.left) / box.width, text: null }
+    })
+    check(
+      `#${id}’s watermark still fits inside the column`,
+      fit.right <= 1.005,
+      fit.right.toFixed(3),
+    )
+  }
+
+  // ======================================================================== J
+  hr('J — the banner is page chrome, not tab content (FIX 2)')
+
+  /*
+    THE ACTUAL REQUIREMENT: the banner must remain fixed and visible across all
+    four tabs, never disappearing or re-rendering when switching. "Present on every
+    tab" is the weak version of that and would pass for four separate copies, so
+    this asserts the STRONGER thing -- the same DOM node survives, at the same
+    position, with the same text.
+
+    Identity is checked by stamping the node and looking for the stamp again: React
+    would drop a data attribute set outside its control only by replacing the
+    element, so the stamp surviving four tab switches IS "it was never re-mounted".
+  */
+  await backToGrid()
+  await openSpecies(197)
+  await page.waitForSelector('[data-testid="species-banner"]', { timeout: 30000 })
+  await page.evaluate(() => {
+    document.querySelector('[data-testid="species-banner"]').setAttribute('data-probe', 'stamped')
+    document
+      .querySelector('[data-testid="species-page-subnav"]')
+      .setAttribute('data-probe', 'stamped')
+  })
+
+  const bannerState = () =>
+    page.evaluate(() => {
+      const b = document.querySelector('[data-testid="species-banner"]')
+      const nav = document.querySelector('[data-testid="species-page-subnav"]')
+      const panel = document.querySelector('[data-testid^="species-page-panel-"]')
+      const br = b.getBoundingClientRect()
+      const nr = nav.getBoundingClientRect()
+      const pr = panel.getBoundingClientRect()
+      return {
+        stamped: b.getAttribute('data-probe') === 'stamped',
+        navStamped: nav.getAttribute('data-probe') === 'stamped',
+        text: b.textContent.replace(/\s+/g, ' ').trim(),
+        top: Math.round(br.top),
+        left: Math.round(br.left),
+        types: [...b.querySelectorAll('[data-type]')].map((e) => e.getAttribute('data-type')),
+        /* Order, which is the whole of punch-list item 5: banner, then sub-nav,
+           then the panel. */
+        navBelowBanner: nr.top >= br.bottom - 2,
+        panelBelowNav: pr.top >= nr.bottom - 2,
+        navRightAligned: Math.abs(nr.right - br.right) < 40,
+      }
+    })
+
+  const before = await bannerState()
+  log(`  ${JSON.stringify(before)}`)
+  /* textContent concatenates without separators, so the expectation is the run
+     rather than a spaced sentence -- and anchoring it is what makes this an order
+     check as well as a presence check: number, name, genus, type. */
+  check(
+    'the banner carries number, name, genus and types, in that order',
+    /^#0197UmbreonMoonlight Pok.mondark$/.test(before.text),
+    before.text,
+  )
+  check('the type row is in the banner', before.types.join('/') === 'dark', before.types.join('/'))
+  check('the sub-nav sits BELOW the banner', before.navBelowBanner)
+  check('and is right-aligned in the column', before.navRightAligned)
+  check('the panel sits below the sub-nav', before.panelBelowNav)
+
+  for (const tab of ['Learnset', 'Description', 'Sprites', 'Info']) {
+    await openTab(tab)
+    const after = await bannerState()
+    const same =
+      after.stamped &&
+      after.navStamped &&
+      after.text === before.text &&
+      after.top === before.top &&
+      after.left === before.left
+    check(
+      `the same banner node survives the switch to ${tab}, unmoved`,
+      same,
+      same ? '' : JSON.stringify(after),
+    )
+  }
+
+  // ======================================================================== K
+  hr('K — the rebuilt evolution chart (FIX 3)')
+
+  /*
+    THE REFERENCE'S VISUAL LANGUAGE, as the things that can be asserted: no
+    bordered cards, no dex numbers or names drawn, chevron wedges rather than a
+    glyph-plus-caption, and real item sprites for the mechanic. What CANNOT be
+    asserted -- whether it LOOKS like the frames -- is what the screenshots are for.
+  */
+  const evoShape = async (id, label) => {
+    await backToGrid()
+    await openSpecies(id)
+    await page.waitForSelector('[data-testid="evolution-tree"]', { timeout: 30000 })
+    const shape = await page.evaluate(() => {
+      const tree = document.querySelector('[data-testid="evolution-tree"]')
+      const nodes = [...tree.querySelectorAll('[data-testid^="evo-node-"]')]
+      const styles = nodes.map((n) => getComputedStyle(n))
+      return {
+        nodes: nodes.length,
+        arrows: tree.querySelectorAll('[data-testid^="evo-arrow-"]').length,
+        wedges: tree.querySelectorAll('.evo-arrow-wedge').length,
+        chevrons: tree.querySelectorAll('.evo-arrow-chevron').length,
+        icons: [...tree.querySelectorAll('[data-evo-icon]')].map((e) =>
+          e.getAttribute('data-evo-icon'),
+        ),
+        /* No card: no border, no background fill, no radius on any stage. */
+        borders: styles.map((c) => c.borderTopWidth).filter((w) => w !== '0px').length,
+        fills: styles
+          .map((c) => c.backgroundColor)
+          .filter((b) => b !== 'rgba(0, 0, 0, 0)' && b !== 'transparent').length,
+        /* No dex number and no name drawn: the reference draws neither. Both are
+           still in the accessibility tree via .visually-hidden, which is why this
+           filters those out rather than checking for absence of the text. */
+        visibleLabels: [...tree.querySelectorAll('[data-testid^="evo-node-"] span')].filter(
+          (e) => !e.classList.contains('visually-hidden') && (e.textContent || '').trim(),
+        ).length,
+        /* The old glyph register must be gone entirely. */
+        tablerGlyphs: tree.querySelectorAll('svg.trigger-icon').length,
+      }
+    })
+    log(`  ${label}: ${JSON.stringify(shape)}`)
+    return shape
+  }
+
+  const bulba = await evoShape(1, 'Bulbasaur (3-stage linear)')
+  check('three stages, two arrows', bulba.nodes === 3 && bulba.arrows === 2)
+  check('one wedge and three chevrons per arrow', bulba.wedges === 2 && bulba.chevrons === 6)
+  check('no bordered cards around the artwork', bulba.borders === 0 && bulba.fills === 0)
+  check('no dex number or name drawn beside a stage', bulba.visibleLabels === 0)
+  check('no Tabler trigger glyphs anywhere in the chart', bulba.tablerGlyphs === 0)
+  /* The reference draws image-rare-candy on every level-up step, so the level-up
+     register is the Rare Candy item sprite and not a glyph. */
+  check(
+    'level-up steps carry the Rare Candy sprite',
+    bulba.icons.filter((i) => i === 'item-rare-candy').length === 2,
+    bulba.icons.join(','),
+  )
+
+  const starmie = await evoShape(121, 'Starmie (stone)')
+  check(
+    'a stone evolution carries the real item sprite, not a glyph',
+    starmie.icons.includes('item-water-stone'),
+    starmie.icons.join(','),
+  )
+
+  const eevee = await evoShape(133, 'Eevee (radial)')
+  check('Eevee draws all its branches', eevee.nodes === 8 && eevee.arrows === 7)
+  /* Radial, per layout-evo-eevee: seven children on a circle, so no two share a
+     row and no two share a column. A vertical fan would put all seven at the same
+     x. */
+  const radial = await page.evaluate(() => {
+    const tree = document.querySelector('[data-testid="evolution-tree"]')
+    const root = tree.querySelector('[data-testid="evo-node-133"]').getBoundingClientRect()
+    const kids = [...tree.querySelectorAll('[data-testid^="evo-node-"]')]
+      .filter((n) => n.getAttribute('data-testid') !== 'evo-node-133')
+      .map((n) => {
+        const r = n.getBoundingClientRect()
+        return {
+          dx: r.left + r.width / 2 - (root.left + root.width / 2),
+          dy: r.top + r.height / 2 - (root.top + root.height / 2),
+        }
+      })
+    const radii = kids.map((k) => Math.hypot(k.dx, k.dy))
+    const artwork = root.width
+    return {
+      distinctX: new Set(kids.map((k) => Math.round(k.dx / 10))).size,
+      spread: Math.max(...radii) / Math.min(...radii),
+      radiusInArtworks: radii.reduce((a, b) => a + b, 0) / radii.length / artwork,
+      above: kids.filter((k) => k.dy < 0).length,
+      below: kids.filter((k) => k.dy > 0).length,
+    }
+  })
+  log(`  radial: ${JSON.stringify(radial)}`)
+  check('the seven branches are on a circle, not in a column', radial.distinctX >= 5)
+  check('all at one radius', radial.spread < 1.15, radial.spread.toFixed(3))
+  /* layout-evo-eevee measures 2.31 artworks; the formula uses 2.30. */
+  check(
+    'at the frame’s radius of ~2.3 artworks',
+    Math.abs(radial.radiusInArtworks - 2.3) < 0.25,
+    radial.radiusInArtworks.toFixed(2),
+  )
+  check('spread on both sides of the parent', radial.above >= 2 && radial.below >= 2)
+
+  const wurmple = await evoShape(265, 'Wurmple (random fork)')
+  check(
+    'the random fork still draws the dice, now inline on the arrow',
+    wurmple.icons.filter((i) => i === 'random-split').length === 2,
+    wurmple.icons.join(','),
+  )
+  const inlineDice = await page.$$eval('[data-testid^="evo-fork-random-"]', (els) => els.length)
+  check('and keeps its own hook for the fork', inlineDice === 2, `(${inlineDice})`)
+
+  await page.screenshot({ path: `${SHOTS}/species-page-evo-wurmple.png` })
+
+  // ======================================================================== L
+  hr('L — tab polish (FIX 5)')
+
+  await backToGrid()
+  await openSpecies(1)
+  await page.waitForSelector('[data-testid="species-info"]', { timeout: 30000 })
+  const infoOrder = await page.evaluate(() => {
+    const info = document.querySelector('[data-testid="species-info"]')
+    const kids = [...info.children]
+    const idx = (sel) => kids.findIndex((k) => k.matches(sel) || k.querySelector(sel))
+    return {
+      last: kids[kids.length - 1]?.getAttribute('data-testid'),
+      pokeathlon: idx('[data-testid="pokeathlon-pending"]'),
+      matchups: idx('[data-testid="species-type-matchups"]'),
+      stats: idx('[data-testid="species-base-stats"]'),
+      total: kids.length,
+    }
+  })
+  log(`  Info tab order: ${JSON.stringify(infoOrder)}`)
+  /* Gen 4 is selected, so the note is present -- and it must be the LAST block on
+     the tab, after the type chart, rather than sitting between the metadata columns
+     and the stat block where it interrupted the facts. */
+  check(
+    'the Pokeathlon note is the last block on the Info tab',
+    infoOrder.pokeathlon === infoOrder.total - 1 && infoOrder.pokeathlon > infoOrder.matchups,
+    `pokeathlon ${infoOrder.pokeathlon}, matchups ${infoOrder.matchups}, of ${infoOrder.total}`,
+  )
+
+  await openTab('Learnset')
+  await page.waitForSelector('[data-testid="species-learn-level-up"]', { timeout: 60000 })
+  const rhythm = await page.evaluate(() => {
+    const wrap = document.querySelector('[data-testid="species-learnset"]')
+    const scope = wrap.querySelector('.species-scope').getBoundingClientRect()
+    const groups = [...wrap.querySelectorAll('.species-learn-group')].map((g) =>
+      g.getBoundingClientRect(),
+    )
+    return {
+      scopeToFirst: Math.round(groups[0].top - scope.bottom),
+      betweenGroups: groups.slice(1).map((g, i) => Math.round(g.top - groups[i].bottom)),
+      groups: groups.length,
+    }
+  })
+  log(`  learnset rhythm: ${JSON.stringify(rhythm)}`)
+  /* Was --space-gap-lg on a flex column, which on the scaled page is ~34px. The
+     tighter step is the fix; the numbers are the assertion that it is actually
+     tighter and did not collapse to nothing. */
+  check(
+    'the gap between the game selector and the first table is tightened',
+    rhythm.scopeToFirst >= 2 && rhythm.scopeToFirst <= 26,
+    `${rhythm.scopeToFirst}px`,
+  )
+  check(
+    'and so is the gap between consecutive tables',
+    rhythm.betweenGroups.every((g) => g >= 2 && g <= 26),
+    rhythm.betweenGroups.join(', '),
+  )
+
+  await openTab('Sprites')
+  await page.waitForSelector('[data-testid="species-sprites"]', { timeout: 30000 })
+  const spritesTab = await page.evaluate(() => ({
+    /* The four-axis control and its filter switch must both be gone. */
+    toggles: document.querySelectorAll('[data-testid^="toggle-"]').length,
+    artworkPanel: document.querySelector('[data-testid="artwork-img"]') != null,
+    featured: document.querySelector('[data-testid="sprites-featured"]') != null,
+    filterCount: document.querySelector('[data-testid="sprites-filter-count"]') != null,
+    cards: document.querySelectorAll('.sprite-card').length,
+    declared: Number(document.querySelector('[data-testid="species-sprites"]')?.dataset.cards),
+    /* Still labelled -- that was the brief for the tab and it did not change. */
+    labelled: [...document.querySelectorAll('.sprite-card')].every(
+      (c) =>
+        (c.querySelector('.sprite-card-primary')?.textContent || '').trim() &&
+        (c.querySelector('.sprite-card-secondary')?.textContent || '').trim(),
+    ),
+  }))
+  log(`  sprites: ${JSON.stringify(spritesTab)}`)
+  check(
+    'no artwork control on the Sprites tab',
+    spritesTab.toggles === 0 && !spritesTab.artworkPanel,
+  )
+  check('and no filter switch or filter count', !spritesTab.featured && !spritesTab.filterCount)
+  check(
+    'every variant is in the one sequence',
+    spritesTab.cards === spritesTab.declared && spritesTab.cards > 20,
+    `${spritesTab.cards} of ${spritesTab.declared}`,
+  )
+  check('every card still names its game and its slot', spritesTab.labelled)
 
   // ======================================================================== H
   hr('H — CONSOLE / PAGE / HTTP')

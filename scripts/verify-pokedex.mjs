@@ -593,131 +593,139 @@ try {
   check('17 attacking types in Gen 4', gen4Attacking === '17')
 
   // ------------------------------------------------------------ SCENARIO H
-  hr('SCENARIO H — no gender toggle for a species without a gender difference')
+  hr('SCENARIO H — a species with no gender difference has no gendered image')
   /*
-    THE FOUR-AXIS CONTROL LIVES ON THE SPRITES TAB NOW, folded in from the old
-    detail page rather than dropped. Same component, same testids, same
-    availability rules -- so what changed here is one openTab call, not the claim.
-    A fifth switch sits beside the four: it turns the same axes into a filter over
-    the sprite catalogue, and is why the count below is 5.
+    RE-POINTED FROM THE CONTROL TO THE CATALOGUE. These three scenarios used to
+    drive the four-axis artwork picker (source / colour / motion / gender), which
+    has been removed: the Sprites tab is now one sequence of every variant, and
+    Artwork.tsx is deleted rather than left unreferenced.
+
+    THE RULES THEY TESTED ARE STILL TESTED, and more directly. "The gender switch
+    is disabled for Bulbasaur" was a proxy for "Bulbasaur has no gendered image",
+    and a disabled switch can be disabled for the wrong reason and still pass.
+    Asserting that no gendered CARD exists is the claim itself:
+
+      in-game gendered   94/493 -- front_female / front_shiny_female are non-null
+                         for exactly the species flagged has_gender_differences.
+                         Driven by the same bitmask that builds the tiles, so an
+                         absent bit is an absent card and no second rule is applied.
+      artwork gendered   0/493 -- official-artwork exposes only front_default and
+                         front_shiny, audited across all 508 varieties.
+      animated gendered  94/493 -- getSpriteUrl still owns the whole rule.
   */
   await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', 'bulbasaur'))
   await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 15000 })
   await openSpecies(1)
   await openTab('Sprites')
-  await page.waitForSelector('[data-testid="artwork-img"]', { timeout: 30000 })
-  // The switch is always rendered and DISABLED when unavailable: a greyed control
-  // with a stated reason beats a control that silently disappears.
-  const bulbaSwitches = await page.$$eval('[data-testid^="toggle-"][role="switch"]', (els) =>
-    els.map((e) => ({
-      id: e.getAttribute('data-testid'),
-      disabled: e.getAttribute('data-disabled') === 'true',
-      value: e.getAttribute('data-value'),
-    })),
-  )
-  log(`  Bulbasaur switches: ${JSON.stringify(bulbaSwitches)}`)
-  const findSwitch = (id) => bulbaSwitches.find((s) => s.id === `toggle-${id}`)
+  await page.waitForSelector('[data-testid="species-sprites"]', { timeout: 30000 })
+
+  const bulbaCards = await page.evaluate(() => {
+    const ids = [...document.querySelectorAll('.sprite-card')].map((c) =>
+      c.getAttribute('data-testid'),
+    )
+    return {
+      total: ids.length,
+      artwork: ids.filter((i) => i.startsWith('sprite-artwork-')),
+      animated: ids.filter((i) => i.startsWith('sprite-animated-')),
+      female: ids.filter((i) => i.includes('female')),
+      /* The control and its switches must be gone entirely, not hidden. */
+      switches: document.querySelectorAll('[data-testid^="toggle-"][role="switch"]').length,
+      artworkPanel: document.querySelector('[data-testid="artwork-img"]') != null,
+    }
+  })
+  log(`  Bulbasaur: ${JSON.stringify(bulbaCards)}`)
   check(
-    'the four axes render, plus the grid filter',
-    bulbaSwitches.length === 5,
-    `(${bulbaSwitches.length})`,
+    'the four-axis artwork control is gone from the tab',
+    bulbaCards.switches === 0 && bulbaCards.artworkPanel === false,
+    `${bulbaCards.switches} switch(es)`,
   )
   check(
-    'all four axes are present by name',
-    ['source', 'shiny', 'motion', 'gender'].every((id) => findSwitch(id) != null),
+    'no gendered card of any kind for a species without a gender difference',
+    bulbaCards.female.length === 0,
+    bulbaCards.female.join(','),
   )
-  check('gender switch disabled for Bulbasaur', findSwitch('gender')?.disabled === true)
-  check('shiny switch present and enabled', findSwitch('shiny')?.disabled === false)
   check(
-    'motion switch present and enabled (artwork source)',
-    findSwitch('motion')?.disabled === false,
+    'official artwork is the two colours and never gendered',
+    bulbaCards.artwork.join(',') === 'sprite-artwork-regular,sprite-artwork-shiny',
+    bulbaCards.artwork.join(','),
   )
-  check('the grid filter defaults to off', findSwitch('grid-filter')?.value === 'All sprites')
+  check(
+    'and the animated set is the two colours for it',
+    bulbaCards.animated.join(',') === 'sprite-animated-regular-male,sprite-animated-shiny-male',
+    bulbaCards.animated.join(','),
+  )
 
   // ------------------------------------------------------------ SCENARIO G
-  hr('SCENARIO G — shiny artwork fetched once, cached thereafter')
-  const regularSrc = await page.getAttribute('[data-testid="artwork-img"]', 'src')
-  await page.click('[data-testid="toggle-shiny"]')
-  await page.waitForFunction(
-    (prev) => document.querySelector('[data-testid="artwork-img"]')?.getAttribute('src') !== prev,
-    regularSrc,
-    { timeout: 15000 },
+  hr('SCENARIO G — shiny artwork crosses the wire once, cached thereafter')
+  /*
+    THE CACHING CLAIM IS UNCHANGED and is about the runtime cache, not about a
+    toggle: the bytes cross the network once and every later view is served
+    locally. What drives the repeat view is different -- there is no toggle to
+    flip, so the tab is left and re-entered, which unmounts and remounts the card
+    and issues a fresh request for the same URL. That is a stricter test of the
+    cache than re-showing an image the browser already has in a live <img>.
+  */
+  const shinySrc = await page.getAttribute(
+    '[data-testid="sprite-artwork-shiny"] .sprite-card-img',
+    'src',
   )
-  const shinySrc = await page.getAttribute('[data-testid="artwork-img"]', 'src')
   await page.waitForFunction(
     () => {
-      const img = document.querySelector('[data-testid="artwork-img"]')
+      const img = document.querySelector('[data-testid="sprite-artwork-shiny"] .sprite-card-img')
       return img && img.complete && img.naturalWidth > 0
     },
     undefined,
     { timeout: 30000 },
   )
-  log(`  regular src : ${regularSrc}`)
-  log(`  shiny src   : ${shinySrc}`)
-  check('artwork src changed on shiny toggle', shinySrc !== regularSrc)
+  log(`  shiny artwork src : ${shinySrc}`)
   const firstFetches = networkFetches(shinySrc)
-  const firstAttempts = attemptsFor(shinySrc).length
-  log(
-    `  after 1st toggle: ${firstAttempts} attempt(s), ${firstFetches} of them a real network fetch`,
-  )
+  log(`  after first view: ${attemptsFor(shinySrc).length} attempt(s), ${firstFetches} network`)
+  check('the shiny official artwork card is present and loaded', firstFetches >= 1)
 
-  // Toggle away and back twice; the same URL must not be re-fetched.
   for (let i = 0; i < 2; i++) {
-    await page.click('[data-testid="toggle-shiny"]')
-    await page.waitForTimeout(250)
-    await page.click('[data-testid="toggle-shiny"]')
-    await page.waitForTimeout(400)
+    await openTab('Info')
+    await page.waitForTimeout(200)
+    await openTab('Sprites')
+    await page
+      .waitForFunction(
+        () => {
+          const img = document.querySelector(
+            '[data-testid="sprite-artwork-shiny"] .sprite-card-img',
+          )
+          return img != null && img.complete && img.naturalWidth > 0
+        },
+        undefined,
+        { timeout: 15000 },
+      )
+      .catch(() => {})
   }
-  /*
-    Settle before measuring. Without this the third view's response event can
-    still be in flight, which is the other half of why this block flaked: an
-    attempt with no response yet classifies as 'pending', and a run that measured
-    early saw a different mix than one that did not.
-  */
-  await page
-    .waitForFunction(
-      () => {
-        const img = document.querySelector('[data-testid="artwork-img"]')
-        return img != null && img.complete && img.naturalWidth > 0
-      },
-      undefined,
-      { timeout: 15000 },
-    )
-    .catch(() => {})
-  const shinyState = await page.getAttribute('[data-testid="artwork-img"]', 'data-shiny')
   const attempts = attemptsFor(shinySrc)
   const afterFetches = networkFetches(shinySrc)
   const cacheHits = attempts.filter((a) => a.kind === 'cache').length
   const pending = attempts.filter((a) => a.kind === 'pending').length
   log(
-    `  after 3 total shiny views: ${attempts.length} attempt(s) = ${afterFetches} network + ${cacheHits} cache + ${pending} pending`,
+    `  after 3 total views: ${attempts.length} attempt(s) = ${afterFetches} network + ${cacheHits} cache + ${pending} pending`,
   )
-  log(`  artwork img data-shiny=${shinyState}`)
-  log(`  per-attempt classification:`)
   attempts.forEach((a, i) =>
     log(`    #${i + 1} ${a.kind.padEnd(7)} bytes=${a.bytes} disk=${a.disk} sw=${a.sw}`),
   )
-
   /*
-    THE CLAIM IS ABOUT NETWORK FETCHES, NOT REQUEST EVENTS. It used to count
-    requestWillBeSent events, which include cache hits, so a second view served
-    from the disk cache read as a second fetch. What the spec actually promises is
-    that the bytes cross the wire once and every later view is served locally --
-    which is now three separate claims instead of one ambiguous count.
+    THE CLAIM IS ABOUT NETWORK FETCHES, NOT REQUEST EVENTS. Counting
+    requestWillBeSent would count cache hits too, so a second view served from disk
+    would read as a second fetch. Bytes on the wire is the discriminator.
   */
   check(
     'shiny artwork crossed the network exactly once across three views',
     afterFetches === 1,
     `(${afterFetches} network fetch(es) of ${attempts.length} attempts)`,
   )
-  check('no additional network fetch on repeat toggles', afterFetches === firstFetches)
+  check('no additional network fetch on re-entering the tab', afterFetches === firstFetches)
   check(
     'and every later attempt was served from a cache, not left pending',
     attempts.length >= 1 && pending === 0 && cacheHits === attempts.length - afterFetches,
     `${cacheHits} cache, ${pending} pending`,
   )
-  check('shiny is the state being displayed', shinyState === 'true')
 
   // "cached after" is only meaningful if it is actually in the cache.
   const artworkCache = await page.evaluate(async (url) => {
@@ -743,84 +751,61 @@ try {
 
   // ------------------------------------------------------------ SCENARIO I
   hr('SCENARIO I — Murkrow (#198) animated sprite uses the unsuffixed file')
+  /*
+    THE ONE-OFF THIS PROTECTS: 93 of the 94 gendered species ship both a `-m` and a
+    `-f` animated file; Murkrow ships an unsuffixed file for the male instead. The
+    rule lives in getSpriteUrl and the cards are built from it, so reading the two
+    cards' src attributes tests the rule directly rather than through two clicks.
+  */
   await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', 'murkrow'))
   await page.waitForSelector('[data-testid="species-row-198"]', { timeout: 15000 })
   await openSpecies(198)
   await openTab('Sprites')
-  await page.waitForSelector('[data-testid="artwork-img"]', { timeout: 30000 })
-  // Murkrow opens on artwork+static, where no gendered image exists, so the
-  // gender switch is disabled until motion is switched to animated.
-  const murkrowGenderBefore = await page.getAttribute(
-    '[data-testid="toggle-gender"]',
-    'data-disabled',
-  )
-  check(
-    'gender disabled while viewing static official artwork',
-    murkrowGenderBefore === 'true',
-    `(data-disabled=${murkrowGenderBefore})`,
-  )
-
-  await page.click('[data-testid="toggle-motion"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-src-kind') ===
-      'animated',
-    undefined,
-    { timeout: 15000 },
-  )
+  await page.waitForSelector('[data-testid="sprite-animated-regular-male"]', { timeout: 30000 })
   await page.waitForFunction(
     () => {
-      const img = document.querySelector('[data-testid="artwork-img"]')
-      return img && img.complete
+      const m = document.querySelector('[data-testid="sprite-animated-regular-male"] img')
+      const f = document.querySelector('[data-testid="sprite-animated-regular-female"] img')
+      return m && f && m.complete && f.complete
     },
     undefined,
     { timeout: 30000 },
   )
-  const male = await page.$eval('[data-testid="artwork-img"]', (el) => ({
-    src: el.getAttribute('src'),
-    naturalWidth: el.naturalWidth,
-    complete: el.complete,
-  }))
-  log(`  male/default animated src : ${male.src}`)
-  log(`  loaded: complete=${male.complete} naturalWidth=${male.naturalWidth}`)
-  check('male sprite uses the unsuffixed file', male.src.endsWith('/198-front-n.webp'), male.src)
-  check('male sprite URL contains no "-m" suffix', !/-[ns]-m\.webp$/.test(male.src))
-  check('male sprite actually rendered (naturalWidth > 0)', male.naturalWidth > 0)
-  const noError = await page.$$('[data-testid="artwork-error"]')
-  check('no broken-image error shown', noError.length === 0)
-  const murkrowGenderAfter = await page.getAttribute(
-    '[data-testid="toggle-gender"]',
-    'data-disabled',
-  )
+  const murkrow = await page.evaluate(() => {
+    const one = (id) => {
+      const img = document.querySelector(`[data-testid="${id}"] img`)
+      return img ? { src: img.getAttribute('src'), naturalWidth: img.naturalWidth } : null
+    }
+    return {
+      male: one('sprite-animated-regular-male'),
+      female: one('sprite-animated-regular-female'),
+      shinyMale: one('sprite-animated-shiny-male'),
+      shinyFemale: one('sprite-animated-shiny-female'),
+      brokenImages: [...document.querySelectorAll('.sprite-card-img')].filter(
+        (i) => i.complete && i.naturalWidth === 0,
+      ).length,
+    }
+  })
+  log(`  male/default animated src : ${murkrow.male.src}`)
+  log(`  female animated src       : ${murkrow.female.src}`)
   check(
-    'gender enabled once motion is animated',
-    murkrowGenderAfter === 'false',
-    `(data-disabled=${murkrowGenderAfter})`,
+    'male sprite uses the unsuffixed file',
+    murkrow.male.src.endsWith('/198-front-n.webp'),
+    murkrow.male.src,
   )
-
-  await page.click('[data-testid="toggle-gender"]')
-  await page.waitForFunction(
-    (prev) => document.querySelector('[data-testid="artwork-img"]')?.getAttribute('src') !== prev,
-    male.src,
-    { timeout: 15000 },
+  check('male sprite URL contains no "-m" suffix', !/-[ns]-m\.webp$/.test(murkrow.male.src))
+  check('male sprite actually rendered (naturalWidth > 0)', murkrow.male.naturalWidth > 0)
+  check(
+    'female sprite uses the -f file',
+    murkrow.female.src.endsWith('/198-front-n-f.webp'),
+    murkrow.female.src,
   )
-  await page.waitForFunction(
-    () => {
-      const img = document.querySelector('[data-testid="artwork-img"]')
-      return img && img.complete
-    },
-    undefined,
-    { timeout: 30000 },
-  )
-  const female = await page.$eval('[data-testid="artwork-img"]', (el) => ({
-    src: el.getAttribute('src'),
-    naturalWidth: el.naturalWidth,
-  }))
-  log(`  female animated src : ${female.src}`)
-  log(`  loaded: naturalWidth=${female.naturalWidth}`)
-  check('female sprite uses the -f file', female.src.endsWith('/198-front-n-f.webp'), female.src)
-  check('female sprite actually rendered', female.naturalWidth > 0)
+  check('female sprite actually rendered', murkrow.female.naturalWidth > 0)
+  /* All four combinations exist for a gendered species, not just the two the old
+     control could reach one at a time. */
+  check('the shiny pair is present too', murkrow.shinyMale != null && murkrow.shinyFemale != null)
+  check('no broken images among the loaded cards', murkrow.brokenImages === 0)
   await page.screenshot({ path: `${SHOTS}/scenarioI-murkrow.png` })
 
   // -------------------------------------------------- detail completeness
@@ -842,7 +827,9 @@ try {
   const sections = {
     'base stats': '[data-testid="species-base-stats"]',
     'stat total': '[data-testid="stat-total"]',
-    types: '[data-testid="species-info-types"]',
+    /* In the persistent banner now rather than inside the Info tab -- which is
+       where the frame puts them, and what makes them visible on all four tabs. */
+    types: '[data-testid="species-banner-types"]',
     'growth rate': '[data-testid="growth-rate"]',
     'catch rate': '[data-testid="catch-rate"]',
     'base XP': '[data-testid="base-xp"]',
@@ -938,21 +925,37 @@ try {
         { timeout: 20000 },
       )
       .catch(() => {})
-    return page.evaluate(() => ({
-      keys: [...document.querySelectorAll('.evo-painted-icon')].map((i) => i.dataset.evoIcon),
-      natural: [...document.querySelectorAll('.evo-painted-icon')].map(
-        (i) => `${i.naturalWidth}x${i.naturalHeight}`,
-      ),
-      boxes: [...document.querySelectorAll('.evo-painted-icon')].map((i) =>
-        Math.round(i.getBoundingClientRect().width),
-      ),
-      labels: [
-        ...document.querySelectorAll(
-          '.evo-arrow .visually-hidden, .evo-fork-random .visually-hidden',
+    return page.evaluate(() => {
+      const icons = [...document.querySelectorAll('.evo-painted-icon')]
+      /*
+        TWO ICON REGISTERS NOW, and they must not be conflated. The rebuilt chart
+        draws the mechanic's own ITEM sprite beside the painted condition icon --
+        image-rare-candy on every level-up step, the real stone on a use-item step,
+        the Soothe Bell for friendship -- because that is what the reference frames
+        draw. Item sprites are PokeAPI's 30x30 in-game icons; the painted set is
+        our own normalised 128x128. Both are .evo-painted-icon and both are sized
+        from --evo-icon-size, so the register is read off data-evo-icon.
+      */
+      const painted = icons.filter((i) => !(i.dataset.evoIcon || '').startsWith('item-'))
+      const items = icons.filter((i) => (i.dataset.evoIcon || '').startsWith('item-'))
+      const dims = (list) => list.map((i) => `${i.naturalWidth}x${i.naturalHeight}`)
+      const box = (list) => list.map((i) => Math.round(i.getBoundingClientRect().width))
+      return {
+        keys: icons.map((i) => i.dataset.evoIcon),
+        paintedKeys: painted.map((i) => i.dataset.evoIcon),
+        natural: dims(painted),
+        boxes: box(painted),
+        itemNatural: dims(items),
+        itemBoxes: box(items),
+        /* One hidden sentence per requirement, on the trigger, rather than one per
+           icon: the icons carry empty alt so a screen reader gets the full clause
+           once instead of a stutter of fragments. */
+        labels: [...document.querySelectorAll('.evo-trigger .visually-hidden')].map(
+          (e) => e.textContent,
         ),
-      ].map((e) => e.textContent),
-      fork: document.querySelector('[data-random-fork="true"]') != null,
-    }))
+        forkIcons: document.querySelectorAll('[data-testid^="evo-fork-random-"]').length,
+      }
+    })
   }
 
   // One species per painted condition, chosen because each is the only Gen 1-4
@@ -973,10 +976,26 @@ try {
       got.keys.includes(c.expect),
       got.keys.join(', ') || '(none)',
     )
+    /*
+      Still the normalised 128px asset -- that has not changed and is what
+      normalize-evo-icons.mjs guarantees. What changed is the DRAWN size: it was a
+      fixed 20px beside 16px line glyphs, and the chart has no line glyphs any
+      more. Every length in it is a fraction of the drawing, so the assertion is
+      that the box is square, non-trivial, and the same for every painted icon on
+      the chart rather than a magic number.
+    */
     check(
-      `  and it is the normalised 128px asset drawn at 20px`,
-      got.natural.every((n) => n === '128x128') && got.boxes.every((b) => b === 20),
-      `${got.natural.join(',')} @ ${got.boxes.join(',')}px`,
+      `  and it is still the normalised 128px asset`,
+      got.natural.every((n) => n === '128x128'),
+      got.natural.join(','),
+    )
+    check(
+      `  drawn at one consistent size, scaled to the chart`,
+      got.boxes.length > 0 &&
+        new Set(got.boxes).size === 1 &&
+        got.boxes[0] >= 12 &&
+        got.boxes[0] <= 120,
+      `${got.boxes.join(',')}px`,
     )
     check(
       `  with a screen-reader label`,
@@ -996,7 +1015,7 @@ try {
     ),
     eeveeIcons.keys.join(', '),
   )
-  check('and Eevee is NOT marked a random fork', eeveeIcons.fork === false)
+  check('and Eevee is NOT marked a random fork', eeveeIcons.forkIcons === 0)
 
   /*
     Wurmple is the ONLY fork in the whole bundle whose branches are byte-identical,
@@ -1005,13 +1024,31 @@ try {
     caught Pokemon to resolve against.
   */
   const wurmple = await paintedOn(265)
-  log(`  Wurmple painted: ${wurmple.keys.join(', ')}  fork=${wurmple.fork}`)
-  check('Wurmple is marked a random fork', wurmple.fork === true)
+  log(`  Wurmple painted: ${wurmple.keys.join(', ')}  forkIcons=${wurmple.forkIcons}`)
+  /*
+    THE MARKER MOVED FROM A ROW TO THE ARROW, which is what the 2-branch-long frame
+    draws: dice, "+", rare candy, "Lv.7", inline on each branch. So there are TWO
+    dice -- one per outcome -- where the old separate "Random" row appeared once at
+    the branch point, and data-random-fork is gone with the <ul> that carried it.
+  */
+  check('Wurmple is marked a random fork on both branches', wurmple.forkIcons === 2)
   check('with the dice icon at the branch point', wurmple.keys.includes('random-split'))
+  /*
+    THE OUTCOME NAMES ARE NOT IN THE CHART ANY MORE, and that is deliberate rather
+    than a loss: the old hidden label read "Random outcome: Silcoon or Cascoon"
+    because the marker sat above both branches and had to say which two it meant.
+    Inline on each branch, the outcome is the artwork the arrow points at, which is
+    already named by its own accessible label -- so the dice says "random" and the
+    node says which. Asserting the old sentence would be asserting the old markup.
+  */
+  const wurmpleNames = await page.$$eval('[data-testid^="evo-node-"] .visually-hidden', (els) =>
+    els.map((e) => e.textContent),
+  )
   check(
-    'and the hidden label names both outcomes',
-    wurmple.labels.some((l) => l?.includes('Silcoon') && l.includes('Cascoon')),
-    wurmple.labels.join(' | '),
+    'and both outcomes are still named in the accessibility tree',
+    wurmpleNames.some((l) => l?.includes('Silcoon')) &&
+      wurmpleNames.some((l) => l?.includes('Cascoon')),
+    wurmpleNames.join(' | '),
   )
   await page.screenshot({ path: `${SHOTS}/evo-wurmple-random.png`, fullPage: true })
 

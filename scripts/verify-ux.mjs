@@ -331,11 +331,11 @@ try {
     })
   }
 
-  /** Open the species and land on the Sprites tab, where the artwork control is. */
+  /** Open the species and land on the Sprites tab, which is the whole catalogue. */
   const openSprites = async (id) => {
     await openSpecies(id)
     await openTab('Sprites')
-    await page.waitForSelector('[data-testid="artwork-img"]', { timeout: 30000 })
+    await page.waitForSelector('[data-testid="species-sprites"]', { timeout: 30000 })
   }
 
   const backToGrid = async () => {
@@ -350,38 +350,33 @@ try {
     await withControls(() => page.fill('[data-testid="species-search"]', term))
     await page.waitForSelector(`[data-testid="species-row-${expectId}"]`, { timeout: 15000 })
   }
-  const imgState = () =>
-    page.$eval('[data-testid="artwork-img"]', (el) => ({
+  /**
+   * One sprite card, by testid: its URL and whether the image really rendered.
+   *
+   * REPLACES imgState / switchState / waitLoaded / waitSrcChange, which all read
+   * the four-axis artwork control. That control is gone -- the Sprites tab is one
+   * sequence of every variant now, so "which image does this axis combination
+   * resolve to" is answered by which CARD exists and what its src is, with no
+   * clicking and no intermediate state to wait for.
+   */
+  const cardState = (testId) =>
+    page.$eval(`[data-testid="${testId}"] img`, (el) => ({
       src: el.getAttribute('src'),
-      mode: el.getAttribute('data-mode'),
-      shiny: el.getAttribute('data-shiny'),
-      gender: el.getAttribute('data-gender'),
-      kind: el.getAttribute('data-src-kind'),
       naturalWidth: el.naturalWidth,
       complete: el.complete,
     }))
-  const switchState = (id) =>
-    page.$eval(`[data-testid="toggle-${id}"]`, (el) => ({
-      state: el.getAttribute('data-state'),
-      value: el.getAttribute('data-value'),
-      disabled: el.getAttribute('data-disabled') === 'true',
-      ariaChecked: el.getAttribute('aria-checked'),
-      reason: el.getAttribute('title'),
-    }))
-  const waitLoaded = () =>
+
+  const cardIds = () =>
+    page.$$eval('.sprite-card', (els) => els.map((e) => e.getAttribute('data-testid')))
+
+  const waitCards = (testId) =>
     page.waitForFunction(
-      () => {
-        const img = document.querySelector('[data-testid="artwork-img"]')
-        return img && img.complete && img.naturalWidth > 0
+      (id) => {
+        const img = document.querySelector(`[data-testid="${id}"] img`)
+        return img != null && img.complete && img.naturalWidth > 0
       },
-      undefined,
+      testId,
       { timeout: 30000 },
-    )
-  const waitSrcChange = async (prev) =>
-    page.waitForFunction(
-      (p) => document.querySelector('[data-testid="artwork-img"]')?.getAttribute('src') !== p,
-      prev,
-      { timeout: 15000 },
     )
 
   await page.goto(APP_URL, { waitUntil: 'load' })
@@ -390,290 +385,170 @@ try {
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
 
   // -------------------------------------------------------------- ITEM 1
-  hr('ITEM 1 (DOM) — static artwork resolves to official artwork, not the in-game sprite')
+  hr('ITEM 1 (DOM) — the artwork cards are the official-artwork asset, not the sprite')
+  /*
+    RE-POINTED FROM THE CONTROL TO THE CATALOGUE. ITEMs 1-3 used to drive the
+    four-axis artwork picker (source / colour / motion / gender) through some fifty
+    clicks and intermediate states. The picker is gone: the Sprites tab is one
+    sequence of every variant, and Artwork.tsx is deleted rather than left
+    unreferenced.
+
+    THE CLAIMS SURVIVE, AND GET SHORTER. Every one of them was of the form "axis
+    combination X resolves to URL Y", which is now "the card for X has src Y" -- the
+    same fact with the clicking removed. Two of them get STRONGER: the gender matrix
+    below used to be read one mode at a time from a disabled attribute, and a
+    disabled switch can be disabled for the wrong reason and still pass; the cards
+    for all three modes are on screen at once and either exist or do not.
+
+    The three data-level ITEMs at the top of this suite are untouched -- they audit
+    all 493 species against the bundle and never used the DOM.
+  */
   await search('bulbasaur', 1)
   await openSprites(1)
-  await waitLoaded()
-  const defaultImg = await imgState()
-  log(`  default src : ${defaultImg.src}`)
-  log(`  mode=${defaultImg.mode} shiny=${defaultImg.shiny} naturalWidth=${defaultImg.naturalWidth}`)
+  await waitCards('sprite-artwork-regular')
+  const regularArt = await cardState('sprite-artwork-regular')
+  log(`  regular artwork src : ${regularArt.src}`)
   check(
-    'default artwork is the official-artwork asset',
-    defaultImg.src.includes('other/official-artwork/1.png'),
-    defaultImg.src,
+    'the regular artwork card is the official-artwork asset',
+    regularArt.src.includes('other/official-artwork/1.png'),
+    regularArt.src,
   )
-  check('default mode is artwork-static', defaultImg.mode === 'artwork-static')
   check(
     'official artwork actually loaded at full size (475px source)',
-    defaultImg.naturalWidth === 475,
-    `(naturalWidth=${defaultImg.naturalWidth})`,
+    regularArt.naturalWidth === 475,
+    `(naturalWidth=${regularArt.naturalWidth})`,
   )
 
-  await page.click('[data-testid="toggle-shiny"]')
-  await waitSrcChange(defaultImg.src)
-  await waitLoaded()
-  const shinyArt = await imgState()
-  log(`  shiny src   : ${shinyArt.src}`)
+  await waitCards('sprite-artwork-shiny')
+  const shinyArt = await cardState('sprite-artwork-shiny')
+  log(`  shiny artwork src   : ${shinyArt.src}`)
   check(
-    'shiny uses the official-artwork shiny field',
+    'the shiny card uses the official-artwork shiny field',
     shinyArt.src.includes('other/official-artwork/shiny/1.png'),
     shinyArt.src,
   )
   check('shiny official artwork loaded', shinyArt.naturalWidth > 0)
-  await page.click('[data-testid="toggle-shiny"]')
-  await waitSrcChange(shinyArt.src)
-  await waitLoaded()
+  check('and the two are different URLs', shinyArt.src !== regularArt.src)
 
   // -------------------------------------------------------------- ITEM 2
-  hr('ITEM 2 (DOM) — the four artwork axes, with the specified defaults')
-  const switches = await page.$$eval('[data-testid^="toggle-"][role="switch"]', (els) =>
-    els.map((e) => ({
-      id: e.getAttribute('data-testid'),
-      role: e.getAttribute('role'),
-      value: e.getAttribute('data-value'),
-      state: e.getAttribute('data-state'),
-      disabled: e.getAttribute('data-disabled') === 'true',
-    })),
-  )
-  log(`  switches (in DOM order):`)
-  switches.forEach((s) => log(`    ${s.id.padEnd(16)} value=${s.value.padEnd(9)} state=${s.state}`))
+  hr('ITEM 2 (DOM) — the three image sources, each from its own place')
   /*
-    FIVE, not four: the four axes came across from the old page unchanged, and the
-    fifth is new here -- it turns the same four axes into a filter over the sprite
-    catalogue below. The order assertion is therefore about the four axes leading,
-    with the grid filter last, rather than about the total.
+    WHAT THE `source` AND `motion` AXES ENCODED. Only three of their eight
+    combinations were ever real, and they are the three registers the catalogue now
+    shows as labelled sections:
+
+      artwork  static    PokeAPI official (Sugimori) artwork
+      artwork  animated  the pokeapp-sprites animated WebP
+      in-game  static    the PokeAPI in-game front sprite
+
+    "Motion is disabled under In-game, with a reason given" was the control's way of
+    saying there is no fourth combination. The catalogue says it by not having a
+    section for one -- and by the in-game cards coming from the bitmask, which only
+    ever describes static slots.
   */
-  check(
-    'five switches: the four axes plus the grid filter',
-    switches.length === 5,
-    `(${switches.length})`,
+  const ids = await cardIds()
+  const sections = await page.$$eval('[data-testid^="sprites-"]', (els) =>
+    els.map((e) => e.getAttribute('data-testid')),
   )
+  log(`  sections: ${sections.join(', ')}`)
   check(
-    'all of them use role="switch" (not plain buttons)',
-    switches.every((s) => s.role === 'switch'),
-  )
-  const ids = switches.map((s) => s.id)
-  check(
-    'the four axes come first, in order source, shiny, motion, gender',
-    JSON.stringify(ids.slice(0, 4)) ===
-      JSON.stringify(['toggle-source', 'toggle-shiny', 'toggle-motion', 'toggle-gender']),
-    ids.join(','),
-  )
-  check('and the grid filter is last', ids[4] === 'toggle-grid-filter', ids.join(','))
-  const defaults = Object.fromEntries(switches.map((s) => [s.id, s.value]))
-  log(`  defaults: ${JSON.stringify(defaults)}`)
-  check('Source defaults to Artwork', defaults['toggle-source'] === 'Artwork')
-  check('Color defaults to Regular', defaults['toggle-shiny'] === 'Regular')
-  check('Motion defaults to Static', defaults['toggle-motion'] === 'Static')
-  check('Gender defaults to Male', defaults['toggle-gender'] === 'Male')
-  check('the grid filter defaults to off', defaults['toggle-grid-filter'] === 'All sprites')
-
-  /*
-    THE FILTER IS OPT-IN, and this is the assertion that pins why. With it off the
-    grid is the whole catalogue; with it on the default axes (artwork, regular,
-    static, male) narrow it to the one official artwork. Applying it
-    unconditionally would have made that the tab's opening state.
-  */
-  const gridBefore = await page.$eval('[data-testid="species-sprites"]', (el) => ({
-    shown: Number(el.getAttribute('data-tiles')),
-    all: Number(el.getAttribute('data-all-tiles')),
-    filtered: el.getAttribute('data-filtered'),
-  }))
-  await page.click('[data-testid="toggle-grid-filter"]')
-  await page.waitForSelector('[data-testid="sprites-filter-count"]', { timeout: 15000 })
-  const gridAfter = await page.$eval('[data-testid="species-sprites"]', (el) => ({
-    shown: Number(el.getAttribute('data-tiles')),
-    all: Number(el.getAttribute('data-all-tiles')),
-    filtered: el.getAttribute('data-filtered'),
-  }))
-  const artworkCards = await page.$$eval('[data-testid^="sprite-artwork-"]', (e) => e.length)
-  log(
-    `  grid off: ${gridBefore.shown}/${gridBefore.all} tiles; on: ${gridAfter.shown}/${gridAfter.all}`,
-  )
-  check('the grid shows every tile while the filter is off', gridBefore.shown === gridBefore.all)
-  check('the filter is off by default', gridBefore.filtered === 'false')
-  check(
-    'turning it on narrows the grid',
-    gridAfter.shown < gridBefore.all && gridAfter.filtered === 'true',
+    'no artwork control and no toggles anywhere on the tab',
+    (await page.$$('[data-testid^="toggle-"]')).length === 0 &&
+      (await page.$('[data-testid="artwork-img"]')) === null,
   )
   check(
-    'and the default axes leave exactly the one regular official artwork',
-    gridAfter.shown === 0 && artworkCards === 1,
-    `${gridAfter.shown} tiles, ${artworkCards} artwork card(s)`,
-  )
-  await page.click('[data-testid="toggle-grid-filter"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="species-sprites"]')?.getAttribute('data-filtered') ===
-      'false',
-    undefined,
-    { timeout: 15000 },
+    'all three registers have a section',
+    sections.includes('sprites-artwork') &&
+      sections.includes('sprites-animated') &&
+      sections.some((x) => x.startsWith('sprites-game-')),
+    sections.join(','),
   )
 
-  // Source = In-game must disable Motion and force it to Static.
-  await page.click('[data-testid="toggle-motion"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="toggle-motion"]')?.getAttribute('data-state') === 'on',
-    undefined,
-    { timeout: 10000 },
+  await waitCards('sprite-animated-regular-male')
+  const animated = await cardState('sprite-animated-regular-male')
+  log(`  animated src : ${animated.src}`)
+  check(
+    'the animated register is the pokeapp-sprites WebP',
+    /pokeapp-sprites/.test(animated.src) && animated.src.endsWith('.webp'),
+    animated.src,
   )
-  const animatedOn = await switchState('motion')
-  log(`  motion after enabling animation: ${JSON.stringify(animatedOn)}`)
-  check('motion can be switched to Animated on the artwork source', animatedOn.value === 'Animated')
+  check('and it rendered', animated.naturalWidth > 0)
 
-  await page.click('[data-testid="toggle-source"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="toggle-source"]')?.getAttribute('data-value') ===
-      'In-game',
-    undefined,
-    { timeout: 10000 },
-  )
-  const motionUnderInGame = await switchState('motion')
-  const inGameImg = await imgState()
-  log(`  motion under in-game source: ${JSON.stringify(motionUnderInGame)}`)
-  log(`  in-game src: ${inGameImg.src} (data-src-kind=${inGameImg.kind})`)
-  check('motion switch disabled under In-game', motionUnderInGame.disabled === true)
+  const inGameId = ids.find((i) => i.startsWith('sprite-tile-') && i.endsWith('front_default'))
+  await waitCards(inGameId)
+  const inGame = await cardState(inGameId)
+  log(`  in-game src  : ${inGame.src} (${inGameId})`)
   check(
-    'motion forced back to Static under In-game',
-    motionUnderInGame.value === 'Static' && motionUnderInGame.state === 'off',
+    'the in-game register is the plain sprite dir',
+    /\/sprites\/pokemon\/(?:versions\/[^?]*\/)?1\.png$/.test(inGame.src),
+    inGame.src,
   )
-  check('a reason is given, not a silent drop', (motionUnderInGame.reason ?? '').length > 10)
-  check('the displayed image is the in-game sprite', inGameImg.mode === 'in-game-static')
+  check('and it rendered', inGame.naturalWidth > 0)
   check(
-    'in-game sprite path is the plain sprite dir',
-    /\/sprites\/pokemon\/1\.png$/.test(inGameImg.src),
-    inGameImg.src,
+    'the three registers are three different URLs',
+    new Set([regularArt.src, animated.src, inGame.src]).size === 3,
   )
-  await page.screenshot({ path: `${SHOTS}/ux-item2-toggles.png` })
+  await page.screenshot({ path: `${SHOTS}/ux-item2-catalogue.png` })
 
   // -------------------------------------------------------------- ITEM 3
-  hr('ITEM 3 (DOM) — gender availability differs per mode, per species')
-  // Bulbasaur: no gendered image anywhere -> disabled in all three modes.
-  const bulbaInGame = await switchState('gender')
-  check('Bulbasaur / in-game static: gender disabled', bulbaInGame.disabled === true)
-  await page.click('[data-testid="toggle-source"]') // back to artwork
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="toggle-source"]')?.getAttribute('data-value') ===
-      'Artwork',
-    undefined,
-    { timeout: 10000 },
-  )
-  const bulbaArtStatic = await switchState('gender')
-  check('Bulbasaur / artwork static: gender disabled', bulbaArtStatic.disabled === true)
-
-  // Venusaur (#3) DOES have gendered in-game and animated images.
-  await search('venusaur', 3)
-  await openSprites(3)
-  await waitLoaded()
-  const venusaurModes = {}
-  venusaurModes['artwork-static'] = await switchState('gender')
-  await page.click('[data-testid="toggle-source"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-mode') ===
-      'in-game-static',
-    undefined,
-    { timeout: 10000 },
-  )
-  venusaurModes['in-game-static'] = await switchState('gender')
-  await page.click('[data-testid="toggle-source"]')
-  await page.click('[data-testid="toggle-motion"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-mode') ===
-      'artwork-animated',
-    undefined,
-    { timeout: 10000 },
-  )
-  venusaurModes['artwork-animated'] = await switchState('gender')
-  log('  Venusaur (#3) gender switch per mode:')
-  for (const [mode, s] of Object.entries(venusaurModes)) {
-    log(`    ${mode.padEnd(18)} disabled=${s.disabled}`)
+  hr('ITEM 3 (DOM) — gender availability differs per register, per species')
+  /*
+    THE SAME MATRIX, READ OFF THE CARDS. Bulbasaur has no gendered image in any
+    register; Venusaur has one in the in-game and animated registers but not in the
+    artwork one, because official-artwork carries only front_default and front_shiny
+    for all 508 varieties. Both rows of the matrix are visible at once here, which
+    is what makes this stronger than reading a disabled attribute three times.
+  */
+  const genderMatrix = async (id, term, label) => {
+    // The list is still filtered from the search above, so the row has to be
+    // brought back before it can be clicked.
+    await search(term, id)
+    await openSprites(id)
+    const cards = await cardIds()
+    const row = {
+      inGameFemale: cards.filter((c) => c.startsWith('sprite-tile-') && c.includes('_female'))
+        .length,
+      artworkFemale: cards.filter((c) => c.startsWith('sprite-artwork-') && c.includes('female'))
+        .length,
+      animatedFemale: cards.filter((c) => c.startsWith('sprite-animated-') && c.endsWith('-female'))
+        .length,
+      artworkTotal: cards.filter((c) => c.startsWith('sprite-artwork-')).length,
+    }
+    log(`  ${label}: ${JSON.stringify(row)}`)
+    return row
   }
+
+  const bulba = await genderMatrix(1, 'bulbasaur', 'Bulbasaur (no gender difference)')
   check(
-    'Venusaur / in-game static: gender ENABLED',
-    venusaurModes['in-game-static'].disabled === false,
-  )
-  check(
-    'Venusaur / artwork static: gender DISABLED (no gendered official artwork)',
-    venusaurModes['artwork-static'].disabled === true,
-  )
-  check(
-    'Venusaur / artwork animated: gender ENABLED',
-    venusaurModes['artwork-animated'].disabled === false,
+    'Bulbasaur has no gendered card in any of the three registers',
+    bulba.inGameFemale === 0 && bulba.artworkFemale === 0 && bulba.animatedFemale === 0,
+    JSON.stringify(bulba),
   )
 
-  // The female image must actually differ and actually load, in both modes that
-  // offer it -- that is what "don't mislabel the male image" means in practice.
-  const maleAnimated = await imgState()
-  await page.click('[data-testid="toggle-gender"]')
-  await waitSrcChange(maleAnimated.src)
-  await waitLoaded()
-  const femaleAnimated = await imgState()
-  log(`  animated male   : ${maleAnimated.src}`)
-  log(`  animated female : ${femaleAnimated.src}`)
-  check('animated female URL is the -f asset', femaleAnimated.src.endsWith('-f.webp'))
-  check('animated male URL is the -m asset', maleAnimated.src.endsWith('-m.webp'))
-  check('animated female image rendered', femaleAnimated.naturalWidth > 0)
-
-  await page.click('[data-testid="toggle-source"]') // -> in-game, gender stays female
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-mode') ===
-      'in-game-static',
-    undefined,
-    { timeout: 10000 },
-  )
-  await waitLoaded()
-  const femaleInGame = await imgState()
-  log(`  in-game female  : ${femaleInGame.src}`)
+  const venusaur = await genderMatrix(3, 'venusaur', 'Venusaur (has gender differences)')
   check(
-    'in-game female uses the /female/ sprite path',
-    femaleInGame.src.includes('/pokemon/female/3.png'),
-    femaleInGame.src,
-  )
-  check('in-game female sprite rendered', femaleInGame.naturalWidth > 0)
-  check('img reports gender=female', femaleInGame.gender === 'female')
-
-  // Back to artwork, then back to Static. Note the app REMEMBERS the Animated
-  // choice across the in-game round trip -- Motion is only forced to Static
-  // while the in-game source is selected, not permanently reset -- so Static has
-  // to be re-selected explicitly here.
-  await page.click('[data-testid="toggle-source"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-mode') ===
-      'artwork-animated',
-    undefined,
-    { timeout: 10000 },
-  )
-  const remembered = await switchState('motion')
-  log(`  motion after returning to the artwork source: ${JSON.stringify(remembered)}`)
-  check('Animated is remembered across an in-game round trip', remembered.value === 'Animated')
-  await page.click('[data-testid="toggle-motion"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-mode') ===
-      'artwork-static',
-    undefined,
-    { timeout: 10000 },
-  )
-  const artStaticImg = await imgState()
-  log(`  artwork-static after having chosen female: gender=${artStaticImg.gender}`)
-  check(
-    'artwork-static reports gender n/a instead of mislabelling',
-    artStaticImg.gender === 'n/a',
-    `(${artStaticImg.gender})`,
+    'Venusaur has gendered cards in the in-game register',
+    venusaur.inGameFemale > 0,
+    `(${venusaur.inGameFemale})`,
   )
   check(
-    'artwork-static shows the ungendered official artwork',
-    artStaticImg.src.includes('other/official-artwork/3.png'),
-    artStaticImg.src,
+    'and in the animated register',
+    venusaur.animatedFemale === 2,
+    `(${venusaur.animatedFemale})`,
   )
-  await page.screenshot({ path: `${SHOTS}/ux-item3-gender-modes.png` })
+  /*
+    0/493, audited across all 508 varieties: sprites.other['official-artwork']
+    exposes only front_default and front_shiny, so no species gets a gendered
+    artwork card -- not even one that has gender differences everywhere else. This
+    is the assertion the old "artwork-static reports gender n/a instead of
+    mislabelling" check was really making.
+  */
+  check(
+    'but never in the artwork register, which has no gendered field at all',
+    venusaur.artworkFemale === 0 && venusaur.artworkTotal === 2,
+    `${venusaur.artworkFemale} female of ${venusaur.artworkTotal}`,
+  )
+  await page.screenshot({ path: `${SHOTS}/ux-item3-gender.png` })
 
   // -------------------------------------------------------------- ITEM 4
   hr('ITEM 4 (DOM) — type filter buttons carry the real type colour; "Any" clears')
@@ -896,47 +771,56 @@ try {
   // -------------------------------------------------------------- ITEM 6
   hr('ITEM 6 (DOM) — pinned left track, scrolling right column, nothing overflows')
   /*
-    THE LAYOUT CLAIM CHANGED SHAPE, not standard. It used to be "a 240px species
-    rail that never flex-grows, beside a detail column of bordered cards". The
-    rebuilt page has no rail and no cards: it is a 420px pinned track holding the
-    hero, beside the one region on the page that scrolls. So the assertions are
-    re-derived from the new geometry rather than renamed onto it.
+    THE COLUMN SPLIT IS A RATIO NOW, NOT A FIXED TRACK.
 
-    420px is not a magic number here either -- it is .ds-hero's own max-width, so
-    the track is exactly the card it holds.
+    It was 420px -- .ds-hero's own max-width, so the track was exactly the card it
+    held. The page no longer holds that card: it is a proportional reproduction of
+    the Figma frame, whose two columns are container-sprite at 737 raw units and
+    container-info at 1115 of an 1860-wide frame. So the claim is the RATIO, 39.6%
+    against 59.9%, which holds at every width instead of at one.
+
+    The other half of the change: the frame stops growing. The page is capped
+    (1400px, and by height so the 1031-unit pinned column always fits), because
+    stretching the same layout across a 2560px monitor is what made it read "too
+    wide relative to height". "The pinned track does not flex-grow" therefore
+    becomes "neither column grows past the cap", which is a stronger statement --
+    the old one let the right column grow without limit.
   */
   const layout = await page.evaluate(() => {
     const page_ = document.querySelector('.species-page')
     const pinned = document.querySelector('[data-testid="species-page-pinned"]')
     const scroll = document.querySelector('[data-testid="species-page-scroll"]')
     return {
-      gridColumns: getComputedStyle(page_).gridTemplateColumns,
+      gridColumns: getComputedStyle(document.querySelector('.species-page-cols'))
+        .gridTemplateColumns,
       pageWidth: Math.round(page_.getBoundingClientRect().width),
       pinnedWidth: Math.round(pinned.getBoundingClientRect().width),
       scrollWidth: Math.round(scroll.getBoundingClientRect().width),
       pinnedOverflow: getComputedStyle(pinned).overflow,
     }
   })
+  const pinnedShare = layout.pinnedWidth / layout.pageWidth
   log(`  grid-template-columns: ${layout.gridColumns}`)
   log(
-    `  page=${layout.pageWidth}px  pinned=${layout.pinnedWidth}px  scrolling=${layout.scrollWidth}px`,
+    `  page=${layout.pageWidth}px  pinned=${layout.pinnedWidth}px (${(pinnedShare * 100).toFixed(1)}%)  scrolling=${layout.scrollWidth}px`,
   )
   check(
-    'the pinned track is exactly 420px',
-    layout.pinnedWidth === 420,
-    `(${layout.pinnedWidth}px)`,
+    'the pinned track is the frame’s 737 of 1860 (39.6%)',
+    Math.abs(pinnedShare - 737 / 1860) < 0.015,
+    `(${(pinnedShare * 100).toFixed(1)}%)`,
   )
   check('and cannot scroll itself', layout.pinnedOverflow === 'hidden', layout.pinnedOverflow)
   check(
     'the right column takes the rest',
-    layout.scrollWidth > layout.pageWidth - 420 - 40 && layout.scrollWidth < layout.pageWidth,
+    layout.scrollWidth > layout.pageWidth * 0.5 && layout.scrollWidth < layout.pageWidth,
     `(${layout.scrollWidth} of ${layout.pageWidth})`,
   )
 
-  // The pinned track must stay 420px when the window grows: "not flex-growing".
+  // Neither column may grow past the cap when the window does.
   await page.setViewportSize({ width: 1900, height: 1000 })
   await page.waitForTimeout(200)
   const wideLayout = await page.evaluate(() => ({
+    pageWidth: Math.round(document.querySelector('.species-page').getBoundingClientRect().width),
     pinnedWidth: Math.round(
       document.querySelector('[data-testid="species-page-pinned"]').getBoundingClientRect().width,
     ),
@@ -945,10 +829,18 @@ try {
     ),
   }))
   log(
-    `  at 1900px viewport: pinned=${wideLayout.pinnedWidth}px scrolling=${wideLayout.scrollWidth}px`,
+    `  at 1900px viewport: page=${wideLayout.pageWidth}px pinned=${wideLayout.pinnedWidth}px scrolling=${wideLayout.scrollWidth}px`,
   )
-  check('pinned track stays 420px at a wider viewport', wideLayout.pinnedWidth === 420)
-  check('the right column absorbed the extra width', wideLayout.scrollWidth > layout.scrollWidth)
+  check(
+    'the frame stops growing rather than stretching to the window',
+    wideLayout.pageWidth <= 1400 && wideLayout.pageWidth < 1900,
+    `(${wideLayout.pageWidth}px of a 1900px window)`,
+  )
+  check(
+    'and the split is still the frame’s ratio at the cap',
+    Math.abs(wideLayout.pinnedWidth / wideLayout.pageWidth - 737 / 1860) < 0.015,
+    `(${((wideLayout.pinnedWidth / wideLayout.pageWidth) * 100).toFixed(1)}%)`,
+  )
   await page.setViewportSize({ width: 1500, height: 1000 })
   await page.waitForTimeout(200)
 
@@ -994,22 +886,39 @@ try {
   await page.$eval('[data-testid="species-page-scroll"]', (el) => el.scrollTo({ top: 0 }))
 
   /*
-    THE SUB-NAV IS PAGE-LOCAL AND SCROLLS WITH ITS PANEL -- it belongs to the
-    content, not to the app bar, and that is what stops it reading as a second
-    level of app navigation.
+    THE SUB-NAV IS PAGE CHROME, NOT PANEL CONTENT -- which is a reversal of the
+    earlier claim, and the point of it.
+
+    It used to sit INSIDE the scroll region and scroll away with the panel, on the
+    reasoning that belonging to the content is what stops it reading as a second
+    app nav. The frame disagrees: Tabs (139:644) is a sibling of the banner in
+    container-info at y=182, above the content that starts at y=223, and the
+    requirement is that the banner above it stays fixed and visible across all four
+    tabs. A sub-nav that scrolled away from a banner that does not would have been
+    two different behaviours in one column.
+
+    So it is outside the scroller now, directly under the banner. Page-local is
+    still what it reads as -- position and scale, not colour, are what separate it
+    from the app bar.
   */
   const subnav = await page.evaluate(() => {
     const nav = document.querySelector('[data-testid="species-page-subnav"]')
     const scroll = document.querySelector('[data-testid="species-page-scroll"]')
+    const banner = document.querySelector('[data-testid="species-banner"]')
+    const nr = nav.getBoundingClientRect()
     return {
       insideScroller: scroll.contains(nav),
+      belowBanner: nr.top >= banner.getBoundingClientRect().bottom - 2,
+      aboveScroller: nr.bottom <= scroll.getBoundingClientRect().top + 2,
       tabs: [...nav.querySelectorAll('.ds-tab')].map((e) => e.textContent.trim()),
       activeUnderline: getComputedStyle(nav.querySelector('.ds-tab[aria-selected="true"]'))
         .borderBottomWidth,
     }
   })
   log(`  sub-nav tabs: ${subnav.tabs.join(' | ')}  activeUnderline=${subnav.activeUnderline}`)
-  check('the sub-nav lives inside the scrolling column', subnav.insideScroller)
+  check('the sub-nav is chrome, outside the scrolling region', subnav.insideScroller === false)
+  check('directly under the banner', subnav.belowBanner)
+  check('and above the panel it switches', subnav.aboveScroller)
   check(
     'and carries the four page tabs',
     subnav.tabs.join(',') === 'Info,Learnset,Description,Sprites',
@@ -1045,17 +954,41 @@ try {
   await page.screenshot({ path: `${SHOTS}/ux-item6-layout.png`, fullPage: true })
 
   // -------------------------------------------------------------- ITEM 7
-  hr('ITEM 7 (DOM) — evolution tree renders artwork nodes, nested layout, labelled arrows')
-  // Evolution thumbnails are loading="lazy": a node below the fold legitimately
-  // has not loaded yet. Scroll the card into view and wait, so the assertion
-  // tests "the thumbnail loads" and not "it loads while off-screen".
+  hr('ITEM 7 (DOM) — the rebuilt evolution chart: artwork, wedges, item sprites')
+  /*
+    REBUILT, NOT RESTYLED, so this block is re-derived rather than renamed.
+
+    WHAT THE CHART WAS: a nested flex tree of bordered <button> cards, each with a
+    thumbnail, a dex number and a name, joined by a Tabler glyph plus a text
+    caption. The assertions matched that DOM -- .evo-thumb, .evo-name, .evo-subtree
+    flex-direction row, .evo-children flex-direction column, and a Tabler svg per
+    arrow whose data-icon had to equal TRIGGER_ICON_NAMES[kind].
+
+    WHAT IT IS: absolutely-positioned artwork inside one aspect-ratio box, joined by
+    tapered chevron wedges, with the mechanic's real item sprite and the painted
+    condition icons sitting on or under each wedge. No cards, no names, no dex
+    numbers, no glyphs, no captions except the level. Layout comes from evoLayout.ts
+    rather than from flex, so a flex-direction assertion has nothing to read.
+
+    WHAT SURVIVES UNCHANGED: every node renders loaded official artwork; the painted
+    icons are all from the eleven in the manifest; no icon is ever a Poke Ball; and
+    the register per requirement is DERIVED from the bundle rather than restated
+    here, which is what made Happiny's sun and Onix's trade icon fall out instead of
+    being hardcoded.
+
+    WHAT IS GONE WITH THE FEATURE: the shiny and motion round trips. Both drove the
+    four-axis artwork control, which is removed -- and the chart no longer takes a
+    shiny prop at all, because the frame's evolution chart has no colour control.
+    "The tree ignores the motion toggle" has no toggle to ignore; what replaces it
+    is the direct claim, that chart artwork is always the static official asset.
+  */
   const settleEvolutionThumbs = async () => {
     await page.$eval('[data-testid="species-evolution"]', (el) =>
       el.scrollIntoView({ block: 'center' }),
     )
     await page.waitForFunction(
       () => {
-        const imgs = [...document.querySelectorAll('[data-testid="evolution-tree"] img')]
+        const imgs = [...document.querySelectorAll('[data-testid="evolution-tree"] .evo-art')]
         return imgs.length > 0 && imgs.every((i) => i.complete && i.naturalWidth > 0)
       },
       undefined,
@@ -1063,44 +996,60 @@ try {
     )
   }
 
+  await backToGrid()
+  await withControls(() => page.fill('[data-testid="species-search"]', 'eevee'))
+  await page.waitForSelector('[data-testid="species-row-133"]', { timeout: 15000 })
+  await openSpecies(133)
   await settleEvolutionThumbs()
 
   const eeveeTree = await page.evaluate(() => {
     const root = document.querySelector('[data-testid="evolution-tree"]')
-    const nodes = [...root.querySelectorAll('[data-testid^="evo-node-"]')].map((e) => ({
-      id: Number(e.getAttribute('data-species-id')),
-      current: e.getAttribute('data-current') === 'true',
-      name: e.querySelector('.evo-name')?.textContent,
-      img: e.querySelector('img')?.getAttribute('src') ?? null,
-      imgLoaded: (e.querySelector('img')?.naturalWidth ?? 0) > 0,
-      left: Math.round(e.getBoundingClientRect().left),
-      top: Math.round(e.getBoundingClientRect().top),
-    }))
+    const nodes = [...root.querySelectorAll('[data-testid^="evo-node-"]')].map((e) => {
+      const r = e.getBoundingClientRect()
+      const cs = getComputedStyle(e)
+      return {
+        id: Number(e.getAttribute('data-species-id')),
+        current: e.getAttribute('data-current') === 'true',
+        img: e.querySelector('img')?.getAttribute('src') ?? null,
+        imgLoaded: (e.querySelector('img')?.naturalWidth ?? 0) > 0,
+        left: Math.round(r.left),
+        top: Math.round(r.top),
+        /* No card: the reference draws none, and the previous build drew one. */
+        border: cs.borderTopWidth,
+        background: cs.backgroundColor,
+        radius: cs.borderTopLeftRadius,
+        /* No visible name or dex number either -- both stay in the a11y tree. */
+        visibleText: [...e.querySelectorAll('span')]
+          .filter((x) => !x.classList.contains('visually-hidden'))
+          .map((x) => x.textContent.trim())
+          .filter(Boolean),
+        hiddenText: e.querySelector('.visually-hidden')?.textContent ?? '',
+      }
+    })
     const triggers = [...root.querySelectorAll('.evo-trigger')].map((e) => ({
       kind: e.getAttribute('data-kind'),
-      icon: e.querySelector('svg')?.getAttribute('data-icon') ?? null,
-      // The second register: a painted PNG instead of a Tabler svg. Exactly one
-      // of the two is present per arrow.
-      painted: e.querySelector('.evo-painted-icon')?.getAttribute('data-evo-icon') ?? null,
+      tabler: e.querySelector('svg.trigger-icon')?.getAttribute('data-icon') ?? null,
+      icons: [...e.querySelectorAll('.evo-painted-icon')].map((i) => i.dataset.evoIcon),
       caption: e.querySelector('.evo-trigger-text')?.textContent ?? '',
       title: e.getAttribute('title'),
     }))
-    const children = root.querySelector('[data-testid="evo-children-133"]')
     return {
       nodes,
       triggers,
       branches: root.getAttribute('data-root-branches'),
-      childCount: children ? Number(children.getAttribute('data-branches')) : 0,
-      childrenColumn: children ? getComputedStyle(children).flexDirection : null,
-      subtreeRow: getComputedStyle(root.querySelector('.evo-subtree')).flexDirection,
+      arrows: root.querySelectorAll('[data-testid^="evo-arrow-"]').length,
+      wedges: root.querySelectorAll('.evo-arrow-wedge').length,
+      chevrons: root.querySelectorAll('.evo-arrow-chevron').length,
+      aspect: getComputedStyle(root).aspectRatio,
     }
   })
-  log(`  root branches: ${eeveeTree.branches}, children container: ${eeveeTree.childCount} items`)
-  log(`  .evo-subtree flex-direction=${eeveeTree.subtreeRow} (parent left, children right)`)
-  log(`  .evo-children flex-direction=${eeveeTree.childrenColumn} (children stacked vertically)`)
+  log(`  root branches: ${eeveeTree.branches}, arrows=${eeveeTree.arrows}`)
+  log(
+    `  wedges=${eeveeTree.wedges} chevrons=${eeveeTree.chevrons} aspect-ratio=${eeveeTree.aspect}`,
+  )
   eeveeTree.nodes.forEach((n) =>
     log(
-      `    #${String(n.id).padStart(3, '0')} ${String(n.name).padEnd(10)} left=${String(n.left).padStart(5)} top=${String(n.top).padStart(5)} img=${n.imgLoaded ? 'loaded' : 'MISSING'}`,
+      `    #${String(n.id).padStart(3, '0')} left=${String(n.left).padStart(5)} top=${String(n.top).padStart(5)} img=${n.imgLoaded ? 'loaded' : 'MISSING'} visible=[${n.visibleText.join('|')}]`,
     ),
   )
   check(
@@ -1115,70 +1064,111 @@ try {
     'node artwork is official artwork, not text-only',
     eeveeTree.nodes.every((n) => n.img.includes('official-artwork')),
   )
-  check('parent sits left of its children', eeveeTree.nodes[0].left < eeveeTree.nodes[1].left)
-  const childTops = eeveeTree.nodes.slice(1).map((n) => n.top)
   check(
-    'children are stacked vertically (distinct tops)',
-    new Set(childTops).size === childTops.length,
-    `${childTops.length} children, ${new Set(childTops).size} distinct tops`,
-  )
-  check('children container is a vertical stack', eeveeTree.childrenColumn === 'column')
-  check('subtree lays out horizontally', eeveeTree.subtreeRow === 'row')
-  check('Eevee shows all its branches', Number(eeveeTree.branches) >= 7, eeveeTree.branches)
-
-  log('  arrow labels:')
-  eeveeTree.triggers.forEach((t) =>
-    log(
-      `    kind=${(t.kind ?? '?').padEnd(11)} ${t.painted ? `painted=${t.painted.padEnd(24)}` : `tabler=${(t.icon ?? 'NONE').padEnd(25)}`} "${t.caption}"`,
+    'no bordered card, fill or radius around any stage',
+    eeveeTree.nodes.every(
+      (n) =>
+        n.border === '0px' &&
+        (n.background === 'rgba(0, 0, 0, 0)' || n.background === 'transparent') &&
+        n.radius === '0px',
     ),
+    eeveeTree.nodes.map((n) => `${n.border}/${n.background}/${n.radius}`).join(' '),
+  )
+  check(
+    'no dex number or name drawn beside a stage',
+    eeveeTree.nodes.every((n) => n.visibleText.length === 0),
+    eeveeTree.nodes.flatMap((n) => n.visibleText).join(','),
+  )
+  /* Removing them from the picture must not remove them from the a11y tree. */
+  check(
+    'but both are still in the accessibility tree',
+    eeveeTree.nodes.every((n) => /#\d{3}\s+\S/.test(n.hiddenText)),
+    eeveeTree.nodes.map((n) => n.hiddenText).join(' | '),
+  )
+  check('Eevee shows all its branches', Number(eeveeTree.branches) >= 7, eeveeTree.branches)
+  check(
+    'one wedge and three chevrons per arrow',
+    eeveeTree.wedges === eeveeTree.arrows && eeveeTree.chevrons === eeveeTree.arrows * 3,
+    `${eeveeTree.wedges} wedges, ${eeveeTree.chevrons} chevrons, ${eeveeTree.arrows} arrows`,
   )
   /*
-    TWO REGISTERS NOW, and this block used to assume one.
-
-    It asserted that every arrow carries a Tabler svg matching TRIGGER_ICON_NAMES
-    for its kind. That is still the rule for the generic conditions, but the
-    painted set in public/evo-icons/ now takes precedence for the specific ones --
-    Eevee's Espeon shows a sun rather than IconHeart, because the time of day is
-    what separates it from Umbreon. So the claim splits in two rather than being
-    weakened: exactly one register per arrow, and the Tabler mapping still exact
-    wherever no painted icon applies.
+    RADIAL FOR SEVEN BRANCHES, per layout-evo-eevee -- so no two children share a
+    row OR a column. The old claim was "children are stacked vertically (distinct
+    tops)", which a circle also satisfies; distinct LEFTS is what separates the
+    circle from the column the old chart drew.
+  */
+  const kids = eeveeTree.nodes.filter((n) => n.id !== 133)
+  /*
+    A CIRCLE MIRRORS ITS ROWS, so "distinct tops" is the wrong test and was the
+    old chart's: seven children at -90 + k*360/7 pair up by symmetry
+    (sin(-141.4) === sin(-38.6)) and give four distinct tops, not seven. Distinct
+    LEFTS is what separates a circle from the vertical column the old chart drew --
+    that one had all seven at the same x.
   */
   check(
-    'every arrow carries an icon in one register or the other',
-    eeveeTree.triggers.every((t) => t.icon != null || t.painted != null),
-    eeveeTree.triggers.filter((t) => !t.icon && !t.painted).length + ' bare',
+    'the branches are on a circle: every one at its own x, in several rows',
+    new Set(kids.map((n) => n.left)).size === kids.length &&
+      new Set(kids.map((n) => n.top)).size >= 4,
+    `${new Set(kids.map((n) => n.top)).size} tops, ${new Set(kids.map((n) => n.left)).size} lefts of ${kids.length}`,
   )
   check(
-    'and never both at once',
-    eeveeTree.triggers.every((t) => !(t.icon != null && t.painted != null)),
+    'the chart is one aspect-ratio box, not a flex row',
+    /\d/.test(eeveeTree.aspect),
+    eeveeTree.aspect,
+  )
+
+  log('  arrow conditions:')
+  eeveeTree.triggers.forEach((t) =>
+    log(`    kind=${(t.kind ?? '?').padEnd(11)} icons=[${t.icons.join(' + ')}] "${t.caption}"`),
+  )
+  /*
+    ONE REGISTER NOW, NOT TWO. The Tabler glyphs are gone from the chart entirely --
+    the reference draws none -- so "exactly one of svg/painted per arrow" has become
+    "no svg glyphs at all, and at least one image icon per arrow". TriggerIcon.tsx
+    was deleted with them.
+  */
+  check(
+    'no Tabler trigger glyphs remain anywhere in the chart',
+    eeveeTree.triggers.every((t) => t.tabler == null),
   )
   check(
-    'every Tabler icon still matches the declared mapping for its kind',
-    eeveeTree.triggers
-      .filter((t) => t.painted == null)
-      .every((t) => TRIGGER_ICON_NAMES[t.kind] === t.icon),
-    eeveeTree.triggers
-      .filter((t) => t.painted == null && TRIGGER_ICON_NAMES[t.kind] !== t.icon)
-      .map((t) => `${t.kind}:${t.icon}`)
-      .join(', ') || 'all match',
+    'every arrow carries at least one image icon',
+    eeveeTree.triggers.every((t) => t.icons.length > 0),
+    eeveeTree.triggers.filter((t) => t.icons.length === 0).length + ' bare',
+  )
+  /*
+    THE MECHANIC'S OWN ITEM SPRITE IS ALWAYS FIRST, which is the reference's
+    vocabulary: image-rare-candy leads every level-up step, the real stone leads a
+    use-item step. The painted condition icon follows it, joined by "+".
+  */
+  check(
+    'the leading icon is the mechanic itself: a rare candy, a stone or the trade icon',
+    eeveeTree.triggers.every(
+      (t) => /^item-/.test(t.icons[0]) || t.icons[0] === 'trade' || t.icons[0] === 'random-split',
+    ),
+    eeveeTree.triggers.map((t) => t.icons[0]).join(','),
   )
   check(
     'every painted icon is one of the eleven in the manifest',
     eeveeTree.triggers
-      .filter((t) => t.painted != null)
-      .every((t) => PAINTED_ICON_KEYS.includes(t.painted)),
+      .flatMap((t) => t.icons)
+      .filter((k) => !k.startsWith('item-'))
+      .every((k) => PAINTED_ICON_KEYS.includes(k)),
     eeveeTree.triggers
-      .filter((t) => t.painted && !PAINTED_ICON_KEYS.includes(t.painted))
-      .map((t) => t.painted)
+      .flatMap((t) => t.icons)
+      .filter((k) => !k.startsWith('item-') && !PAINTED_ICON_KEYS.includes(k))
       .join(', ') || 'all known',
   )
   check(
     'no arrow icon is a Poke Ball',
-    eeveeTree.triggers.every((t) => !/Ball|CircleDot/i.test(t.icon ?? '')),
+    eeveeTree.triggers.every((t) => !/ball|circle-?dot/i.test(t.icons.join(' '))),
   )
+  /* Every requirement still spells itself out in full, in the title and in the
+     hidden sentence -- the picture lost the captions, the a11y tree did not. */
   check(
-    'non-trade arrows carry a caption',
-    eeveeTree.triggers.filter((t) => t.kind !== 'trade').every((t) => t.caption.length > 0),
+    'every arrow still carries the full requirement as its title',
+    eeveeTree.triggers.every((t) => (t.title ?? '').length > 5),
+    eeveeTree.triggers.filter((t) => (t.title ?? '').length <= 5).length + ' bare',
   )
 
   // Walk species that exercise the other trigger kinds, so all six brief-named
@@ -1193,8 +1183,6 @@ try {
   ]
   const seenKinds = new Map()
   for (const stop of TRIGGER_TOUR) {
-    // The detail page replaces the grid, so each stop has to return to the list
-    // before it can search for the next one.
     await backToGrid()
     await withControls(() => page.fill('[data-testid="species-search"]', stop.name.toLowerCase()))
     await page.waitForSelector(`[data-testid="species-row-${stop.id}"]`, { timeout: 15000 })
@@ -1202,25 +1190,27 @@ try {
     const found = await page.$$eval('[data-testid="evolution-tree"] .evo-trigger', (els) =>
       els.map((e) => [
         e.getAttribute('data-kind'),
-        e.querySelector('svg')?.getAttribute('data-icon'),
+        [...e.querySelectorAll('.evo-painted-icon')].map((i) => i.dataset.evoIcon),
         e.querySelector('.evo-trigger-text')?.textContent ?? '',
-        e.querySelector('.evo-painted-icon')?.getAttribute('data-evo-icon') ?? null,
       ]),
     )
     log(`  ${stop.name} (#${stop.id}):`)
-    found.forEach(([k, i, c, p]) => {
-      log(`    ${String(k).padEnd(11)} ${String(p ?? i).padEnd(24)} "${c}"`)
-      if (!seenKinds.has(k)) seenKinds.set(k, [p ?? i, c])
+    found.forEach(([k, icons, c]) => {
+      log(`    ${String(k).padEnd(11)} [${icons.join(' + ')}] "${c}"`)
+      if (!seenKinds.has(k)) seenKinds.set(k, [icons.join('+'), c])
     })
     /*
-      THE EXPECTED REGISTER IS DERIVED, NOT RESTATED. For each kind on the tour,
+      THE EXPECTED ICON IS STILL DERIVED, NOT RESTATED. For each kind on the tour
       the first matching detail is pulled from the bundle and run through
-      paintedIconKey; if that yields a key the arrow must carry the painted icon,
-      otherwise it must carry exactly the Tabler glyph the kind maps to.
+      paintedIconKey; if that yields a key the arrow must carry it. What changed is
+      the fallback: where no painted icon applies, the arrow no longer carries a
+      Tabler glyph -- it carries the mechanic's item sprite, which is what the
+      reference draws. So the else-branch asserts an item icon rather than a glyph
+      name.
 
       This is why Onix and Kadabra both land on the painted trade icon, and why
-      Happiny -- which evolves in the DAY while holding an Oval Stone -- shows a
-      sun rather than IconHandGrab. Nothing about those cases is hardcoded here.
+      Happiny -- which evolves in the DAY while holding an Oval Stone -- shows a sun.
+      Nothing about those cases is hardcoded here.
     */
     for (const kind of stop.kinds) {
       const hit = found.find(([k]) => k === kind)
@@ -1228,130 +1218,78 @@ try {
       const expectPainted = detail ? paintedIconKey(detail) : null
       if (expectPainted) {
         check(
-          `${stop.name} shows a ${kind} arrow with the painted "${expectPainted}"`,
-          hit != null && hit[3] === expectPainted,
-          hit ? `painted=${hit[3]} caption="${hit[2]}"` : 'not found',
+          `${stop.name} shows a ${kind} arrow carrying the painted "${expectPainted}"`,
+          hit != null && hit[1].includes(expectPainted),
+          hit ? `icons=[${hit[1].join('+')}] caption="${hit[2]}"` : 'not found',
         )
       } else {
         check(
-          `${stop.name} shows a ${kind} arrow with ${TRIGGER_ICON_NAMES[kind]}`,
-          hit != null && hit[1] === TRIGGER_ICON_NAMES[kind] && hit[3] == null,
-          hit ? `icon=${hit[1]} painted=${hit[3]} caption="${hit[2]}"` : 'not found',
+          `${stop.name} shows a ${kind} arrow carrying the mechanic's item sprite`,
+          hit != null && hit[1].some((k) => k.startsWith('item-')),
+          hit ? `icons=[${hit[1].join('+')}] caption="${hit[2]}"` : 'not found',
         )
       }
     }
   }
   log('')
-  log('  icon actually observed in the DOM per kind:')
-  for (const [kind, [icon, caption]] of [...seenKinds].sort()) {
-    log(`    ${String(kind).padEnd(11)} ${String(icon).padEnd(20)} e.g. "${caption}"`)
+  log('  icons actually observed in the DOM per kind:')
+  for (const [kind, [icons, caption]] of [...seenKinds].sort()) {
+    log(`    ${String(kind).padEnd(11)} ${String(icons).padEnd(34)} e.g. "${caption}"`)
   }
+  /* Plain trade has no level, so it has no .evo-trigger-text -- the reference
+     draws the trade icon alone, and that claim is unchanged. */
   check(
     'plain trade renders icon-only (no caption)',
     (seenKinds.get('trade') ?? [null, 'x'])[1] === '',
     JSON.stringify(seenKinds.get('trade')),
   )
 
-  // Shiny follows the detail toggle; the node stays static and default-gender.
+  /*
+    THE CHART IS ALWAYS THE STATIC OFFICIAL ASSET. Previously this was two round
+    trips through the Sprites tab's colour and motion switches, asserting that the
+    chart followed the first and ignored the second. There are no switches: the
+    chart takes no shiny prop, because the frame's evolution chart has no colour
+    control. So the claim is now direct -- never a shiny path, never a .webp -- and
+    it is the same thing the "ignores the motion toggle" check was protecting.
+  */
   await backToGrid()
   await withControls(() => page.fill('[data-testid="species-search"]', 'eevee'))
   await page.waitForSelector('[data-testid="species-row-133"]', { timeout: 15000 })
   await openSpecies(133)
-  /*
-    .evo-thumb img, not every img in the tree. The tree now also contains painted
-    condition icons, which are <img> elements and are correctly NOT affected by the
-    shiny toggle -- a bare `img` selector swept them in and read as "a node failed
-    to switch". Narrowed to the species thumbnails, which is what the claim below
-    has always been about.
-  */
-  const THUMB_SELECTOR = '[data-testid="evolution-tree"] .evo-thumb img'
-  const regularNodes = await page.$$eval(THUMB_SELECTOR, (els) =>
-    els.map((e) => e.getAttribute('src')),
-  )
-  /*
-    TWO TABS FOR ONE CLAIM. The colour toggle is on the Sprites tab and the chart
-    is on Info, so this is now a round trip -- which is exactly the behaviour worth
-    asserting: the artwork view is owned by the PAGE, not by the tab that shows the
-    switch, so a shiny selection survives the tab change and reaches the chart.
-    Held in tab-local state it would not.
-  */
-  await openTab('Sprites')
-  await page.waitForSelector('[data-testid="toggle-shiny"]', { timeout: 30000 })
-  await page.click('[data-testid="toggle-shiny"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="toggle-shiny"]')?.getAttribute('data-value') ===
-      'Shiny',
-    undefined,
-    { timeout: 10000 },
-  )
-  await openTab('Info')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="evolution-tree"]')?.getAttribute('data-shiny') ===
-      'true',
-    undefined,
-    { timeout: 10000 },
-  )
-  check('the colour axis survives the tab change and reaches the chart', true)
   await settleEvolutionThumbs()
-  const shinyNodes = await page.$$eval(THUMB_SELECTOR, (els) =>
+  const chartArt = await page.$$eval('[data-testid="evolution-tree"] .evo-art', (els) =>
     els.map((e) => ({ src: e.getAttribute('src'), loaded: e.naturalWidth > 0 })),
   )
-  log(`  regular node[0]: ${regularNodes[0]}`)
-  log(`  shiny   node[0]: ${shinyNodes[0].src}`)
-  log(`  thumbs compared : ${shinyNodes.length} (painted condition icons excluded)`)
-  // The painted icons must still be there -- narrowing the selector must not have
-  // been achieved by the icons quietly disappearing.
   const paintedInTree = await page.$$eval(
     '[data-testid="evolution-tree"] .evo-painted-icon',
     (els) => els.map((e) => e.getAttribute('data-evo-icon')),
   )
-  log(`  painted icons still present: ${paintedInTree.join(', ') || '(none)'}`)
+  log(`  chart artwork: ${chartArt.length} thumb(s), e.g. ${chartArt[0]?.src}`)
+  log(`  icons in tree: ${paintedInTree.join(', ') || '(none)'}`)
   check(
-    'the painted condition icons are unaffected by the shiny toggle',
-    paintedInTree.length > 0 && paintedInTree.every((k) => PAINTED_ICON_KEYS.includes(k)),
+    'chart artwork is the static official asset, never shiny',
+    chartArt.length > 0 &&
+      chartArt.every((n) => n.src.includes('official-artwork/') && !n.src.includes('/shiny/')),
+    chartArt.map((n) => n.src).join(' ') || 'none',
+  )
+  check(
+    'and never the animated webp',
+    chartArt.every((n) => !n.src.endsWith('.webp')),
+  )
+  check(
+    'all chart artwork loaded',
+    chartArt.every((n) => n.loaded),
+  )
+  check(
+    'the condition icons are present and all known',
+    paintedInTree.length > 0 &&
+      paintedInTree.every((k) => k.startsWith('item-') || PAINTED_ICON_KEYS.includes(k)),
     paintedInTree.join(', '),
   )
   check(
-    'every evolution node switched to shiny artwork',
-    shinyNodes.every((n) => n.src.includes('official-artwork/shiny/')),
+    'data-shiny is false: the chart has no colour control',
+    (await page.getAttribute('[data-testid="evolution-tree"]', 'data-shiny')) === 'false',
   )
-  check(
-    'shiny node artwork loaded',
-    shinyNodes.every((n) => n.loaded),
-  )
-  check(
-    'nodes stay on static official artwork (no animated webp)',
-    shinyNodes.every((n) => !n.src.endsWith('.webp')),
-  )
-  // Turning on animation for the featured image must NOT animate the tree. Same
-  // round trip: switch it on Sprites, then come back and look at the chart.
-  await openTab('Sprites')
-  await page.click('[data-testid="toggle-motion"]')
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="artwork-img"]')?.getAttribute('data-mode') ===
-      'artwork-animated',
-    undefined,
-    { timeout: 10000 },
-  )
-  await openTab('Info')
-  await settleEvolutionThumbs()
-  // Same narrowing as above: compare thumbnails against thumbnails, or the
-  // painted icons make the two lists different lengths and the claim never holds.
-  const afterMotion = await page.$$eval(THUMB_SELECTOR, (els) =>
-    els.map((e) => e.getAttribute('src')),
-  )
-  check(
-    'tree ignores the motion toggle',
-    afterMotion.every((s) => !s.endsWith('.webp')) &&
-      JSON.stringify(afterMotion) === JSON.stringify(shinyNodes.map((n) => n.src)),
-    `${afterMotion.length} thumbs vs ${shinyNodes.length}`,
-  )
-  await openTab('Sprites')
-  await page.click('[data-testid="toggle-motion"]')
-  await openTab('Info')
   await page.screenshot({ path: `${SHOTS}/ux-item7-evolution.png`, fullPage: true })
 
   // -------------------------------------------------------------- ITEM 8

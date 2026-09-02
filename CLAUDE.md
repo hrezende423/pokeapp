@@ -21,6 +21,14 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   abilities, items, learnsets as of the selected game). Not just a list
   filter — a full context that every module must respect.
 - Favor extensibility (Gen 5+ additions via config) over refactoring.
+- **The species detail page reproduces its Figma frame proportionally**,
+  not at the token sizes. `DetailPage-Light` is 1860 × 1172 raw units drawn
+  at 2.23× (established by `scripts/calibrate-scale.mjs`), so every length
+  on that page is a multiple of `--dp-u` = `100cqw / 1860` and the type
+  tokens are REDEFINED in those units on `.species-page-inner`. That is why
+  shared components (`DataTable`, `StatRow`, `Tabs`) scale with the page
+  without per-component work — and why an element there cannot query its
+  own container, which is what the `-inner` wrapper exists for.
 - Sprites: GitHub Release assets in `hrezende423/pokeapp-sprites`,
   runtime-cached, NOT precached (648MB total, too large to bundle).
   `species-background-colors.json` lives in the same repo, fetched at
@@ -45,13 +53,20 @@ must never be re-derived, re-explained, or re-litigated in a fresh session.
   these fields must hide/adapt them per the active generation, not just
   always show the modern version.
 - **PokéAPI's `past_` arrays are incomplete, so era rules can't be left
-  to the data alone.** Two cases hit so far, both fixed in
-  `src/data/era.ts`: 17 species have no `past_abilities` entry emptying
-  their hidden slot (Koffing advertised Stench in HGSS), and 20 have a
-  Gen 1 `special` entry *plus* a later entry on a physical stat, so stats
-  must resolve per stat rather than per entry (Beedrill's Gen 1 Attack is
-  80, not the modern 90). Where a mechanic's start generation is a known
-  fact, encode it as a rule.
+  to the data alone.** Two cases fixed in `src/data/era.ts`: 17 species
+  have no `past_abilities` entry emptying their hidden slot (Koffing
+  advertised Stench in HGSS), and 20 have a Gen 1 `special` entry *plus* a
+  later entry on a physical stat, so stats must resolve per stat rather
+  than per entry (Beedrill's Gen 1 Attack is 80, not the modern 90).
+  Where a mechanic's start generation is a known fact, encode it as a rule.
+- **Moves have `past_values` and NOTHING READS IT — open bug.** Charm,
+  Sweet Kiss and Moonlight are stored as Fairy (`type_id: 18`, a Gen 6
+  type) with a `past_values` entry giving Normal, so all three render as
+  FAIRY under a Gen 1–4 selection. Affects the Movedex and every learnset
+  table, not one page. Same class as the hidden-ability case and the data
+  is already in the bundle; needs a `resolveMoveTypeForGeneration` and a
+  decision, since it touches a pre-redesign module. See
+  `src/modules/pokedex/SPECIES-PAGE-PUNCH-LIST.md` §6a.
 - **Japanese species names**: PokéAPI's `ja-roma` gives the real,
   official Nintendo romanization, NOT a mechanical transliteration —
   ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not
@@ -103,7 +118,13 @@ that isn't explicitly about design.)
 ## Known gotchas (already hit once)
 
 - Bare element selectors in old CSS (`.panel h2`, `.panel section`) can
-  silently outrank a component class by specificity.
+  silently outrank a component class by specificity. **`.panel section`
+  has bitten once for real**: `margin-top: 2rem; padding-top: 1.5rem;
+  border-top: 1px solid` reached every `<section>` on all four species-page
+  tabs, and was the actual cause of what looked like three separate design
+  problems (unremovable whitespace on the Learnset tab, a stray hairline
+  above the first table, and an "airy" Info tab). When a page's own spacing
+  will not respond to its own rules, check for one of these first.
 - `:hover` can outrank `.active`/`.selected` at equal specificity if
   declared later — scope hovers to `:not(.active)`.
 - Font stack order matters — list the self-hosted font first, or a

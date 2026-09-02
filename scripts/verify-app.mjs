@@ -319,31 +319,53 @@ try {
   // ---------------------------------------------------------------- STEP 4
   hr(`STEP 4 — switch to "${GROUP_B}" then back: expect 0 refetches for ${GROUP_A}`)
   /*
-    DRIVEN THROUGH THE PAGE'S OWN GAME CONTROL, not the app-wide selector. The
-    learnset is species-local by design now, so the app selector no longer moves
-    it -- but the claim under test never was about which control fires the fetch.
-    It is about the LOADER: a partition is fetched once and served from memory
-    afterwards, however the request arrives.
+    TWO CONTROLS NOW, and which one drives which partition is the point.
+
+    The learnset follows the PAGE's own generation control, by design. The
+    Description tab's locations follow the APP-WIDE selector, which is the
+    architecture rule in CLAUDE.md -- it lost its own selector when the tab was
+    changed to show every game's Pokedex entry at once, since a full sequence of
+    flavour text needs no game picked but a 2.8 MB encounter partition still does.
+
+    So driving only the page control moved the learnset partition and left the
+    encounter one where the app selector had it. That is not a caching failure, it
+    is the two scopes doing what they are each for -- and the claim under test is
+    unchanged: each partition is fetched exactly once, whichever control asks.
   */
   before = mark()
   await selectPageGroup('learnset', 1, GROUP_B)
-  // Both tabs, because both partitions are the claim: the scope is shared, but a
-  // tab that is not mounted has nothing to fetch, so the encounter file only moves
-  // when Description is on screen.
-  await openTab('Description')
   await openTab('Learnset')
   newReqs = requests.slice(before)
   const bLearn = newReqs.filter((r) => r.url.includes(`/data/learnsets/${GROUP_B}.json`))
-  const bEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_B}.json`))
-  log(`  ${GROUP_B}: learnsets=${bLearn.length} fetch(es), encounters=${bEnc.length} fetch(es)`)
+  const bEncFromPage = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_B}.json`))
+  log(`  page control -> ${GROUP_B}: learnsets=${bLearn.length}, encounters=${bEncFromPage.length}`)
   check(`exactly 1 fetch for learnsets/${GROUP_B}.json`, bLearn.length === 1)
+  check(
+    'the page control does NOT move the encounter partition',
+    bEncFromPage.length === 0,
+    `(${bEncFromPage.length})`,
+  )
+
+  before = mark()
+  await selectGroup(GROUP_B)
+  // A tab that is not mounted has nothing to fetch, so the encounter file only
+  // moves once Description is on screen.
+  await openTab('Description')
+  newReqs = requests.slice(before)
+  const bEnc = newReqs.filter((r) => r.url.includes(`/data/encounters/${GROUP_B}.json`))
+  log(`  app selector -> ${GROUP_B}: encounters=${bEnc.length} fetch(es)`)
   check(`exactly 1 fetch for encounters/${GROUP_B}.json`, bEnc.length === 1)
 
   before = mark()
+  await selectGroup(GROUP_A)
+  // The page control lives on the Learnset tab, so that tab has to be the one on
+  // screen to reach it -- one tab is mounted at a time.
+  await openTab('Learnset')
   await selectPageGroup('learnset', 4, GROUP_A)
+  await openTab('Description')
   newReqs = requests.slice(before)
   const refetch = newReqs.filter((r) => /\/data\//.test(r.url))
-  log(`  returning to ${GROUP_A}: ${refetch.length} data request(s)`)
+  log(`  returning to ${GROUP_A} on both controls: ${refetch.length} data request(s)`)
   refetch.forEach((r) => log(`    unexpected: ${r.url}`))
   check(`returning to ${GROUP_A} triggers 0 data fetches`, refetch.length === 0)
 
