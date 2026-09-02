@@ -1,69 +1,69 @@
 /**
- * The species detail page: pinned left column, scrolling right column.
+ * The species detail page: pinned left column, persistent banner, scrolling panel.
  *
- * ALL FOUR TABS ARE BUILT. What is still behind ?detail is the CUTOVER, not the
- * content -- see the note on NEW_DETAIL_PAGE in Pokedex.tsx. The one thing the old
- * page has that this one does not is the four-axis artwork control
- * (source/colour/motion/gender), which no part of the Figma DetailPage spec asks
- * for; the Sprites tab shows every image instead of letting you toggle one. That
- * is a real decision, not an oversight, and it is what the flag is holding open.
+ * THE PAGE IS A PROPORTIONAL REPRODUCTION OF THE FIGMA FRAME, not a token-sized
+ * layout that happens to have the same parts. DetailPage-Light (57:730) is
+ * 1860 x 1172 raw units, and calibrate-scale.mjs established that those units are
+ * CSS px x 2.23 -- so the frame is an 834px-wide page. Rendering it at token sizes
+ * across a 1500px+ window is what made it read "too wide and too small": the same
+ * type over nearly twice the linear space. .species-page is therefore a container,
+ * every length on it is a multiple of --dp-u (one raw unit = 100cqw / 1860), and
+ * the type tokens are redefined in those units for the whole subtree. One
+ * consequence worth knowing: DataTable, StatRow and Tabs scale with it for free,
+ * because they read the same custom properties.
  *
- * THE LAYOUT, per Part 1 of the handoff:
+ * THE LAYOUT, from the frame rather than from prose:
  *
- *   LEFT   fixed. Never scrolls, whatever the right column does. Back-link, the
- *          hero treatment (ghost watermark + artwork + rotated micro-label), and
- *          the katakana / romaji pair under the name.
- *   RIGHT  the only scrollable area on the page. Page-local sub-nav, then the
- *          active panel.
+ *   container-sprite  57:837   x=8    w=737    the pinned column. Never scrolls.
+ *   container-info    57:732   x=745  w=1115   banner, sub-nav, scrolling panel.
+ *   container-poke-name 57:733 y=4    h=159    the banner.
+ *   Tabs              139:644  x=575  y=182    the sub-nav: BELOW the banner,
+ *                                              right-aligned in the column.
+ *
+ * THE BANNER IS PAGE CHROME. It is rendered here, once, outside the tab switch and
+ * outside the scroll region, so switching tabs cannot unmount it, re-mount it or
+ * scroll it away -- which is the actual requirement, and the reason punch-list
+ * item 5 had no fix before: the name lived in the LEFT column and the types lived
+ * inside the Info tab, so there was no single stacking order to reorder. The
+ * sub-nav is chrome for the same reason and sits directly under it.
+ *
+ * THE BACK LINK IS ABSOLUTE, matching the frame (icon-page-back 59:900 sits at the
+ * top-left of container-detail, overlapping the sprite column). In flow above the
+ * hero it stole ~40px from a column whose artwork is meant to sit high in it.
  *
  * NO PER-SPECIES TINT and NO FLOATING DRAWER, both settled: the page is flat
  * --surface like every other, and this is a plain two-column split rather than an
  * overlapping rounded panel. species-background-colors.json is untouched.
  *
- * WHAT IS REUSED RATHER THAN BUILT, across all five parts:
+ * WHAT IS REUSED RATHER THAN BUILT:
  *
- *   HeroDetailCard   the watermark + artwork + rotated micro-label treatment.
- *                    Extended with optional sections rather than copied -- see the
- *                    note in that file for why types and stats are omitted here.
- *   ScrollArea       the right column's scroll model: native scrollbar suppressed,
- *                    the Figma icon-scrolldown chevron when more content is below,
- *                    and the back-to-top control. Its .scroll-top is positioned
- *                    against .scroll-area-outer, so "bottom-right of this column,
- *                    not the page" is what it already does.
- *   Tabs            the ds Navigation tab row: 1px --hairline under the whole row,
- *                    2px --accent under the active tab, accent + bold label. That
- *                    IS the app nav's tab treatment, so "styled identically" is a
- *                    shared component rather than a copied rule.
- *   EvolutionTree    dropped into the Info tab whole. Already era-aware, already
- *                    carries the painted/line condition icons and the dice fork.
- *   DataTable        the sortable hairline table, for the learnset sections and the
- *                    encounter list. A config, not a new table.
- *   StatRow/StatList the ds label-left / value-right hairline row, which IS the
- *                    metadata treatment the two Info sub-columns need.
- *   spriteTiles      the bitmask decoder from e15b347, for the Sprites tab.
- *   Artwork          the four-axis artwork control, folded into the Sprites tab
- *                    from the old page rather than rewritten -- see the note in
- *                    SpeciesSpritesTab for why it moved there and not onto this
- *                    card, and why the view state is held here.
+ *   ScrollArea       the panel's scroll model: native scrollbar suppressed, the
+ *                    Figma icon-scrolldown chevron when more is below, and the
+ *                    back-to-top control.
+ *   Tabs             the ds Navigation tab row -- the same component the app nav
+ *                    uses, so "styled identically" is shared code, not a copy.
+ *   EvolutionTree    the Info tab's chart. Rebuilt to the layout-evo-* frames.
+ *   DataTable        the learnset sections and the encounter list.
+ *   StatRow/StatList the ds label-left / value-right hairline metadata row.
+ *   spriteTiles      the bitmask decoder, for the Sprites tab.
  *   usePartitionRows the four-state loader for the two on-demand datasets.
  *
- * NEW: TypeMatchupChart (the grid form the old grouped list cannot express),
- * useSpeciesGameScope (the page's own game selector), resolveStatsForGeneration
- * in data/era.ts, and the four tab components.
+ * LOCAL: SpeciesHero (the left column, replacing HeroDetailCard here -- see that
+ * file for why the shared card stays as it is), SpeciesBanner, TypeMatchupChart,
+ * useSpeciesGameScope, and the four tab components.
  *
- * OPEN ITEMS live in SPECIES-PAGE-PUNCH-LIST.md beside this file -- the layout
- * fix-ups, the cutover decision, and the hidden-ability finding. Read it before
- * "fixing" the watermark size or the genus line: both are known and held.
+ * OPEN ITEMS live in SPECIES-PAGE-PUNCH-LIST.md beside this file.
  */
 
 import { IconArrowLeft } from '@tabler/icons-react'
 import { useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
-import { HeroDetailCard } from '../../components/ds/HeroDetailCard'
 import { Tabs } from '../../components/ds/Navigation'
-import { DEFAULT_ARTWORK_VIEW, getRegionForSpecies, getSpecies } from '../../data'
-import type { ArtworkView, Species } from '../../data'
+import { getSpecies } from '../../data'
+import type { Species } from '../../data'
+import { SpeciesBanner } from './SpeciesBanner'
 import { SpeciesDescriptionTab } from './SpeciesDescriptionTab'
+import { SpeciesHero } from './SpeciesHero'
 import { SpeciesInfoTab } from './SpeciesInfoTab'
 import { SpeciesLearnsetTab } from './SpeciesLearnsetTab'
 import { SpeciesSpritesTab } from './SpeciesSpritesTab'
@@ -71,8 +71,8 @@ import { useSpeciesGameScope } from './useSpeciesGameScope'
 import { useVersionGroup } from '../version-group/context'
 
 /**
- * Tab order is the handoff's, and it is meaningful: Info is what most visits
- * want, Sprites is the browse-for-fun one and goes last.
+ * Tab order is the frame's (139:646-649), and it is meaningful: Info is what most
+ * visits want, Sprites is the browse-for-fun one and goes last.
  */
 const TABS = ['Info', 'Learnset', 'Description', 'Sprites'] as const
 export type SpeciesTab = (typeof TABS)[number]
@@ -96,22 +96,13 @@ export function SpeciesDetailPage({
   const [tab, setTab] = useState<SpeciesTab>('Info')
   const { generation, versionGroup } = useVersionGroup()
   /*
-    THE PAGE OWNS THE GAME SCOPE, not the tabs that show it. Held here for two
-    reasons: the Learnset and Description tabs are reading the same "which game"
-    question and should not be able to disagree about the answer, and only one tab
-    is mounted at a time -- state inside a tab would reset every time you left it,
-    so picking Gen 1 in Learnset and glancing at Sprites would silently put you
-    back on the app's era.
+    THE PAGE OWNS THE GAME SCOPE, not the tabs that show it. The Learnset tab's own
+    generation control drives it, and the Description tab reads it as the fallback
+    for its locations section when the app selector is on "All". Held here because
+    only one tab is mounted at a time -- state inside a tab would reset every time
+    you left it.
   */
   const gameScope = useSpeciesGameScope(speciesId)
-  /*
-    THE ARTWORK VIEW IS THE PAGE'S TOO, for the reason the old detail page held it:
-    the colour axis drives the evolution chart as well as the image, and those are
-    now on two different tabs. Reset per species by the key in Pokedex, so every
-    species opens on regular static artwork.
-  */
-  const [view, setView] = useState<ArtworkView>(DEFAULT_ARTWORK_VIEW)
-  const [matchGrid, setMatchGrid] = useState(false)
   const species = getSpecies(speciesId)
 
   if (!species) {
@@ -123,118 +114,93 @@ export function SpeciesDetailPage({
   }
 
   const variety = defaultVariety(species)
-  const region = getRegionForSpecies(species.id)
 
   return (
     <div className="species-page" data-testid="species-page" data-species-id={species.id}>
       {/*
-        PINNED. Not sticky and not a scroll area: it is a grid column with its own
-        overflow hidden, so it cannot scroll no matter how long the right column
-        gets. Sticky would still have moved if the page itself ever scrolled.
+        THE UNIT AND THE TYPE SCALE LIVE HERE, not on .species-page. An element
+        cannot query its own container: 100cqw inside .species-page's declarations
+        would resolve against an ancestor container, not against .species-page. This
+        wrapper is inside it, so cqw is the page width -- and --dp-u inherits from
+        here to everything on the page. See pokedex.css.
       */}
-      <div className="species-page-pinned" data-testid="species-page-pinned">
-        <div className="pokedex-back-row">
-          <button
-            type="button"
-            className="pokedex-back"
-            data-testid="species-page-back"
-            onClick={onBack}
-          >
-            <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
-            All species
-          </button>
-        </div>
-
-        <HeroDetailCard
-          dexNumber={species.id}
-          name={species.display_name}
-          genus={species.genus}
-          era={region ? `Region: ${region}` : 'Region: —'}
-          artworkUrl={variety?.sprites.official_artwork ?? null}
+      <div className="species-page-inner">
+        <button
+          type="button"
+          className="pokedex-back species-page-back"
+          data-testid="species-page-back"
+          onClick={onBack}
         >
-          {/*
-            The Japanese pair sits inside the hero card, under the name, because
-            it is part of naming the species rather than a fact about it. Both come
-            straight from the bundle -- see the note on nameInLanguage in
-            build-data.ts for why there is no transliteration step.
-          */}
-          {(species.name_ja || species.name_ja_romanized) && (
-            <p className="species-page-ja" data-testid="species-page-ja">
-              {species.name_ja && (
-                <span className="species-page-ja-kana" lang="ja" data-testid="species-page-kana">
-                  {species.name_ja}
-                </span>
-              )}
-              {species.name_ja_romanized && (
-                <span className="species-page-ja-roma" data-testid="species-page-romaji">
-                  {species.name_ja_romanized}
-                </span>
-              )}
-            </p>
-          )}
-        </HeroDetailCard>
-      </div>
+          <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
+          All species
+        </button>
 
-      {/*
-        THE ONLY SCROLLABLE AREA ON THE PAGE. The sub-nav is inside it rather than
-        pinned above it, so the tab row scrolls away with its own content -- it
-        belongs to the panel, not to the page, which is also what stops it reading
-        as a second app-level nav.
-      */}
-      <ScrollArea className="species-page-scroll" testId="species-page-scroll">
-        <div className="species-page-main">
-          <div className="species-page-subnav" data-testid="species-page-subnav">
-            <Tabs tabs={[...TABS]} active={tab} onSelect={(t) => setTab(t as SpeciesTab)} />
+        <div className="species-page-cols">
+          {/*
+          PINNED. Not sticky and not a scroll area: it is a grid column with its own
+          overflow hidden, so it cannot scroll no matter how long the panel gets.
+        */}
+          <div className="species-page-pinned" data-testid="species-page-pinned">
+            <SpeciesHero species={species} variety={variety} />
           </div>
 
-          <div
-            className="species-page-panel"
-            data-testid={`species-page-panel-${tab.toLowerCase()}`}
-            data-tab={tab}
-            role="tabpanel"
-          >
-            {/*
-              ONE TAB MOUNTED AT A TIME, not all four hidden with CSS. Learnset and
-              Description each own an on-demand partition fetch, and mounting them
-              on open would fire both requests for a visit that only wanted Info.
-              The trade-off is that switching away and back re-runs the load -- the
-              loader caches per partition, so that is a cache read, not a refetch.
-            */}
-            {variety && tab === 'Info' && (
-              <SpeciesInfoTab
-                species={species}
-                variety={variety}
-                generation={generation}
-                versionGroup={versionGroup}
-                shiny={view.shiny}
-                onSelectSpecies={onSelectSpecies}
-                onSelectEggGroup={onSelectEggGroup}
-              />
-            )}
-            {variety && tab === 'Learnset' && (
-              <SpeciesLearnsetTab species={species} variety={variety} scope={gameScope} />
-            )}
-            {variety && tab === 'Description' && (
-              <SpeciesDescriptionTab species={species} variety={variety} scope={gameScope} />
-            )}
-            {variety && tab === 'Sprites' && (
-              <SpeciesSpritesTab
-                species={species}
-                variety={variety}
-                view={view}
-                onViewChange={setView}
-                matchGrid={matchGrid}
-                onMatchGridChange={setMatchGrid}
-              />
-            )}
-            {!variety && (
-              <p className="subtitle" data-testid="species-page-no-variety">
-                No default form for this species.
-              </p>
-            )}
+          <div className="species-page-right">
+            {/* CHROME. Outside the tab switch on purpose -- see the note above. */}
+            <SpeciesBanner species={species} variety={variety} generation={generation} />
+
+            <div className="species-page-subnav" data-testid="species-page-subnav">
+              <Tabs tabs={[...TABS]} active={tab} onSelect={(t) => setTab(t as SpeciesTab)} />
+            </div>
+
+            {/* THE ONLY SCROLLABLE AREA ON THE PAGE. */}
+            <ScrollArea className="species-page-scroll" testId="species-page-scroll">
+              <div
+                className="species-page-panel"
+                data-testid={`species-page-panel-${tab.toLowerCase()}`}
+                data-tab={tab}
+                role="tabpanel"
+              >
+                {/*
+                ONE TAB MOUNTED AT A TIME, not all four hidden with CSS. Learnset and
+                Description each own an on-demand partition fetch, and mounting them
+                on open would fire both requests for a visit that only wanted Info.
+                The trade-off is that switching away and back re-runs the load -- the
+                loader caches per partition, so that is a cache read, not a refetch.
+              */}
+                {variety && tab === 'Info' && (
+                  <SpeciesInfoTab
+                    species={species}
+                    variety={variety}
+                    generation={generation}
+                    versionGroup={versionGroup}
+                    onSelectSpecies={onSelectSpecies}
+                    onSelectEggGroup={onSelectEggGroup}
+                  />
+                )}
+                {variety && tab === 'Learnset' && (
+                  <SpeciesLearnsetTab species={species} variety={variety} scope={gameScope} />
+                )}
+                {variety && tab === 'Description' && (
+                  <SpeciesDescriptionTab
+                    species={species}
+                    variety={variety}
+                    versionGroup={versionGroup}
+                    scope={gameScope}
+                  />
+                )}
+                {variety && tab === 'Sprites' && (
+                  <SpeciesSpritesTab species={species} variety={variety} />
+                )}
+                {!variety && (
+                  <p className="subtitle" data-testid="species-page-no-variety">
+                    No default form for this species.
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

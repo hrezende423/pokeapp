@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import { StatList, StatRow } from '../../components/ds/DataRows'
-import { TypeRow } from '../../components/ds/TypeLabel'
 import {
   ABILITIES_INTRODUCED_IN_GENERATION,
   EFFORT_VALUES_INTRODUCED_IN_GENERATION,
@@ -11,7 +10,6 @@ import {
   resolveAbilitiesForGeneration,
   resolveStatsForGeneration,
   resolveTypesForGeneration,
-  getType,
 } from '../../data'
 import type { Species, Variety, VersionGroup } from '../../data'
 import { BREEDING_INTRODUCED_IN_GENERATION } from '../dex/entrySources'
@@ -146,7 +144,6 @@ export function SpeciesInfoTab({
   variety,
   generation,
   versionGroup,
-  shiny = false,
   onSelectSpecies,
   onSelectEggGroup,
 }: {
@@ -154,8 +151,6 @@ export function SpeciesInfoTab({
   variety: Variety
   generation: number
   versionGroup: VersionGroup | null
-  /** Follows the colour axis of the Sprites tab's artwork control. */
-  shiny?: boolean
   onSelectSpecies?: (id: number) => void
   onSelectEggGroup?: (id: number) => void
 }) {
@@ -169,7 +164,6 @@ export function SpeciesInfoTab({
     [variety, generation],
   )
 
-  const typeNames = typeIds.map((id) => getType(id)?.name).filter((n): n is string => n != null)
   const breedingExists = generation >= BREEDING_INTRODUCED_IN_GENERATION
   const eggGroups = species.egg_group_ids
     .map((id) => getEggGroup(id))
@@ -181,12 +175,11 @@ export function SpeciesInfoTab({
 
   return (
     <div className="species-info" data-testid="species-info">
-      {/* The types live here rather than in the pinned card: the card carries the
-          identity (number, art, name, kana) and this tab carries the facts. */}
-      <div className="species-info-types" data-testid="species-info-types">
-        <TypeRow types={typeNames} />
-      </div>
-
+      {/* THE TYPES ARE NOT HERE ANY MORE. They are in SpeciesBanner, which is
+          page chrome, so they now show on all four tabs instead of only this one
+          -- and the banner is where the frame puts them (group-TypeText 57:735 is
+          a child of container-poke-name). typeIds is still resolved here for the
+          type-effectiveness chart at the bottom. */}
       <div className="species-info-cols">
         <StatList>
           <StatRow
@@ -382,18 +375,6 @@ export function SpeciesInfoTab({
         </StatList>
       </div>
 
-      {/*
-        POKEATHLON, Gen 4 only. The gate is the selected era, not the species: every
-        Gen 1-4 species has Pokeathlon stats in HeartGold/SoulSilver.
-      */}
-      {generation === 4 && (
-        <p className="species-info-note" data-testid="pokeathlon-pending">
-          Pokeathlon stats (Speed, Power, Skill, Stamina, Jump) are Generation IV only and are not
-          in PokeAPI at species level — they are part of the separately-scoped Bulbapedia sourcing
-          pass.
-        </p>
-      )}
-
       <div className="species-info-wide">
         <section className="species-info-block" data-testid="species-base-stats">
           <h3 className="species-info-heading">Base stats</h3>
@@ -423,12 +404,7 @@ export function SpeciesInfoTab({
         <section className="species-info-block" data-testid="species-evolution">
           <h3 className="species-info-heading">Evolution</h3>
           {chain ? (
-            <EvolutionTree
-              chain={chain.chain}
-              currentId={species.id}
-              shiny={shiny}
-              onSelect={onSelectSpecies}
-            />
+            <EvolutionTree chain={chain.chain} currentId={species.id} onSelect={onSelectSpecies} />
           ) : (
             <p className="species-info-caption">No evolution chain data.</p>
           )}
@@ -439,6 +415,21 @@ export function SpeciesInfoTab({
         <h3 className="species-info-heading">Type effectiveness</h3>
         <TypeMatchupChart typeIds={typeIds} generation={generation} />
       </section>
+
+      {/*
+        POKEATHLON, Gen 4 only, and LAST on the tab. The gate is the selected era,
+        not the species: every Gen 1-4 species has Pokeathlon stats in
+        HeartGold/SoulSilver. It sat between the metadata columns and the stat
+        block, which put a sourcing note in the middle of the facts; at the bottom
+        it reads as the footnote it is.
+      */}
+      {generation === 4 && (
+        <p className="species-info-note" data-testid="pokeathlon-pending">
+          Pokeathlon stats (Speed, Power, Skill, Stamina, Jump) are Generation IV only and are not
+          in PokeAPI at species level — they are part of the separately-scoped Bulbapedia sourcing
+          pass.
+        </p>
+      )}
     </div>
   )
 }

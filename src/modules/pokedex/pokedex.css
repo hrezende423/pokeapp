@@ -809,185 +809,209 @@
 
 /* ---------------------------------------------------------------- evolution */
 
-/* A chain can be wider than the card (Eevee, three-stage lines), so the tree
-   scrolls inside its own card rather than stretching the grid. */
+/*
+  THE REBUILT CHART. Absolutely-positioned artwork inside one aspect-ratio box.
+
+  NOT A FLEX TREE ANY MORE, because the reference is not one. The nine layout-evo-*
+  frames place branches, arrows and condition icons at angles and offsets that no
+  flex or grid arrangement produces -- see evoLayout.ts, which walks the chain and
+  returns positions in raw units, and EvolutionTree.tsx for what was dropped
+  (bordered cards, dex numbers, names, Tabler glyph + text captions).
+
+  Positions arrive as percentages of a box whose aspect-ratio is the computed
+  layout's, so the chart is one scalable drawing at whatever width the column
+  gives it.
+
+  --evo-w is that layout's width in raw units, set inline per chain. It is what
+  lets type and icons inside the drawing scale with it: calc(100cqw * N /
+  var(--evo-w)) is N raw units, always.
+*/
 .evo-tree {
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
 }
 
-.evo-subtree {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-/* Children stack vertically to the right of their parent; the same rule applies
-   recursively at every depth, so linear chains render as one row and branching
-   ones fan out without any special case for Eevee's eight. */
-.evo-children {
+/* The single-stage frame (139:1170) is one artwork in a square and nothing else. */
+.evo-tree-single {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.evo-child {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.4rem;
 }
 
-.evo-card {
-  display: grid;
-  justify-items: center;
-  gap: 0.05rem;
-  flex: none;
-  width: 5.6rem;
-  padding: 0.35rem 0.2rem;
-  font: inherit;
-  color: var(--text-h);
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  cursor: pointer;
+.evo-tree-single .evo-art {
+  width: 42%;
+  max-width: 12rem;
+  height: auto;
 }
 
-.evo-card:disabled {
-  cursor: default;
-}
-
-.evo-card:not(:disabled):hover {
-  border-color: var(--accent);
-}
-
-.evo-card-current {
-  background: var(--accent-bg);
-  border-color: var(--accent);
-}
-
-.evo-thumb {
+/*
+  The artwork. Still a button, because it still navigates -- with none of a
+  button's chrome: no border, no fill, no radius, no label. The current stage and
+  hover are opacity steps, not colour; a bordered "selected" card is precisely
+  what this rebuild removes.
+*/
+.evo-art-btn {
+  position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3.5rem;
-  height: 3.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 2;
 }
 
-.evo-thumb img {
-  max-width: 100%;
-  max-height: 100%;
+.evo-art-btn:disabled {
+  cursor: default;
 }
 
-.evo-thumb-missing {
-  color: var(--text);
+.evo-art {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The species whose page this is reads as the anchor of the chart; the others
+   sit back a step. No box around either. */
+.evo-art-btn[data-current='false'] .evo-art {
+  opacity: 0.7;
+}
+
+.evo-art-btn:not(:disabled):hover .evo-art {
+  opacity: 1;
+}
+
+.evo-art-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.evo-art-missing {
+  color: var(--text-secondary);
   font-size: 1.4rem;
 }
 
-.evo-dex {
-  color: var(--text);
-  font-size: 0.6rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.evo-name {
-  font-size: 0.7rem;
-  line-height: 1.2;
-  text-align: center;
-}
-
-/* The labelled arrow. The ::after chevron is pure decoration; the icon + caption
-   inside .evo-trigger carry the meaning. */
+/*
+  THE CHEVRON WEDGE, in the reference's two registers: a very light wedge widening
+  toward the child, and three chevrons a few steps darker sitting on it. Both are
+  currentColor at different opacities rather than two new palette entries, so the
+  chart re-tones with the theme and the token set does not grow. --accent is not
+  available here (four sanctioned uses, none of them this) and would read as a
+  state rather than as a connector.
+*/
 .evo-arrow {
+  position: absolute;
+  overflow: visible;
+  color: var(--text-secondary);
+  z-index: 1;
+}
+
+.evo-arrow-wedge {
+  fill: currentColor;
+  opacity: 0.2;
+}
+
+.evo-arrow-chevron {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.45;
+}
+
+/*
+  The condition group, centred on its own point. translate(-50%, -50%) rather than
+  negative margins, because the point is a percentage of a box whose pixel size is
+  not knowable here.
+
+  pointer-events: none on the wrapper and auto on the trigger, so the empty space
+  around a short label does not sit on top of the artwork button behind it.
+*/
+.evo-cond {
+  position: absolute;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
-  flex: none;
-  min-width: 5.5rem;
-  padding: 0 0.15rem;
-  position: relative;
+  align-items: center;
+  gap: 0.15em;
+  z-index: 3;
+  pointer-events: none;
 }
 
-.evo-arrow::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--border);
-  z-index: 0;
-}
+/*
+  One requirement. Icons and the level share a line; each remaining clause wraps to
+  its own, which is what the frames do -- the 3-branch frame gives "Lv.20" and
+  "Atk > Def" separate text nodes rather than one run, and joining them produced a
+  line wide enough to cross Tyrogue's artwork.
 
+  max-width is in chart units (230, a little over two artworks) so a long clause
+  wraps instead of running out of the drawing.
+*/
 .evo-trigger {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
-  position: relative;
-  z-index: 1;
-  padding: 0.1rem 0.25rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 0.6rem;
-  color: var(--text-h);
-  font-size: 0.65rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.1em 0.14em;
+  max-width: calc(100cqw * 230 / var(--evo-w));
   white-space: nowrap;
+  text-align: center;
+  color: var(--text-primary);
+  /* 15 raw units, from text-xp-value's box. */
+  font-size: calc(100cqw * 15 / var(--evo-w));
+  pointer-events: auto;
 }
 
-.trigger-icon {
-  flex: none;
-  color: var(--accent);
+/* flex-basis 100% is what puts a clause on its own line, with no wrapper. */
+.evo-trigger-clause {
+  flex: 0 0 100%;
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+}
+
+.evo-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.14em;
+}
+
+/* icon-add, 11 raw units. */
+.evo-trigger-plus {
+  color: var(--text-secondary);
+  font-size: calc(100cqw * 11 / var(--evo-w));
+  line-height: 1;
 }
 
 /*
-  The painted condition icons, sitting in the same slot as .trigger-icon.
+  The painted and item icons in one rule. --evo-icon-size is the raw size set
+  inline per icon -- 37 for the mechanic's own item (image-rare-candy,
+  image-evo-stone), 33 for a secondary condition -- so the two sizes the frames use
+  need no second class.
 
-  20px against the line icons' 16px, deliberately: these are shaded artwork rather
-  than 1.8px strokes, and at 16 the detail turns to mush. The source is 128px, so
-  this is a 6.4x reduction with retina headroom. No colour applied -- unlike the
-  Tabler glyphs these carry their own, which is the whole point of the register.
-
-  They are all 128x128 with content at 79.7% of the canvas (see
-  scripts/normalize-evo-icons.mjs), so a fixed box needs no per-icon nudging and
-  none of them draws heavier than another.
+  The painted set is all 128x128 with content at 79.7% of the canvas (see
+  scripts/normalize-evo-icons.mjs), so a fixed box needs no per-icon nudging.
 */
 .evo-painted-icon {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: calc(100cqw * var(--evo-icon-size) / var(--evo-w));
+  height: calc(100cqw * var(--evo-icon-size) / var(--evo-w));
   object-fit: contain;
-  /* The row is 16px-tall text; a 20px image would otherwise push the pill taller
-     than its line-icon siblings. Negative margin keeps the pill heights equal. */
-  margin: -2px 0;
 }
 
-/*
-  The random-fork marker: one row above the branches it describes, inside the same
-  .evo-children column so it reads as belonging to the fork rather than to either
-  outcome. No border, unlike .evo-trigger -- it is a note on the branch point, not
-  a requirement on an arrow, and giving it the pill chrome made it look like a
-  third sibling.
-*/
-.evo-fork-random {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  padding-left: 0.15rem;
-  color: var(--text-secondary);
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+/* Item sprites are 30x30 in-game icons drawn well above 1:1 here, so they get
+   nearest-neighbour. The painted condition icons are 128px artwork and must not. */
+.evo-painted-icon[data-evo-icon^='item-'] {
+  image-rendering: pixelated;
 }
 
-.evo-fork-random-text {
-  white-space: nowrap;
-}
-
-.evo-trigger-vg {
-  color: var(--text);
-  font-size: 0.55rem;
+.evo-trigger-text {
+  font-family: var(--font-numeric);
+  letter-spacing: -0.03em;
 }
 
 /* ---------------------------------------------------------------- tables */
@@ -2631,123 +2655,386 @@
 /* ============================================================ species page */
 
 /*
-  Two-column split: pinned left, scrolling right. Step 1 of the detail-page redo.
+  THE PAGE IS THE FIGMA FRAME, SCALED.
 
-  A GRID, NOT position:sticky. The left column is a track with its own
-  `overflow: hidden`, so it physically cannot scroll however long the right column
-  gets. Sticky would have been the reflex and is wrong here: it still moves once
-  its containing block scrolls, and the whole point of the app's viewport lock is
-  that only an inner region ever scrolls -- a sticky element inside a scrolling
-  parent is a weaker version of what a fixed track gives for free.
+  DetailPage-Light (57:730) is 1860 x 1172 raw units, and calibrate-scale.mjs
+  established that the frames are drawn at 2.23x -- so the design is an 834px-wide
+  page. Rendering it at the token sizes across a 1500px+ window is what made it
+  read too wide and too small: the same type stretched over nearly twice the linear
+  space, with a 420px pinned column beside a 960px panel where the frame has
+  737 : 1115.
 
-  min-height: 0 on both tracks, because the grid row is the growing one and
-  without it a long panel pushes the row taller than the viewport and hands the
-  scroll back to the page.
+  So --dp-u is ONE RAW UNIT (100cqw / 1860) and every length here is a multiple of
+  it. The type TOKENS are redefined in the same units for the whole subtree, which
+  is the part that matters: DataTable, StatRow, Tabs and every shared component
+  inside the page scale with it for free, because they already read those
+  properties. Nothing needed a per-component pass.
 
-  420px matches .ds-hero's own max-width, so the pinned track is exactly the card
-  it holds rather than a guess that leaves a gap or clips it.
+  Raw type sizes come from scripts/calibrate-detail.mjs, which inverts each Figma
+  node's box width through the real advance of the real self-hosted face. get_
+  metadata carries no type properties and the Figma MCP hit its Starter-plan call
+  limit before get_design_context landed, so this is measured rather than read --
+  and it is the better of the two anyway, because it makes the RENDERED box match
+  the frame's box in our font:
+
+    role                       raw   css @2.23   nearest token
+    section heading / body      30      13.6       14   (spread 0.19 over 3 nodes)
+    label / stat abbreviation   26      11.5       11   (spread 1.27 over 7 nodes)
+    sub-nav tab                 33      14.4       14   (spread 0.98 over 4 nodes)
+    dex number, region label    43      19.3       20
+    name (hero AND banner)      66      29.6       --   off-token, deliberately loud
+    katakana                   111      50.0       --
+    genus                       40      17.9       --
+    watermark                  389     174.6       --
+
+  --dp-frame-max is the ONE tunable number: the width the frame stops growing at.
+  1400px puts body type at 22.6px and the pinned column at 555px. It is also what
+  answers "reduce the overall page aspect ratio" -- the page stops widening and
+  centres instead of stretching to a 2560px monitor.
+
+  The vh term is the second cap and is load-bearing rather than defensive: the
+  pinned column is 1031 units tall, so on a short window the WIDTH has to give or
+  the hero's name lines would be clipped by the column's overflow.
 */
 .species-page {
-  display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
-  gap: var(--space-gap-lg);
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  max-width: min(1400px, calc((100vh - 8rem) * 1860 / 1031));
+  margin-inline: auto;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
+/*
+  The unit and the type scale live on a CHILD, not on .species-page itself.
+
+  An element cannot query its own container: 100cqw inside .species-page's own
+  declarations resolves against the nearest ANCESTOR container, not against
+  .species-page. Everything below is inside it, so cqw is the page width here.
+*/
+.species-page-inner {
+  --dp-u: calc(100cqw / 1860);
+  --font-size-display: calc(66 * var(--dp-u));
+  --font-size-title: calc(43 * var(--dp-u));
+  --font-size-body: calc(30 * var(--dp-u));
+  --font-size-label: calc(26 * var(--dp-u));
+  --font-size-caption: calc(22 * var(--dp-u));
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  /* container-sprite sits at x=8 in the frame. */
+  padding-left: calc(8 * var(--dp-u));
+  font-size: var(--font-size-body);
+}
+
+/*
+  icon-page-back (59:900) and text-back2dex (59:903) sit at the top-left of
+  container-detail, OVER the sprite column. Absolute rather than a flow row for
+  exactly that reason: in flow it stole ~40px of height from a column whose
+  artwork is meant to sit high in it (punch-list item 2).
+*/
+.species-page-back {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  font-size: var(--font-size-label);
+}
+
+/*
+  container-sprite 737 wide, container-info 1115, no gap between them -- they are
+  flush at x=745 in the frame. A GRID, NOT position:sticky: the left column is a
+  track with its own overflow:hidden, so it physically cannot scroll however long
+  the panel gets. min-height:0 on both tracks because the row is the growing one.
+*/
+.species-page-cols {
+  display: grid;
+  grid-template-columns: calc(737 * var(--dp-u)) minmax(0, 1fr);
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+}
+
 .species-page-pinned {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-gap-sm);
+  min-width: 0;
   min-height: 0;
   /* The half of "never scrolls" that CSS has to say out loud. */
   overflow: hidden;
 }
 
-/* The card must not stretch to the track height -- it is a card, not a panel. */
-.species-page-pinned .ds-hero {
-  flex: none;
+.species-page-right {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---- the pinned column (container-sprite 57:837) */
+
+/*
+  737 x 1031, with every child at Figma's own percentage of that box -- the table
+  is in SpeciesHero.tsx.
+
+  ITS OWN CONTAINER, so the type inside scales with the COLUMN rather than with the
+  page. That matters when the vh cap above bites: the whole treatment shrinks
+  together instead of the names outgrowing a smaller box.
+*/
+.species-hero {
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 737 / 1031;
 }
 
 /*
-  The katakana / romaji pair, under the name inside the hero card.
+  --hu, one raw unit of THIS column, defined on the children for the same
+  self-query reason as --dp-u above.
+*/
+.species-hero > * {
+  --hu: calc(100cqw / 737);
+}
 
-  Kana at body size and romaji smaller and secondary: the Japanese name is the
-  thing being shown, the romanization is the pronunciation aid beneath it. Both are
-  --font-body, NOT --font-numeric -- they are names, and the numeric face is for
-  tabular data only.
-*/
 /*
-  Centred, because the card it sits in centres its own name and artwork -- that is
-  the reference treatment, and left-aligning just this pair put the kana under the
-  name's left edge while the artwork above stayed centred. Alignment is the card's
-  to decide, not this block's.
+  shadow-number 57:842: x=0 y=29, 701 x 344 in a 737 x 1031 column. LEFT-aligned,
+  95% of the width, 33% of the height, and ENTIRELY INSIDE THE BOUNDS.
+
+  That is the fix for punch-list item 1, and it is a position fix rather than a
+  size one: the design-system card's watermark genuinely does bleed off its
+  top-right, this one genuinely does not, and the previous build used the card's
+  treatment here. Same scale, different placement -- which is why this is a local
+  element and not a third `scale` on GhostWatermark.
+
+  tabular-nums is what makes "entirely inside" true for all 493 rather than for
+  #197. Plex Sans draws proportional digits by default (measured: #0001/#0002/#0003
+  are 96/100/101 raw in the MainPage frame), so a wide number would render wider
+  than the frame's box and clip again. 389 raw at a 0.6em tabular advance is
+  700.2 raw for three digits, against the frame's 701.
 */
-.species-page-ja {
+.species-hero-ghost {
+  position: absolute;
+  left: 0;
+  top: 2.813%;
+  width: 95.115%;
+  z-index: 0;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  font-size: calc(389 * var(--hu));
+  /* 344 / 389: the frame's box is shorter than its own type size. */
+  line-height: 0.883;
+  text-align: left;
+  color: var(--ghost-watermark);
+  opacity: var(--ghost-watermark-opacity);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* poke-artwork 57:843: 500 x 500 at (95, 213). No platform, no shadow, no frame. */
+.species-hero-art {
+  position: absolute;
+  left: 12.89%;
+  top: 20.66%;
+  width: 67.843%;
+  height: 48.497%;
+  object-fit: contain;
+  z-index: 1;
+}
+
+/*
+  Region 57:840: a 78 x 313 box at (17, 604), rotated. Anchored at the BOTTOM of
+  that box and rotated -90deg from a left-top origin, so the text runs upward from
+  y=917 to y=604 -- which is the direction the reference reads.
+
+  Mixed case, not uppercase: the frame draws "Region: Johto". The design-system
+  card's own micro-label is uppercase, and inheriting that here was wrong.
+*/
+.species-hero-region {
+  position: absolute;
+  left: 2.307%;
+  top: 88.943%;
+  transform-origin: left top;
+  transform: rotate(-90deg);
+  white-space: nowrap;
+  z-index: 1;
+  font-size: calc(43 * var(--hu));
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+/* Name-kata 57:841: 557 x 146 at (85, 717). ABOVE the Latin names, not below. */
+.species-hero-kana {
+  position: absolute;
+  left: 11.533%;
+  top: 69.544%;
+  z-index: 1;
+  font-size: calc(111 * var(--hu));
+  line-height: 1.15;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+/*
+  Name-main 57:838 at (85, 879) and Name-roma 57:839 at (369, 882): ONE ROW, not
+  two lines. Name-roma's box starts exactly where Name-main's ends, so the frame
+  puts them side by side -- which is what the previous build got wrong by stacking
+  main / kana / roma.
+
+  A baseline flex row with a real gap rather than two absolutely-placed boxes: the
+  two boxes overlap in the frame (Name-main's 408 against a genus starting at 319
+  in the banner, and 284 here against a 305-wide roma box that its text does not
+  fill), so neither is tight, and absolute placement would collide on a long name.
+*/
+.species-hero-names {
+  position: absolute;
+  left: 11.533%;
+  top: 85.257%;
+  margin: 0;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  margin: 0.35rem 0 0;
+  align-items: baseline;
+  gap: calc(24 * var(--hu));
+  white-space: nowrap;
 }
 
-.species-page-ja-kana {
-  font-size: var(--font-size-body);
+.species-hero-name {
+  font-family: var(--font-body);
+  font-size: calc(66 * var(--hu));
+  font-weight: var(--font-weight-bold);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
-.species-page-ja-roma {
-  font-size: var(--font-size-label);
+.species-hero-roma {
+  font-size: calc(66 * var(--hu));
+  font-style: italic;
+  font-weight: var(--font-weight-regular);
+  line-height: 1.05;
   color: var(--text-secondary);
-  letter-spacing: 0.02em;
 }
 
-/* The right track. .scroll-area-outer inside it supplies the scroll model. */
-.species-page-scroll {
-  padding-right: var(--space-gap-md);
+/* ---- the persistent banner (container-poke-name 57:733) */
+
+/*
+  1115 x 159: number, then name + genus on one row, then the type row. Three
+  stacked rows at y=10 / 41 / 126.
+
+  PAGE CHROME, rendered once by SpeciesDetailPage outside the tab switch and
+  outside the scroll region -- see SpeciesBanner.tsx. It is what makes punch-list
+  item 5 fixable at all.
+*/
+.species-banner {
+  display: grid;
+  gap: calc(4 * var(--dp-u));
+  padding-top: calc(4 * var(--dp-u));
+  min-width: 0;
 }
 
-.species-page-main {
+.species-banner-number {
+  font-size: var(--font-size-title);
+  color: var(--text-secondary);
+}
+
+.species-banner-title {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-gap-md);
-  /* Capped for the same reason the ledger list is: a table whose row runs the
-     full 1600px does not read as one row. */
-  max-width: 60rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: calc(28 * var(--dp-u));
+  min-width: 0;
 }
 
 /*
-  PAGE-LOCAL SUB-NAV. Same treatment as the app nav's tabs by using the same
-  component -- .ds-tabs already carries the 1px --hairline under the row and the
-  2px --accent under the active tab.
+  .species-banner h2.species-banner-name, not the class alone.
 
-  What separates it from the app bar is position and scale, not colour: it sits
-  inside the scrolling column rather than in the fixed bar, and one step down in
-  size. Reading as page-local is the thing to verify by eye.
+  App.css's `.panel h2` is (0,1,1) and would outrank a bare (0,1,0) class -- the
+  first gotcha CLAUDE.md lists, and the one that once rendered the hero card's name
+  at 14.4px uppercase. (0,2,1) settles it.
 */
+.species-banner h2.species-banner-name {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+/* genus 57:745, on the name's row and to its right. THIS is where the genus
+   belongs -- punch-list item 4 was it rendering in the pinned column instead. */
+.species-banner-genus {
+  margin: 0;
+  font-size: calc(40 * var(--dp-u));
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.species-banner-types {
+  font-size: var(--font-size-body);
+}
+
+/* ---- the sub-nav (Tabs 139:644) */
+
+/*
+  x=575 w=532 in a 1115 column, so right-aligned; y=182 against the banner's 163
+  bottom edge, so 19 units below it.
+
+  BELOW THE BANNER AND ABOVE THE PANEL, which is the whole of punch-list item 5.
+  Both are chrome now, so the order is a real stacking order for the first time --
+  before this the name was in the LEFT column and the types were inside the Info
+  tab, and there was nothing to reorder.
+
+  Mixed case, not uppercase: the frame draws "Info Learnset Description Sprites".
+*/
+.species-page-subnav {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(19 * var(--dp-u));
+  min-width: 0;
+}
+
 .species-page-subnav .ds-tabs {
-  font-size: var(--font-size-label);
+  font-size: calc(33 * var(--dp-u));
 }
 
 .species-page-subnav .ds-tab {
-  font-size: var(--font-size-label);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: calc(33 * var(--dp-u));
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* container-main-info starts at y=223, two units under the tab row. */
+.species-page-scroll {
+  margin-top: calc(2 * var(--dp-u));
+  padding-right: calc(20 * var(--dp-u));
+  min-height: 0;
 }
 
 .species-page-panel {
   min-height: 0;
 }
 
-@media (max-width: 1100px) {
-  /* One column below the width the 420px track plus a readable panel needs. The
-     pinned column stops being pinned here -- it becomes the first thing in the
-     scrolling column, because two independent scroll regions on a narrow screen
-     is worse than one. */
+@media (max-width: 900px) {
+  /*
+    One column below the width the two tracks need. The pinned column stops being
+    pinned here -- it becomes the first thing in the scrolling column, because two
+    independent scroll regions on a narrow screen is worse than one.
+  */
   .species-page {
+    max-width: none;
+  }
+
+  .species-page-cols {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .species-hero {
+    max-width: 20rem;
   }
 }
 
@@ -2772,6 +3059,31 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-gap-lg);
+}
+
+/*
+  APP.CSS REACHES EVERY <section> IN HERE, and that is where most of this page's
+  spacing was actually coming from:
+
+    .panel section { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border) }
+
+  .species-info-block and .species-learn-group are both <section> elements, so all
+  three declarations applied to every block on all four tabs. It is the first
+  gotcha CLAUDE.md lists -- a bare element selector in old CSS silently outranking
+  a component class -- and it accounts for three separate symptoms: the 38px the
+  Learnset tab could not lose however small its own gap got, a stray full-width
+  hairline above the first table on every tab, and most of what was logged as "the
+  Info tab is airy".
+
+  Neutralised rather than worked around, at (0,2,1) against the old rule's (0,1,1),
+  so the rhythm below is the only thing setting it. The design-system spec for this
+  page is explicit that there are no borders between blocks: sections are separated
+  by space and by the hairline under each heading, and this restores that.
+*/
+.species-page-panel section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .species-info-block {
@@ -2814,10 +3126,6 @@
 
 .species-meta-none {
   color: var(--text-secondary);
-}
-
-.species-info-types {
-  font-size: var(--font-size-body);
 }
 
 /* ---- Info tab: the two metadata sub-columns */
@@ -2951,9 +3259,12 @@
 
 /* ---- Info tab: base stats and evolution, side by side */
 
+/* container-bs-chart is 565 wide and container-evo-chart 550, in a 1115 column --
+   so the frame splits this row down the middle rather than giving the stats a
+   fixed 22rem and the chart whatever was left. */
 .species-info-wide {
   display: grid;
-  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-gap-lg);
   align-items: start;
 }
@@ -3002,7 +3313,7 @@
   color: var(--text-primary);
 }
 
-/* ---- Info tab: type matchup chart */
+/* ---- Info tab: type effectiveness, grouped by multiplier */
 
 .type-matchup-caption {
   margin: 0 0 0.6rem;
@@ -3015,43 +3326,69 @@
 }
 
 /*
-  A grid, so every attacking type is on screen at once -- that is the difference
-  between a chart and the grouped list the old component renders. auto-fill rather
-  than a fixed column count: the panel width varies with the window, so the cells
-  reflow instead of clipping.
+  SIX ROWS AT MOST, one per multiplier tier, each listing the types in it -- see
+  TypeMatchupChart.tsx for why that inverts better than seventeen per-type cells.
+  Empty tiers are not rendered at all, so there is no "no types here" state to
+  style.
+
+  Same shape and the same --hairline separator as every other data row on the page,
+  so the tier list reads as data rather than as a legend. No badges, no pills, no
+  boxes: type names are coloured text through the shared TypeLabel, which is the
+  app-wide treatment.
 */
-.type-matchup-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-  gap: 0;
+.type-matchup-tiers {
   margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.type-matchup-cell {
-  display: flex;
+.type-matchup-tier {
+  display: grid;
+  grid-template-columns: 5em minmax(0, 1fr);
+  gap: 0.75em;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 0.4rem;
-  padding: var(--space-row-padding-block) 0.5rem;
+  padding: var(--space-row-padding-block) 0;
   border-bottom: 1px solid var(--hairline);
+  font-size: var(--font-size-label);
 }
 
-/* Neutral cells recede; anything that is not x1 is the thing worth reading. */
-.type-matchup-value {
+.type-matchup-tier:last-child {
+  border-bottom: 0;
+}
+
+.type-matchup-tier-label {
   color: var(--text-primary);
   font-weight: var(--font-weight-bold);
 }
 
-.type-matchup-cell[data-neutral='true'] .type-matchup-value {
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-regular);
+/* "Immune" is a word, not a number, so it drops the tabular face. */
+.type-matchup-tier[data-multiplier='0'] .type-matchup-tier-label {
+  font-family: var(--font-body);
+  letter-spacing: 0;
 }
 
-.type-matchup-times {
-  margin-right: 0.05em;
-  font-family: var(--font-body);
+.type-matchup-tier-types {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1em 0.3em;
+  margin: 0;
+}
+
+/*
+  Neutral recedes as a whole row -- it is the tier you read past. A TONE STEP, not
+  a colour: --accent has four sanctioned uses and none of them is this, and
+  --stat-increase / --stat-decrease already mean a nature's stat change.
+*/
+.type-matchup-tier[data-multiplier='1'] {
+  opacity: 0.72;
+}
+
+.type-matchup-type {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3em;
+}
+
+.type-matchup-sep {
   color: var(--text-secondary);
 }
 
@@ -3118,6 +3455,30 @@
 
 /* ---- Learnset tab */
 
+/*
+  LEARNSET RHYTHM. The four tabs share one --space-gap-lg flex column, which is
+  right for the airy Info tab and too much here: between the scope control and the
+  first table, and between consecutive tables, the gap read as "the page ended".
+  This tab is a run of dense tables, so it gets its own tighter step rather than
+  the shared one being reduced for all four.
+*/
+.species-learnset {
+  gap: var(--space-gap-sm);
+}
+
+.species-learnset .species-scope {
+  margin-bottom: 0.1rem;
+}
+
+.species-learn-group + .species-learn-group {
+  margin-top: 0.35rem;
+}
+
+.species-learn-group .species-info-heading {
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.2rem;
+}
+
 .species-learn-group {
   min-width: 0;
 }
@@ -3129,6 +3490,26 @@
 }
 
 /* ---- Description tab */
+
+/*
+  A GENERATION IS A DIVIDER, NOT A SECTION TITLE. The tab is one run of up to
+  sixteen entries with four rules through it; a full .species-info-heading at each
+  break would out-weigh the entries it separates.
+*/
+.species-flavor-gen + .species-flavor-gen {
+  margin-top: 0.8rem;
+}
+
+.species-flavor-gen-label {
+  margin: 0 0 0.3rem;
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
 
 .species-flavor-list {
   margin: 0;
@@ -3332,90 +3713,24 @@
   white-space: normal;
 }
 
-/* ---- Sprites tab: the folded artwork control */
-
-/*
-  The resolved image beside its switches. Two columns rather than the old page's
-  stacked panel, because here it sits at the top of a scrolling tab and a stacked
-  version pushed the catalogue a full viewport down.
-
-  .artwork and .artwork-toggles keep their own styles from the old detail view --
-  the component moved, its CSS did not, so the switches look and behave exactly as
-  they were verified to.
-*/
-.sprites-featured {
-  display: grid;
-  grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
-  gap: var(--space-gap-lg);
-  align-items: start;
-}
-
-/*
-  The component stacks its frame above its switches, which is right in a narrow
-  panel and wrong here -- stacked, the four switches ran down a 16rem column with
-  the whole right half of the row empty. Image beside switches instead; the
-  component is untouched, only this page's arrangement of it.
-*/
-.species-sprites .artwork {
-  display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr);
-  gap: var(--space-gap-md);
-  align-items: start;
-  min-width: 0;
-}
-
-/* Capped so a 475px official artwork does not set the row height. */
-.species-sprites .artwork-frame {
-  max-height: 14rem;
-}
-
-.species-sprites .artwork-frame img {
-  max-height: 14rem;
-  object-fit: contain;
-}
-
-/*
-  The frame's own background is --code-bg, from the old detail view's card
-  palette. On this page that reads as a stray cream box on a flat --surface plane,
-  so it is re-toned to the same --surface-raised step the sprite cards use --
-  scoped here, leaving the component's own styles alone.
-*/
-.species-sprites .artwork-frame {
-  background: var(--surface-raised);
-  border-color: var(--hairline);
-}
-
-.sprites-featured-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-width: 0;
-}
-
-/* The fifth switch is about the grid, not about the image, so it is separated
-   from the four axes by a hairline rather than sitting flush against them. */
-.sprites-featured-filter .toggle {
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--hairline);
-}
-
-@media (max-width: 1200px) {
-  .sprites-featured {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 /* ---- narrow */
 
-@media (max-width: 1500px) {
-  /* Stats and the evolution chart stop fitting side by side well before the page
-     drops to one column -- the chart is the wide one, so it gets the full width. */
+/*
+  A CONTAINER QUERY, NOT A VIEWPORT ONE. Stats and the evolution chart stop fitting
+  side by side when the PANEL is narrow, and the panel is now a fixed fraction of a
+  frame that is itself capped at 1400px -- so a viewport breakpoint was measuring
+  the wrong box and firing at the wrong time (it never fired at all above 1500px,
+  where the frame had already stopped growing).
+
+  The container is .species-page, so the threshold is a FRAME width: the panel is
+  1115/1860 = 60% of it, and the two blocks need roughly 560px of panel, which is
+  ~933px of frame. 58rem.
+*/
+@container (max-width: 58rem) {
   .species-info-wide {
     grid-template-columns: minmax(0, 1fr);
   }
-}
 
-@media (max-width: 900px) {
   .species-info-cols {
     grid-template-columns: minmax(0, 1fr);
   }

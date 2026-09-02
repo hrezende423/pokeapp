@@ -53,7 +53,7 @@ export default tseslint.config(
   },
   {
     // The allowlist. Nothing else may reach the painted gender icons.
-    files: ['src/modules/pokedex/EvolutionTree.tsx', 'src/modules/pokedex/TriggerIcon.tsx'],
+    files: ['src/modules/pokedex/EvolutionTree.tsx'],
     rules: { 'no-restricted-imports': 'off' },
   },
   {

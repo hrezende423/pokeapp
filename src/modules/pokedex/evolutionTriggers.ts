@@ -1,30 +1,24 @@
 /**
- * Icon + short caption for one evolution requirement.
+ * Which kind of requirement one evolution detail is.
  *
- * Icons are real Tabler icons imported from @tabler/icons-react -- no hand-drawn
- * or invented paths. The Poke Ball motif is deliberately absent: it is reserved
- * for caught / not-caught status elsewhere in the app, so nothing here may look
- * like one (which also rules out Tabler's IconCircleDot).
+ * WHAT USED TO BE HERE. This module also owned TRIGGER_ICON_NAMES (a Tabler export
+ * name per kind) and triggerCaption (a short text label per kind), for the old
+ * chart's "glyph + caption beside an arrow" treatment. The rebuilt chart draws
+ * neither -- the reference uses real item sprites and the painted condition icons,
+ * with no line glyphs and no captions -- so both are deleted rather than left as
+ * exports nothing renders. TriggerIcon.tsx went with them.
  *
- * KIND -> ICON
- *   level         IconTrendingUp      level-up, caption is the level number
- *   stone         IconDiamond         use-item, caption is the stone name
- *   move          IconSwords          requires knowing a move, caption is the move
- *   trade         IconArrowsExchange  plain trade, icon alone
- *   trade-item    IconGift            trade while holding an item, caption is the item
- *   location      IconMapPin          location-gated, caption is the location
- *   friendship    IconHeart           friendship threshold, caption is the value
- *   held-item     IconHandGrab        level up while holding an item (Razor Fang etc.)
- *   shed          IconGhost           Nincada -> Shedinja
- *   other         IconHelpCircle      fallback, never reached by Gen 1-4 data
+ * triggerKind survives because it is still the honest answer to "what kind of
+ * requirement is this", independent of how it is drawn: the chart puts it on
+ * data-kind, and the suites read that.
  *
- * The last four exist because the Gen 1-4 chains need them: `use-item` is always
- * a stone in this era (verified: all 27 use-item details point at one of the 9
- * *-stone items), but level-up splits into plain levels, friendship, locations,
- * known moves and held items, and each deserves its own glyph.
+ * PRECEDENCE IS MOST-DISTINGUISHING-FIRST. A requirement often carries several
+ * conditions at once (Espeon is level-up + friendship + daytime), so the kind is
+ * the one that separates this branch from its siblings. Order matters: trade and
+ * use-item are decided by the trigger, everything else by which extra condition is
+ * set.
  */
 
-import { getItem, getLocation, getMove } from '../../data'
 import type { EvolutionDetail } from '../../data'
 
 export type TriggerKind =
@@ -38,20 +32,6 @@ export type TriggerKind =
   | 'held-item'
   | 'shed'
   | 'other'
-
-/** The Tabler export name per kind, for reporting and for the DOM attribute. */
-export const TRIGGER_ICON_NAMES: Record<TriggerKind, string> = {
-  level: 'IconTrendingUp',
-  stone: 'IconDiamond',
-  move: 'IconSwords',
-  trade: 'IconArrowsExchange',
-  'trade-item': 'IconGift',
-  location: 'IconMapPin',
-  friendship: 'IconHeart',
-  'held-item': 'IconHandGrab',
-  shed: 'IconGhost',
-  other: 'IconHelpCircle',
-}
 
 /**
  * Pick the single most specific kind for a requirement.
@@ -71,35 +51,4 @@ export function triggerKind(detail: EvolutionDetail): TriggerKind {
   if (detail.min_happiness != null || detail.min_affection != null) return 'friendship'
   if (detail.trigger === 'level-up') return 'level'
   return 'other'
-}
-
-/**
- * Short caption beside the icon: the one value that identifies this branch.
- * Empty for plain trade, which the brief specifies as icon-only.
- */
-export function triggerCaption(detail: EvolutionDetail, kind: TriggerKind): string {
-  switch (kind) {
-    case 'level':
-      return detail.min_level != null ? `Lv ${detail.min_level}` : 'Level up'
-    case 'stone':
-      return getItem(detail.item_id ?? -1)?.display_name ?? 'Stone'
-    case 'move':
-      return detail.known_move_id != null
-        ? (getMove(detail.known_move_id)?.display_name ?? 'a move')
-        : 'a move type'
-    case 'trade':
-      return ''
-    case 'trade-item':
-      return getItem(detail.held_item_id ?? -1)?.display_name ?? 'an item'
-    case 'location':
-      return getLocation(detail.location_id ?? -1)?.display_name ?? 'a location'
-    case 'friendship':
-      return detail.min_happiness != null ? `Friendship ${detail.min_happiness}` : 'Affection'
-    case 'held-item':
-      return getItem(detail.held_item_id ?? -1)?.display_name ?? 'an item'
-    case 'shed':
-      return 'Shed'
-    case 'other':
-      return detail.trigger ?? 'Unknown'
-  }
 }

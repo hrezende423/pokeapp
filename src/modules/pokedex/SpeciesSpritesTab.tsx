@@ -1,79 +1,53 @@
 import { useMemo } from 'react'
-import { ToggleSwitch } from '../../components/ToggleSwitch'
-import { SPRITE_GAMES, artworkMode, getSpriteUrl, spriteTiles } from '../../data'
-import type { ArtworkView, Species, SpriteTile, Variety } from '../../data'
-import { Artwork } from './Artwork'
+import { SPRITE_GAMES, getSpriteUrl, spriteTiles } from '../../data'
+import type { Species, SpriteTile, Variety } from '../../data'
 
 /**
- * The Sprites tab: every image the app has for this species, plus the four-axis
- * artwork control that used to live on the old detail page.
+ * The Sprites tab: every image the app has for this species, in one sequence.
  *
- * WHY THE CONTROL IS HERE. The old page's left panel resolved ONE image from four
- * axes (source, colour, motion, gender), each checked against what actually exists
- * for that species. This tab is the catalogue of all of them. Folding the control
- * in rather than dropping it keeps the thing it was uniquely good at -- seeing one
- * exact combination large, with the unavailable combinations explained rather than
- * silently substituted -- and gives the catalogue a filter. Artwork.tsx is reused
- * unchanged, so the availability logic and its four switches are the same code
- * that was verified before, not a reimplementation.
+ * NO CONTROL, AND THAT IS THE CHANGE. The four-axis artwork picker
+ * (source / colour / motion / gender) is gone, along with the fifth switch that
+ * turned it into a filter over this grid. A picker resolves ONE image and explains
+ * why the other combinations are unavailable; a catalogue shows all of them, and
+ * the two answers to "what does this species look like" do not both need to be on
+ * the same tab. Artwork.tsx is deleted rather than left unreferenced.
  *
- * THE FILTER IS OPT-IN, and that is the load-bearing detail. Applying the four
- * axes to the grid unconditionally would mean the default view (artwork, regular,
- * static, male) hides every in-game sprite -- the tab would open on two cards. So
- * the axes narrow the grid only while the fifth switch is on, and off is the
- * default: the tab opens as the full catalogue and becomes a filter when asked.
+ * WHAT THE PICKER'S AVAILABILITY RULES BECAME. Those rules were real facts about
+ * the data, not UI behaviour, and they survive as the grid's own shape:
  *
- * All four axes narrow, not two, so the switch means one thing:
- *   source in-game       -> the per-game sections only
- *   source artwork       -> the official artwork or the animated set, per motion
- *   colour, gender       -> within whatever is left
+ *   in-game gendered   94/493 species have front_female / front_shiny_female, so
+ *                      those tiles exist for 94 species and not for the other 399.
+ *                      Driven by the same bitmask, so no separate rule is applied
+ *                      here at all -- an absent bit is an absent card.
+ *   artwork gendered   0/493. official-artwork exposes only front_default and
+ *                      front_shiny, so the artwork section is always two cards.
+ *   animated           94/493 ship a gendered file; getSpriteUrl still owns the
+ *                      whole rule including Murkrow's unsuffixed male file.
  *
- * THE COLOUR AXIS ALSO DRIVES THE EVOLUTION CHART on the Info tab, which is why
- * the view state is owned by SpeciesDetailPage rather than by this tab: a shiny
- * selection here shows a shiny chain there, exactly as it did on the old page.
+ * ANIMATED SPRITES, VERIFIED RATHER THAN ASSUMED. Audited across all 493 in-scope
+ * records in the api-data snapshot: PokeAPI carries an `animated` object for
+ * exactly one game, generation-v/black-white, which is out of scope. Emerald and
+ * Crystal animated in-game and have NO animated sprites upstream -- only static
+ * slots. The one other animated source api-data exposes is
+ * `sprites.other.showdown` (493 species, front/back x regular/shiny), which is
+ * Pokemon Showdown's art in a single modern style rather than per-game, and is not
+ * a sanctioned source in CLAUDE.md. So the animated WebPs in pokeapp-sprites
+ * remain the only animated content in scope, and the section below is theirs.
  *
- * THE PER-GAME TILES COME FROM THE BITMASK added in e15b347 -- `spriteTiles`
- * decodes `version_sprite_slots` and builds the URLs from the transcribed path
- * table. That is what makes this tab possible without a 16,204-URL manifest, and
+ * EVERY CARD IS LABELLED, which is the brief for the tab and the reason the
+ * sequence keeps its per-game headings instead of collapsing into one unlabelled
+ * wall: the interesting thing about a Gen 1 gray Charmander is WHICH rendering it
+ * is. Each card names its slot (Front, Front - Shiny, Back - Transparent) and each
+ * group names the game.
+ *
+ * THE PER-GAME TILES COME FROM THE BITMASK -- `spriteTiles` decodes
+ * `version_sprite_slots` and builds URLs from the transcribed path table. That is
  * why the mask is precached eagerly rather than lazily fetched: an offline visit
  * has to be able to open this tab.
  *
- * EVERY CARD IS LABELLED, which is the whole brief for the tab. An unlabelled wall
- * of thumbnails is unreadable precisely because the interesting thing about a Gen
- * 1 gray Charmander is WHICH rendering it is. Each card names the slot (Front ·
- * Shiny, Back · Transparent, ...) and each group names the game.
- *
  * IMAGES ARE lazy AND decoding=async. A fully-evolved Gen 1 species has around
- * fifty tiles here and they are all off-screen on open; loading them eagerly would
- * make opening the tab a fifty-request burst.
+ * fifty tiles here and they are all off-screen on open.
  */
-
-const FILTER_HINT = 'Narrow the grid below to the source, colour, motion and gender selected above.'
-
-/** What a card is, for the filter. The three sources are mutually exclusive. */
-type CardKind = 'game' | 'artwork' | 'animated'
-
-interface CardFacts {
-  kind: CardKind
-  shiny: boolean
-  female: boolean
-}
-
-/**
- * Whether a card survives the current filter.
- *
- * Gray and transparent game tiles are neither shiny nor gendered, so they count as
- * regular/male -- which is right: they are alternate RENDERINGS of the regular
- * sprite, not a fourth colour.
- */
-function matchesView(view: ArtworkView, facts: CardFacts): boolean {
-  const mode = artworkMode(view)
-  const wantKind: CardKind =
-    mode === 'in-game-static' ? 'game' : mode === 'artwork-animated' ? 'animated' : 'artwork'
-  if (facts.kind !== wantKind) return false
-  if (facts.shiny !== view.shiny) return false
-  return facts.female === (view.gender === 'female')
-}
 
 interface SpriteCardProps {
   url: string
@@ -120,51 +94,20 @@ function groupByGame(tiles: SpriteTile[]) {
   return groups
 }
 
-export function SpeciesSpritesTab({
-  species,
-  variety,
-  view,
-  onViewChange,
-  matchGrid,
-  onMatchGridChange,
-}: {
-  species: Species
-  variety: Variety
-  /** Owned by the page: the colour axis also drives the Info tab's chain. */
-  view: ArtworkView
-  onViewChange: (next: ArtworkView) => void
-  /** Whether the four axes are narrowing the grid. */
-  matchGrid: boolean
-  onMatchGridChange: (next: boolean) => void
-}) {
-  const allTiles = useMemo(() => spriteTiles(species), [species])
-
-  const tiles = matchGrid
-    ? allTiles.filter((t) =>
-        matchesView(view, {
-          kind: 'game',
-          shiny: t.slot.includes('_shiny'),
-          female: t.slot.endsWith('_female'),
-        }),
-      )
-    : allTiles
+export function SpeciesSpritesTab({ species, variety }: { species: Species; variety: Variety }) {
+  const tiles = useMemo(() => spriteTiles(species), [species])
   const gameGroups = useMemo(() => groupByGame(tiles), [tiles])
 
   const artwork = [
-    { url: variety.sprites.official_artwork, label: 'Regular', shiny: false },
-    { url: variety.sprites.official_artwork_shiny, label: 'Shiny', shiny: true },
-  ]
-    .filter((a): a is { url: string; label: string; shiny: boolean } => a.url != null)
-    .filter(
-      (a) => !matchGrid || matchesView(view, { kind: 'artwork', shiny: a.shiny, female: false }),
-    )
+    { url: variety.sprites.official_artwork, label: 'Regular' },
+    { url: variety.sprites.official_artwork_shiny, label: 'Shiny' },
+  ].filter((a): a is { url: string; label: string } => a.url != null)
 
   /*
     The animated set: two colours, times the genders that actually have a file.
-    availableSpriteGenders would give the gender list, but getSpriteUrl already
-    encodes the whole rule (including Murkrow's unsuffixed male file), so the axes
-    are built here and the URL builder stays the single source of truth for what
-    exists.
+    getSpriteUrl encodes the whole rule (including Murkrow's unsuffixed male file),
+    so the axes are enumerated here and the URL builder stays the single source of
+    truth for what exists -- a null return drops the card.
   */
   const animated: { url: string; primary: string; secondary: string; testId: string }[] = []
   for (const shiny of [false, true]) {
@@ -172,12 +115,6 @@ export function SpeciesSpritesTab({
       ? ['male', 'female']
       : ['male']
     for (const gender of genders) {
-      if (
-        matchGrid &&
-        !matchesView(view, { kind: 'animated', shiny, female: gender === 'female' })
-      ) {
-        continue
-      }
       const url = getSpriteUrl(species.id, {
         shiny,
         gender,
@@ -196,46 +133,24 @@ export function SpeciesSpritesTab({
   }
 
   const gamesWithNone = SPRITE_GAMES.filter(
-    (g) => g.generation <= 4 && !allTiles.some((t) => t.game === g.game),
+    (g) => g.generation <= 4 && !tiles.some((t) => t.game === g.game),
   )
-  const shownCards = tiles.length + artwork.length + animated.length
+  const totalCards = tiles.length + artwork.length + animated.length
 
   return (
     <div
       className="species-sprites"
       data-testid="species-sprites"
       data-tiles={tiles.length}
-      data-all-tiles={allTiles.length}
-      data-filtered={matchGrid}
+      data-cards={totalCards}
     >
-      {/*
-        THE FOLDED CONTROL. Artwork.tsx renders the resolved image and its four
-        switches; the fifth switch beside them is what turns the same four axes
-        into a filter over everything below.
-      */}
-      <section className="species-info-block" data-testid="sprites-featured">
-        <h3 className="species-info-heading">Selected sprite</h3>
-        <div className="sprites-featured">
-          <Artwork species={species} variety={variety} view={view} onChange={onViewChange} />
-          <div className="sprites-featured-filter">
-            <ToggleSwitch
-              id="grid-filter"
-              label="Grid"
-              offLabel="All sprites"
-              onLabel="Match above"
-              checked={matchGrid}
-              onChange={onMatchGridChange}
-            />
-            <p className="species-info-caption">{FILTER_HINT}</p>
-            {matchGrid && (
-              <p className="species-info-caption" data-testid="sprites-filter-count">
-                Showing <span className="num">{shownCards}</span> of{' '}
-                <span className="num">{allTiles.length + 2}</span> images.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
+      <p className="species-info-caption" data-testid="sprites-total">
+        <span className="num">{totalCards}</span> images:{' '}
+        <span className="num">{artwork.length}</span> official artwork,{' '}
+        <span className="num">{animated.length}</span> animated,{' '}
+        <span className="num">{tiles.length}</span> in-game across{' '}
+        <span className="num">{gameGroups.length}</span> games.
+      </p>
 
       {artwork.length > 0 && (
         <section className="species-info-block" data-testid="sprites-artwork">
@@ -306,18 +221,9 @@ export function SpeciesSpritesTab({
         </section>
       ))}
 
-      {/* A filter that matches nothing says so, rather than ending the page on the
-          last section that happened to survive. */}
-      {matchGrid && shownCards === 0 && (
-        <p className="species-info-caption" data-testid="sprites-filter-empty">
-          No image matches that combination for {species.display_name}.
-        </p>
-      )}
-
       {/* Named rather than silently absent: a Gen 4 species genuinely has no Gen 1
           sprite, and saying which games have none is the honest version of an
-          empty section. Read from the unfiltered set, so it does not start listing
-          games the filter removed. */}
+          empty section. */}
       {gamesWithNone.length > 0 && (
         <p className="species-info-caption" data-testid="sprites-missing-games">
           No sprites in {gamesWithNone.map((g) => g.label).join(', ')}.
