@@ -6,7 +6,15 @@ captures the current state and the reasoning behind it, not a running history
 of every round.
 
 Companion files: `design-tokens.json` (platform-agnostic, W3C DTCG-flavored),
-`design-tokens.css` (web/React implementation).
+`design-tokens.css` (web/React implementation), and **`MODULE-PATTERNS.md`** —
+the build reference for anyone starting a new module, extracted from the two
+screens that have actually shipped.
+
+**Read §12 first if you are implementing.** Two screens have now been built for
+real against real data, and §12 is the as-built record of them. Where it differs
+from §5, §12 is what shipped and §5 is the spec it was designed from; both are
+kept, because the reasoning in §5 is still the reasoning, and knowing which
+parts survived contact is the useful part.
 
 ---
 
@@ -38,10 +46,13 @@ For future projects, the process that got us here:
 ## 2. Design principles
 
 **Monochrome + one reserved accent.** Ink and paper do almost all the work.
-The accent (`--accent`, Pokedex red) is reserved for exactly two functional
-jobs — active tab/nav state, and binary state indicators (caught toggle,
-similar future toggles). It never decorates. If a new component wants to use
-the accent, ask whether it's a genuinely analogous functional case first.
+The accent (`--accent`, Pokedex red) is reserved for exactly **four** functional
+jobs — active tab/nav state, binary state indicators (caught toggle, the
+gender-ratio bar's female share), error/validation emphasis, and base-stat
+magnitude. It never decorates. If a new component wants to use the accent, ask
+whether it's a genuinely analogous functional case first. The third was
+confirmed in §8 and the fourth in §12; the count has grown twice by argument and
+never by drift, which is the discipline worth keeping.
 
 **The dex number is the signature element, not a caption.** Across the whole
 system, the catalog number gets outsized visual treatment — a full ledger
@@ -86,6 +97,13 @@ value right, monospace, hairline row divider. Progress bars were tried and
 rejected — too close to the generic fitness-app/RPG-clone default, and
 disconnected from anything specific to a Pokedex.
 
+*Narrowly reversed for base stats — see §12.* The species detail page's
+base-stat block does use a bar, in `--accent`, confirmed against the real Figma
+prototype. It is scoped to that one block: six values on one comparable 0-255
+scale, where the shape of the spread is the fact being read. Every other stat row
+in the app is still the plain table above, and this is not a general licence for
+bars — a metadata row, an EV row and a matchup tier all stay text.
+
 **Artwork provides the color.** The UI chrome is almost entirely
 achromatic (ink/paper + the one reserved accent). Real sprite/artwork,
 background-removed, is what actually carries color into the screen. Don't
@@ -107,6 +125,15 @@ duplicate it), and introducing a glyph-based split between contexts would
 reintroduce exactly the kind of extra visual machinery this system has
 repeatedly stripped out elsewhere.
 
+**And now it is the whole rule rather than a rule with an exception.** Game
+names were badged for two passes — a per-version colour at a 12% self-tint of
+itself, argued on the grounds that a version is a NAME a reader scans a column
+by rather than a value — and the badge was removed on request along with its
+palette. Nothing in the app carries a fill, a pill or a chip.
+`--radius-badge-square` is now a sanctioned token that nothing uses, which is
+the honest state; the open item in `design-tokens.json` that called the badge
+treatment "a dev-time per-context call" is closed by removal, not by choosing.
+
 ---
 
 ## 4. Rejected directions (and why)
@@ -121,7 +148,10 @@ they didn't work:
   solve visual hierarchy with opposite tools (color/depth vs. absence).
   Material-forward with minimalism as restraint (not co-equal system) won.
 - **Colored fill badge/chip for type** — the most common generic-AI tell
-  found across every reference search. Replaced with colored text.
+  found across every reference search. Replaced with colored text. A badge was
+  later built for GAME names rather than types, on the argument that a version
+  is a name and not a value; it shipped for two passes and was removed. The
+  category is now closed rather than narrowed: no badges at all (§3).
 - **Horizontal progress bars for stats** — generic fitness-app/RPG-clone
   default. Replaced with a plain right-aligned data table.
 - **"Tasteful muted hue" accent selection** (teal/cobalt/amber/crimson/olive
@@ -230,8 +260,28 @@ bottom border under the nav, active item in `--accent`. 3-column grid,
   not a default.
 - Open question carried over from §3: whether the dex number gets dimmed
   for not-yet-seen entries — not yet re-confirmed at grid scale.
+- **As built, and still accurate**, which is worth saying because the detail
+  page's spec did not survive the same way. Two additions from implementation:
+  the geometry is frozen CSS px at a *measured* scale rather than proportional
+  units (§12), and the card carries an explicit `font-size: 13.3333px` that is
+  load-bearing — the Figma calibration was done while the card was a `<button>`
+  inheriting Chrome's UA size, and turning it into a `<div>` moved the ability
+  line 9px. The value is stated on purpose; nothing inside the card renders at
+  it.
 
 ### Species detail page
+
+> **SUPERSEDED BY §12 as the built spec.** What shipped is a proportional
+> reproduction of the `DetailPage-Light` Figma frame: a pinned artwork column, a
+> persistent banner, a sub-nav of four tabs, and **one flat `--surface` plane** —
+> no drawer, no floating panel, no rounded exposed edge, and no species-tinted
+> background. The two-panel drawer described here IS built and IS live, but only
+> on the design-system reference page (`?ds=1`, `SpeciesDetailPanel.tsx`), where
+> it remains the handoff artefact for this spec. The species-background database
+> (§9, all 493 hand-reviewed pairs) is likewise used only there. Both are kept
+> deliberately: the spec below is a complete, tested design, and if the frame
+> reproduction is ever revisited this is what it would be revisited against.
+
 Two-panel layout, not a card. Artwork panel is fixed/non-scrolling; the info
 drawer is a persistent, pronounced, rounded-corner panel (not an overlay
 with a scrim) anchored to the right edge, rounded only on its exposed left
@@ -320,11 +370,14 @@ way), status-green for non-form indicators, bento/grain's eventual
 occasions, and the retrofit-vs-fresh-application decision for pokeapp's
 existing built modules.
 
-**Implementation note — IBM Plex Sans**: this is a self-hosted webfont, not
-a system font. Download the actual font files from Google Fonts and bundle
-them (same treatment as sprite assets — no CDN dependency, offline-first).
-Add `@font-face` rules once those files exist; `design-tokens.css`
-currently only has the fallback stack wired up.
+**Implementation note — IBM Plex Sans**: DONE. Self-hosted, four `@font-face`
+blocks in `src/design-tokens.css` — two subsets (latin, latin-ext) x two styles
+(Roman, Italic), variable wght 100-700, precached, no CDN. The italic pair was
+added late, after `font-style: italic` turned out to have been a silent no-op
+app-wide: only Roman faces were bundled and Chrome synthesised nothing, so the
+computed style read `italic` over upright glyphs in three places. Martian Mono
+and JetBrains Mono are bundled the same way. `design-tokens.css` (the handoff
+copy) still carries only the fallback stack, by design — it is the handoff copy.
 
 ## 7. Full 95-component pass (validated)
 
@@ -425,6 +478,154 @@ Pokedex grid page (ghost card + mini watermark), the species detail page
 standard and species-tinted background modes, and the team-build form
 (compact strip + EV-dominant layout).
 
+*Written before implementation. §12 is the state now, and the two-panel drawer
+line above is the one that did not survive — see §12.2.*
+
 Next real task: pick up the next component or screen from the 95-item
 scope and design it under these constraints — this document plus the two
 token files are now the actual reference for that, not the chat history.
+
+---
+
+## 12. As built — the two screens that shipped
+
+Everything above §12 was designed before implementation. This section is the
+audit of what actually exists after building the Pokedex browse grid and the
+species detail page against real data for all 493 Gen 1-4 species. It is the
+authoritative record where the two disagree.
+
+**`MODULE-PATTERNS.md` is the companion to this section** — same material,
+organised as instructions for building the next module rather than as a record
+of these two.
+
+### 12.1 What survived contact, unchanged
+
+Worth stating first, because most of the system did:
+
+- **Monochrome plus one accent.** Held completely. The accent grew from two
+  sanctioned uses to four, each by explicit argument.
+- **No shadows — but this audit found the exception.** The DOM assertions cover
+  every element the *reference page* renders, which is most of the system and not
+  the whole app: `.egg-marker-note`, a popover on the species detail page's
+  Learnset tab, was still carrying `box-shadow: var(--shadow)` — the legacy
+  10px/15px double drop shadow from `index.css` — because no suite visits it.
+  Fixed during this audit (`--surface-raised` plus the accent hairline it already
+  had), and the suite now scans **every tracked CSS file under `src/`** for a
+  `box-shadow` declaration, with one named allow-list entry: `.toggle-knob`, in
+  the unimported `ToggleSwitch.tsx`. The rule held everywhere it was being
+  watched, which is the useful lesson about where it was being watched.
+- **Type as coloured text.** Held, and strengthened: there is now no badge of
+  any kind anywhere in the app (§3).
+- **Artwork provides the colour.** Held. Both screens are achromatic chrome plus
+  official artwork.
+- **The dex number as the signature element.** Held and amplified — the detail
+  page's watermark is 341 raw units, exactly 200px at the width cap, letter-spaced
+  0.2em, `tabular-nums` so it contains for all 493.
+- **Three surface tones.** Held. On the detail page `--surface-raised` appears
+  only as a bar/track fill; the page itself is one flat `--surface` plane.
+- **Functional numbers are monospace, display numbers are not.** Held exactly as
+  §2 refined it.
+- **Hairline-and-whitespace separation.** Held. No card backgrounds and no
+  borders anywhere in the detail page's tab content.
+
+### 12.2 What changed, and why
+
+| § | designed | built | why |
+| --- | --- | --- | --- |
+| 2 | accent has 2 uses | **4** | error emphasis (§8), then base-stat magnitude, confirmed against the Figma prototype |
+| 2 | stats are never bars | **base stats are bars** | six values on one 0-255 scale; the spread is the fact. Scoped to that block only |
+| 5 | detail page is a two-panel layout with a persistent rounded drawer | **one flat plane**: pinned column + banner + sub-nav + four tabs | the real Figma frame (`DetailPage-Light`) is not a drawer layout. The drawer spec is still built and live on the reference page |
+| 5 | species-tinted artwork background | **not used on the real page** | the frame has no tint. The 493-pair database (§9) drives the reference page only |
+| 5, 7 | uppercase micro-labels | **`capitalize`, tracking 0.01em** | requested directly; scoped to `.species-page` so the five old dexes and the reference page keep their own typography |
+| 6 | Plex Sans "not yet in the codebase" | **self-hosted, Roman + Italic** | done; see the note in §6 |
+| open-items | type badge and type palette are "dev-time per-context calls" | **both closed** | no badges at all; the community palette is the palette, the muted set is retired |
+
+### 12.3 The scaling model — the one genuinely new architectural idea
+
+Neither screen renders at the token sizes across an arbitrary viewport, and they
+solve that differently. **This is the first decision a new screen has to make.**
+
+**Grid page — frozen px at a measured scale.** The Figma frames are drawn at
+2.348x, established by `calibrate-scale.mjs`: it measures every unambiguous text
+node's advance in the real self-hosted face and inverts it to the size the node
+was set at. Every role lands on a locked token at that divisor, which is how the
+divisor was chosen — a conventional 2.0 export scale puts every role 1.2-3.0px
+between tokens. Geometry is then Figma-value / 2.348, frozen as CSS px, and the
+three 212px columns are **centred** in the wider shell rather than stretched.
+
+**Detail page — proportional to its container.** The whole screen is one frame
+(1860 x 1172), so `--dp-u` is one raw unit (`100cqw / 1860`) and every length is
+a multiple of it. The crucial move is that the type and spacing **tokens** are
+redefined in those units on an inner wrapper, so `DataTable`, `StatRow` and
+`Tabs` scale with the page for free — no per-component pass. Two tunable numbers,
+deliberately separate: the 1400px width cap, and `--dp-s` (0.78) which multiplies
+only type. Because every length is one unit, "narrower page" and "smaller text"
+would otherwise be one control.
+
+`npm run report:type-scale` prints every size in the app — the fixed tokens and
+the detail page's raw units, measured in a real browser. The RAW column is what
+you edit.
+
+### 12.4 Patterns that emerged during implementation
+
+None of these were in the original scope. All are now reusable, and all are
+written up with their failure modes in `MODULE-PATTERNS.md`:
+
+- **The hairline-band rule.** If rows draw their own `border-bottom`, a row *gap*
+  falls inside the band a reader sees, and content centred in its own box reads
+  low. No row gap on a bordered-row grid; verify by reconstructing the band from
+  the hairlines, not by measuring the row box.
+- **Subgrid for paired columns.** Two lists read as pairs must share row tracks,
+  or the taller cell walks every hairline below it out of line.
+- **`LoadState` as a four-state type.** `ready` with an empty array is not
+  `error`; conflating them made the UI assert something false.
+- **On-demand data behind an intersection gate**, where the gate is "on screen"
+  rather than "has scrolled" — and partial failures are named, never dropped.
+- **Cross-navigation is a clickable label**, never a button shape. Includes
+  section headings that expand to own their tab.
+- **Group a chart by the axis with fewer buckets** — six multiplier tiers, not
+  seventeen per-type cells.
+- **Custom SVG only where the game has no Tabler equivalent** (evolution
+  conditions), and prefer the plainer glyph elsewhere.
+
+### 12.5 Verification as part of the system
+
+Ten suites, **1,317 checks**, driving the real app in a real browser — 341 of
+them in `verify-design-system.mjs`, which resolves expected values out of
+`design-tokens.json` and asserts them against what the browser computes, so it
+fails if the CSS drifts from the tokens rather than comparing the CSS to a copy
+of itself. This is part of the design system rather than adjacent to it, because
+several design decisions were only provable by measurement and two shipped wrong
+without it:
+
+- **Assert the relation, not the pixel** — padding as a fraction of its type
+  survives a scale change.
+- **Measure what rendered, not what was declared** — a computed style says what
+  the CSS asked for. `font-style: italic` read `italic` over upright glyphs for
+  months; sprite transparency needed canvas pixel decoding; the animated-WebP
+  check reads the file's own `VP8X` flag byte.
+- **Assert removals** — no fill, no radius, no leftover padding, one colour where
+  there were sixteen. An exception that has been taken out grows back otherwise.
+- **Both themes, every time**, and wait on `img.complete` before measuring.
+
+### 12.6 Still open after implementation
+
+- **`ToggleSwitch.tsx` is dead code and a trap.** Nothing imports it; the
+  sanctioned toggle is `components/ds/Toggle.tsx`. It is the last `box-shadow` in
+  the codebase, allow-listed by name in the suite rather than fixed, so that
+  adding the app-wide scan did not also delete a component. Delete both together
+  when someone decides to.
+
+- **Dex-number dimming at grid scale** (carried from §5). The ledger rule exists
+  (caught 100% / not-caught 40%); the grid card has not adopted it.
+- **The reference page shows the superseded detail design.** Deliberate — it is
+  the handoff artefact for the §5 spec, and rebuilding it around the frame
+  reproduction would duplicate the real page. Flagged rather than done.
+- **Status-green for non-form indicators** — unchanged from §8, still open.
+- **`--radius-badge-square`** — a sanctioned token nothing uses, now that the
+  game badge is gone.
+- **Retrofit of the five pre-redesign dexes** — unchanged. They keep their own
+  layout and typography by standing decision.
+- **Species-tinted backgrounds and the 493-pair database** — built, reviewed
+  species-by-species, and currently unused by the shipping detail page. Not
+  deprecated; it has nowhere to go under the frame design as drawn.

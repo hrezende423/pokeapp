@@ -1,5 +1,5 @@
 {
-  "$description": "Pokeapp design tokens — consolidated v1. Platform-agnostic, W3C DTCG-flavored. Light/dark given as sibling values on each token rather than separate files, for simplicity at this scale. Extracted from and validated against: hero detail POC, Pokedex grid POC, species detail (two-panel) POC, team-build form POC.",
+  "$description": "Pokeapp design tokens — consolidated v1. Platform-agnostic, W3C DTCG-flavored. Light/dark given as sibling values on each token rather than separate files, for simplicity at this scale. Extracted from and validated against: hero detail POC, Pokedex grid POC, species detail (two-panel) POC, team-build form POC. AS BUILT: two screens have since shipped against real data for all 493 species — the Pokedex browse grid and the species detail page. Every token value here is still authoritative and unchanged (verify-design-system.mjs asserts the CSS against this file in both themes), but the species detail page that shipped is a proportional reproduction of its Figma frame rather than the two-panel drawer POC this file was validated against. See DESIGN-SYSTEM.md §12 for the audit, and MODULE-PATTERNS.md for how a new module reuses all of it.",
 
   "color": {
     "$type": "color",
@@ -309,18 +309,46 @@
   },
 
 
+  "as-built-scaling": {
+    "$description": "NOT a token, and deliberately not expressed as one: the two shipped screens do not render at the token sizes across an arbitrary viewport, and they solve that in two different ways. This is the FIRST decision a new screen has to make, so it is recorded beside the tokens rather than only in prose. Full write-up in MODULE-PATTERNS.md §1.",
+    "token-scaled": {
+      "$description": "The default. Sizes come from the typography and spacing tokens directly. The browse grid is this: geometry is Figma-value / 2.348 frozen as CSS px, and the three 212px columns are centred in a wider shell rather than stretched to fill it.",
+      "measured-figma-scale": "2.348",
+      "why-measured": "scripts/calibrate-scale.mjs measures every unambiguous text node's advance in the real self-hosted face and inverts it to the size the node was set at. At 2.348 every role lands on a locked token; a conventional 2.0 export scale puts every role 1.2-3.0px between tokens."
+    },
+    "frame-scaled": {
+      "$description": "Only for a screen that IS one design frame. The species detail page: --dp-u is one raw unit of the frame (100cqw / 1860) and every length is a multiple of it. The type AND spacing tokens are redefined in those units on an inner wrapper, so every shared component (DataTable, StatRow, Tabs) scales with the page for free.",
+      "frame": "1860 x 1172 raw units",
+      "width-cap": "1400px",
+      "type-scale": "0.78",
+      "rules": [
+        "Redefine the TOKENS, not the rules — shared components then come along for free.",
+        "Spacing must be redefined too, or the rhythm keeps a larger face's padding. A rem or px spacing value on such a page is a bug.",
+        "An element cannot query its own container, so the unit lives on an inner wrapper.",
+        "Exactly two tunable numbers, kept separate on purpose: the width cap and the type scale.",
+        "getPropertyValue on the unit returns the literal calc() — custom properties are substituted, not resolved. Derive it from the measured width.",
+        "npm run report:type-scale prints every size in the app, measured in a real browser. The RAW column is what you edit."
+      ]
+    }
+  },
+
   "open-items": {
-    "$description": "Explicitly deferred or unresolved — do not treat silence on these as a decision.",
+    "$description": "Explicitly deferred or unresolved — do not treat silence on these as a decision. Revised after the browse grid and species detail page shipped: five closed, four added. Closed items keep their outcome rather than being deleted, so a later session does not re-open them as if they had never been settled.",
     "items": [
-      "species_id -> {bg_light, bg_dark} data table — DONE, all 493 species, published to hrezende423/pokeapp-sprites. See species-background-extraction for the full methodology and revision history — the automated contrast-solver direction was tried and explicitly rejected/reverted, not the final approach.",
       "Bento grid and grain-texture techniques — parked for specific future occasions (charts, callout cards), not part of the base system.",
-      "Type-badge treatment: both plain colored text (default) and the solid-square badge are sanctioned, dev-time per-context call.",
-      "Type color source: both the muted custom palette and the community-standard hex set are sanctioned, dev-time per-context call.",
-      "IBM Plex Sans needs to be downloaded and self-hosted as .woff2 — not yet in the codebase.",
       "Status-green for non-form indicators (e.g. a 'synced' status dot) — separate from the form-field success decision (which deliberately avoided a new color), still genuinely open.",
       "Region/generation badge icon (#11) — option C locked with a 'vertical fold line' modification requested but not yet drawn.",
       "7 domain icons (sprite toggle, move category, contest conditions, item categories, berry, type-effectiveness marker, held item) — user sourcing from Tabler/Icones/game-icons.net directly.",
-      "Retrofit strategy for pokeapp's existing built modules (old design system) — not yet decided whether/how they migrate to this one."
+      "Retrofit strategy for pokeapp's existing built modules (old design system) — STILL OPEN, and now a standing decision rather than a pending one: the five pre-redesign dexes (Itemdex, Abilitydex, Naturedex, Berrydex, Movedex) keep their own layout, components and typography untouched. Revisit deliberately or not at all.",
+      "Dex-number dimming at GRID scale — carried from DESIGN-SYSTEM.md §5 and still open. The ledger rule is settled (caught 100% / not-caught 40%, see ledger-dim-rule); the grid card has not adopted it.",
+      "The design-system reference page (?ds=1) still renders the SUPERSEDED two-panel detail design. Deliberate: it is the handoff artefact for that spec, and rebuilding it around the frame reproduction would duplicate the real page. Flagged, not done.",
+      "Species-tinted artwork backgrounds and the 493-pair species-background database — built and human-reviewed species-by-species, and currently used ONLY by the reference page. The shipped detail page reproduces a Figma frame that has no tint. Not deprecated; it has nowhere to go under the frame design as drawn.",
+      "radius.badge-square — a sanctioned token that NOTHING uses, now that the game badge is gone. Do not reach for it without deciding a fill and text-colour spec first.",
+      "CLOSED — species_id -> {bg_light, bg_dark} data table: done, all 493 species, published to hrezende423/pokeapp-sprites. See species-background-extraction; the automated contrast-solver direction was tried and explicitly rejected/reverted.",
+      "CLOSED — type-badge treatment ('both plain colored text and the solid-square badge are sanctioned, dev-time call'): closed by REMOVAL, not by choosing. Nothing in the app carries a badge, pill or chip. A game-name badge was built, shipped for two passes, and removed on request along with its per-version palette.",
+      "CLOSED — type color source ('both the muted custom palette and the community hex set are sanctioned, dev-time call'): the community palette is the palette, in both themes, with per-mode contrast overrides (dark overrides 5 of 17, light 12 of 17). color.primitive.type-color, the muted set, is retired — kept for the record, referenced by nothing.",
+      "CLOSED — IBM Plex Sans self-hosting: done. Four @font-face blocks, two subsets x two styles (Roman and Italic), variable wght 100-700, precached, no CDN. Martian Mono and JetBrains Mono the same way.",
+      "CLOSED — EV/IV sliders: resolved in the full-95 pass."
     ]
   }
 }

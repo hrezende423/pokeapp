@@ -8,6 +8,13 @@ Full rationale for anything below lives in `/design-system/DESIGN-SYSTEM.md`
 and `/design-system/design-tokens.json`. This file is only the rules that
 must never be re-derived, re-explained, or re-litigated in a fresh session.
 
+**STARTING A NEW MODULE? Read `/design-system/MODULE-PATTERNS.md` first.**
+It is the build reference — every pattern the Pokédex grid and species
+detail page established, in the order you need them, each with the file to
+copy from and the mistake it exists to prevent. `DESIGN-SYSTEM.md` §12 is
+the as-built audit of those two screens and is authoritative wherever it
+disagrees with §1–§11, which were written before implementation.
+
 ## Architecture
 
 - **Generation-scoped source of truth**: every dex module (species, moves,
@@ -150,6 +157,15 @@ that isn't explicitly about design.)
 
 - **No `box-shadow`, anywhere, either theme.** Elevation is a tone-step:
   `--surface` vs `--surface-raised`.
+- **The hairline-band rule.** Where rows draw their own `border-bottom`,
+  the band a reader sees runs from one hairline to the NEXT — so a row
+  `gap` falls inside that band and content centred in its own box reads a
+  half-gap low. Either no row gap or no per-row border; never both. This
+  shipped wrong once with every box-relative measurement passing, so
+  verify by reconstructing the band from the hairlines, not the row box.
+- **Base-stat bars are the one sanctioned reversal of "stats are a plain
+  table".** Six values on one 0-255 scale where the spread is the fact.
+  Scoped to that block; not a licence for progress bars anywhere else.
 - **`--accent` (red) has exactly four uses**: active tab/nav state,
   binary state indicators, error/validation emphasis, and stat magnitude
   (the filled portion of a base-stat bar on the species detail page).

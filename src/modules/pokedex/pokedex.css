@@ -1088,6 +1088,20 @@
   color: var(--text-h);
 }
 
+/*
+  NO box-shadow, AND THIS ONE HAD SURVIVED. It is a popover on the species
+  detail page's Learnset tab, so it is on a redesigned screen, and it carried
+  `box-shadow: var(--shadow)` -- the legacy token from index.css, a 10px/15px
+  double drop shadow. It was the only live violation of the house rule left in
+  the app: the design-system suite asserts `box-shadow: none` on every element
+  the REFERENCE page renders, and this element is not on that page.
+
+  Elevation is the tone-step, so --surface-raised is the floating surface and the
+  accent hairline it already had does the rest. --bg and --text-h were the
+  pre-redesign tokens for the same two jobs, which is how the shadow came along
+  with them; they resolve to nearly the same colours, so this is a token
+  correction rather than a visual change beyond losing the shadow.
+*/
 .egg-marker-note {
   position: absolute;
   bottom: calc(100% + 0.3rem);
@@ -1096,11 +1110,10 @@
   width: max-content;
   max-width: 13rem;
   padding: 0.3rem 0.45rem;
-  color: var(--text-h);
-  background: var(--bg);
+  color: var(--text-primary);
+  background: var(--surface-raised);
   border: 1px solid var(--accent);
   border-radius: 0.35rem;
-  box-shadow: var(--shadow);
   font-size: 0.68rem;
   line-height: 1.3;
   white-space: normal;

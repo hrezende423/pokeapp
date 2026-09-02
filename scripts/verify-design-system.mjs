@@ -23,7 +23,7 @@
  * Usage: node scripts/verify-design-system.mjs
  */
 
-import { spawn, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
@@ -330,6 +330,59 @@ check(
   italicFaces.length === 2 &&
     italicFaces.every((b) => /ibm-plex-sans-italic-latin(-ext)?\.woff2/.test(b)),
   `${italicFaces.length} of ${faceBlocks.length} @font-face blocks`,
+)
+
+/*
+  NO SHADOW, APP-WIDE IN SOURCE -- and this is a new check because the browser
+  half of it had a hole. The DOM assertions below cover every element the
+  DESIGN-SYSTEM REFERENCE PAGE renders, which is most of the system but not the
+  whole app: `.egg-marker-note`, a popover on the species detail page's Learnset
+  tab, carried `box-shadow: var(--shadow)` -- the legacy 10px/15px double drop
+  shadow from index.css -- and no suite looked at it, because it does not appear
+  on the reference page.
+
+  So the source is scanned too. This is the one rule worth checking statically as
+  well as dynamically: it is the system's hardest, it is a single property, and
+  the failure mode is a rule violation on a screen no suite happens to visit.
+
+  ONE NAMED EXCEPTION, and naming it is the point. `.toggle-knob` belongs to
+  src/components/ToggleSwitch.tsx, which NOTHING IMPORTS -- the sanctioned toggle
+  is components/ds/Toggle.tsx. It is dead code carrying a dead violation, so it
+  renders nowhere; it is allow-listed rather than fixed so that this check can
+  ship without deleting a component as a side effect, and it is listed here by
+  name so the allowance cannot quietly cover anything else. Delete both when the
+  file goes.
+*/
+const SHADOW_EXCEPTIONS = ['.toggle-knob']
+/* Every tracked file under src/, filtered here rather than globbed by git: a
+   pathspec glob that misses a directory would make this check silently pass. */
+const cssFiles = execFileSync('git', ['ls-files', 'src'], { encoding: 'utf8' })
+  .split('\n')
+  .filter((f) => f.endsWith('.css'))
+const liveShadows = []
+for (const file of cssFiles) {
+  const text = readFileSync(file, 'utf8')
+  // Strip comments first: several of them discuss the rule by name.
+  const code = text.replace(/\/\*[\s\S]*?\*\//g, '')
+  code.split('\n').forEach((line, i) => {
+    if (!/box-shadow\s*:/.test(line)) return
+    if (/box-shadow\s*:\s*none/.test(line)) return
+    // Which selector is this inside? The nearest preceding one is enough here.
+    const upto = code
+      .split('\n')
+      .slice(0, i + 1)
+      .join('\n')
+    const selector = [...upto.matchAll(/([^\s{};][^{};]*)\{/g)].pop()?.[1].trim() ?? '?'
+    if (SHADOW_EXCEPTIONS.some((ex) => selector.includes(ex))) return
+    liveShadows.push(`${file}:${i + 1} ${selector}`)
+  })
+}
+log(`  CSS files scanned for box-shadow: ${cssFiles.length}`)
+liveShadows.forEach((v) => log(`    VIOLATION ${v}`))
+check(
+  'no box-shadow declaration anywhere in the app CSS',
+  liveShadows.length === 0,
+  liveShadows.join(' | ') || `(${SHADOW_EXCEPTIONS.join(', ')} allow-listed as dead code)`,
 )
 
 // No shadow, in source as well as in the browser.
