@@ -43,7 +43,7 @@
  *   Tabs             the ds Navigation tab row -- the same component the app nav
  *                    uses, so "styled identically" is shared code, not a copy.
  *   EvolutionTree    the Info tab's chart. Rebuilt to the layout-evo-* frames.
- *   DataTable        the learnset sections and the encounter list.
+ *   DataTable        the learnset sections and the Info tab's encounter list.
  *   StatRow/StatList the ds label-left / value-right hairline metadata row.
  *   spriteTiles      the bitmask decoder, for the Sprites tab.
  *   usePartitionRows the four-state loader for the two on-demand datasets.
@@ -97,10 +97,10 @@ export function SpeciesDetailPage({
   const { generation, versionGroup } = useVersionGroup()
   /*
     THE PAGE OWNS THE GAME SCOPE, not the tabs that show it. The Learnset tab's own
-    generation control drives it, and the Description tab reads it as the fallback
-    for its locations section when the app selector is on "All". Held here because
-    only one tab is mounted at a time -- state inside a tab would reset every time
-    you left it.
+    generation control drives it, and the Info tab reads it as the fallback for its
+    locations section when the app selector is on "All". Held here because only one
+    tab is mounted at a time -- state inside a tab would reset every time you left
+    it.
   */
   const gameScope = useSpeciesGameScope(speciesId)
   const species = getSpecies(speciesId)
@@ -173,6 +173,7 @@ export function SpeciesDetailPage({
                     variety={variety}
                     generation={generation}
                     versionGroup={versionGroup}
+                    scope={gameScope}
                     onSelectSpecies={onSelectSpecies}
                     onSelectEggGroup={onSelectEggGroup}
                   />
@@ -180,14 +181,7 @@ export function SpeciesDetailPage({
                 {variety && tab === 'Learnset' && (
                   <SpeciesLearnsetTab species={species} variety={variety} scope={gameScope} />
                 )}
-                {variety && tab === 'Description' && (
-                  <SpeciesDescriptionTab
-                    species={species}
-                    variety={variety}
-                    versionGroup={versionGroup}
-                    scope={gameScope}
-                  />
-                )}
+                {variety && tab === 'Description' && <SpeciesDescriptionTab species={species} />}
                 {variety && tab === 'Sprites' && (
                   <SpeciesSpritesTab species={species} variety={variety} />
                 )}

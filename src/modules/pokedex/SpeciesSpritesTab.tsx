@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { SPRITE_GAMES, getSpriteUrl, spriteTiles } from '../../data'
+import { SPRITE_GAMES, bwAnimatedTiles, getSpriteUrl, spriteTiles } from '../../data'
 import type { Species, SpriteTile, Variety } from '../../data'
 
 /**
@@ -24,15 +24,28 @@ import type { Species, SpriteTile, Variety } from '../../data'
  *   animated           94/493 ship a gendered file; getSpriteUrl still owns the
  *                      whole rule including Murkrow's unsuffixed male file.
  *
- * ANIMATED SPRITES, VERIFIED RATHER THAN ASSUMED. Audited across all 493 in-scope
- * records in the api-data snapshot: PokeAPI carries an `animated` object for
- * exactly one game, generation-v/black-white, which is out of scope. Emerald and
- * Crystal animated in-game and have NO animated sprites upstream -- only static
- * slots. The one other animated source api-data exposes is
- * `sprites.other.showdown` (493 species, front/back x regular/shiny), which is
- * Pokemon Showdown's art in a single modern style rather than per-game, and is not
- * a sanctioned source in CLAUDE.md. So the animated WebPs in pokeapp-sprites
- * remain the only animated content in scope, and the section below is theirs.
+ * TWO ANIMATED REGISTERS, and they are different things.
+ *
+ *   Animated artwork   the high-resolution animated WebPs already in
+ *                      pokeapp-sprites. Front only, regular/shiny x the genders
+ *                      that have a file.
+ *   Black / White      PokeAPI's animated sprites. The API has exactly one
+ *                      animated set and it is GIF, at
+ *                      versions/generation-v/black-white/animated -- so all
+ *                      2,340 files are converted to animated WebP and hosted
+ *                      beside the artwork. Front AND back, regular/shiny, plus
+ *                      female where upstream has one. See
+ *                      src/data/animatedSprites.ts for the audit, the
+ *                      transparency finding and the availability bitmask.
+ *
+ * WHAT IS STILL NOT AVAILABLE: Emerald and Crystal animated in-game and have NO
+ * animated sprites upstream, only static slots. The one other animated source is
+ * `sprites.other.showdown`, which is one modern style rather than per-game and is
+ * not a sanctioned source in CLAUDE.md.
+ *
+ * THE BLACK/WHITE SECTION NAMES ITS GAME, which matters in a Gen 1-4 app: the
+ * species are all in scope, the game they were drawn for is not, and a reader
+ * must never be shown Gen 5 art under a Gen 1 heading.
  *
  * EVERY CARD IS LABELLED, which is the brief for the tab and the reason the
  * sequence keeps its per-game headings instead of collapsing into one unlabelled
@@ -57,19 +70,25 @@ interface SpriteCardProps {
   testId: string
   /** Pixel art is nearest-neighbour; the artwork and animations are not. */
   pixelated?: boolean
+  /**
+   * Draw to the frame instead of at 1:1.
+   *
+   * Only the Black/White set needs it, and it needs it because those sprites
+   * range from 36 to 153 px of native width -- Bulbasaur's is 37 px, which in an
+   * 88 px frame looks lost rather than small. The per-game tiles are all 96 px
+   * and sit at very nearly 1:1 already, so scaling them would be worse.
+   */
+  scaled?: boolean
 }
 
-function SpriteCard({ url, primary, secondary, alt, testId, pixelated }: SpriteCardProps) {
+function SpriteCard({ url, primary, secondary, alt, testId, pixelated, scaled }: SpriteCardProps) {
+  const classes = ['sprite-card-img']
+  if (pixelated) classes.push('is-pixelated')
+  if (scaled) classes.push('is-scaled')
   return (
     <li className="sprite-card" data-testid={testId}>
       <span className="sprite-card-frame">
-        <img
-          className={pixelated ? 'sprite-card-img is-pixelated' : 'sprite-card-img'}
-          src={url}
-          alt={alt}
-          loading="lazy"
-          decoding="async"
-        />
+        <img className={classes.join(' ')} src={url} alt={alt} loading="lazy" decoding="async" />
       </span>
       <span className="sprite-card-primary">{primary}</span>
       <span className="sprite-card-secondary">{secondary}</span>
@@ -97,6 +116,7 @@ function groupByGame(tiles: SpriteTile[]) {
 export function SpeciesSpritesTab({ species, variety }: { species: Species; variety: Variety }) {
   const tiles = useMemo(() => spriteTiles(species), [species])
   const gameGroups = useMemo(() => groupByGame(tiles), [tiles])
+  const bwTiles = useMemo(() => bwAnimatedTiles(species.id), [species.id])
 
   const artwork = [
     { url: variety.sprites.official_artwork, label: 'Regular' },
@@ -135,7 +155,7 @@ export function SpeciesSpritesTab({ species, variety }: { species: Species; vari
   const gamesWithNone = SPRITE_GAMES.filter(
     (g) => g.generation <= 4 && !tiles.some((t) => t.game === g.game),
   )
-  const totalCards = tiles.length + artwork.length + animated.length
+  const totalCards = tiles.length + artwork.length + animated.length + bwTiles.length
 
   return (
     <div
@@ -143,11 +163,13 @@ export function SpeciesSpritesTab({ species, variety }: { species: Species; vari
       data-testid="species-sprites"
       data-tiles={tiles.length}
       data-cards={totalCards}
+      data-bw-tiles={bwTiles.length}
     >
       <p className="species-info-caption" data-testid="sprites-total">
         <span className="num">{totalCards}</span> images:{' '}
         <span className="num">{artwork.length}</span> official artwork,{' '}
-        <span className="num">{animated.length}</span> animated,{' '}
+        <span className="num">{animated.length}</span> animated artwork,{' '}
+        <span className="num">{bwTiles.length}</span> Black/White animated,{' '}
         <span className="num">{tiles.length}</span> in-game across{' '}
         <span className="num">{gameGroups.length}</span> games.
       </p>
@@ -176,7 +198,7 @@ export function SpeciesSpritesTab({ species, variety }: { species: Species; vari
       {animated.length > 0 && (
         <section className="species-info-block" data-testid="sprites-animated">
           <h3 className="species-info-heading">
-            Animated
+            Animated artwork
             <span className="species-info-count num">{animated.length}</span>
           </h3>
           <ul className="sprite-grid">
@@ -188,6 +210,36 @@ export function SpeciesSpritesTab({ species, variety }: { species: Species; vari
                 secondary={a.secondary}
                 alt={`${species.display_name} animated sprite, ${a.primary.toLowerCase()}`}
                 testId={a.testId}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/*
+        THE API'S OWN ANIMATED SET, converted to WebP. Named for its game rather
+        than filed under a generic "Animated" heading, because it IS Gen 5 art --
+        see the note at the top of this file. Pixelated: these are 2x-3x sprites
+        drawn well above 1:1 in a 7rem card, and smoothing them is what makes a
+        GIF-derived sprite grow a soft white edge.
+      */}
+      {bwTiles.length > 0 && (
+        <section className="species-info-block" data-testid="sprites-bw-animated">
+          <h3 className="species-info-heading">
+            Black / White animated
+            <span className="species-info-count num">{bwTiles.length}</span>
+          </h3>
+          <ul className="sprite-grid">
+            {bwTiles.map((tile) => (
+              <SpriteCard
+                key={tile.testId}
+                url={tile.url}
+                primary={tile.sideLabel}
+                secondary={tile.variantLabel}
+                alt={`${species.display_name} animated Black/White sprite, ${tile.sideLabel.toLowerCase()} ${tile.variantLabel.toLowerCase()}`}
+                testId={tile.testId}
+                pixelated
+                scaled
               />
             ))}
           </ul>

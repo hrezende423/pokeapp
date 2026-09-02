@@ -13,7 +13,9 @@ import {
 } from '../../data'
 import type { Species, Variety, VersionGroup } from '../../data'
 import { BREEDING_INTRODUCED_IN_GENERATION } from '../dex/entrySources'
+import type { SpeciesGameScope } from './useSpeciesGameScope'
 import { EvolutionTree } from './EvolutionTree'
+import { SpeciesLocations } from './SpeciesLocations'
 import { TypeMatchupChart } from './TypeMatchupChart'
 import {
   MAX_BASE_STAT,
@@ -49,14 +51,44 @@ import {
  *
  * NO FOOTPRINT ROW, as decided: no such field exists in the bundle or upstream,
  * and the sprite URLs 404.
+ *
+ * THE TAB'S ORDER, top to bottom: the two metadata columns, then base stats and
+ * the evolution chart side by side, then WHERE TO FIND IT, then type
+ * effectiveness, then the Pokeathlon note. Locations moved here from the
+ * Description tab -- see SpeciesLocations for why -- and they sit under the two
+ * charts and above the type table, which is where they were asked for.
  */
 
+/**
+ * The gender split as a two-segment bar.
+ *
+ * --accent FOR FEMALE, THE PAGE'S INK FOR MALE, requested directly. It replaces
+ * two tone steps of the same grey, which needed the percentages beside it to say
+ * which segment was which.
+ *
+ * NOT A FIFTH USE OF --accent: its sanctioned list is active tab/nav state,
+ * BINARY INDICATORS, error emphasis and base-stat magnitude, and a gender split
+ * is the second of those -- the same use that already covers caught/not-caught.
+ * Noted because the count is a rule in CLAUDE.md.
+ *
+ * --text-primary rather than a literal white, because "white for male" is what
+ * --text-primary is in the dark theme this page was designed in, and a literal
+ * #fff would vanish into the light theme's white track.
+ *
+ * GENDERLESS IS A FULL GREY BAR, not the bare word. The row used to be a
+ * different shape for the 19 genderless species than for the other 474, which
+ * broke the metadata columns' shared rows for exactly those species. The grey is
+ * the one the female segment used to be, so nothing new enters the palette.
+ */
 function GenderRatioBar({ genderRate }: { genderRate: number | null }) {
   const ratio = genderRatio(genderRate)
   if (!ratio) {
     return (
       <span className="species-gender" data-testid="gender-ratio" data-genderless="true">
-        Genderless
+        <span className="species-gender-track" aria-hidden>
+          <span className="species-gender-none" />
+        </span>
+        <span className="species-gender-legend">Genderless</span>
       </span>
     )
   }
@@ -67,13 +99,6 @@ function GenderRatioBar({ genderRate }: { genderRate: number | null }) {
       data-male={ratio.male}
       data-female={ratio.female}
     >
-      {/*
-        A TONE STEP, NOT TWO NEW COLOURS. Blue/pink is the obvious reflex and is
-        exactly the kind of colour the system does not have a token for; --accent
-        has four sanctioned uses and this is not one of them. So the two segments
-        are the primary and secondary text tones, and the percentages beside them
-        are what actually names which is which.
-      */}
       <span className="species-gender-track" aria-hidden>
         <span className="species-gender-male" style={{ width: `${ratio.male}%` }} />
         <span className="species-gender-female" style={{ width: `${ratio.female}%` }} />
@@ -144,6 +169,7 @@ export function SpeciesInfoTab({
   variety,
   generation,
   versionGroup,
+  scope,
   onSelectSpecies,
   onSelectEggGroup,
 }: {
@@ -151,6 +177,8 @@ export function SpeciesInfoTab({
   variety: Variety
   generation: number
   versionGroup: VersionGroup | null
+  /** The page's own game scope -- the locations section's fallback. */
+  scope: SpeciesGameScope | null
   onSelectSpecies?: (id: number) => void
   onSelectEggGroup?: (id: number) => void
 }) {
@@ -410,6 +438,14 @@ export function SpeciesInfoTab({
           )}
         </section>
       </div>
+
+      {/* WHERE TO FIND IT: under the two charts, above type effectiveness. */}
+      <SpeciesLocations
+        species={species}
+        variety={variety}
+        versionGroup={versionGroup}
+        scope={scope}
+      />
 
       <section className="species-info-block" data-testid="species-type-matchups">
         <h3 className="species-info-heading">Type effectiveness</h3>

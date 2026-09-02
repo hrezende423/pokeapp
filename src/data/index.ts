@@ -117,6 +117,15 @@ export type { AbilityHolder } from './abilityHolders'
 
 export { availableSpriteGenders, getSpriteUrl, usesUnsuffixedMaleSprite } from './sprites'
 export type { SpriteGender, SpriteOptions } from './sprites'
+export {
+  BW_FIRST_ID,
+  BW_LAST_ID,
+  bwAnimatedCount,
+  bwAnimatedTiles,
+  bwAnimatedUrl,
+  hasBwAnimated,
+} from './animatedSprites'
+export type { BwSlot, BwTile } from './animatedSprites'
 
 export {
   SLOT_ORDER,

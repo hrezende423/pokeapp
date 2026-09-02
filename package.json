@@ -20,7 +20,10 @@
     "verify:search": "node scripts/verify-search.mjs",
     "verify:ds": "node scripts/verify-design-system.mjs",
     "verify:evo-icons": "node scripts/verify-evo-icons.mjs",
-    "verify:species-page": "node scripts/verify-species-page.mjs"
+    "verify:species-page": "node scripts/verify-species-page.mjs",
+    "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
+    "calibrate:game-colors": "node scripts/calibrate-game-colors.mjs",
+    "report:type-scale": "node scripts/report-type-scale.mjs"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.46.0",

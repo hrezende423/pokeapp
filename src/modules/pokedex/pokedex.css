@@ -875,14 +875,20 @@
   object-fit: contain;
 }
 
-/* The species whose page this is reads as the anchor of the chart; the others
-   sit back a step. No box around either. */
-.evo-art-btn[data-current='false'] .evo-art {
-  opacity: 0.7;
-}
+/*
+  NO TONE STEP BETWEEN THE STAGES ANY MORE. The chart used to dim every species
+  except the one whose page it is, which read as focus but also made two thirds
+  of the drawing look unavailable -- and on a radial chart it dimmed seven of
+  eight. All stages are now drawn at full strength; the banner already says which
+  species the page is about, and the chart's job is to show the line.
 
+  Hover is a small scale rather than an opacity lift, since there is no longer
+  any opacity to lift from. transform-origin is the centre so the artwork grows
+  in place instead of drifting off its absolute position.
+*/
 .evo-art-btn:not(:disabled):hover .evo-art {
-  opacity: 1;
+  transform: scale(1.05);
+  transform-origin: center;
 }
 
 .evo-art-btn:focus-visible {
@@ -915,12 +921,20 @@
   opacity: 0.2;
 }
 
+/*
+  FILLED, MITRED POLYGONS -- not stroked polylines.
+
+  They were `polyline` + stroke-width 9 + stroke-linecap/linejoin round, which
+  draws a chevron with rounded ends and a rounded elbow and no relationship to
+  the wedge it sits on. The brief is a RECTANGULAR chevron whose edges follow the
+  trapezoid's leg lines, so each one is now a six-point polygon whose two arm
+  ends lie ON a line parallel to the leg it meets. The geometry is in
+  EvolutionTree.tsx, where it can be derived from the wedge's own numbers instead
+  of being three magic point lists.
+*/
 .evo-arrow-chevron {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  fill: currentColor;
+  stroke: none;
   opacity: 0.45;
 }
 
@@ -2687,10 +2701,23 @@
     genus                       40      17.9       --
     watermark                  389     174.6       --
 
-  --dp-frame-max is the ONE tunable number: the width the frame stops growing at.
-  1400px puts body type at 22.6px and the pinned column at 555px. It is also what
-  answers "reduce the overall page aspect ratio" -- the page stops widening and
-  centres instead of stretching to a 2560px monitor.
+  TWO TUNABLE NUMBERS, and nothing else on the page is a hand-picked size:
+
+    the 1400px cap   the width the frame stops growing at. It is what answers
+                     "reduce the overall page aspect ratio" -- the page stops
+                     widening and centres instead of stretching to a 2560px
+                     monitor.
+    --dp-s           the type scale, below. 1 is the frame's own type at the
+                     frame's own scale; it is 0.78 because the frame's sizes,
+                     reproduced faithfully, read too large in a browser window.
+
+  --dp-s IS DELIBERATELY A SEPARATE KNOB FROM THE CAP. Shrinking the page shrinks
+  the type with it, because every length is one unit -- so "smaller text" and
+  "narrower page" were the same control, and they are two different requests. The
+  scale multiplies only the type, so the layout keeps the frame's proportions
+  while the text sits at a readable size inside them. Every size on the page is
+  `raw x --dp-u x --dp-s`, which means one number changes all of them and the
+  table above stays the record of what the frame actually says.
 
   The vh term is the second cap and is load-bearing rather than defensive: the
   pinned column is 1031 units tall, so on a short window the WIDTH has to give or
@@ -2716,11 +2743,15 @@
 */
 .species-page-inner {
   --dp-u: calc(100cqw / 1860);
-  --font-size-display: calc(66 * var(--dp-u));
-  --font-size-title: calc(43 * var(--dp-u));
-  --font-size-body: calc(30 * var(--dp-u));
-  --font-size-label: calc(26 * var(--dp-u));
-  --font-size-caption: calc(22 * var(--dp-u));
+  /* The type scale. See the note above: one knob for every size on the page. */
+  --dp-s: 0.78;
+  /* One raw unit of type, i.e. the unit every font-size below is a multiple of. */
+  --dp-t: calc(var(--dp-u) * var(--dp-s));
+  --font-size-display: calc(66 * var(--dp-t));
+  --font-size-title: calc(43 * var(--dp-t));
+  --font-size-body: calc(30 * var(--dp-t));
+  --font-size-label: calc(26 * var(--dp-t));
+  --font-size-caption: calc(22 * var(--dp-t));
   position: relative;
   height: 100%;
   min-height: 0;
@@ -2794,6 +2825,9 @@
 */
 .species-hero > * {
   --hu: calc(100cqw / 737);
+  /* One raw unit of type in THIS column: --dp-s inherits from
+     .species-page-inner, so the page's single type knob moves the hero too. */
+  --ht: calc(var(--hu) * var(--dp-s, 1));
 }
 
 /*
@@ -2821,7 +2855,7 @@
   font-family: var(--font-body);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
-  font-size: calc(389 * var(--hu));
+  font-size: calc(389 * var(--ht));
   /* 344 / 389: the frame's box is shorter than its own type size. */
   line-height: 0.883;
   text-align: left;
@@ -2858,7 +2892,7 @@
   transform: rotate(-90deg);
   white-space: nowrap;
   z-index: 1;
-  font-size: calc(43 * var(--hu));
+  font-size: calc(43 * var(--ht));
   letter-spacing: 0.02em;
   color: var(--text-secondary);
 }
@@ -2869,7 +2903,7 @@
   left: 11.533%;
   top: 69.544%;
   z-index: 1;
-  font-size: calc(111 * var(--hu));
+  font-size: calc(111 * var(--ht));
   line-height: 1.15;
   white-space: nowrap;
   color: var(--text-secondary);
@@ -2895,20 +2929,41 @@
   display: flex;
   align-items: baseline;
   gap: calc(24 * var(--hu));
+  /*
+    THE ROW MAY WRAP, AND THAT IS THE FIX FOR THE CLIPPED NAME.
+
+    It was `white-space: nowrap` on a row starting at x=85 in a 737-wide column
+    with overflow:hidden, so any name pair wider than 652 raw units lost its
+    tail -- "Bulbasaur Fushigidane" rendered as "Bulbasaur Fushigidan". A
+    smaller type scale alone would only move which pair clips, since the
+    romanised names are data and some of them are long; the row has to be able
+    to give way. Each NAME still refuses to break internally, so the wrap always
+    happens at the gap between them.
+
+    max-width is the column minus the left inset: 652/737.
+  */
+  flex-wrap: wrap;
+  max-width: 88.46%;
+}
+
+.species-hero-name,
+.species-hero-roma {
   white-space: nowrap;
 }
 
 .species-hero-name {
   font-family: var(--font-body);
-  font-size: calc(66 * var(--hu));
+  font-size: calc(66 * var(--ht));
   font-weight: var(--font-weight-bold);
   line-height: 1.05;
   letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
+/* 52, not the frame's 66: the romanised name is the quieter of the two and the
+   pair has to fit one row for the common case. See the wrap note above. */
 .species-hero-roma {
-  font-size: calc(66 * var(--hu));
+  font-size: calc(52 * var(--ht));
   font-style: italic;
   font-weight: var(--font-weight-regular);
   line-height: 1.05;
@@ -2968,7 +3023,7 @@
    belongs -- punch-list item 4 was it rendering in the pinned column instead. */
 .species-banner-genus {
   margin: 0;
-  font-size: calc(40 * var(--dp-u));
+  font-size: calc(40 * var(--dp-t));
   font-style: italic;
   color: var(--text-secondary);
 }
@@ -2998,13 +3053,49 @@
 }
 
 .species-page-subnav .ds-tabs {
-  font-size: calc(33 * var(--dp-u));
+  font-size: calc(33 * var(--dp-t));
 }
 
 .species-page-subnav .ds-tab {
-  font-size: calc(33 * var(--dp-u));
+  font-size: calc(33 * var(--dp-t));
   text-transform: none;
   letter-spacing: 0;
+}
+
+/* ---- no ALL-CAPS type on this page */
+
+/*
+  EVERY MICRO-LABEL HERE IS TITLE CASE, and it is one block rather than an edit
+  to each rule because the sources are three different files: .ds-stat-label and
+  .ds-type are shared design-system components, .data-table-sort is the shared
+  table, and the rest belong to this module.
+
+  SCOPED TO .species-page ON PURPOSE. The five pre-redesign dexes (Itemdex,
+  Abilitydex, Naturedex, Berrydex, Movedex) and the design-system reference page
+  keep their own typography, which is the standing rule -- and the DS page in
+  particular is a handoff artefact that has to keep matching its own spec.
+
+  `capitalize`, not `none`: "the initial of each word" is the requirement and the
+  source strings are a mix of Title Case ("Abilities"), sentence case ("Base
+  stats") and lowercase data ("grass"), so leaving it to the strings would give
+  three different answers. The tracking goes with it -- 0.05-0.08em is spacing
+  for caps, and on mixed case the same value reads as a gap between letters.
+*/
+.species-page .ds-stat-label,
+.species-page .ds-type,
+.species-page .species-info-heading,
+.species-page .species-scope-label,
+.species-page .species-flavor-gen-label,
+.species-page .species-ability-hidden {
+  text-transform: capitalize;
+  letter-spacing: 0.01em;
+}
+
+/* Authored labels, already cased, and two of them ("TM/HM", "PP") are initialisms
+   that no transform should touch. */
+.species-page .data-table-sort {
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 /* container-main-info starts at y=223, two units under the tab row. */
@@ -3131,17 +3222,43 @@
 /* ---- Info tab: the two metadata sub-columns */
 
 /*
-  Two columns of ds stat rows. They are independent lists rather than one
-  two-column grid, so a long value (seven abilities' worth, or four held items)
-  grows its own row without dragging the other column's rows out of alignment with
-  it -- the rows are not meant to line up across the gap, they are two lists that
-  happen to sit side by side.
+  TWO COLUMNS THAT SHARE THEIR ROWS, via subgrid.
+
+  They used to be two independent lists side by side, on the reasoning that a
+  long value should grow its own row without dragging the other column's rows
+  with it. In practice that is exactly what went wrong: the Gender ratio row is
+  two lines tall (bar plus legend) and every row below it in the left column sat
+  a step lower than its neighbour on the right, so seven pairs of hairlines
+  drifted apart down the block.
+
+  So the outer grid owns seven rows and each list is a `grid-template-rows:
+  subgrid` participant in them. Both lists have exactly seven rows and they are
+  read as pairs (Abilities | Egg groups, Height | Hatch time, ...), so a shared
+  row track is what the content already meant. The tallest cell in a pair sets
+  the height for both, which is the "same height on both columns" requirement.
+
+  Subgrid, not a single flat grid of four tracks: the two label/value pairs have
+  to stay two lists so .ds-stat-row keeps owning its own hairline and its own
+  space-between, and a flat grid would have had to rebuild that row component.
 */
 .species-info-cols {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(7, auto);
   gap: var(--space-gap-lg);
   align-items: start;
+}
+
+.species-info-cols > .ds-stat-list {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / span 7;
+}
+
+/* The row is a grid item now, so the hairline needs it to fill its track rather
+   than sit at its content height. */
+.species-info-cols > .ds-stat-list > .ds-stat-row {
+  align-items: baseline;
 }
 
 /* A metadata value is often a small cluster, not one word -- let it wrap. */
@@ -3240,20 +3357,51 @@
 }
 
 /*
-  TWO TONE STEPS, NOT TWO HUES -- see the note in SpeciesInfoTab. The percentages
-  in the legend are what identify the segments; the bar carries the proportion.
+  TWO HUES NOW, requested directly: --accent for the female share and the page's
+  ink for the male one.
+
+  THIS IS NOT A FIFTH USE OF --accent. Its sanctioned list is active tab/nav
+  state, binary indicators, error/validation emphasis and base-stat magnitude --
+  and a gender split is a binary indicator, which is the one that already covers
+  caught/not-caught. Recorded here because the count is a rule in CLAUDE.md and
+  a reader will check it.
+
+  --text-primary rather than a literal white: the request was "white for male",
+  which is what --text-primary is in the dark theme the page is designed in. A
+  literal #fff would be invisible on the light theme's white --surface-raised
+  track, so the token is the version of "white" that survives both themes.
 */
 .species-gender-male {
   background: var(--text-primary);
 }
 
 .species-gender-female {
+  background: var(--accent);
+}
+
+/*
+  Genderless is a FULL BAR, not an absent one. It used to be the bare word with
+  no bar at all, which made the row a different shape from every other species'.
+  The grey is exactly what the female segment used to be -- --text-secondary at
+  0.45 -- so nothing new enters the palette to say "no split here".
+*/
+.species-gender-none {
+  width: 100%;
   background: var(--text-secondary);
   opacity: 0.45;
 }
 
+/*
+  One step below caption. The legend is the tallest thing in the Gender ratio
+  row and the row was the reason the two metadata columns drifted out of line;
+  it is also the least important text in the row, being a gloss on a bar that
+  already shows the proportion. The columns are aligned by subgrid as well --
+  see .species-info-cols -- so this is the readable half of that fix rather than
+  the whole of it.
+*/
 .species-gender-legend {
-  font-size: var(--font-size-caption);
+  font-size: calc(18 * var(--dp-t, 1px));
+  line-height: 1.25;
   color: var(--text-secondary);
 }
 
@@ -3456,27 +3604,32 @@
 /* ---- Learnset tab */
 
 /*
-  LEARNSET RHYTHM. The four tabs share one --space-gap-lg flex column, which is
-  right for the airy Info tab and too much here: between the scope control and the
-  first table, and between consecutive tables, the gap read as "the page ended".
-  This tab is a run of dense tables, so it gets its own tighter step rather than
-  the shared one being reduced for all four.
+  LEARNSET RHYTHM, second pass. The four tabs share one --space-gap-lg flex
+  column, which is right for the airy Info tab and too much for a run of dense
+  tables -- but the first pass overcorrected all the way to --space-gap-sm plus a
+  0.35rem step, and consecutive tables then ran together with no break between
+  the end of one and the heading of the next.
+
+  --space-gap-md is the middle step of the same scale rather than a new number,
+  and the group-to-group margin is where most of the separation now lives: a
+  heading is what starts a section, so the space belongs above the heading, not
+  spread evenly through the tab.
 */
 .species-learnset {
-  gap: var(--space-gap-sm);
+  gap: var(--space-gap-md);
 }
 
 .species-learnset .species-scope {
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.2rem;
 }
 
 .species-learn-group + .species-learn-group {
-  margin-top: 0.35rem;
+  margin-top: 0.9rem;
 }
 
 .species-learn-group .species-info-heading {
-  margin-bottom: 0.25rem;
-  padding-bottom: 0.2rem;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.25rem;
 }
 
 .species-learn-group {
@@ -3528,11 +3681,54 @@
   border-bottom: 0;
 }
 
+/*
+  THE GAME NAME IS A COLOURED BADGE.
+
+  Asked for as "check if each game has an associated colour and if so, put the
+  game names in a colored badge instead of plain text". The data says no -- see
+  the block comment on --game-* in design-tokens.css -- so the palette is the
+  community version-colour set, contrast-corrected per theme by
+  scripts/calibrate-game-colors.mjs.
+
+  A BADGE HERE AND NOT ON A TYPE, and the difference is deliberate rather than
+  inconsistent. "Type is data, not decoration" is why type indicators are
+  coloured text with no shape; a version label is a NAME, the thing a reader
+  scans this list by, and 16 of them stacked down a column need something to
+  scan. It uses --radius-badge-square, the badge radius design-tokens.json
+  sanctions and TypeLabel deliberately left unimplemented for want of a fill and
+  text-colour spec: this is that spec, decided and measured.
+
+  Both colours come from the one --game-c custom property set inline, so the
+  fill is always a 12% self-tint of the text colour and the pair can never drift.
+  colour-mix against --surface rather than transparent, so the tint does not
+  double up over the flavour entry's own background.
+*/
 .species-flavor-version {
+  display: inline-block;
+  padding: 0.1em 0.45em;
+  border-radius: var(--radius-badge-square);
+  background: color-mix(in srgb, var(--game-c, var(--text-secondary)) 12%, var(--surface));
+  color: var(--game-c, var(--text-secondary));
   font-size: var(--font-size-label);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+/* The same badge inside the locations table's Version cell, where it is one of
+   five columns and has to stay on one line. */
+.species-game-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.1em 0.4em;
+  border-radius: var(--radius-badge-square);
+  background: color-mix(in srgb, var(--game-c, var(--text-secondary)) 12%, var(--surface));
+  color: var(--game-c, var(--text-secondary));
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .species-flavor-text {
@@ -3585,6 +3781,25 @@
    them look wrong. The artwork and the animated WebPs are not pixelated. */
 .sprite-card-img.is-pixelated {
   image-rendering: pixelated;
+}
+
+/*
+  DRAWN TO THE FRAME, for the Black/White set only.
+
+  Those sprites are 36-153 px wide natively -- Bulbasaur's is 37 -- so at 1:1 the
+  small ones sit lost in the middle of an 88 px frame while the large ones fill
+  it, and the section reads as a broken grid rather than a set. Filling the frame
+  makes every card the same weight.
+
+  It scales by a non-integer factor, which for pixel art is normally the wrong
+  answer; is-pixelated is what makes it acceptable, since nearest-neighbour gives
+  hard edges with slightly uneven pixel widths rather than a blur. The per-game
+  tiles deliberately do NOT get this: they are all 96 px and already at ~1:1.
+*/
+.sprite-card-img.is-scaled {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .sprite-card-primary {
@@ -3731,7 +3946,15 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* One column, so the shared row tracks have nothing to share -- and 14 rows in
+     7 tracks would overlap. Back to two stacked lists. */
   .species-info-cols {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .species-info-cols > .ds-stat-list {
+    display: block;
+    grid-row: auto;
   }
 }
