@@ -109,6 +109,63 @@ export const SPRITE_GAMES = [
 const SPRITE_BASE =
   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions'
 
+/*
+  ================================================ NO WHITE-BACKGROUND SPRITES
+
+  PokeAPI serves the Gen 1-2 sprites on an OPAQUE WHITE background. Audited by
+  decoding the real PNGs and reading their corner alpha, per game and per slot:
+
+    red-blue, yellow   front/back default and front/back gray are white
+    gold, silver       front/back x default/shiny are white
+    crystal            front/back x default/shiny are white
+    Ruby/Sapphire on   already transparent, every slot
+
+  Two different fixes, because upstream is inconsistent about what it also
+  provides transparently:
+
+  1. MOST OF THEM HAVE A TRANSPARENT COUNTERPART upstream -- a `transparent/`
+     rendering of the same face and shininess -- so the white one is simply not
+     rendered and the counterpart takes its place. 2,110 tiles. They are a
+     different canvas size (96 x 96 against 40 x 40 for red-blue), which is why
+     they are a real alternative rather than the same file with alpha.
+
+  2. 2,110 HAVE NO COUNTERPART: both gray slots on red-blue and yellow, and
+     front_shiny / back_default / back_shiny on gold and silver. Dropping those
+     would have lost every Game Boy grayscale sprite and every Gold/Silver back
+     and shiny, so they are keyed to transparency and hosted in pokeapp-sprites
+     instead -- flood-filled inward from the border, not colour-keyed, because
+     these sprites use the same #ffffff for eyes and teeth as for the background
+     (344,194 interior white pixels survive across the set because of it).
+
+  So every tile the app renders is transparent, and nothing was lost to get
+  there.
+*/
+
+/** Slots each Gen 1-2 game serves on an opaque white background. */
+const WHITE_BACKGROUND: Record<string, readonly SpriteSlot[]> = {
+  'red-blue': ['front_default', 'back_default', 'front_gray', 'back_gray'],
+  yellow: ['front_default', 'back_default', 'front_gray', 'back_gray'],
+  gold: ['front_default', 'front_shiny', 'back_default', 'back_shiny'],
+  silver: ['front_default', 'front_shiny', 'back_default', 'back_shiny'],
+  crystal: ['front_default', 'front_shiny', 'back_default', 'back_shiny'],
+}
+
+/** The transparent slot that renders the same face and shininess, where one exists. */
+const TRANSPARENT_COUNTERPART: Partial<Record<SpriteSlot, SpriteSlot>> = {
+  front_default: 'front_transparent',
+  back_default: 'back_transparent',
+  front_shiny: 'front_shiny_transparent',
+  back_shiny: 'back_shiny_transparent',
+}
+
+/** Our keyed copies, for the white slots with no counterpart upstream. */
+const KEYED_BASE = 'https://raw.githubusercontent.com/hrezende423/pokeapp-sprites/main/transparent'
+
+/** Does this game serve this slot on white? */
+function isWhiteBacked(game: string, slot: SpriteSlot): boolean {
+  return WHITE_BACKGROUND[game]?.includes(slot) ?? false
+}
+
 const defaultVariety = (species: Species): Variety | undefined =>
   species.varieties.find((v) => v.is_default) ?? species.varieties[0]
 
@@ -136,20 +193,44 @@ export function versionSpriteUrl(pokemonId: number, game: string, slot: SpriteSl
 /**
  * Human label for a slot.
  *
- * Gray and transparent are named as their own kind rather than as modifiers of
- * "Normal": a Gen 1 gray sprite is not a shininess or a gender, it is a different
- * rendering of the same Pokemon, and calling it "Normal · Gray" read as a
- * contradiction in the grid.
+ * Gray is named as its own kind rather than as a modifier of "Normal": a Gen 1
+ * gray sprite is not a shininess or a gender, it is a different rendering of the
+ * same Pokemon, and calling it "Normal · Gray" read as a contradiction.
+ *
+ * "TRANSPARENT" IS NO LONGER A LABEL. It used to be, because the tab showed the
+ * white-backgrounded slot AND its transparent counterpart side by side and the
+ * background was the only difference between them. Now that every tile is
+ * transparent it distinguishes nothing, and `front_transparent` is simply this
+ * game's front sprite -- so it reads "Front · Normal", which is what the reader
+ * is actually looking at.
  */
 export function slotLabel(slot: SpriteSlot): string {
   const face = slot.startsWith('back_') ? 'Back' : 'Front'
   const parts: string[] = [face]
   if (slot.includes('_shiny')) parts.push('Shiny')
-  else if (!slot.includes('gray') && !slot.includes('transparent')) parts.push('Normal')
+  else if (!slot.includes('gray')) parts.push('Normal')
   if (slot.endsWith('_female')) parts.push('Female')
-  if (slot.includes('transparent')) parts.push('Transparent')
   if (slot.includes('gray')) parts.push('Gray')
   return parts.join(' · ')
+}
+
+/**
+ * Display order within one game: front before back, plain before shiny, male
+ * before female, colour before grayscale.
+ *
+ * NOT SLOT_ORDER, which is a BIT order and is append-only -- the six Gen 1-2
+ * variants were added last, so `front_transparent` sits at bit 8 and sorted
+ * after every default and back slot. That put Gold's four tiles on screen as
+ * "Front Shiny, Back Normal, Back Shiny, Front Normal", which is the bit layout
+ * showing through the UI.
+ */
+function slotRank(slot: SpriteSlot): number {
+  return (
+    (slot.startsWith('back_') ? 8 : 0) +
+    (slot.includes('gray') ? 4 : 0) +
+    (slot.includes('_shiny') ? 2 : 0) +
+    (slot.endsWith('_female') ? 1 : 0)
+  )
 }
 
 export interface SpriteTile {
@@ -173,9 +254,17 @@ export function spriteTiles(species: Species, maxGeneration = 4): SpriteTile[] {
   const out: SpriteTile[] = []
   for (const g of [...SPRITE_GAMES].reverse()) {
     if (g.generation > maxGeneration) continue
-    for (const slot of slotsFor(variety, g.game)) {
-      const url = versionSpriteUrl(variety.pokemon_id, g.game, slot)
+    const slots = slotsFor(variety, g.game)
+    // Sorted for display, not by bit position -- see slotRank.
+    for (const slot of [...slots].sort((a, b) => slotRank(a) - slotRank(b))) {
+      let url = versionSpriteUrl(variety.pokemon_id, g.game, slot)
       if (!url) continue
+      if (isWhiteBacked(g.game, slot)) {
+        // See the NO WHITE-BACKGROUND SPRITES note above.
+        const counterpart = TRANSPARENT_COUNTERPART[slot]
+        if (counterpart && slots.includes(counterpart)) continue
+        url = `${KEYED_BASE}/${g.game}/${slot}/${variety.pokemon_id}.png`
+      }
       out.push({
         game: g.game,
         gameLabel: g.label,

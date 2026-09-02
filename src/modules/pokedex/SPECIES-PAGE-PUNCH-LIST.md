@@ -3,9 +3,10 @@
 State of the rebuilt page (`SpeciesDetailPage.tsx`, `SpeciesHero.tsx`,
 `SpeciesBanner.tsx` and the four `Species*Tab.tsx` files).
 
-Sections 1–7 are DONE and kept as the record of what changed and why.
-Section 8 is the open list. `npm run verify:species-page` is green at 164
-checks and the other nine suites pass.
+Sections 1–8 are DONE and kept as the record of what changed and why.
+Section 9 is the open list and is last in the file.
+`npm run verify:species-page` is green at 203 checks, and the other nine
+suites pass.
 
 ## 1 — The five-item fix pass — DONE
 
@@ -410,9 +411,195 @@ the rules that generalise — linear left-to-right, 2–3 branches fanning right
 and 0.80 A for a three-way fan) that buy clearance the reference gets by
 hand.
 
-## 8 — OPEN
+## 8 — The second polish pass — DONE
 
-### 8a — A real per-generation accuracy bug, found while verifying FIX 5
+Twelve items. Same shape as §6: visual complaints, each turned into something
+that can be read back, with the screenshots for the parts that cannot.
+
+### 8.1 — Back to top is a plain arrow
+
+`IconArrowBarToUp` → `IconArrowUp`. The bar under that glyph reads as "jump to
+the start of a document"; this scrolls a panel.
+
+### 8.2 — The pinned column is one grey
+
+Every text element in it — watermark, region label, katakana, both names — is
+now `#999999` at 0.8 opacity. That is what turns the column from a second
+headline into the quiet decorative half of the page, and the banner still
+carries the name in `--text-primary`, so the species is stated at full strength
+exactly once.
+
+`#999999` is a **fixed grey in both themes**, held as `--hero-quiet` on the
+column rather than as a token: it is 4.4:1 on the dark surface and 2.8:1 on the
+light one, deliberately below the body-text floor because none of it is body
+text. `--text-secondary` would have re-themed it and lost that.
+
+**"20% more transparent" is read as opacity 0.8** for the four text lines. For
+the watermark it is applied RELATIVELY — `--ghost-watermark-opacity × 0.8`,
+0.05 → 0.04 on dark and 0.09 → 0.072 on light — because that token is per-mode
+on purpose (5% white on near-black reads far stronger than 5% black on
+near-white) and one absolute alpha would have broken one of the two themes.
+
+Per element:
+
+| element      | change                                                      |
+| ------------ | ----------------------------------------------------------- |
+| watermark    | 341 raw = **200px at the 1400px cap**, 0.2em tracking, bold |
+| katakana     | colour + opacity only                                       |
+| romanisation | Plex Sans **Light italic** (300)                            |
+| region label | Plex Sans **Light** (300), un-rotated, under the watermark  |
+| main name    | Plex Sans **Bold**, colour + opacity                        |
+
+The watermark stays in raw units rather than literal `200px` so it still scales
+on a narrow window and the one type knob still moves it. The tracking is what
+makes it tight: 0.2em on three tabular digits is 2.4em = 638 of the column's 737
+raw units, with 99 to spare, and identical for all 493 because the digits are
+tabular.
+
+**The region label is un-rotated**, at the watermark's own left edge (0) and
+directly below it. "Aligned at the left side of the sprite" is ambiguous between
+the column edge, the artwork edge and the name column's 11.533%; sharing an edge
+with the block directly above it is the reading that looks intentional. It sits
+over the artwork's 500×500 box, which is fine in practice — every
+official-artwork PNG has transparent margin at that corner — and it carries
+`z-index: 2` in case one ever does not.
+
+### 8.3 — The Info tab's rhythm follows its type
+
+`--dp-s` took the type down 22% in §6 and the SPACING did not come with it, so
+every row kept the padding of a larger face. The spacing tokens are now
+redefined in the page's own units on `.species-page-inner`, the same move the
+type scale makes:
+
+```
+--space-row-padding-block  10 raw   5.9px   (was 9px absolute)
+--space-gap-sm             12 raw   7.0px
+--space-gap-md             20 raw  11.7px
+--space-gap-lg             26 raw  15.3px
+--space-gap-xl             42 raw  24.7px
+```
+
+Two hard-coded values in shared CSS could not be reached that way and are
+overridden inside `.species-page`: `.ds-stat-row`'s `padding: 8px 0` and
+`.data-table`'s `5px 7px`. The suite asserts the RELATION rather than the pixels
+— padding over type size has to stay 10/26 — because an absolute value is
+exactly what was wrong.
+
+### 8.4 — The arrow's wedge is a gradient
+
+Transparent at the tail, solid where the chevrons point. One
+`<linearGradient>` per arrow, in that arrow's own `<defs>`: `fill: url(#id)`
+resolves against ids in the document, so a single shared id across Eevee's seven
+arrows would be seven references to whichever one mounted first. Keyed to the
+child's species id.
+
+`objectBoundingBox` space, so `x=0` is the tail at every length, and the CSS
+rotation carries the gradient with the shape — "opaque where the chevrons point"
+holds at every angle. The element opacity went 0.2 → 0.3, because a band that is
+now weakest along most of its length needs more at the head to read as the same
+connector.
+
+### 8.5 — The Evolution heading expands the chart
+
+Clicking it hands the whole Info tab to the chart; clicking again gives it back.
+The chart normally gets half of a half-page column, which is fine for a
+two-stage chain and nowhere near enough for Eevee's eight species and seven
+conditions — measured, the tree goes 404px → 824px.
+
+It **replaces** the other blocks rather than pushing them down, which is what
+was asked and also what keeps the locations section from sitting mounted (and
+fetching its partition) behind a chart nobody can scroll past. State lives in
+`SpeciesInfoTab`, so leaving the tab resets it.
+
+The heading IS the button — no separate control beside it — which is the same
+affordance language as the egg-group links.
+
+### 8.6 — The Lv column matches TM/HM
+
+Both lead columns were already the same WIDTH; the difference was that level-up's
+lead is a numeric column and machine's is not, so `DataTable` right-aligned one
+and left-aligned the other. Lv is left-aligned now. **Alignment only** — it keeps
+`--font-numeric` and keeps sorting by the real level — and every other column is
+identical between the two tables, which the suite checks column by column.
+
+Two rules, because `.data-table th.data-table-num` is (0,2,1) and
+`.data-table-num .data-table-sort` is (0,2,0) and each has to be out-ranked
+separately.
+
+### 8.7 — No white-background sprites anywhere
+
+**PokéAPI serves the Gen 1–2 sprites on an opaque white background.** Audited by
+decoding the real PNGs' corner alpha, per game and per slot:
+
+| games            | white slots                         |
+| ---------------- | ----------------------------------- |
+| red-blue, yellow | front/back default, front/back gray |
+| gold, silver     | front/back × default/shiny          |
+| crystal          | front/back × default/shiny          |
+| Ruby/Sapphire on | none — already transparent          |
+
+Two fixes, because upstream is inconsistent about what it also provides
+transparently:
+
+1. **2,110 have a `transparent/` counterpart upstream** — a different rendering
+   of the same face and shininess, on a different canvas size (96×96 against
+   40×40 for red-blue). Those white slots are simply not rendered.
+2. **2,110 have none** — both gray slots on red-blue and yellow, and
+   front_shiny / back_default / back_shiny on gold and silver. Dropping them
+   would have lost every Game Boy grayscale sprite and every Gold/Silver back
+   and shiny, so they are keyed to transparency and hosted in `pokeapp-sprites`
+   under `transparent/{game}/{slot}/{id}.png`.
+
+**Flood fill inward from the border, not a global colour key.** These sprites use
+the same `#ffffff` for eyes, teeth and highlights as for the background, so
+keying every white pixel punches holes in them — 344,194 interior white pixels
+across the set survive because only white connected to the edge is cleared.
+4-connected, so the fill cannot leak through a one-pixel diagonal gap in an
+outline.
+
+The suite proves this by DECODING: every Gen 1–2 tile is drawn into a canvas and
+its four corners are read. "The URL says transparent" is exactly the assumption
+that was wrong — gold's `front_default` is white and its `front_transparent` is
+not, and both are 200s.
+
+### 8.8 — Two labelling consequences of 8.7
+
+- **"Transparent" is no longer a label.** It only ever distinguished anything
+  because the white version sat beside it; every tile is transparent now, so
+  `front_transparent` reads "Front · Normal", which is what the reader is
+  looking at.
+- **Slots are sorted for display, not by bit position.** `SLOT_ORDER` is a bit
+  order and is append-only, so the six Gen 1–2 variants sit at bits 8–13 and
+  sorted after every default and back slot — Gold's four tiles came out as
+  "Front Shiny, Back Normal, Back Shiny, Front Normal", which is the bit layout
+  showing through the UI. `slotRank` sorts front→back, plain→shiny,
+  male→female, colour→gray.
+
+### 8.9 — No card behind a sprite
+
+`--surface-raised` with `--radius-control`, on the reasoning that a transparent
+image needs a frame. Two things made that wrong: on the light theme
+`--surface-raised` is `#fff` against a `#fafafa` page, so the "frame" was a white
+box (logged as an open item for two passes), and every sprite in the tab is
+transparent now, so a container whose job is to say "this image has no
+background" says nothing. Same treatment as the species grid, which has been
+card-less from the start.
+
+The frame keeps its fixed 5.5rem height as pure layout, so a 40px Gen 1 sprite
+and a 96px Gen 4 one leave their labels on the same baseline.
+
+### 8.10 — What is repeatable
+
+`npm run audit:white-sprites` re-derives which slots are white, re-checks
+whether upstream has grown a counterpart for any of the ten we key, and samples
+the hosted set. It does NOT decode pixels — that lives in the suite, where a
+browser is the cheapest PNG decoder this project has.
+
+## 9 — OPEN
+
+### 9a — A real per-generation accuracy bug, found while verifying FIX 5
+
+**Raised twice, still unanswered.**
 
 **Three moves render as Fairy under a Gen 1–4 selection.** Charm, Sweet Kiss
 and Moonlight are `type_id: 18` (Fairy) in the bundle, each with a
@@ -431,17 +618,15 @@ five fixes, and it touches the Movedex, which CLAUDE.md keeps as an
 untouched pre-redesign module. Needs a decision. **Raised once and still
 unanswered.**
 
-### 8b — Smaller things, no decision needed to ship
+### 9b — Smaller things, no decision needed to ship
 
 - **Flavour text carries the games' own hyphenation.** Umbreon's Gold entry
   reads "this POKéMON pro tects itself" — PokéAPI's `flavor_text` preserves
   the line breaks and soft hyphens of the original 8-character-wide game
   text. A de-hyphenation pass in `build-data.ts` would fix it for all 493 ×
   16 entries; risky to do blindly, since some breaks are legitimate spaces.
-- **Sprite-card tone step in light mode** (carried from §5). More visible now
-  that the Sprites tab has a fourth section: `--surface-raised` is `#fff`
-  against `--surface` `#fafafa`, so a light-mode sprite card is a white box on
-  a near-white page.
+- ~~Sprite-card tone step in light mode~~ RESOLVED in §8.9 — the card is gone
+  entirely, so there is no tone step to be subtle.
 - **Location names are not links yet.** Confirmed as wanted — each should open
   the corresponding map — but there is no map module to open, so they stay
   text rather than becoming buttons that do nothing.
@@ -449,7 +634,7 @@ unanswered.**
   artwork by a few units on tight chains (Tyrogue). The reference avoids it
   by hand-placing; see the `VGAP_WIDE` note.
 
-### 8c — Two facts from the pre-cutover page that never came back
+### 9c — Two facts from the pre-cutover page that never came back
 
 Both outside the DetailPage spec, both still absent, both still needing a
 yes/no rather than being added unrequested:
@@ -460,7 +645,7 @@ yes/no rather than being added unrequested:
    `short_effect` as body text. The Info tab has it as the ability's `title`
    attribute, so it is a hover rather than a read.
 
-### 8d — Coverage that changed shape in the polish pass
+### 9d — Coverage that changed shape in the polish pass
 
 `verify-species-page` went 122 → 164 checks; the other nine are unchanged in
 what they claim. Three suites had assertions RE-POINTED rather than removed,
@@ -482,7 +667,31 @@ One assertion became growth-tolerant rather than being weakened: section A's
 locations fetch (it failed once at 694 of 787). It scrolls, waits for the
 section to settle, and scrolls again.
 
-### 8e — Still deferred by prior decision
+### 9e — Crystal and Emerald are still static, and here is what it would take
+
+Raised as "Crystal and Emerald sprites still are static", which is true, and
+PokéAPI is not going to fix it — audited twice now: its only animated set is
+`generation-v/black-white`. But both games DO animate in-game, and the pret
+disassemblies are a sanctioned source in CLAUDE.md, so this is a decision
+rather than a dead end. The two are not equally tractable:
+
+- **Crystal is a frame sequence, and extractable.** `pret/pokecrystal` carries
+  `gfx/pokemon/{name}/front.png` as a vertical frame sheet plus `anim.asm` (the
+  intro) and `anim_idle.asm` (the loop), which are the frame order and the
+  delays as data. So the work is: parse the two scripts, slice the sheet, apply
+  the palette, assemble ~251 animated WebPs. Real but mechanical — the same
+  shape as the Black/White job already shipped.
+- **Emerald is a transform program, and is not.** `pret/pokeemerald` has only
+  `anim_front.png` (two frames) plus per-species animation FUNCTIONS in
+  `src/data/pokemon_graphics/front_pic_anims.h` that scale, rotate and
+  translate the sprite over time. Reproducing it means interpreting those
+  transforms, not slicing a sheet — a much larger job, and the output would be
+  our rendering of the animation rather than the game's frames.
+
+Not started. Needs a yes/no, and the honest split is "Crystal yes, Emerald
+probably not worth it".
+
+### 9f — Still deferred by prior decision
 
 - **Pokéathlon stats** — Gen 4 only, absent from PokéAPI at species level.
   The Info tab renders a one-line sourcing note under a Gen 4 selection.

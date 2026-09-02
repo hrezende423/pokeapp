@@ -319,6 +319,18 @@ function chevronPoints(tipX: number): string {
 
 function EvoArrow({ arrow, width, height }: { arrow: PlacedArrow; width: number; height: number }) {
   const pct = (v: number, base: number) => `${(v / base) * 100}%`
+  /*
+    ONE GRADIENT PER ARROW, and it has to be per-arrow rather than one shared
+    <defs> at the top of the chart: `fill: url(#id)` resolves against ids in the
+    document, so a single id reused across seven arrows on Eevee's radial is seven
+    references to whichever one React mounted first. Keying it to the child's
+    species id makes it unique within the chart and stable across re-renders.
+
+    objectBoundingBox space (the default), so x=0 is the tail and x=1 the head
+    whatever the arrow's length -- and the CSS rotation carries the gradient with
+    the shape, so "opaque where the chevrons point" holds at every angle.
+  */
+  const gradientId = `evo-wedge-${arrow.child.species_id}`
   return (
     <svg
       className="evo-arrow"
@@ -334,8 +346,19 @@ function EvoArrow({ arrow, width, height }: { arrow: PlacedArrow; width: number;
         transform: `rotate(${arrow.angle}deg)`,
       }}
     >
-      {/* The trapezoid: tail 17.5 tall, head the full 61.5, legs equal. */}
-      <polygon className="evo-arrow-wedge" points={`0,22 ${AW},0 ${AW},${AH} 0,${AH - 22}`} />
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="currentColor" stopOpacity="0" />
+          <stop offset="1" stopColor="currentColor" stopOpacity="1" />
+        </linearGradient>
+      </defs>
+      {/* The trapezoid: tail 17.5 tall, head the full 61.5, legs equal -- and now
+          fading in along its length rather than a flat tone. */}
+      <polygon
+        className="evo-arrow-wedge"
+        fill={`url(#${gradientId})`}
+        points={`0,22 ${AW},0 ${AW},${AH} 0,${AH - 22}`}
+      />
       {CHEVRON_TIPS.map((tipX) => (
         <polygon key={tipX} className="evo-arrow-chevron" points={chevronPoints(tipX)} />
       ))}

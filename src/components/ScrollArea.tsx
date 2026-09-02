@@ -1,4 +1,4 @@
-import { IconArrowBarToUp, IconChevronDown } from '@tabler/icons-react'
+import { IconArrowUp, IconChevronDown } from '@tabler/icons-react'
 import { useEffect, useState, type ReactNode } from 'react'
 
 /**
@@ -119,7 +119,9 @@ export function ScrollArea({
           title="Back to top"
           onClick={() => el?.scrollTo({ top: 0, behavior: 'smooth' })}
         >
-          <IconArrowBarToUp size={24} stroke={1.5} aria-hidden focusable="false" />
+          {/* A plain arrow, not IconArrowBarToUp: the bar under that one reads as
+              "jump to the very start of a document", and this scrolls a panel. */}
+          <IconArrowUp size={24} stroke={1.5} aria-hidden focusable="false" />
         </button>
       )}
     </div>

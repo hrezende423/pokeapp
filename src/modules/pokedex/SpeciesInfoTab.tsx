@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { IconArrowsDiagonal, IconArrowsDiagonalMinimize2 } from '@tabler/icons-react'
+import { useMemo, useState } from 'react'
 import { StatList, StatRow } from '../../components/ds/DataRows'
 import {
   ABILITIES_INTRODUCED_IN_GENERATION,
@@ -57,6 +58,13 @@ import {
  * effectiveness, then the Pokeathlon note. Locations moved here from the
  * Description tab -- see SpeciesLocations for why -- and they sit under the two
  * charts and above the type table, which is where they were asked for.
+ *
+ * THE EVOLUTION HEADING IS A TOGGLE, and while it is on, the chart IS the tab.
+ * The chart normally gets half of a half-page column, which is enough for a
+ * two-stage chain and nowhere near enough for Eevee's eight species and seven
+ * conditions or for a three-way fan. Expanding replaces the rest of the tab
+ * rather than pushing it down, because the point is the room, and it is state
+ * inside this component on purpose: leaving the tab should put it back.
  */
 
 /**
@@ -164,6 +172,48 @@ function HeldItems({
   )
 }
 
+/**
+ * A section heading that expands its own section to the whole tab.
+ *
+ * The heading itself is the button -- no separate control beside it -- so the row
+ * gains nothing but the direction icon. Same reasoning as the egg-group links: the
+ * app's cross-navigation affordance is a label you can click, not a button shape.
+ */
+function ExpandableHeading({
+  label,
+  expanded,
+  onToggle,
+  testId,
+}: {
+  label: string
+  expanded: boolean
+  onToggle: () => void
+  testId: string
+}) {
+  return (
+    <h3 className="species-info-heading">
+      <button
+        type="button"
+        className="species-info-heading-btn"
+        data-testid={testId}
+        data-expanded={expanded}
+        aria-expanded={expanded}
+        onClick={onToggle}
+        title={expanded ? `Show the rest of the Info tab` : `Expand ${label} to the whole tab`}
+      >
+        {label}
+        <span className="species-info-heading-expand" aria-hidden>
+          {expanded ? (
+            <IconArrowsDiagonalMinimize2 size={16} stroke={1.5} focusable="false" />
+          ) : (
+            <IconArrowsDiagonal size={16} stroke={1.5} focusable="false" />
+          )}
+        </span>
+      </button>
+    </h3>
+  )
+}
+
 export function SpeciesInfoTab({
   species,
   variety,
@@ -192,6 +242,8 @@ export function SpeciesInfoTab({
     [variety, generation],
   )
 
+  const [evoExpanded, setEvoExpanded] = useState(false)
+
   const breedingExists = generation >= BREEDING_INTRODUCED_IN_GENERATION
   const eggGroups = species.egg_group_ids
     .map((id) => getEggGroup(id))
@@ -201,8 +253,38 @@ export function SpeciesInfoTab({
   const ev = evYield(stats)
   const steps = hatchSteps(species.hatch_counter)
 
+  /*
+    EXPANDED: the chart alone, at the column's width. An early return rather than
+    conditional classes on the full tree -- everything else on the tab is simply
+    not rendered, which is what "replacing temporarily the other info" asks for,
+    and it also means the locations section does not sit mounted (and fetching)
+    behind a chart nobody can see past.
+  */
+  if (evoExpanded) {
+    return (
+      <div className="species-info" data-testid="species-info" data-evo-expanded="true">
+        <section
+          className="species-info-block species-evolution-expanded"
+          data-testid="species-evolution"
+        >
+          <ExpandableHeading
+            label="Evolution"
+            expanded
+            onToggle={() => setEvoExpanded(false)}
+            testId="species-evolution-toggle"
+          />
+          {chain ? (
+            <EvolutionTree chain={chain.chain} currentId={species.id} onSelect={onSelectSpecies} />
+          ) : (
+            <p className="species-info-caption">No evolution chain data.</p>
+          )}
+        </section>
+      </div>
+    )
+  }
+
   return (
-    <div className="species-info" data-testid="species-info">
+    <div className="species-info" data-testid="species-info" data-evo-expanded="false">
       {/* THE TYPES ARE NOT HERE ANY MORE. They are in SpeciesBanner, which is
           page chrome, so they now show on all four tabs instead of only this one
           -- and the banner is where the frame puts them (group-TypeText 57:735 is
@@ -430,7 +512,12 @@ export function SpeciesInfoTab({
         </section>
 
         <section className="species-info-block" data-testid="species-evolution">
-          <h3 className="species-info-heading">Evolution</h3>
+          <ExpandableHeading
+            label="Evolution"
+            expanded={false}
+            onToggle={() => setEvoExpanded(true)}
+            testId="species-evolution-toggle"
+          />
           {chain ? (
             <EvolutionTree chain={chain.chain} currentId={species.id} onSelect={onSelectSpecies} />
           ) : (

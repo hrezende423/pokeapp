@@ -22,6 +22,7 @@
     "verify:evo-icons": "node scripts/verify-evo-icons.mjs",
     "verify:species-page": "node scripts/verify-species-page.mjs",
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
+    "audit:white-sprites": "node scripts/audit-white-sprites.mjs",
     "calibrate:game-colors": "node scripts/calibrate-game-colors.mjs",
     "report:type-scale": "node scripts/report-type-scale.mjs"
   },

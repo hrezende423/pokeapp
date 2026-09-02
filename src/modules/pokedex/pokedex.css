@@ -916,9 +916,17 @@
   z-index: 1;
 }
 
+/*
+  A GRADIENT ALONG THE ARROW, transparent at the tail and solid where the chevrons
+  point. The fill is a per-arrow <linearGradient> in the SVG's own defs -- see
+  EvolutionTree.tsx for why it needs one id per arrow -- so this rule only sets
+  the strength the gradient's opaque end reaches.
+
+  0.3 rather than the flat 0.2 it replaced: the band is now weakest along most of
+  its length, so the head has to carry more to read as the same connector.
+*/
 .evo-arrow-wedge {
-  fill: currentColor;
-  opacity: 0.2;
+  opacity: 0.3;
 }
 
 /*
@@ -2752,6 +2760,24 @@
   --font-size-body: calc(30 * var(--dp-t));
   --font-size-label: calc(26 * var(--dp-t));
   --font-size-caption: calc(22 * var(--dp-t));
+
+  /*
+    THE SPACING IS IN THE SAME UNITS AS THE TYPE, and it had to follow it down.
+    The type dropped ~22% when --dp-s landed and the rhythm did not, so every row
+    on the Info tab kept the padding of a larger face and the sections read as
+    twice as tall as their content. These are the token values re-expressed in raw
+    units of THIS page rather than new numbers: 9px of row padding became 10 raw
+    (5.9px), 20px of gap became 26 raw (15.3px), and so on down the scale.
+
+    Redefining the tokens rather than overriding the rules is the same move the
+    type scale makes, and it buys the same thing: every shared component that
+    already reads --space-* comes along without a per-component pass.
+  */
+  --space-row-padding-block: calc(10 * var(--dp-t));
+  --space-gap-sm: calc(12 * var(--dp-t));
+  --space-gap-md: calc(20 * var(--dp-t));
+  --space-gap-lg: calc(26 * var(--dp-t));
+  --space-gap-xl: calc(42 * var(--dp-t));
   position: relative;
   height: 100%;
   min-height: 0;
@@ -2825,6 +2851,9 @@
 */
 .species-hero > * {
   --hu: calc(100cqw / 737);
+  /* The column's one text colour. See .species-hero-name for why it is a fixed
+     grey rather than --text-secondary. */
+  --hero-quiet: #999999;
   /* One raw unit of type in THIS column: --dp-s inherits from
      .species-page-inner, so the page's single type knob moves the hero too. */
   --ht: calc(var(--hu) * var(--dp-s, 1));
@@ -2855,12 +2884,31 @@
   font-family: var(--font-body);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
-  font-size: calc(389 * var(--ht));
+  /*
+    341 raw, which draws at exactly 200px at the 1400px cap -- the size that was
+    asked for. Written as raw units rather than as `200px` so it still scales with
+    the frame on a smaller window, and so the one type knob still moves it.
+
+    THE LETTER SPACING IS WHAT MAKES THIS TIGHT. 0.2em on three tabular digits is
+    3 x 0.6em of advance plus 3 x 0.2em of tracking = 2.4em, i.e. 638 raw units of
+    the column's 737 at the current scale. It fits with 99 to spare, and it fits
+    identically for every one of the 493 because the digits are tabular -- Plex
+    Sans draws proportional digits by default and #1 would be narrower than #111.
+  */
+  font-size: calc(341 * var(--ht));
+  letter-spacing: 0.2em;
   /* 344 / 389: the frame's box is shorter than its own type size. */
   line-height: 0.883;
   text-align: left;
-  color: var(--ghost-watermark);
-  opacity: var(--ghost-watermark-opacity);
+  color: var(--hero-quiet);
+  /*
+    20% MORE TRANSPARENT, relative rather than absolute. --ghost-watermark-opacity
+    is 0.05 on dark and 0.09 on light -- 5% white on near-black reads far stronger
+    than 5% black on near-white, which is why the token is per-mode -- so a single
+    absolute alpha here would break one of the two themes. x 0.8 keeps that
+    asymmetry and takes a fifth off both.
+  */
+  opacity: calc(var(--ghost-watermark-opacity) * 0.8);
   pointer-events: none;
   user-select: none;
 }
@@ -2877,24 +2925,39 @@
 }
 
 /*
-  Region 57:840: a 78 x 313 box at (17, 604), rotated. Anchored at the BOTTOM of
-  that box and rotated -90deg from a left-top origin, so the text runs upward from
-  y=917 to y=604 -- which is the direction the reference reads.
+  NO LONGER ROTATED, and no longer at the bottom of the column.
 
-  Mixed case, not uppercase: the frame draws "Region: Johto". The design-system
-  card's own micro-label is uppercase, and inheriting that here was wrong.
+  The frame had it as a 78 x 313 box at (17, 604) turned -90deg, running upward
+  from y=917 to y=604. It is a horizontal line under the watermark now, which is
+  a deliberate departure: a rotated label is a strong graphic gesture and it was
+  competing with the watermark for the same left edge.
+
+  LEFT: 0, i.e. the WATERMARK's left edge rather than the artwork's or the name
+  column's 11.533%. "Aligned at the left side" is ambiguous between the three, and
+  sharing an edge with the block directly above it is the one that reads as
+  intentional -- the two top elements form one left-aligned stack.
+
+  TOP: 26%, which is where the watermark's own box ends (29 raw + 341 x 0.78 x
+  0.883 = 264 raw of 1031). It sits over the artwork's box, which starts at 20.66%
+  -- but the artwork is object-fit: contain in a 500 x 500 square and every
+  official-artwork PNG has transparent margin at that corner, so nothing collides
+  in practice. z-index 2 rather than 1 so it stays above the artwork if one ever
+  does.
 */
 .species-hero-region {
   position: absolute;
-  left: 2.307%;
-  top: 88.943%;
-  transform-origin: left top;
-  transform: rotate(-90deg);
+  left: 0;
+  top: 26%;
   white-space: nowrap;
-  z-index: 1;
+  z-index: 2;
+  /* Light, i.e. Plex Sans at 300. The variable font is bundled at 100-700, so
+     this is a real weight and not a synthesised one; there is no --font-weight
+     token below 400 and one rule does not earn one. */
+  font-weight: 300;
   font-size: calc(43 * var(--ht));
   letter-spacing: 0.02em;
-  color: var(--text-secondary);
+  color: var(--hero-quiet);
+  opacity: 0.8;
 }
 
 /* Name-kata 57:841: 557 x 146 at (85, 717). ABOVE the Latin names, not below. */
@@ -2906,7 +2969,8 @@
   font-size: calc(111 * var(--ht));
   line-height: 1.15;
   white-space: nowrap;
-  color: var(--text-secondary);
+  color: var(--hero-quiet);
+  opacity: 0.8;
 }
 
 /*
@@ -2951,23 +3015,40 @@
   white-space: nowrap;
 }
 
+/*
+  ONE COLOUR FOR THE WHOLE COLUMN: --hero-quiet, #999999, at 0.8.
+
+  Every text element here -- watermark, region, katakana, both names -- is now the
+  same grey, which is what turns the column from a headline into the quiet
+  decorative half of the page. The BANNER carries the name in --text-primary, so
+  the species is still stated once at full strength; saying it twice in white was
+  the thing that made the two columns compete.
+
+  A local custom property rather than a token: #999999 is a fixed grey in both
+  themes on purpose -- it is 4.4:1 on the dark surface and 2.8:1 on the light one,
+  which is deliberately below the body-text floor because none of this is body
+  text. --text-secondary would have re-themed it and lost that.
+*/
 .species-hero-name {
   font-family: var(--font-body);
   font-size: calc(66 * var(--ht));
   font-weight: var(--font-weight-bold);
   line-height: 1.05;
   letter-spacing: -0.01em;
-  color: var(--text-primary);
+  color: var(--hero-quiet);
+  opacity: 0.8;
 }
 
 /* 52, not the frame's 66: the romanised name is the quieter of the two and the
-   pair has to fit one row for the common case. See the wrap note above. */
+   pair has to fit one row for the common case. See the wrap note above.
+   Light italic -- 300, the same real variable weight the region label uses. */
 .species-hero-roma {
   font-size: calc(52 * var(--ht));
   font-style: italic;
-  font-weight: var(--font-weight-regular);
+  font-weight: 300;
   line-height: 1.05;
-  color: var(--text-secondary);
+  color: var(--hero-quiet);
+  opacity: 0.8;
 }
 
 /* ---- the persistent banner (container-poke-name 57:733) */
@@ -3184,9 +3265,9 @@
 .species-info-heading {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
-  margin: 0 0 0.5rem;
-  padding-bottom: 0.3rem;
+  gap: calc(12 * var(--dp-t, 1px));
+  margin: 0 0 calc(12 * var(--dp-t, 1px));
+  padding-bottom: calc(7 * var(--dp-t, 1px));
   border-bottom: 1px solid var(--hairline);
   font-family: var(--font-body);
   font-size: var(--font-size-label);
@@ -3204,7 +3285,7 @@
 
 .species-info-caption,
 .species-info-note {
-  margin: 0.4rem 0 0;
+  margin: calc(10 * var(--dp-t, 1px)) 0 0;
   font-size: var(--font-size-caption);
   color: var(--text-secondary);
 }
@@ -3259,6 +3340,22 @@
    than sit at its content height. */
 .species-info-cols > .ds-stat-list > .ds-stat-row {
   align-items: baseline;
+}
+
+/*
+  ds.css hard-codes `padding: 8px 0` on .ds-stat-row, which is the one piece of
+  the Info tab's rhythm the redefined tokens above cannot reach. Scoped here so
+  the shared component keeps its own value everywhere else.
+*/
+.species-page .ds-stat-row {
+  padding: var(--space-row-padding-block) 0;
+}
+
+/* Same for the shared table's cell padding: 5px 7px in absolute px, against a
+   face that is now 22% smaller than the one those numbers were chosen for. */
+.species-page .data-table td,
+.species-page .data-table-sort {
+  padding: calc(9 * var(--dp-t)) calc(12 * var(--dp-t));
 }
 
 /* A metadata value is often a small cluster, not one word -- let it wrap. */
@@ -3343,7 +3440,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.25rem;
+  gap: calc(5 * var(--dp-t, 1px));
   width: 100%;
 }
 
@@ -3459,6 +3556,71 @@
 .species-stat-value {
   text-align: right;
   color: var(--text-primary);
+}
+
+/* ---- Info tab: the evolution chart, expanded */
+
+/*
+  THE "Evolution" HEADING IS A CONTROL. Clicking it hands the whole Info tab to
+  the chart and takes it back, which is what a branching chain actually needs:
+  Eevee's radial and a three-way fan are drawn into half of a 1115-unit column,
+  and half of half a page is not enough room for eight species and seven
+  conditions.
+
+  A HEADING THAT IS A BUTTON, not a heading with a button beside it. The label is
+  the affordance -- same hairline-underline-on-hover language as the egg-group
+  links and the Breedingdex jumps -- so the row gains no new furniture. The icon
+  after it is the only addition, and it names the direction rather than repeating
+  the label.
+*/
+.species-info-heading-btn {
+  display: flex;
+  align-items: baseline;
+  gap: inherit;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.species-info-heading-btn:hover,
+.species-info-heading-btn:focus-visible {
+  color: var(--text-primary);
+}
+
+.species-info-heading-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Pushed to the right end of the heading row so the hairline under the heading
+   reads as one rule rather than as two labels. */
+.species-info-heading-expand {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+/*
+  EXPANDED: the chart gets the column, capped so a two-stage chain does not become
+  a mural. 46rem is a little under the panel's own width at the frame cap, which
+  is where a 3-branch fan stops gaining from more room.
+*/
+.species-evolution-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-md);
+}
+
+.species-evolution-expanded .evo-tree {
+  max-width: 46rem;
 }
 
 /* ---- Info tab: type effectiveness, grouped by multiplier */
@@ -3754,15 +3916,23 @@
   list-style: none;
 }
 
+/*
+  NO CARD BEHIND THE SPRITE. It was --surface-raised with --radius-control, on the
+  reasoning that a transparent image needs a frame to read against. Two things
+  made that wrong: on the light theme --surface-raised is #fff against a #fafafa
+  page, so the "frame" was a white box (logged as an open item for two passes),
+  and every sprite in the tab is transparent now, so a container that exists to
+  say "this image has no background" says nothing.
+
+  Same treatment as the species grid, which has been card-less from the start: the
+  artwork carries the colour and the label carries the identity.
+*/
 .sprite-card {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding: var(--space-gap-sm);
-  border-radius: var(--radius-control);
-  /* The one tone-step in the tab: a card needs to read as a frame around an
-     image whose own background is transparent. */
-  background: var(--surface-raised);
+  gap: calc(4 * var(--dp-t, 1px));
+  padding: 0;
+  background: none;
 }
 
 .sprite-card-frame {
@@ -3770,6 +3940,9 @@
   align-items: center;
   justify-content: center;
   height: 5.5rem;
+  /* No card behind it any more, so the frame is pure layout: it reserves one
+     consistent height so a 40px Gen 1 sprite and a 96px Gen 4 one leave their
+     labels on the same baseline. */
 }
 
 .sprite-card-img {
@@ -3854,6 +4027,28 @@
 .species-learn-group .data-table th:nth-child(6),
 .species-learn-group .data-table td:nth-child(6) {
   width: 3.5rem;
+}
+
+/*
+  THE Lv COLUMN IS LEFT-ALIGNED, TO MATCH TM/HM.
+
+  Both tables' first column is already the same WIDTH -- the rule below sets it
+  for both -- but level-up's lead is a numeric column and machine's is not, so
+  DataTable right-aligned one and left-aligned the other and the two sections did
+  not line up down the page. Alignment only: the column keeps --font-numeric and
+  keeps sorting by the real level, and no other column moves.
+
+  Specificity is why these are two rules: `.data-table th.data-table-num` is
+  (0,2,1) and `.data-table-num .data-table-sort` is (0,2,0), so the override has
+  to out-rank each separately.
+*/
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:first-child.data-table-num,
+.species-learn-group [data-testid='species-learn-level-up-rows'] td:first-child.data-table-num {
+  text-align: left;
+}
+
+.species-learn-group [data-testid='species-learn-level-up-rows'] th:first-child .data-table-sort {
+  justify-content: flex-start;
 }
 
 .species-learn-group [data-testid='species-learn-level-up-rows'] th:first-child,
