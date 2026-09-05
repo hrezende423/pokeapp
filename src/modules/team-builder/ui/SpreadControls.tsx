@@ -87,34 +87,34 @@ export function SpreadControls({
         {effortKeys.map((key) => (
           <div className="tb-spread-row" key={key} data-stat={key}>
             <span className="tb-spread-name">{STAT_LABEL[key]}</span>
-            <span className="tb-spread-value num" data-testid={`tb-ev-${key}-value`}>
-              {build.effort[key] ?? 0}
-            </span>
+            <input
+              type="number"
+              className="tb-number tb-spread-input"
+              min={0}
+              max={modern ? MAX_EV : MAX_STAT_EXP}
+              step={1}
+              value={build.effort[key] ?? 0}
+              data-testid={`tb-ev-${key}-value`}
+              onChange={(e) => setEffort(key, Number(e.target.value))}
+            />
             <Stepper
-              onStep={(dir) => setEffort(key, (build.effort[key] ?? 0) + dir * (modern ? 4 : 256))}
+              /* Step 1, both spreads. A 4-step was a Gen-3 EV-per-point-of-stat
+                 shortcut, but it makes the odd values unreachable by button and
+                 disagrees with the number box beside it, which steps by 1.
+                 Stat Exp keeps its 256 because a 1-step over 0-65535 is useless. */
+              onStep={(dir) => setEffort(key, (build.effort[key] ?? 0) + dir * (modern ? 1 : 256))}
               testId={`tb-ev-${key}`}
             />
             {modern ? (
-              <input
-                type="range"
-                className="tb-range"
-                min={0}
+              <Range
                 max={MAX_EV}
                 value={build.effort[key] ?? 0}
-                data-testid={`tb-ev-${key}-slider`}
-                onChange={(e) => setEffort(key, Number(e.target.value))}
+                testId={`tb-ev-${key}-slider`}
+                onChange={(next) => setEffort(key, next)}
               />
             ) : (
-              /* A stepper, not a slider: see this file's header. */
-              <input
-                type="number"
-                className="tb-number"
-                min={0}
-                max={MAX_STAT_EXP}
-                value={build.effort[key] ?? 0}
-                data-testid={`tb-ev-${key}-input`}
-                onChange={(e) => setEffort(key, Number(e.target.value))}
-              />
+              /* No slider at all in Gen 1-2: see this file's header. */
+              <span className="tb-spread-note">of {MAX_STAT_EXP}</span>
             )}
           </div>
         ))}
@@ -194,9 +194,17 @@ export function SpreadControls({
               data-locked={locked || undefined}
             >
               <span className="tb-spread-name">{STAT_LABEL[key]}</span>
-              <span className="tb-spread-value num" data-testid={`tb-iv-${key}-value`}>
-                {value}
-              </span>
+              <input
+                type="number"
+                className="tb-number tb-spread-input"
+                min={0}
+                max={modern ? MAX_IV : MAX_DV}
+                step={1}
+                value={value}
+                disabled={locked}
+                data-testid={`tb-iv-${key}-value`}
+                onChange={(e) => setIndividual(key, Number(e.target.value))}
+              />
               {skipAware ? (
                 /* Only the eight legal Attack DVs, stepped through in order. */
                 <Stepper
@@ -210,15 +218,12 @@ export function SpreadControls({
                   disabled={locked}
                 />
               )}
-              <input
-                type="range"
-                className="tb-range"
-                min={0}
+              <Range
                 max={modern ? MAX_IV : MAX_DV}
                 value={value}
                 disabled={locked || skipAware}
-                data-testid={`tb-iv-${key}-slider`}
-                onChange={(e) => setIndividual(key, Number(e.target.value))}
+                testId={`tb-iv-${key}-slider`}
+                onChange={(next) => setIndividual(key, next)}
               />
             </div>
           )
@@ -231,6 +236,45 @@ export function SpreadControls({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * The spread slider.
+ *
+ * The FILLED PORTION IS DRAWN BY THIS COMPONENT, not by `accent-color`. The
+ * design calls for a red run-up, a grey remainder and an oblong white thumb;
+ * `accent-color` gives you a round thumb and one browser's idea of a track, and
+ * only Firefox fills the run-up at all. So the percentage is handed to CSS as
+ * `--fill` and the track is a gradient. See `.tb-range` in teamBuilder.css.
+ */
+function Range({
+  max,
+  value,
+  onChange,
+  testId,
+  disabled = false,
+}: {
+  max: number
+  value: number
+  onChange: (next: number) => void
+  testId?: string
+  disabled?: boolean
+}) {
+  const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0
+  return (
+    <input
+      type="range"
+      className="tb-range"
+      min={0}
+      max={max}
+      step={1}
+      value={value}
+      disabled={disabled}
+      style={{ '--fill': `${pct}%` } as React.CSSProperties}
+      data-testid={testId}
+      onChange={(e) => onChange(Number(e.target.value))}
+    />
   )
 }
 

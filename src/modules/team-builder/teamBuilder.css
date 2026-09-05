@@ -17,6 +17,30 @@
 
 .tb {
   padding: 0;
+
+  /*
+    Two slider colours the global tokens cannot supply.
+
+    --slider-track: the UNFILLED half. --surface-hover is #141414 in dark, the
+    same value as --surface, so a track painted with it disappears against the
+    page -- and "grey remainder" is the whole point of the control.
+    --slider-thumb-border: the thumb is white in both modes. On dark that needs
+    no outline; on light a white oblong on a pale track has no edge without one.
+  */
+  --slider-track: #e2e2e6;
+  --slider-thumb-border: #9b9ba1;
+  /*
+    DELIBERATELY THE SAME IN BOTH MODES, which is why it is declared once here
+    and not redefined below. It fills a thing sitting ON the slider track or ON
+    --accent -- a switch knob, a slider thumb -- so it answers to those, not to
+    the page ground. --text-primary would invert with the theme and turn the
+    knob black-on-red in light mode.
+  */
+  --tb-on-accent: #ffffff;
+}
+[data-theme='dark'] .tb {
+  --slider-track: #3a3a3e;
+  --slider-thumb-border: #ffffff;
 }
 
 .tb-screen {
@@ -82,6 +106,16 @@
 .tb-ghost[data-danger='true'] {
   color: var(--accent);
   border-color: var(--accent-border);
+}
+/* Chevron and text on the page, no box. The screens' back control. */
+.tb-ghost[data-bare='true'] {
+  padding: 4px 0;
+  color: var(--text-secondary);
+  border: none;
+}
+.tb-ghost[data-bare='true']:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: transparent;
 }
 
 .tb-icon-btn {
@@ -769,41 +803,90 @@
 
 /* ----------------------------------------------------------------- the form */
 
+/*
+  CAPPED, not fluid to the viewport. Three columns stretched across a 2560px
+  monitor put the Nature dropdown a hand's width from the Gender dropdown it
+  belongs beside, and left the identity panel a thin strip against a field of
+  nothing. The cap is the width the form is actually designed at; past it the
+  page gains margin, not column width.
+*/
 .tb-form-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 190px;
+  grid-template-columns: 210px minmax(0, 1fr) 170px;
   gap: var(--space-gap-xl);
   align-items: start;
+  max-width: 1180px;
 }
 
 .tb-identity {
   display: flex;
   flex-direction: column;
   gap: var(--space-gap-sm);
+  padding-right: var(--space-gap-md);
+  border-right: 1px solid var(--hairline);
 }
+/*
+  A POSITIONED STAGE, not a centring grid. Everything in here is placed against
+  the box's own edges -- numeral to the top, katakana to the left, item to the
+  bottom-right corner -- so the sprite can be centred over all of them without
+  any of the four fighting for the same flow position.
+*/
 .tb-identity-art {
   position: relative;
-  display: grid;
-  place-items: center;
-  height: 190px;
+  height: 168px;
   overflow: hidden;
 }
-.tb-identity-art img {
-  position: relative;
+/*
+  ABSOLUTE AND INSET, which is what stops the artwork being clipped. As a
+  centred grid item its box was sized by the grid area and `object-fit` had
+  nothing left to fit inside, so a wide sprite lost its edges. Given an explicit
+  box smaller than the stage, `contain` can only ever letterbox.
+*/
+.tb-identity-sprite {
+  position: absolute;
+  inset: 14px 4px 8px 26px;
   z-index: 1;
-  max-width: 100%;
-  max-height: 100%;
+  width: calc(100% - 30px);
+  height: calc(100% - 22px);
   object-fit: contain;
 }
-/* NOT the 220px hero size: this panel is 260px wide, and the hero numeral
-   overflows it into an unreadable grey slab rather than reading as a number. */
-.tb-identity .tb-card-ghost {
-  top: 6px;
-  font-size: 92px;
-}
+/*
+  BOTH WATERMARKS ARE LOUDER HERE than on a grid card, and that is the fix for
+  "the katakana is missing": at the card's opacity it was there and simply could
+  not be seen, a 10% white glyph sitting behind a dark sprite. This panel is the
+  build's portrait, so the texture behind the sprite is meant to be read.
+*/
+.tb-identity .tb-card-ghost,
 .tb-identity .tb-card-ghost-ja {
-  bottom: 6px;
-  font-size: var(--font-size-title);
+  opacity: calc(var(--ghost-watermark-opacity) * 4);
+}
+/* Sized to the 210px panel, not to the grid tile: three digits at 46px with the
+   inherited letter-spacing span about half the column, which reads as a number.
+   At the old 92px they merged into a grey slab. */
+.tb-identity .tb-card-ghost {
+  top: 0;
+  font-size: 46px;
+}
+/* Left-anchored and BELOW the numeral rather than centred: dead-centre it sat
+   entirely behind the sprite, which is the other half of why it read as absent. */
+.tb-identity .tb-card-ghost-ja {
+  top: 44px;
+  bottom: auto;
+  left: 0;
+  font-size: var(--font-size-body);
+  letter-spacing: 0.16em;
+  transform: none;
+}
+/* The held item, in the corner of the sprite. 30x30 source, so pixelated. */
+.tb-held-item {
+  position: absolute;
+  right: 2px;
+  bottom: 10px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 .tb-types-row {
   display: flex;
@@ -811,6 +894,12 @@
   gap: 4px;
   padding-bottom: var(--space-gap-sm);
   border-bottom: 1px solid var(--hairline);
+}
+.tb-stats-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--space-gap-sm);
 }
 .tb-genus,
 .tb-ja {
@@ -856,6 +945,20 @@
 .tb-number {
   font-family: var(--font-numeric);
 }
+/*
+  THE OPEN DROPDOWN IS PAINTED BY THE BROWSER, not by us, and it takes its
+  colours from `color-scheme` -- not from the page's `data-theme`. The app sets
+  `color-scheme: light dark` on :root, so a machine sitting in OS light mode
+  drew a white popup with pale grey text even with the app switched to dark:
+  legible in light, unreadable in dark. Pinning the property to the app's own
+  theme is what ties the popup to the theme the user actually picked.
+*/
+[data-theme='dark'] .tb-select {
+  color-scheme: dark;
+}
+[data-theme='light'] .tb-select {
+  color-scheme: light;
+}
 .tb-select:focus,
 .tb-input:focus,
 .tb-number:focus {
@@ -874,6 +977,74 @@
   padding: 4px 2px;
   font-size: var(--font-size-body);
   color: var(--text-primary);
+}
+/* Derived, so not editable. Carries the same underline as the fields beside it
+   -- it is one of the row, not a caption floating in it -- at the form's own
+   disabled opacity. */
+.tb-readout[data-disabled='true'] {
+  cursor: not-allowed;
+  border-bottom: 1px solid var(--border);
+  opacity: var(--field-disabled-opacity);
+}
+
+/* --------------------------------------------------------------- the switch */
+
+/*
+  A REAL CHECKBOX under a drawn track. Keeping the input means the label, the
+  keyboard and every test selector still work; `appearance: none` on the input
+  itself would leave us restyling a box, and this control is a switch.
+*/
+.tb-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 38px;
+  height: 20px;
+  margin-top: 2px;
+}
+.tb-switch input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+.tb-switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  transition: background-color 120ms ease;
+}
+.tb-switch-track::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  content: '';
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+/* On is a binary indicator, which is one of --accent's four sanctioned uses. */
+.tb-switch input:checked + .tb-switch-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.tb-switch input:checked + .tb-switch-track::after {
+  background: var(--tb-on-accent);
+  transform: translateX(18px);
+}
+.tb-switch input:focus-visible + .tb-switch-track {
+  outline: 2px solid var(--field-focus-border);
+  outline-offset: 2px;
 }
 
 /* ------------------------------------------------------------------- moves */
@@ -924,9 +1095,20 @@
 }
 .tb-spread-row {
   display: grid;
-  grid-template-columns: 34px 42px auto minmax(0, 1fr);
+  grid-template-columns: 56px 56px auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+}
+/*
+  THE SAME CONTROL AS LEVEL AND FRIENDSHIP -- `.tb-number`, `type="number"`,
+  `step="1"` -- so a spread value can be typed rather than only nudged, and so
+  the two halves of this form do not offer two different ways to enter a number.
+  It sits beside the stepper rather than replacing it: the stepper is for
+  nudging, the box is the fastest route to 252 or 31, and both write one field.
+*/
+.tb-spread-input {
+  padding: 2px 0;
+  font-size: var(--font-size-caption);
 }
 .tb-spread-row[data-locked='true'] {
   opacity: var(--field-disabled-opacity);
@@ -980,10 +1162,72 @@
   opacity: var(--field-disabled-opacity);
 }
 
-/* The one sanctioned use of a range input in this module. */
+/*
+  The one sanctioned use of a range input in this module, drawn by hand.
+
+  `accent-color` was doing none of what the design asks: it gives a round thumb,
+  and only Gecko fills the run-up to it. So the track is a two-stop gradient cut
+  at `--fill` (set inline from the value, see SpreadControls.Range) and both
+  engines' thumb pseudo-elements are styled to the same oblong.
+*/
 .tb-range {
   width: 100%;
-  accent-color: var(--accent);
+  height: 16px;
+  appearance: none;
+  background: transparent;
+}
+.tb-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill, 0%),
+    var(--slider-track) var(--fill, 0%) 100%
+  );
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+}
+.tb-range::-moz-range-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill, 0%),
+    var(--slider-track) var(--fill, 0%) 100%
+  );
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+}
+/* An OBLONG, not a circle: it is wider than the track is tall, so it reads as a
+   grip on a line rather than a bead on a string. */
+.tb-range::-webkit-slider-thumb {
+  width: 10px;
+  height: 16px;
+  margin-top: -7px;
+  appearance: none;
+  cursor: grab;
+  background: var(--tb-on-accent);
+  border: 1px solid var(--slider-thumb-border);
+  border-radius: 5px;
+}
+.tb-range::-moz-range-thumb {
+  width: 10px;
+  height: 16px;
+  cursor: grab;
+  background: var(--tb-on-accent);
+  border: 1px solid var(--slider-thumb-border);
+  border-radius: 5px;
+}
+.tb-range:focus-visible {
+  outline: none;
+}
+.tb-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--field-focus-border);
+}
+.tb-range:focus-visible::-moz-range-thumb {
+  border-color: var(--field-focus-border);
+}
+.tb-range:disabled {
+  cursor: not-allowed;
+  opacity: var(--field-disabled-opacity);
 }
 
 /* ------------------------------------------------------------- stat table */

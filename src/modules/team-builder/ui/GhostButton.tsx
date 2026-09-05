@@ -16,6 +16,12 @@ export function GhostButton({
   size = 'md',
   danger = false,
   disabled = false,
+  /**
+   * Drops the outline entirely, leaving glyph and text on the page background.
+   * The screen's own back control: it is a way out, not an action, and a boxed
+   * button beside a bare page header reads as the loudest thing on the screen.
+   */
+  bare = false,
   title,
 }: {
   children: ReactNode
@@ -24,12 +30,14 @@ export function GhostButton({
   size?: 'sm' | 'md'
   danger?: boolean
   disabled?: boolean
+  bare?: boolean
   title?: string
 }) {
   return (
     <button
       type="button"
       className={`tb-ghost tb-ghost-${size}`}
+      data-bare={bare ? 'true' : undefined}
       data-danger={danger ? 'true' : undefined}
       data-testid={testId}
       onClick={onClick}

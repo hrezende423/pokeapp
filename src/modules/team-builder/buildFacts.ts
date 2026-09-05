@@ -36,6 +36,7 @@ import {
   resolveTypesForGeneration,
 } from '../../data'
 import type { Species, StatEntry, Variety } from '../../data'
+import { itemIconUrl } from '../../data/itemArtwork'
 import { resolveMoveTypeNameForGeneration } from '../../data/moveEra'
 import type { Build, Gender } from './model'
 import type { NatureMods, StatKey } from './statMath'
@@ -172,6 +173,18 @@ export function abilityName(abilityId: number | null): string {
 
 export function itemName(itemId: number | null): string {
   return itemId == null ? '—' : (getItem(itemId)?.display_name ?? '—')
+}
+
+/**
+ * The held item's icon, for the corner badge on the identity sprite.
+ *
+ * The 30x30 in-game icon rather than the 90x90 Dream World render: the icon
+ * covers 561 of 563 items, the Dream World set covers barely half, and at badge
+ * size (28px) the extra resolution buys nothing. Rendered `pixelated`.
+ */
+export function itemIconFor(itemId: number | null): string | null {
+  if (itemId == null) return null
+  return itemIconUrl(getItem(itemId))
 }
 
 /* ------------------------------------------------------------------ factory */

@@ -50,6 +50,8 @@ import {
   abilityOptionsFor,
   buildSpecies,
   genderOptionsFor,
+  itemIconFor,
+  itemName,
   itemOptionsFor,
   natureOptionsFor,
   newBuildInit,
@@ -188,6 +190,9 @@ function BuildFormFields({
       ? (data.teams.find((t) => t.id === origin.teamId) ?? null)
       : (attachedTeams[0] ?? null)
 
+  /* Gen 1 has no held items, so no badge -- not an empty one. */
+  const heldIcon = generation >= 2 ? itemIconFor(build.itemId) : null
+
   const art = facts
     ? resolveArtworkUrl(facts.species, facts.variety, {
         source: 'artwork',
@@ -204,7 +209,7 @@ function BuildFormFields({
       data-build-id={build.id}
     >
       <header className="tb-screen-head">
-        <GhostButton onClick={back} testId="tb-build-back">
+        <GhostButton onClick={back} testId="tb-build-back" bare>
           <IconChevronLeft size={18} stroke={1.5} />
           {origin.kind === 'team' ? 'Back to team' : 'Build Library'}
         </GhostButton>
@@ -298,7 +303,14 @@ function BuildFormFields({
       <div className="tb-form-grid">
         {/* ------------------------------------------------- identity panel */}
         <aside className="tb-identity" data-testid="tb-identity">
-          <div className="tb-identity-art">
+          {/*
+            Four layers, back to front: the dex numeral, the katakana name, the
+            sprite, and the held item in the bottom-right corner. The two
+            watermarks sit BEHIND the sprite by design -- they are texture, not
+            labels -- which is why the numeral is anchored top and the katakana
+            left, where a centred sprite leaves them room to read.
+          */}
+          <div className="tb-identity-art" data-testid="tb-identity-art">
             <span className="tb-card-ghost" aria-hidden>
               {String(build.speciesId).padStart(3, '0')}
             </span>
@@ -307,7 +319,16 @@ function BuildFormFields({
                 {facts.species.name_ja}
               </span>
             )}
-            {art && <img src={art} alt="" />}
+            {art && <img className="tb-identity-sprite" src={art} alt="" />}
+            {heldIcon && (
+              <img
+                className="tb-held-item"
+                src={heldIcon}
+                alt=""
+                title={itemName(build.itemId)}
+                data-testid="tb-held-item"
+              />
+            )}
           </div>
 
           <div className="tb-types-row" data-testid="tb-type-row">
@@ -355,34 +376,19 @@ function BuildFormFields({
             />
           </Field>
 
-          {/* Genderless: the field is ABSENT, not disabled and not dashed. */}
-          {genderOptions && (
-            <Field label="Gender">
-              <select
-                className="tb-select"
-                value={build.gender ?? ''}
-                disabled={genderOptions.length === 1}
-                data-testid="tb-gender"
-                onChange={(e) => commit({ gender: e.target.value as 'male' | 'female' })}
-              >
-                {genderOptions.map((g) => (
-                  <option key={g} value={g}>
-                    {g === 'male' ? '♂ Male' : '♀ Female'}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
-
           {generation >= 3 && (
             <Field label="Shiny">
-              <input
-                type="checkbox"
-                className="tb-toggle"
-                checked={build.shiny}
-                data-testid="tb-shiny"
-                onChange={(e) => commit({ shiny: e.target.checked })}
-              />
+              {/* A switch, not a tick box: this is a state the build is IN, and
+                  the identity panel it sits in is a picture of that state. */}
+              <span className="tb-switch">
+                <input
+                  type="checkbox"
+                  checked={build.shiny}
+                  data-testid="tb-shiny"
+                  onChange={(e) => commit({ shiny: e.target.checked })}
+                />
+                <span className="tb-switch-track" aria-hidden />
+              </span>
             </Field>
           )}
           {generation === 2 && (
@@ -395,13 +401,18 @@ function BuildFormFields({
           )}
 
           {facts && (
+            <div className="tb-stats-block">
+              <span className="tb-field-label">Stats</span>
+              <StatTable build={build} facts={facts} />
+            </div>
+          )}
+
+          {facts && (
             <>
               <p className="tb-genus">{facts.species.genus}</p>
               <p className="tb-ja">{facts.species.name_ja_romanized}</p>
             </>
           )}
-
-          {facts && <StatTable build={build} facts={facts} />}
         </aside>
 
         {/* ---------------------------------------------------- main column */}
@@ -462,6 +473,24 @@ function BuildFormFields({
                 </select>
               </Field>
             )}
+            {/* Genderless: the field is ABSENT, not disabled and not dashed. */}
+            {genderOptions && (
+              <Field label="Gender">
+                <select
+                  className="tb-select"
+                  value={build.gender ?? ''}
+                  disabled={genderOptions.length === 1}
+                  data-testid="tb-gender"
+                  onChange={(e) => commit({ gender: e.target.value as 'male' | 'female' })}
+                >
+                  {genderOptions.map((g) => (
+                    <option key={g} value={g}>
+                      {g === 'male' ? '♂ Male' : '♀ Female'}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </div>
 
           <div className="tb-field-row">
@@ -496,14 +525,34 @@ function BuildFormFields({
               </Field>
             )}
             {hp && (
+              /*
+                DISABLED, NOT MERELY READ-ONLY. Hidden Power is derived from the
+                DV/IV spread -- you change it by changing the spread below, never
+                here -- so both fields carry the same dimmed, not-allowed
+                treatment the form's other unavailable controls do. The type
+                keeps its colour: it is still the era-correct answer, and
+                greying it out would hide the one fact the field exists to show.
+              */
               <>
                 <Field label="HP Type">
-                  <span className="tb-readout" data-testid="tb-hidden-power-type">
+                  <span
+                    className="tb-readout"
+                    data-disabled="true"
+                    aria-disabled="true"
+                    title="Derived from the IV spread"
+                    data-testid="tb-hidden-power-type"
+                  >
                     <TypeLabel type={hp.type} />
                   </span>
                 </Field>
                 <Field label="HP Power">
-                  <span className="tb-readout num" data-testid="tb-hidden-power-value">
+                  <span
+                    className="tb-readout num"
+                    data-disabled="true"
+                    aria-disabled="true"
+                    title="Derived from the IV spread"
+                    data-testid="tb-hidden-power-value"
+                  >
                     {hp.power}
                   </span>
                 </Field>
