@@ -317,3 +317,62 @@
   white-space: nowrap;
   border: 0;
 }
+
+/*
+  See components/LayoutOverlay.tsx. Fixed and pointer-events:none, so the page
+  underneath stays fully usable while it is on -- you can open a dropdown, drag a
+  slider and watch the regions re-measure around it.
+
+  Colours are literal rather than tokens on purpose: this is a measuring tool
+  drawn OVER the design, and it has to stay legible against either theme and
+  against whatever the page happens to be painting behind it. Borrowing the
+  palette it is inspecting is exactly how it would become invisible.
+*/
+.layout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.layout-overlay-box {
+  position: fixed;
+  outline: 1px dashed rgba(0, 200, 255, 0.9);
+}
+
+.layout-overlay-box[data-kind='area'] {
+  outline: 1px solid rgba(255, 90, 200, 0.85);
+}
+
+.layout-overlay-label {
+  position: absolute;
+  top: calc(var(--depth, 0) * 12px);
+  left: 0;
+  padding: 0 3px;
+  font:
+    10px/1.4 ui-monospace,
+    Consolas,
+    monospace;
+  color: #001018;
+  white-space: nowrap;
+  background: rgba(0, 200, 255, 0.9);
+}
+
+.layout-overlay-box[data-kind='area'] .layout-overlay-label {
+  color: #1a0010;
+  background: rgba(255, 90, 200, 0.85);
+}
+
+.layout-overlay-legend {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  margin: 0;
+  padding: 3px 7px;
+  font:
+    11px/1.4 ui-monospace,
+    Consolas,
+    monospace;
+  color: #001018;
+  background: rgba(0, 200, 255, 0.9);
+}

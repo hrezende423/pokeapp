@@ -407,9 +407,9 @@ function BuildFormFields({
         )}
       </header>
 
-      <div className="tb-form-grid">
+      <div className="tb-form-grid" data-layout="form-grid">
         {/* ------------------------------------------------- identity panel */}
-        <aside className="tb-identity" data-testid="tb-identity">
+        <aside className="tb-identity" data-layout="identity" data-testid="tb-identity">
           {/*
             Four layers, back to front: the dex numeral, the katakana name, the
             sprite, and the held item in the bottom-right corner. The two
@@ -417,7 +417,7 @@ function BuildFormFields({
             labels -- which is why the numeral is anchored top and the katakana
             left, where a centred sprite leaves them room to read.
           */}
-          <div className="tb-identity-art" data-testid="tb-identity-art">
+          <div className="tb-identity-art" data-layout="identity-art" data-testid="tb-identity-art">
             <span className="tb-card-ghost" aria-hidden>
               {String(build.speciesId).padStart(3, '0')}
             </span>
@@ -532,8 +532,8 @@ function BuildFormFields({
         </aside>
 
         {/* ---------------------------------------------------- main column */}
-        <div className="tb-form-main">
-          <div className="tb-field-row">
+        <div className="tb-form-main" data-layout="main">
+          <div className="tb-field-row" data-layout="field-row">
             {generation >= 2 && (
               <Field label="Item">
                 <select
@@ -609,7 +609,7 @@ function BuildFormFields({
             )}
           </div>
 
-          <div className="tb-field-row">
+          <div className="tb-field-row" data-layout="field-row">
             <Field label="Level">
               <input
                 type="number"
@@ -707,7 +707,7 @@ function BuildFormFields({
           it; here it sits against the thing it acts on, and the form's own top
           row is left to the back control alone.
         */}
-        <div className="tb-form-dock-col tb-dock-anchor">
+        <div className="tb-form-dock-col tb-dock-anchor" data-layout="dock-col">
           <Dock testId="tb-form-dock" items={dockItems} />
           {matchup && (
             <Popover
@@ -729,6 +729,7 @@ function BuildFormFields({
         {/* ----------------------------------------------------- right rail */}
         <aside
           className="tb-rail"
+          data-layout="rail"
           data-testid="tb-rail"
           data-state={railTeam ? 'attached' : 'loose'}
         >

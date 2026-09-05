@@ -86,7 +86,7 @@ export function SpreadControls({
   }
 
   return (
-    <div className="tb-spreads" data-testid="tb-spreads">
+    <div className="tb-spreads" data-layout="spreads" data-testid="tb-spreads">
       <div className="tb-spread-col" data-testid="tb-effort-col">
         <div className="tb-spread-head">
           <span className="tb-field-label">{modern ? 'EV Spread' : 'Stat Exp'}</span>

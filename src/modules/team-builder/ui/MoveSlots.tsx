@@ -39,7 +39,7 @@ export function MoveSlots({
   const byName = [...options].sort((a, b) => a.name.localeCompare(b.name))
 
   return (
-    <div className="tb-moves" data-testid="tb-move-slots">
+    <div className="tb-moves" data-layout="moves" data-testid="tb-move-slots">
       {Array.from({ length: MOVE_SLOTS }, (_, slot) => {
         const moveId = moveIds[slot] ?? null
         const chosen = options.find((m) => m.move_id === moveId) ?? null

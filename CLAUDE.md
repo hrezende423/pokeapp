@@ -230,6 +230,46 @@ that isn't explicitly about design.)
   exclusive, same as the --accent situation — moving one to "everywhere"
   moves it everywhere, including untouched legacy modules.
 
+## Laying out a screen
+
+Adopted after the Build Form took four review rounds of "move it up a bit".
+Every one of those notes was about the same thing: elements placed by
+independent pixel coordinates that did not refer to each other, so each fix
+was local and the next complaint was too.
+
+- **Position by AREA, not by coordinate.** A container that places more than
+  two children declares `grid-template-areas` and each child takes a
+  `grid-area`. Absolute `top`/`left` offsets inside a container are the
+  smell — they encode a relationship ("just under the numeral") as a number
+  that silently stops being true when the other thing changes. Moving an
+  element should be swapping two words in the template.
+- **No raw px gaps.** The design system's `--space-gap-*` starts at 8px,
+  which is too coarse for dense form UI, so `.tb` declares its own scale
+  (`--tb-1: 2px` … `--tb-6: 20px`). If a module needs gaps below 8px it
+  declares a scale once; it does not pick numbers per rule.
+- **Name the regions.** A layout container carries `data-layout="<name>"`.
+  That name is the vocabulary for reviewing it — see below.
+- **Nothing may be clipped.** `#root` is pinned to the viewport and `.panel`
+  sets `overflow: hidden`, so a module taller than the window does NOT
+  scroll — it is truncated, with the bottom unreachable. Every module root
+  must contain a `ScrollArea`. Team Building shipped without one and the
+  Build Form simply ended mid-page. verify-team-builder section 7 asserts
+  reachability at a deliberately short viewport rather than asserting a
+  height, which would only be true on the machine that ran it.
+
+### The layout inspector
+
+`?layout=1` on any URL, or Ctrl+Shift+L — `src/components/LayoutOverlay.tsx`.
+Draws every `[data-layout]` region and every named grid area over the live
+page, with sizes and column tracks. **It ships in the production bundle on
+purpose**: this app is reviewed on the deployed preview from a phone, and a
+`import.meta.env.DEV` gate would put it exactly where it is no use. ~2KB,
+inert until switched on, `pointer-events: none` so the page stays usable.
+
+Use it to REVIEW: screenshot with it on and name the region, rather than
+describing a direction and a distance. It reads `grid-template-areas` from
+the computed style, so a name it prints is a name in the stylesheet.
+
 ## Known deferred debt (logged, not fixed)
 
 Real, reproducible, and deliberately left alone. Each entry says why it is

@@ -834,6 +834,113 @@ try {
   })
 
   // =====================================================================
+  /*
+    7. LAYOUT — reachability at a short viewport, and the inspector.
+
+    "IT DOES NOT FIT" IS NOT THE FAILURE. The app pins #root to the viewport and
+    `.panel` sets `overflow: hidden`, so a module that is too tall does not grow
+    a scrollbar -- it is silently CLIPPED, and the bottom of the form becomes
+    unreachable rather than merely below the fold. That shipped once and was
+    found by eye on a phone. The check is therefore not "the form is short
+    enough" (which depends on the window, and would fail on a laptop while
+    passing here) but "everything in it can still be reached".
+  */
+  hr('7. LAYOUT — nothing is unreachable, and the inspector reports real regions')
+  await seedStore({
+    nextBuildSeq: 2,
+    nextTeamSeq: 2,
+    /* HOLDING AN ITEM, because the `item` area only exists when there is one to
+       draw -- Gen 1 and an empty hand render no badge at all, by design. */
+    builds: [mkBuild('b1', { speciesId: 197, pokemonId: 197, itemId: 234 })],
+    teams: [],
+  })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  check(
+    'the seeded build really is holding an item, so the `item` area exists',
+    (await page.$$('[data-testid="tb-held-item"]')).length === 1,
+  )
+
+  /* Deliberately cruel: shorter than any real laptop, so the form MUST overflow
+     and the scroll area is the only thing that can save it. */
+  await page.setViewportSize({ width: 1440, height: 620 })
+  await page.waitForTimeout(400)
+  const scrollState = await page.evaluate(() => {
+    const area = document.querySelector('[data-testid="tb-scroll"]')
+    if (!area) return null
+    return { scrollHeight: area.scrollHeight, clientHeight: area.clientHeight }
+  })
+  check(
+    'the Build Form sits in a scroll area rather than being clipped by .panel',
+    scrollState !== null && scrollState.scrollHeight > scrollState.clientHeight,
+    scrollState
+      ? `${scrollState.scrollHeight} content / ${scrollState.clientHeight} visible`
+      : 'no scroll area',
+  )
+
+  /* The last thing on the page, at the bottom of the tallest column. If this can
+     be scrolled into view, so can everything above it. */
+  await page.evaluate(() => {
+    const area = document.querySelector('[data-testid="tb-scroll"]')
+    if (area) area.scrollTop = area.scrollHeight
+  })
+  await page.waitForTimeout(400)
+  const lastVisible = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="tb-stat-sum"]')
+    const area = document.querySelector('[data-testid="tb-scroll"]')
+    if (!el || !area) return null
+    const r = el.getBoundingClientRect()
+    const a = area.getBoundingClientRect()
+    return { inside: r.bottom <= a.bottom + 1 && r.top >= a.top - 1, top: Math.round(r.top) }
+  })
+  check(
+    'and scrolling to the end really does reach the bottom of the tallest column',
+    lastVisible !== null && lastVisible.inside,
+    JSON.stringify(lastVisible),
+  )
+  await page.setViewportSize({ width: 1600, height: 1100 })
+  await page.waitForTimeout(300)
+
+  /*
+    THE INSPECTOR IS SHIPPED CODE, so it gets a check like anything else. It
+    reads `grid-template-areas` out of the computed style, which means a passing
+    check here also proves those area names really are what the stylesheet says.
+  */
+  await page.goto(`${APP_URL}?layout=1`, { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[data-testid="boot-status"]', { timeout: 60000 })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(700)
+  const regions = await page.$$eval('.layout-overlay-label', (els) =>
+    els.map((e) => (e.textContent ?? '').split(' ')[0]),
+  )
+  log(`  regions: ${regions.join(', ')}`)
+  check(
+    '?layout=1 names the form regions, including the artwork grid areas',
+    ['form-grid', 'identity', 'identity-art', 'main', 'rail', 'dex', 'kana', 'shiny', 'item'].every(
+      (n) => regions.includes(n),
+    ),
+    regions.join(','),
+  )
+  check(
+    'and the overlay is inert — it never intercepts a click',
+    (await page.evaluate(
+      () => getComputedStyle(document.querySelector('.layout-overlay')).pointerEvents,
+    )) === 'none',
+  )
+  /* Back to a clean page so the conventions section is not inspecting the tool. */
+  await page.goto(APP_URL, { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[data-testid="boot-status"]', { timeout: 60000 })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+
+  // =====================================================================
   hr('CONVENTIONS — across the whole module')
   const savey = await page.evaluate(() =>
     [...document.querySelectorAll('button')]

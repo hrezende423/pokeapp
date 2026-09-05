@@ -30,6 +30,22 @@
     --slider-thumb-border: the thumb is white in both modes. On dark that needs
     no outline; on light a white oblong on a pale track has no edge without one.
   */
+  /*
+    THE MODULE'S SPACING SCALE, and the reason it exists rather than reaching
+    for --space-gap-*: that scale starts at 8px, which is the smallest gap a
+    page of prose ever wants. A dense form wants 2, 4 and 6 constantly -- and
+    with no token for those, every small gap in this file was picked freehand.
+    The file ended up using 1, 2, 3, 4, 5, 6, 7 and 8px, which is not a scale,
+    it is a hundred independent decisions nobody can hold in their head. Six
+    steps, doubling, and NOTHING in this file may write a raw px gap again.
+  */
+  --tb-1: 2px;
+  --tb-2: 4px;
+  --tb-3: 6px;
+  --tb-4: 8px;
+  --tb-5: 12px;
+  --tb-6: 20px;
+
   --slider-track: #e2e2e6;
   --slider-thumb-border: #9b9ba1;
   /*
@@ -841,14 +857,14 @@
 }
 .tb-form-dock-col .tb-dock {
   flex-direction: column;
-  gap: 4px;
+  gap: var(--tb-2);
 }
 /* The separator before the destructive item is a rule across the strip when the
    dock is vertical, not a bar beside it. */
 .tb-form-dock-col .tb-dock-sep {
   width: 16px;
   height: 1px;
-  margin: 4px 0;
+  margin: var(--tb-2) 0;
 }
 
 /* A status, not a control -- this form has no Save button to press. */
@@ -861,33 +877,59 @@
 .tb-identity {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--tb-3);
   padding-right: var(--space-gap-md);
   border-right: 1px solid var(--hairline);
 }
 /*
-  A POSITIONED STAGE, not a centring grid. Everything in here is placed against
-  the box's own edges -- numeral to the top, katakana to the left, item to the
-  bottom-right corner -- so the sprite can be centred over all of them without
-  any of the four fighting for the same flow position.
+  A NAMED GRID, not six absolutely-positioned elements.
+
+  This block is where every "move it up a bit" note came from. It used to be a
+  positioned stage: the numeral at top:0, the katakana at top:44px, the item at
+  right:0/bottom:2px, the switch at bottom:2px/left:0, and the sprite inset by
+  four hand-picked numbers. Twelve coordinates across six rules, and not one of
+  them referred to another -- so "44px" silently meant "just under a 46px
+  numeral" and stopped being true the moment the numeral resized.
+
+  As areas, a position is a RELATIONSHIP. Moving the switch to the other corner
+  is swapping two words in the template below; nothing else needs re-tuning,
+  because nothing else was measuring off it.
+
+  The sprite spans the whole grid (1 / 1 / -1 / -1) and sits above the rest on
+  z-index, which is what lets the watermarks read as texture behind it rather
+  than fighting it for a flow position.
 */
 .tb-identity-art {
-  position: relative;
+  display: grid;
+  grid-template:
+    'dex   dex ' auto
+    'kana  .   ' auto
+    '.     .   ' 1fr
+    'shiny item' auto / 1fr auto;
   height: 150px;
   overflow: hidden;
 }
 /*
-  ABSOLUTE AND INSET, which is what stops the artwork being clipped. As a
-  centred grid item its box was sized by the grid area and `object-fit` had
-  nothing left to fit inside, so a wide sprite lost its edges. Given an explicit
-  box smaller than the stage, `contain` can only ever letterbox.
+  SPANS EVERY CELL, which is also what stops the artwork being clipped. As a
+  centred item its box was sized by the grid area and `object-fit` had nothing
+  left to fit inside, so a wide sprite lost its edges. Given the full stage and
+  an explicit padding, `contain` can only ever letterbox.
 */
 .tb-identity-sprite {
-  position: absolute;
-  inset: 12px 4px 2px 26px;
   z-index: 1;
-  width: calc(100% - 30px);
-  height: calc(100% - 14px);
+  /*
+    EXPLICIT 100%, and box-sizing, because this is a REPLACED element. Box
+    alignment's `normal` behaves as `stretch` for an ordinary box but as `start`
+    for a replaced one, so an <img> spanning the grid with `min-width: 0` was
+    free to resolve its content box to nothing -- which it did, leaving a 24x14
+    element that was pure padding. Sizing it outright is what gives `contain`
+    something to letterbox inside.
+  */
+  box-sizing: border-box;
+  grid-area: 1 / 1 / -1 / -1;
+  width: 100%;
+  height: 100%;
+  padding: var(--tb-5) var(--tb-2) var(--tb-1) var(--tb-6);
   object-fit: contain;
 }
 /*
@@ -898,33 +940,30 @@
 */
 .tb-identity .tb-card-ghost,
 .tb-identity .tb-card-ghost-ja {
+  position: static;
+  z-index: 0;
+  white-space: nowrap;
   opacity: calc(var(--ghost-watermark-opacity) * 4);
+  transform: none;
 }
 /* Sized to the 210px panel, not to the grid tile: three digits at 46px with the
    inherited letter-spacing span about half the column, which reads as a number.
    At the old 92px they merged into a grey slab. */
 .tb-identity .tb-card-ghost {
-  top: 0;
+  grid-area: dex;
   font-size: 46px;
 }
-/* Left-anchored and BELOW the numeral rather than centred: dead-centre it sat
-   entirely behind the sprite, which is the other half of why it read as absent. */
 .tb-identity .tb-card-ghost-ja {
-  top: 44px;
-  bottom: auto;
-  left: 0;
+  grid-area: kana;
   font-size: var(--font-size-body);
   letter-spacing: 0.16em;
-  transform: none;
 }
 /* The held item, in the corner of the sprite. Official item artwork, so it is
    rendered smoothly; the 30x30 game icon is only the onError fallback and asks
    for `pixelated`, which is set on the element when that swap happens. */
 .tb-held-item {
-  position: absolute;
-  right: 0;
-  bottom: 2px;
   z-index: 2;
+  grid-area: item;
   width: 34px;
   height: 34px;
   object-fit: contain;
@@ -941,31 +980,27 @@
   picture, and it costs the panel no vertical space at all.
 */
 .tb-shiny-dock {
-  position: absolute;
-  bottom: 2px;
-  left: 0;
   z-index: 3;
+  grid-area: shiny;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--tb-3);
 }
 .tb-shiny-dock .tb-field-label {
   font-size: var(--font-size-label);
 }
-/* Tight to the sprite: the types belong to the picture above them, and the old
-   --space-gap-sm read as a divider between two unrelated blocks. */
 .tb-types-row {
   display: flex;
   align-items: baseline;
-  gap: 4px;
-  padding-bottom: 5px;
+  gap: var(--tb-2);
+  padding-bottom: var(--tb-3);
   border-bottom: 1px solid var(--hairline);
 }
 .tb-stats-block {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-top: 2px;
+  gap: var(--tb-1);
+  padding-top: var(--tb-1);
 }
 .tb-genus,
 .tb-ja {
@@ -987,7 +1022,7 @@
 .tb-field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--tb-1);
   min-width: 0;
 }
 .tb-field-label {
@@ -1109,7 +1144,7 @@
 .tb-move-slot {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--tb-1);
   min-width: 0;
 }
 .tb-move-meta {
@@ -1136,19 +1171,19 @@
 .tb-spread-col {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--tb-1);
 }
 .tb-spread-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-gap-sm);
-  padding-bottom: 4px;
+  padding-bottom: var(--tb-2);
 }
 .tb-spread-row {
   display: grid;
   grid-template-columns: 34px 52px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--tb-5);
   align-items: center;
 }
 /* Gen 2's shiny-locked Attack DV is the one row that still carries a stepper --
@@ -1190,8 +1225,8 @@
 .tb-spread-total {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-top: 4px;
+  gap: var(--tb-4);
+  padding-top: var(--tb-2);
   border-top: 1px solid var(--hairline);
 }
 

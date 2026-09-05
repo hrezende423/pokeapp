@@ -1,3 +1,4 @@
+import { LayoutOverlay } from './components/LayoutOverlay'
 import { useEffect, useState } from 'react'
 import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
@@ -140,6 +141,10 @@ export default function App() {
           <span className="num">1–{meta.scope.max_species_id}</span>
         </p>
       </footer>
+
+      {/* Inert until switched on; see components/LayoutOverlay.tsx. Last child
+          so it paints over everything, including the bar and the footer. */}
+      <LayoutOverlay />
     </main>
   )
 }
