@@ -236,19 +236,18 @@ Real, reproducible, and deliberately left alone. Each entry says why it is
 not worth fixing yet — read that before "fixing" one as a drive-by, because
 the reason is usually that the cheap fix is the wrong one.
 
-- **Leaving Build Form via the global app nav bar does not prompt for a
-  shared build's unsaved edits.** Team Building intercepts every *in-module*
-  exit from Build Form and, when the build is attached to 2+ teams, offers
-  save-back / discard / save-as-new. Exiting through the top app bar instead
-  bypasses that entirely: the module just unmounts and the uncommitted edit
-  is dropped. The failure direction is safe — the shared build itself is
-  untouched, so no data is corrupted and no other team sees a surprise
-  change — but it does contradict the module's "nothing is lost silently"
-  intent for this one path. **Do not patch this inside Team Building.** The
-  app has no router and no navigation-guard infrastructure; a real fix is a
-  cross-module concern (a guard the nav layer consults before switching
-  modules), and anything Team-Building-local would be a second, divergent
-  mechanism for the same job.
+- ~~**Leaving Build Form via the global app nav bar does not prompt for a
+  shared build's unsaved edits.**~~ **Half fixed**, by the move to explicit save
+  points. Build Form now flushes its draft from its own unmount cleanup, so an
+  UNSHARED build survives leaving through the app bar — that path is covered by
+  a check in verify-team-builder section 5. A SHARED build (2+ teams) still
+  drops the edit there, and deliberately: the cleanup runs with the component
+  already gone, so there is nobody left to ask which of save-back /
+  save-as-new / discard was meant, and writing without asking would change every
+  team that uses the build. The failure direction stays safe — the shared
+  original is untouched. A real fix is still a cross-module navigation guard the
+  nav layer consults BEFORE switching modules; **do not build a
+  Team-Building-local version of that.**
 - **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
   one species whose HP does not follow the normal formula — it is always 1,
   at every level, with any DV/IV or EV spread — and `statMath.ts` computes it

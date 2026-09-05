@@ -1,16 +1,37 @@
 /**
  * Screen 4: one build, everything about it.
  *
- * AUTOSAVE, NO SAVE BUTTON, with exactly one exception. Every field writes through
- * on change or blur. The exception is a build attached to 2+ TEAMS: editing one of
- * those silently changes every team that uses it, so leaving after an edit asks
- * whether to save back, discard, or fork into a new build. A build on one team, or
- * on none, just saves.
+ * EVERY EDIT IS A DRAFT. Typing, dragging a slider and picking from a dropdown
+ * all change local state and NOTHING ELSE -- the store is written only at the
+ * save points listed below. This replaced a write-through-on-every-change model,
+ * which meant a build half-way through being set up was continuously persisted:
+ * every intermediate state of it was, briefly, the saved state, and abandoning an
+ * edit half-done left that half in the library.
  *
- * THE DRAFT ONLY EXISTS FOR SHARED BUILDS. An unshared build writes straight to
- * the store, so there is nothing to lose and nothing to reconcile. A shared one
- * edits a local copy until you leave. That is why `commit` branches on `isShared`
- * rather than always buffering.
+ * THE SAVE POINTS, all of them:
+ *   - leaving by the back control (Back to team / Build Library)
+ *   - opening another member from the right rail
+ *   - adding a member from the right rail, or starting a team from this build
+ *   - duplicating: the ORIGINAL is saved, then the copy is made from it and the
+ *     form switches to the copy, so the edit you were making lands in both
+ *   - adding this build to another team
+ *   - Reset, which is confirmed and destructive, so it sticks immediately
+ *   - unmounting for ANY other reason, which is what covers leaving through the
+ *     global app nav bar, and `pagehide`, which covers closing the tab
+ * Delete is the one exit that deliberately does not save: the record is going.
+ *
+ * THE UNMOUNT FLUSH READS A REF, NOT STATE. Its cleanup runs after the last
+ * render, so state read there could be a render behind; `pending` is written
+ * synchronously by every edit and cleared by every save, which makes it the
+ * honest answer to "is there anything to write". It is only ever touched in
+ * handlers and effects, never during render.
+ *
+ * A SHARED BUILD (2+ teams) STILL PROMPTS, because saving it changes every team
+ * that uses it. That prompt is the reason saves funnel through `saveThen` rather
+ * than each call site writing for itself -- there is one place that can ask.
+ * The unmount flush cannot ask, so for a shared build it declines to write: the
+ * failure direction is "the shared build is untouched", never "six teams changed
+ * without being asked".
  *
  * KEY-REMOUNTED ON `buildId`. Re-seeding the draft in an effect when the id
  * changes would be a synchronous setState in an effect body; remounting is both
@@ -22,7 +43,7 @@
  * there), and no Hidden Power in Gen 1.
  */
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   IconChevronLeft,
   IconCopy,
@@ -50,7 +71,7 @@ import {
   abilityOptionsFor,
   buildSpecies,
   genderOptionsFor,
-  itemIconFor,
+  itemArtFor,
   itemName,
   itemOptionsFor,
   natureOptionsFor,
@@ -65,6 +86,7 @@ import {
   deleteBuild,
   duplicateBuild,
   forkBuildInTeam,
+  readData,
   setTeamMember,
   updateBuild,
   useTeamBuilderData,
@@ -99,9 +121,47 @@ function BuildFormFields({
     stored ? isShinyByDvs(stored.individual) : false,
   )
 
+  /*
+    The unsaved draft, or null when there is nothing outstanding. Deliberately a
+    ref and not derived from `draft`/`dirty`: the unmount flush needs the value
+    as of the last EDIT, not as of the last render.
+  */
+  const pending = useRef<Build | null>(null)
+
   const attachedTeams = stored ? teamsUsingBuild(data, stored.id) : []
   const isShared = attachedTeams.length >= 2
-  const build = (isShared ? draft : stored) ?? stored
+  const build = draft ?? stored
+
+  /** Write the outstanding draft. The ONLY function in this file that saves. */
+  const flush = useCallback(() => {
+    const next = pending.current
+    if (!next) return
+    pending.current = null
+    updateBuild(next.id, next)
+  }, [])
+
+  /*
+    The safety net under every exit this component does not own: the global app
+    nav bar, a module switch, a browser tab closing. `pagehide` rather than
+    `beforeunload` because it fires on mobile backgrounding too, and localStorage
+    is synchronous so there is nothing to await.
+
+    It REFUSES to write a shared build, because at this point there is nobody
+    left to ask which of the three answers the user wanted.
+  */
+  useEffect(() => {
+    const flushUnattended = () => {
+      const next = pending.current
+      if (!next) return
+      if (teamsUsingBuild(readData(), next.id).length >= 2) return
+      flush()
+    }
+    window.addEventListener('pagehide', flushUnattended)
+    return () => {
+      window.removeEventListener('pagehide', flushUnattended)
+      flushUnattended()
+    }
+  }, [flush])
 
   const moveset = useLegalMoveset({
     speciesId: build?.speciesId ?? 1,
@@ -123,26 +183,38 @@ function BuildFormFields({
   const generation = build.generation
 
   /**
-   * Write a change through -- or hold it in the draft when the build is shared.
+   * Record a field change. Draft only -- this does NOT touch the store.
+   *
+   * `pending` is written here rather than in an effect so the unmount flush can
+   * see an edit that never got a chance to re-render.
    */
   const commit = (patch: Partial<Build>) => {
-    if (isShared) {
-      setDraft({ ...build, ...patch })
-      setDirty(true)
-      return
-    }
-    updateBuild(build.id, patch)
+    const next = { ...build, ...patch }
+    pending.current = next
+    setDraft(next)
+    setDirty(true)
   }
 
   /**
-   * EVERY exit from this screen funnels through here, so the shared-build prompt
-   * cannot be bypassed by taking a different route out.
+   * SAVE, THEN DO THE THING. Every save point in this screen calls this, so the
+   * shared-build question is asked in one place and cannot be bypassed by taking
+   * a different route out.
+   *
+   * `after` runs in all three shared-build branches, discard included: the
+   * question is what happens to the EDIT, not whether the user gets to leave.
    */
-  const attemptLeave = (go: () => void) => {
-    if (!isShared || !dirty) {
-      go()
+  const saveThen = (after: () => void) => {
+    if (!pending.current) {
+      after()
       return
     }
+    if (!isShared) {
+      flush()
+      setDirty(false)
+      after()
+      return
+    }
+    const edited = pending.current
     prompt.ask({
       title: 'This build is used by more than one team',
       body: `Saving changes it for all ${attachedTeams.length} teams that use it (${attachedTeams
@@ -154,26 +226,42 @@ function BuildFormFields({
           label: 'Save to all teams',
           testId: 'tb-shared-save',
           onPick: () => {
-            updateBuild(build.id, build)
-            go()
+            flush()
+            setDirty(false)
+            after()
           },
         },
         {
           label: 'Save as a new build',
           testId: 'tb-shared-fork',
           onPick: () => {
-            if (origin.kind === 'team') forkBuildInTeam(stored.id, build, origin.teamId)
-            else createBuild({ ...build })
-            go()
+            /* The copy takes the edit; the original keeps what it had. Clearing
+               `pending` first is what stops the unmount flush writing the edit
+               back onto the original a moment later. */
+            pending.current = null
+            setDirty(false)
+            if (origin.kind === 'team') forkBuildInTeam(stored.id, edited, origin.teamId)
+            else createBuild({ ...edited })
+            after()
           },
         },
-        { label: 'Discard changes', danger: true, testId: 'tb-shared-discard', onPick: go },
+        {
+          label: 'Discard changes',
+          danger: true,
+          testId: 'tb-shared-discard',
+          onPick: () => {
+            pending.current = null
+            setDirty(false)
+            setDraft(stored)
+            after()
+          },
+        },
       ],
     })
   }
 
   const back = () =>
-    attemptLeave(() =>
+    saveThen(() =>
       origin.kind === 'team'
         ? goTo({ kind: 'team-viewer', teamId: origin.teamId })
         : goTo({ kind: 'build-library' }),
@@ -191,7 +279,102 @@ function BuildFormFields({
       : (attachedTeams[0] ?? null)
 
   /* Gen 1 has no held items, so no badge -- not an empty one. */
-  const heldIcon = generation >= 2 ? itemIconFor(build.itemId) : null
+  const heldArt = generation >= 2 ? itemArtFor(build.itemId) : null
+
+  /*
+    THE DOCK IS BUILT HERE, RENDERED BESIDE THE RAIL. Three of its six actions
+    are save points, so the list has to be in scope of `saveThen`; where it is
+    drawn is a layout question and is answered further down.
+  */
+  const dockItems = [
+    {
+      icon: <IconCopy size={18} stroke={1.5} />,
+      label: 'Duplicate build',
+      testId: 'tb-form-duplicate',
+      /* SAVE FIRST, then copy, then follow the copy. `duplicateBuild` reads the
+         STORE, so without the save the copy would be of the build as it was
+         before this editing session -- the edit would appear to vanish. */
+      onClick: () =>
+        saveThen(() => {
+          const copy = duplicateBuild(build.id)
+          if (copy) goTo({ kind: 'build-form', buildId: copy.id, origin })
+        }),
+    },
+    {
+      icon: <IconInfoCircle size={18} stroke={1.5} />,
+      label: 'Build info',
+      onClick: () => setInfo(true),
+      testId: 'tb-form-info',
+    },
+    {
+      icon: <IconShieldHalf size={18} stroke={1.5} />,
+      label: 'Type matchups',
+      onClick: () => setMatchup(true),
+      testId: 'tb-form-matchup',
+    },
+    {
+      icon: <IconUsersPlus size={18} stroke={1.5} />,
+      label: 'Add to other team',
+      /* Save first: the team is about to point at this build, and it should
+         point at what is on screen rather than at the last saved version. */
+      onClick: () => saveThen(() => setAddTo(true)),
+      testId: 'tb-form-add-to-team',
+    },
+    {
+      icon: <IconRotate size={18} stroke={1.5} />,
+      label: 'Reset build',
+      testId: 'tb-form-reset',
+      onClick: () =>
+        prompt.confirm(
+          'Reset this build?',
+          () => {
+            /* Clears item, moves, level, friendship, nickname, spread and shiny.
+               KEEPS species, nature, ability and gender -- those are identity,
+               not tuning. Confirmed and destructive, so unlike an ordinary field
+               edit it is written straight through rather than left in the draft. */
+            const reset = {
+              ...build,
+              itemId: null,
+              moveIds: [null, null, null, null],
+              level: 1,
+              friendship: 0,
+              nickname: '',
+              effort: {},
+              individual: {},
+              shiny: false,
+            }
+            pending.current = reset
+            setDraft(reset)
+            flush()
+            setDirty(false)
+          },
+          { confirmLabel: 'Reset', testId: 'tb-reset-prompt' },
+        ),
+    },
+    {
+      icon: <IconTrash size={18} stroke={1.5} />,
+      label: 'Delete build',
+      danger: true,
+      testId: 'tb-form-delete',
+      onClick: () =>
+        prompt.confirm(
+          'Delete this build?',
+          () => {
+            /* The one exit that must NOT save. Dropping `pending` first stops the
+               unmount flush resurrecting the record we are deleting. */
+            pending.current = null
+            setDirty(false)
+            deleteBuild(build.id)
+            goTo(
+              origin.kind === 'team'
+                ? { kind: 'team-viewer', teamId: origin.teamId }
+                : { kind: 'build-library' },
+            )
+          },
+          { testId: 'tb-delete-build-prompt' },
+        ),
+    },
+  ]
 
   const art = facts
     ? resolveArtworkUrl(facts.species, facts.variety, {
@@ -213,91 +396,15 @@ function BuildFormFields({
           <IconChevronLeft size={18} stroke={1.5} />
           {origin.kind === 'team' ? 'Back to team' : 'Build Library'}
         </GhostButton>
-        <div className="tb-dock-anchor">
-          <Dock
-            testId="tb-form-dock"
-            items={[
-              {
-                icon: <IconCopy size={18} stroke={1.5} />,
-                label: 'Duplicate build',
-                onClick: () => duplicateBuild(build.id),
-                testId: 'tb-form-duplicate',
-              },
-              {
-                icon: <IconInfoCircle size={18} stroke={1.5} />,
-                label: 'Build info',
-                onClick: () => setInfo(true),
-                testId: 'tb-form-info',
-              },
-              {
-                icon: <IconShieldHalf size={18} stroke={1.5} />,
-                label: 'Type matchups',
-                onClick: () => setMatchup(true),
-                testId: 'tb-form-matchup',
-              },
-              {
-                icon: <IconUsersPlus size={18} stroke={1.5} />,
-                label: 'Add to other team',
-                onClick: () => setAddTo(true),
-                testId: 'tb-form-add-to-team',
-              },
-              {
-                icon: <IconRotate size={18} stroke={1.5} />,
-                label: 'Reset build',
-                testId: 'tb-form-reset',
-                onClick: () =>
-                  prompt.confirm(
-                    'Reset this build?',
-                    () =>
-                      /* Clears item, moves, level, friendship, nickname, spread and
-                         shiny. KEEPS species, nature, ability and gender -- those are
-                         identity, not tuning. */
-                      commit({
-                        itemId: null,
-                        moveIds: [null, null, null, null],
-                        level: 1,
-                        friendship: 0,
-                        nickname: '',
-                        effort: {},
-                        individual: {},
-                        shiny: false,
-                      }),
-                    { confirmLabel: 'Reset', testId: 'tb-reset-prompt' },
-                  ),
-              },
-              {
-                icon: <IconTrash size={18} stroke={1.5} />,
-                label: 'Delete build',
-                danger: true,
-                testId: 'tb-form-delete',
-                onClick: () =>
-                  prompt.confirm(
-                    'Delete this build?',
-                    () => {
-                      deleteBuild(build.id)
-                      goTo(
-                        origin.kind === 'team'
-                          ? { kind: 'team-viewer', teamId: origin.teamId }
-                          : { kind: 'build-library' },
-                      )
-                    },
-                    { testId: 'tb-delete-build-prompt' },
-                  ),
-              },
-            ]}
-          />
-          {matchup && (
-            <Popover onClose={() => setMatchup(false)} testId="tb-form-matchup-popover">
-              {facts && (
-                <SpeciesMatchup
-                  typeIds={typeIdsFor(facts.variety, generation)}
-                  generation={generation}
-                  title={facts.species.display_name}
-                />
-              )}
-            </Popover>
-          )}
-        </div>
+        {/*
+          There is no Save button by design, so the only honest way to say "this
+          is not written down yet" is to say it. It is a status, not a control.
+        */}
+        {dirty && (
+          <span className="tb-dirty-note" data-testid="tb-dirty-note">
+            Unsaved changes
+          </span>
+        )}
       </header>
 
       <div className="tb-form-grid">
@@ -320,14 +427,47 @@ function BuildFormFields({
               </span>
             )}
             {art && <img className="tb-identity-sprite" src={art} alt="" />}
-            {heldIcon && (
+            {heldArt && (
               <img
                 className="tb-held-item"
-                src={heldIcon}
+                src={heldArt.artwork}
                 alt=""
                 title={itemName(build.itemId)}
                 data-testid="tb-held-item"
+                /* Roughly half the bag has no Dream World render. Falling back to
+                   the 30x30 game icon on the 404 is what itemArtwork.ts asks for;
+                   `data-fallback` is what tells the CSS to draw it pixelated. */
+                onError={(e) => {
+                  const img = e.currentTarget
+                  if (img.dataset.fallback === 'true') return
+                  img.dataset.fallback = 'true'
+                  img.src = heldArt.icon
+                }}
               />
+            )}
+            {generation >= 3 && (
+              <span className="tb-shiny-dock">
+                <span className="tb-field-label">Shiny</span>
+                <span className="tb-switch">
+                  <input
+                    type="checkbox"
+                    checked={build.shiny}
+                    aria-label="Shiny"
+                    data-testid="tb-shiny"
+                    onChange={(e) => commit({ shiny: e.target.checked })}
+                  />
+                  <span className="tb-switch-track" aria-hidden />
+                </span>
+              </span>
+            )}
+            {generation === 2 && (
+              /* READ-ONLY in Gen 2: shininess there is a fact about the DV spread. */
+              <span className="tb-shiny-dock">
+                <span className="tb-field-label">Shiny</span>
+                <span className="tb-readout" data-testid="tb-shiny-computed">
+                  {isShinyByDvs(build.individual) ? 'Yes' : 'No'}
+                </span>
+              </span>
             )}
           </div>
 
@@ -375,30 +515,6 @@ function BuildFormFields({
               onBlur={(e) => commit({ nickname: e.target.value })}
             />
           </Field>
-
-          {generation >= 3 && (
-            <Field label="Shiny">
-              {/* A switch, not a tick box: this is a state the build is IN, and
-                  the identity panel it sits in is a picture of that state. */}
-              <span className="tb-switch">
-                <input
-                  type="checkbox"
-                  checked={build.shiny}
-                  data-testid="tb-shiny"
-                  onChange={(e) => commit({ shiny: e.target.checked })}
-                />
-                <span className="tb-switch-track" aria-hidden />
-              </span>
-            </Field>
-          )}
-          {generation === 2 && (
-            /* READ-ONLY in Gen 2: shininess there is a fact about the DV spread. */
-            <Field label="Shiny">
-              <span className="tb-readout" data-testid="tb-shiny-computed">
-                {isShinyByDvs(build.individual) ? 'Yes' : 'No'}
-              </span>
-            </Field>
-          )}
 
           {facts && (
             <div className="tb-stats-block">
@@ -585,6 +701,31 @@ function BuildFormFields({
           />
         </div>
 
+        {/*
+          THE DOCK, immediately left of the rail rather than up in the page's
+          top-right corner. Up there it read as belonging to the app bar above
+          it; here it sits against the thing it acts on, and the form's own top
+          row is left to the back control alone.
+        */}
+        <div className="tb-form-dock-col tb-dock-anchor">
+          <Dock testId="tb-form-dock" items={dockItems} />
+          {matchup && (
+            <Popover
+              onClose={() => setMatchup(false)}
+              align="right"
+              testId="tb-form-matchup-popover"
+            >
+              {facts && (
+                <SpeciesMatchup
+                  typeIds={typeIdsFor(facts.variety, generation)}
+                  generation={generation}
+                  title={facts.species.display_name}
+                />
+              )}
+            </Popover>
+          )}
+        </div>
+
         {/* ----------------------------------------------------- right rail */}
         <aside
           className="tb-rail"
@@ -603,8 +744,9 @@ function BuildFormFields({
                     build={member}
                     variant="rail"
                     testId={`tb-rail-${member.id}`}
+                    /* Save point: opening a sibling replaces this form. */
                     onOpen={() =>
-                      attemptLeave(() =>
+                      saveThen(() =>
                         goTo({
                           kind: 'build-form',
                           buildId: member.id,
@@ -618,17 +760,22 @@ function BuildFormFields({
                 icon={<IconPlus size={20} stroke={1.5} />}
                 label="Add member"
                 testId="tb-rail-add"
-                onClick={() => {
-                  const slot = railTeam.memberIds.findIndex((m) => m == null)
-                  if (slot === -1) return
-                  const fresh = createBuild(newBuildInit(railTeam.generation))
-                  setTeamMember(railTeam.id, slot, fresh.id)
-                  goTo({
-                    kind: 'build-form',
-                    buildId: fresh.id,
-                    origin: { kind: 'team', teamId: railTeam.id },
+                /* Save point, and it used to be a hole: this bypassed the leave
+                   path entirely, so adding a member silently threw away whatever
+                   you had just typed into the build you were on. */
+                onClick={() =>
+                  saveThen(() => {
+                    const slot = railTeam.memberIds.findIndex((m) => m == null)
+                    if (slot === -1) return
+                    const fresh = createBuild(newBuildInit(railTeam.generation))
+                    setTeamMember(railTeam.id, slot, fresh.id)
+                    goTo({
+                      kind: 'build-form',
+                      buildId: fresh.id,
+                      origin: { kind: 'team', teamId: railTeam.id },
+                    })
                   })
-                }}
+                }
               />
             </>
           ) : railOpen ? (
@@ -642,7 +789,8 @@ function BuildFormFields({
               icon={<IconPlus size={20} stroke={1.5} />}
               label="Start a team with this build"
               testId="tb-rail-create-team"
-              onClick={() => createTeam(generation, [build.id])}
+              /* Save point: the new team is about to reference this build. */
+              onClick={() => saveThen(() => createTeam(generation, [build.id]))}
             />
           ) : (
             <IconButton

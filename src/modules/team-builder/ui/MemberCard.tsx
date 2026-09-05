@@ -10,9 +10,12 @@
  *            was confirmed over the fuller spec text, since six full cards would
  *            triple every row's height.
  *   full     Team Viewer. The whole build: level, (Species), spread, four moves.
- *   library  Build Library. `full` plus tags and a usage count, drawn with
- *            OFFICIAL ARTWORK instead of the in-game sprite.
- *   rail     Build Form's right rail. Three tight lines beside a small sprite.
+ *   library  Build Library. `full` plus tags and a usage count.
+ *   rail     Build Form's right rail. Three tight lines beside a small portrait.
+ *
+ * ALL FOUR DRAW OFFICIAL ARTWORK. The in-game sprite is not used in this module
+ * at all -- the same build must not be a smooth render on one screen and a pixel
+ * tile on the next.
  *
  * Duplicating this per screen would mean remembering the era-correct move-type
  * rule, the genderless rule and the nickname-parenthetical rule four times.
@@ -118,11 +121,12 @@ export function MemberCard({
   const spread = spreadSummary(build, statKeysForGeneration(build.generation))
   const dvSpread = spreadSummary(build, spreadStatKeys(build.generation))
 
-  /* THE LIBRARY USES OFFICIAL ARTWORK, everything else the in-game sprite. That
-     is the library card's one stated visual difference, and it rides here rather
-     than at the call site so the two cannot drift apart. */
+  /* OFFICIAL ARTWORK IN EVERY VARIANT. It used to be library-only, with the other
+     three on the in-game sprite -- so one screen showed a Pokemon at 475px of
+     smooth artwork and the next showed the same build as a 64px pixel tile. The
+     module now shows one picture of a species everywhere. */
   const art = resolveArtworkUrl(species, variety, {
-    source: variant === 'library' ? 'artwork' : 'in-game',
+    source: 'artwork',
     motion: 'static',
     shiny: build.shiny,
     gender: build.gender === 'female' ? 'female' : 'male',

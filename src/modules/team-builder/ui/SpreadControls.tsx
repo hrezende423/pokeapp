@@ -17,6 +17,13 @@
  * SKIP-AWARE STEPPER over {2,3,6,7,10,11,14,15} -- a constrained continuous slider
  * would let a drag land on 4 and silently drop shininess.
  *
+ * EVERY ROW IS `name | number box | slider`, and that Attack row is the ONLY one
+ * that still carries -/+ buttons. They used to be on all of them; a typed number
+ * box does the same job with one control instead of two, and the buttons stepped
+ * by 4 while the box stepped by 1, so the two disagreed. The shiny-locked Attack
+ * DV survives because its legal values are a set, not a range: "next" is not
+ * "+1" there, and no number box or slider can say so.
+ *
  * GEN 3-4 -- "EV" and "IV":
  *   EV sliders, 0-252 each, with a running total HARD-CAPPED at 510. The cap is
  *   enforced by clamping the slider being moved rather than by refusing the input,
@@ -96,14 +103,6 @@ export function SpreadControls({
               value={build.effort[key] ?? 0}
               data-testid={`tb-ev-${key}-value`}
               onChange={(e) => setEffort(key, Number(e.target.value))}
-            />
-            <Stepper
-              /* Step 1, both spreads. A 4-step was a Gen-3 EV-per-point-of-stat
-                 shortcut, but it makes the odd values unreachable by button and
-                 disagrees with the number box beside it, which steps by 1.
-                 Stat Exp keeps its 256 because a 1-step over 0-65535 is useless. */
-              onStep={(dir) => setEffort(key, (build.effort[key] ?? 0) + dir * (modern ? 1 : 256))}
-              testId={`tb-ev-${key}`}
             />
             {modern ? (
               <Range
@@ -192,6 +191,7 @@ export function SpreadControls({
               key={key}
               data-stat={key}
               data-locked={locked || undefined}
+              data-skip-aware={skipAware || undefined}
             >
               <span className="tb-spread-name">{STAT_LABEL[key]}</span>
               <input
@@ -205,17 +205,18 @@ export function SpreadControls({
                 data-testid={`tb-iv-${key}-value`}
                 onChange={(e) => setIndividual(key, Number(e.target.value))}
               />
-              {skipAware ? (
-                /* Only the eight legal Attack DVs, stepped through in order. */
+              {/*
+                THE ONE SURVIVING STEPPER. Every other row lost its -/+ buttons to
+                the number box beside it, which does the same job with one control
+                instead of two. This row cannot: under the Gen 2 shiny lock the
+                legal Attack DVs are {2,3,6,7,10,11,14,15}, so "next value" is not
+                "value + 1" and neither a typed number nor a dragged slider can
+                express it. Stepping the set in order is the only honest control.
+              */}
+              {skipAware && (
                 <Stepper
                   onStep={(dir) => setIndividual(key, nextShinyAttackDv(value, dir))}
                   testId={`tb-iv-${key}`}
-                />
-              ) : (
-                <Stepper
-                  onStep={(dir) => setIndividual(key, value + dir)}
-                  testId={`tb-iv-${key}`}
-                  disabled={locked}
                 />
               )}
               <Range

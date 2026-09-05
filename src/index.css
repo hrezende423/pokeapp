@@ -78,6 +78,36 @@
   filter: invert(1) brightness(2);
 }
 
+/*
+  THE OPEN <select> DROPDOWN IS PAINTED BY THE BROWSER, and it takes its ground
+  from `color-scheme` -- never from `data-theme`, which the browser knows nothing
+  about. :root above declares `color-scheme: light dark`, meaning "either, follow
+  the OS". That was right while the app only mirrored `prefers-color-scheme`; it
+  has been wrong since the theme became a user choice. On a machine sitting in OS
+  light mode with the app switched to dark, every dropdown opened as a WHITE
+  popup carrying our light-on-dark option colour: invisible text.
+
+  Pinning the property per theme fixes it at the source, for every native control
+  in the app -- selects, scrollbars, date pickers -- rather than one module's
+  selects. The explicit `option` colours below are the belt to that braces:
+  Chromium honours `color-scheme` for the popup, but only paints options from it
+  when they have no colour of their own to inherit, and ours inherit the field's.
+*/
+[data-theme='light'] {
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+[data-theme='light'] select option {
+  color: #141414;
+  background-color: #ffffff;
+}
+[data-theme='dark'] select option {
+  color: #f5f5f5;
+  background-color: #1c1c1e;
+}
+
 /* Widened from the starter template's fixed 1126px: the Pokedex is a 240px rail
    plus a detail column of side-by-side cards, which needs the room.
 

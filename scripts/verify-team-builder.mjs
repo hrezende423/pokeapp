@@ -433,11 +433,23 @@ try {
     typeRow.join(','),
   )
 
-  // ---- clearing slot 2 shifts 3 and 4 up
-  const movesBefore = (await readStore()).builds.find((b) => b.id === 'b1').moveIds
+  /*
+    ---- clearing slot 2 shifts 3 and 4 up
+
+    READ OFF THE FORM, NOT OUT OF THE STORE. The form edits a draft and writes
+    only at a save point, so the store still holds the pre-edit moveset at this
+    instant -- by design. What this check is about is the SHIFT rule, so it asks
+    the four selects what they are showing. Section 6 is where the draft actually
+    reaching the store is proven.
+  */
+  const slotValues = () =>
+    page.$$eval('[data-testid^="tb-move-select-"]', (els) =>
+      els.map((e) => (e.value === '' ? null : Number(e.value))),
+    )
+  const movesBefore = await slotValues()
   await page.selectOption('[data-testid="tb-move-select-1"]', '')
   await page.waitForTimeout(300)
-  const movesAfter = (await readStore()).builds.find((b) => b.id === 'b1').moveIds
+  const movesAfter = await slotValues()
   log(`  moves before: ${movesBefore.join(',')}`)
   log(`  moves after:  ${movesAfter.join(',')}`)
   check(
@@ -561,7 +573,194 @@ try {
 
   // =====================================================================
   /*
-    5. HIDDEN POWER — the pure formula, driven with MIXED spreads.
+    5. THE SAVE MODEL — when a draft becomes a saved build, and when it does not.
+
+    THE FORM DOES NOT AUTOSAVE. It used to, and the consequence was that every
+    keystroke of a half-built Pokemon was, briefly, the saved state of it. It now
+    edits a draft and writes at named save points, so both halves need proving:
+    that an edit does NOT reach the store on its own, and that each save point
+    really does put it there. Half of this section would pass against a form that
+    never saved at all, and the other half against the old autosaving one.
+
+    EVERY CHECK READS localStorage, because "the field shows the new value" is
+    exactly what a draft does whether or not anything was written down.
+  */
+  hr('5. THE SAVE MODEL — drafts, save points, and the one exit that must not save')
+  const nickOf = async (id) => (await readStore()).builds.find((b) => b.id === id)?.nickname
+  const openBuild = async (id) => {
+    await goTo('build-library')
+    await page.waitForSelector('[data-testid="tb-build-grid"]')
+    await page.click(`[data-testid="tb-build-${id}-open"]`)
+    await page.waitForSelector('[data-testid="tb-build-form"]')
+  }
+
+  await seedStore({
+    nextBuildSeq: 3,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1', { speciesId: 6, pokemonId: 6, nickname: 'Original' })],
+    teams: [mkTeam('t1', 1, ['b1'])],
+  })
+
+  // ---- an edit stays in the draft
+  await openBuild('b1')
+  await page.fill('[data-testid="tb-nickname"]', 'Draft')
+  await page.click('[data-testid="tb-level"]')
+  await page.waitForTimeout(400)
+  check(
+    'typing in the form does NOT write to the store',
+    (await nickOf('b1')) === 'Original',
+    `stored nickname is "${await nickOf('b1')}"`,
+  )
+  check(
+    'and the screen says so, since there is no Save button to press',
+    (await page.$$('[data-testid="tb-dirty-note"]')).length === 1,
+  )
+
+  // ---- back is a save point
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(400)
+  check(
+    'leaving by the back control saves the draft',
+    (await nickOf('b1')) === 'Draft',
+    `stored nickname is "${await nickOf('b1')}"`,
+  )
+
+  // ---- the GLOBAL nav bar is a save point too, which was logged debt
+  await openBuild('b1')
+  await page.fill('[data-testid="tb-nickname"]', 'ViaGlobalNav')
+  await page.click('[data-testid="tb-level"]')
+  await page.waitForTimeout(300)
+  /* Out of the module entirely, by the app bar -- the route that used to drop
+     the edit on the floor. Pokepedia's tab opens a dropdown; picking any entry
+     in it unmounts Team Building, which is the case under test. */
+  await page.hover('[data-testid="nav-tab-pokepedia"]')
+  await page.waitForSelector('[data-testid="nav-dropdown-pokepedia"]', { state: 'visible' })
+  await page.click('[data-testid="nav-dropdown-pokepedia"] button')
+  await page.waitForTimeout(900)
+  const afterGlobalNav = await nickOf('b1')
+  check(
+    'leaving through the GLOBAL app nav bar saves it as well',
+    afterGlobalNav === 'ViaGlobalNav',
+    `stored nickname is "${afterGlobalNav}"`,
+  )
+
+  // ---- adding a member from the rail saves the build you were on
+  await seedStore({
+    nextBuildSeq: 3,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1', { speciesId: 6, pokemonId: 6, nickname: 'Original' })],
+    teams: [mkTeam('t1', 1, ['b1'])],
+  })
+  await openBuild('b1')
+  await page.fill('[data-testid="tb-nickname"]', 'SavedByAdd')
+  await page.click('[data-testid="tb-level"]')
+  await page.waitForTimeout(300)
+  await page.click('[data-testid="tb-rail-add"]')
+  await page.waitForTimeout(700)
+  check(
+    'adding a member from the right rail saves the build you were editing',
+    (await nickOf('b1')) === 'SavedByAdd',
+    `stored nickname is "${await nickOf('b1')}"`,
+  )
+
+  // ---- duplicate saves the original, copies the EDIT, and lands on the copy
+  await seedStore({
+    nextBuildSeq: 2,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1', { speciesId: 6, pokemonId: 6, nickname: 'Original' })],
+    teams: [],
+  })
+  await openBuild('b1')
+  await page.fill('[data-testid="tb-nickname"]', 'Edited')
+  await page.click('[data-testid="tb-level"]')
+  await page.waitForTimeout(300)
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-duplicate"]')
+  await page.waitForTimeout(800)
+  const dupStore = await readStore()
+  const landedOn = await page.getAttribute('[data-testid="tb-build-form"]', 'data-build-id')
+  log(`  after duplicate: ${dupStore.builds.map((b) => `${b.id}:${b.nickname}`).join(' ')}`)
+  check(
+    'duplicating saves the original with the edit, and the copy carries it too',
+    dupStore.builds.length === 2 &&
+      dupStore.builds.find((b) => b.id === 'b1').nickname === 'Edited' &&
+      dupStore.builds.filter((b) => b.nickname === 'Edited').length === 2,
+    dupStore.builds.map((b) => `${b.id}:${b.nickname}`).join(' '),
+  )
+  check(
+    'and the form switches to the COPY, not the original',
+    landedOn !== null && landedOn !== 'b1',
+    `landed on ${landedOn}`,
+  )
+
+  // ---- reset is confirmed and destructive, so it writes straight through
+  await seedStore({
+    nextBuildSeq: 2,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1', { speciesId: 6, pokemonId: 6, nickname: 'Original', level: 77 })],
+    teams: [],
+  })
+  await openBuild('b1')
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-reset"]')
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(600)
+  const afterReset2 = (await readStore()).builds.find((b) => b.id === 'b1')
+  check(
+    'Reset writes immediately rather than leaving a reset sitting in the draft',
+    afterReset2.nickname === '' && afterReset2.level === 1,
+    `nickname="${afterReset2.nickname}" level=${afterReset2.level}`,
+  )
+
+  // ---- delete must not be resurrected by the unmount flush
+  await seedStore({
+    nextBuildSeq: 3,
+    nextTeamSeq: 2,
+    builds: [
+      mkBuild('b1', { speciesId: 6, pokemonId: 6, nickname: 'Doomed' }),
+      mkBuild('b2', { speciesId: 9, pokemonId: 9 }),
+    ],
+    teams: [],
+  })
+  await openBuild('b1')
+  await page.fill('[data-testid="tb-nickname"]', 'EditedThenDeleted')
+  await page.click('[data-testid="tb-level"]')
+  await page.waitForTimeout(300)
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-delete"]')
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(700)
+  const afterDelete = await readStore()
+  check(
+    'deleting an EDITED build does not resurrect it through the unmount flush',
+    !afterDelete.builds.some((b) => b.id === 'b1'),
+    afterDelete.builds.map((b) => b.id).join(',') || 'none',
+  )
+
+  // ---- discard on a shared build leaves the store alone
+  await seedStore({
+    nextBuildSeq: 4,
+    nextTeamSeq: 3,
+    builds: [mkBuild('b3', { speciesId: 25, pokemonId: 25, nickname: 'SharedOriginal' })],
+    teams: [mkTeam('t1', 1, ['b3']), mkTeam('t2', 2, ['b3'])],
+  })
+  await openBuild('b3')
+  await page.fill('[data-testid="tb-nickname"]', 'ShouldVanish')
+  await page.click('[data-testid="tb-level"]')
+  await page.waitForTimeout(300)
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(500)
+  await page.click('[data-testid="tb-shared-discard"]')
+  await page.waitForTimeout(700)
+  check(
+    'Discard on a shared build leaves the original untouched, flush included',
+    (await nickOf('b3')) === 'SharedOriginal',
+    `stored nickname is "${await nickOf('b3')}"`,
+  )
+
+  // =====================================================================
+  /*
+    6. HIDDEN POWER — the pure formula, driven with MIXED spreads.
 
     THE MAXED SPREAD IS THE ONE CASE THAT CANNOT FAIL, which is exactly why this
     section exists. Gen 2's power formula weights the high bit of each DV
@@ -576,7 +775,7 @@ try {
     corroborated by pret/pokecrystal engine/battle/hidden_power.asm -- never from
     this app's own output, which would make the test circular.
   */
-  hr('5. HIDDEN POWER — mixed DV/IV spreads, not just the maxed one')
+  hr('6. HIDDEN POWER — mixed DV/IV spreads, not just the maxed one')
   const STAT_MATH_URL = '/pokeapp/src/modules/team-builder/statMath.ts'
   const hiddenPowerCases = [
     { gen: 2, dvs: [15, 15, 15, 15], type: 'dark', power: 70, note: 'maxed — the old anchor' },

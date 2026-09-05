@@ -16,6 +16,9 @@
 */
 
 .tb {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 0;
 
   /*
@@ -43,9 +46,20 @@
   --slider-thumb-border: #ffffff;
 }
 
-.tb-screen {
+/*
+  THE `.panel section` BLEED, which is gotcha #1 in CLAUDE.md and has now bitten
+  twice. App.css carries `.panel section { margin-top: 2rem; padding-top: 1.5rem;
+  border-top: 1px solid }` from when the panel held prose, and every screen here
+  is a <section> inside .panel -- so each one arrived with 57px of dead space and
+  a stray hairline above it, which is the band between the app bar and the back
+  button. Bare-element specificity (0,1,1) beats `.tb-screen` (0,1,0), so this
+  has to out-specify it rather than merely restate it.
+*/
+.tb .tb-screen {
   position: relative;
-  padding: var(--space-gap-lg) var(--space-gap-xl) var(--space-gap-xl);
+  margin-top: 0;
+  padding: var(--space-gap-sm) var(--space-gap-xl) var(--space-gap-md);
+  border-top: none;
 }
 
 /* ----------------------------------------------------------- screen header */
@@ -425,16 +439,14 @@
   justify-content: center;
   height: 96px;
 }
+/* Official artwork in every variant now, so nothing here is pixel art and
+   nothing asks for `pixelated`. */
 .tb-card-art img {
   position: relative;
   z-index: 1;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  image-rendering: pixelated;
-}
-.tb-card-library .tb-card-art img {
-  image-rendering: auto;
 }
 .tb-card-art-none {
   width: 64px;
@@ -714,8 +726,8 @@
   background: var(--surface-hover);
 }
 .tb-card-rail .tb-card-art {
-  flex: 0 0 48px;
-  height: 48px;
+  flex: 0 0 38px;
+  height: 38px;
 }
 .tb-rail-lines {
   display: flex;
@@ -812,16 +824,44 @@
 */
 .tb-form-grid {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr) 170px;
-  gap: var(--space-gap-xl);
+  grid-template-columns: 210px minmax(0, 1fr) 30px 168px;
+  gap: var(--space-gap-lg);
   align-items: start;
   max-width: 1180px;
+}
+
+/*
+  The dock's own column: a vertical strip between the form and the rail. It is a
+  grid column rather than something absolutely placed over the rail so it can
+  never overlap a member card, at any rail height.
+*/
+.tb-form-dock-col {
+  display: flex;
+  justify-content: flex-end;
+}
+.tb-form-dock-col .tb-dock {
+  flex-direction: column;
+  gap: 4px;
+}
+/* The separator before the destructive item is a rule across the strip when the
+   dock is vertical, not a bar beside it. */
+.tb-form-dock-col .tb-dock-sep {
+  width: 16px;
+  height: 1px;
+  margin: 4px 0;
+}
+
+/* A status, not a control -- this form has no Save button to press. */
+.tb-dirty-note {
+  font-size: var(--font-size-label);
+  letter-spacing: 0.08em;
+  color: var(--accent);
 }
 
 .tb-identity {
   display: flex;
   flex-direction: column;
-  gap: var(--space-gap-sm);
+  gap: 6px;
   padding-right: var(--space-gap-md);
   border-right: 1px solid var(--hairline);
 }
@@ -833,7 +873,7 @@
 */
 .tb-identity-art {
   position: relative;
-  height: 168px;
+  height: 150px;
   overflow: hidden;
 }
 /*
@@ -844,10 +884,10 @@
 */
 .tb-identity-sprite {
   position: absolute;
-  inset: 14px 4px 8px 26px;
+  inset: 12px 4px 2px 26px;
   z-index: 1;
   width: calc(100% - 30px);
-  height: calc(100% - 22px);
+  height: calc(100% - 14px);
   object-fit: contain;
 }
 /*
@@ -877,29 +917,55 @@
   letter-spacing: 0.16em;
   transform: none;
 }
-/* The held item, in the corner of the sprite. 30x30 source, so pixelated. */
+/* The held item, in the corner of the sprite. Official item artwork, so it is
+   rendered smoothly; the 30x30 game icon is only the onError fallback and asks
+   for `pixelated`, which is set on the element when that swap happens. */
 .tb-held-item {
   position: absolute;
-  right: 2px;
-  bottom: 10px;
+  right: 0;
+  bottom: 2px;
   z-index: 2;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.tb-held-item[data-fallback='true'] {
   width: 28px;
   height: 28px;
-  object-fit: contain;
   image-rendering: pixelated;
 }
+/*
+  THE SHINY SWITCH LIVES ON THE ARTWORK, bottom-left, because that is what it
+  acts on -- it repaints the sprite it sits on. As a labelled form row four
+  fields down it was a setting about the build; here it is a control on the
+  picture, and it costs the panel no vertical space at all.
+*/
+.tb-shiny-dock {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tb-shiny-dock .tb-field-label {
+  font-size: var(--font-size-label);
+}
+/* Tight to the sprite: the types belong to the picture above them, and the old
+   --space-gap-sm read as a divider between two unrelated blocks. */
 .tb-types-row {
   display: flex;
   align-items: baseline;
   gap: 4px;
-  padding-bottom: var(--space-gap-sm);
+  padding-bottom: 5px;
   border-bottom: 1px solid var(--hairline);
 }
 .tb-stats-block {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-top: var(--space-gap-sm);
+  gap: 2px;
+  padding-top: 2px;
 }
 .tb-genus,
 .tb-ja {
@@ -911,7 +977,7 @@
 .tb-form-main {
   display: flex;
   flex-direction: column;
-  gap: var(--space-gap-lg);
+  gap: var(--space-gap-md);
 }
 .tb-field-row {
   display: grid;
@@ -944,20 +1010,6 @@
 }
 .tb-number {
   font-family: var(--font-numeric);
-}
-/*
-  THE OPEN DROPDOWN IS PAINTED BY THE BROWSER, not by us, and it takes its
-  colours from `color-scheme` -- not from the page's `data-theme`. The app sets
-  `color-scheme: light dark` on :root, so a machine sitting in OS light mode
-  drew a white popup with pale grey text even with the app switched to dark:
-  legible in light, unreadable in dark. Pinning the property to the app's own
-  theme is what ties the popup to the theme the user actually picked.
-*/
-[data-theme='dark'] .tb-select {
-  color-scheme: dark;
-}
-[data-theme='light'] .tb-select {
-  color-scheme: light;
 }
 .tb-select:focus,
 .tb-input:focus,
@@ -1084,7 +1136,7 @@
 .tb-spread-col {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .tb-spread-head {
   display: flex;
@@ -1095,9 +1147,14 @@
 }
 .tb-spread-row {
   display: grid;
-  grid-template-columns: 56px 56px auto minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 34px 52px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
+}
+/* Gen 2's shiny-locked Attack DV is the one row that still carries a stepper --
+   see SpreadControls -- so it gets a fourth column instead of squeezing one in. */
+.tb-spread-row[data-skip-aware='true'] {
+  grid-template-columns: 34px 52px auto minmax(0, 1fr);
 }
 /*
   THE SAME CONTROL AS LEVEL AND FRIENDSHIP -- `.tb-number`, `type="number"`,
@@ -1196,25 +1253,25 @@
   border: 1px solid var(--hairline);
   border-radius: 2px;
 }
-/* An OBLONG, not a circle: it is wider than the track is tall, so it reads as a
-   grip on a line rather than a bead on a string. */
+/* An OBLONG LYING DOWN: wider than it is tall, so it reads as a grip sliding
+   ALONG the line rather than a bead threaded across it. */
 .tb-range::-webkit-slider-thumb {
-  width: 10px;
-  height: 16px;
-  margin-top: -7px;
+  width: 20px;
+  height: 11px;
+  margin-top: -4px;
   appearance: none;
   cursor: grab;
   background: var(--tb-on-accent);
   border: 1px solid var(--slider-thumb-border);
-  border-radius: 5px;
+  border-radius: 6px;
 }
 .tb-range::-moz-range-thumb {
-  width: 10px;
-  height: 16px;
+  width: 20px;
+  height: 11px;
   cursor: grab;
   background: var(--tb-on-accent);
   border: 1px solid var(--slider-thumb-border);
-  border-radius: 5px;
+  border-radius: 6px;
 }
 .tb-range:focus-visible {
   outline: none;
@@ -1239,7 +1296,7 @@
 }
 .tb-stats th,
 .tb-stats td {
-  padding: 3px 4px;
+  padding: 1px 4px;
   border-bottom: 1px solid var(--hairline);
 }
 .tb-stat-name {

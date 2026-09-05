@@ -36,7 +36,7 @@ import {
   resolveTypesForGeneration,
 } from '../../data'
 import type { Species, StatEntry, Variety } from '../../data'
-import { itemIconUrl } from '../../data/itemArtwork'
+import { itemArtworkUrl, itemIconUrl } from '../../data/itemArtwork'
 import { resolveMoveTypeNameForGeneration } from '../../data/moveEra'
 import type { Build, Gender } from './model'
 import type { NatureMods, StatKey } from './statMath'
@@ -176,15 +176,21 @@ export function itemName(itemId: number | null): string {
 }
 
 /**
- * The held item's icon, for the corner badge on the identity sprite.
+ * The held item's picture: official artwork first, in-game icon as the fallback.
  *
- * The 30x30 in-game icon rather than the 90x90 Dream World render: the icon
- * covers 561 of 563 items, the Dream World set covers barely half, and at badge
- * size (28px) the extra resolution buys nothing. Rendered `pixelated`.
+ * BOTH, NOT ONE, because neither is sufficient alone. The 90x90 Dream World
+ * render is the official artwork and is what this module shows, but it exists
+ * for only about half the bag and 404s for the rest; the 30x30 in-game icon
+ * covers 561 of 563 items and never 404s. So the caller renders `artwork` and
+ * swaps to `icon` from `onError` -- the same pairing itemArtwork.ts documents.
  */
-export function itemIconFor(itemId: number | null): string | null {
+export function itemArtFor(itemId: number | null): { artwork: string; icon: string } | null {
   if (itemId == null) return null
-  return itemIconUrl(getItem(itemId))
+  const item = getItem(itemId)
+  const artwork = itemArtworkUrl(item)
+  const icon = itemIconUrl(item)
+  if (!artwork && !icon) return null
+  return { artwork: artwork ?? icon!, icon: icon ?? artwork! }
 }
 
 /* ------------------------------------------------------------------ factory */

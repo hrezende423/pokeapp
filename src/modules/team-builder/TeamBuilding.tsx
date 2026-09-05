@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { ScrollArea } from '../../components/ScrollArea'
 import { useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { BuildForm } from './BuildForm'
@@ -79,14 +80,23 @@ export function TeamBuilding() {
     if (root) goTo(root)
   }, [nav.moduleId, nav.moduleNonce, generation])
 
+  /*
+    EVERY SCREEN SCROLLS INSIDE A ScrollArea, which is the app's scroll model:
+    #root is locked to the viewport and `.panel` sets `overflow: hidden`, so a
+    module without one does not scroll -- it is CLIPPED. Team Building shipped
+    without one, and on a short window the Build Form simply ended mid-page with
+    no way to reach the rest of it.
+  */
   return (
     <div className="tb" data-tb-screen={screen.kind} data-generation={generation}>
-      {screen.kind === 'my-teams' && <MyTeams generation={generation} />}
-      {screen.kind === 'team-viewer' && <TeamViewer teamId={screen.teamId} />}
-      {screen.kind === 'build-library' && <BuildLibrary generation={generation} />}
-      {screen.kind === 'build-form' && (
-        <BuildForm buildId={screen.buildId} origin={screen.origin} generation={generation} />
-      )}
+      <ScrollArea testId="tb-scroll" hint={false}>
+        {screen.kind === 'my-teams' && <MyTeams generation={generation} />}
+        {screen.kind === 'team-viewer' && <TeamViewer teamId={screen.teamId} />}
+        {screen.kind === 'build-library' && <BuildLibrary generation={generation} />}
+        {screen.kind === 'build-form' && (
+          <BuildForm buildId={screen.buildId} origin={screen.origin} generation={generation} />
+        )}
+      </ScrollArea>
     </div>
   )
 }
