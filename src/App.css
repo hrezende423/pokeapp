@@ -327,6 +327,12 @@
   drawn OVER the design, and it has to stay legible against either theme and
   against whatever the page happens to be painting behind it. Borrowing the
   palette it is inspecting is exactly how it would become invisible.
+
+  Four kinds, and the two FILLED ones are the point. An outline says where a
+  region is; a fill says how much empty space is there and why -- amber for a
+  gap the container asked for, green for padding inside one. Those two are what
+  every "that spacing is off" note is actually about, and both are invisible
+  until something paints them.
 */
 .layout-overlay {
   position: fixed;
@@ -342,6 +348,25 @@
 
 .layout-overlay-box[data-kind='area'] {
   outline: 1px solid rgba(255, 90, 200, 0.85);
+}
+
+/* Gap and padding are FILLED, not outlined: the measurement is the area. */
+.layout-overlay-box[data-kind='gap'] {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 170, 0, 0.42) 0 4px,
+    rgba(255, 170, 0, 0.16) 4px 8px
+  );
+  outline: none;
+}
+
+.layout-overlay-box[data-kind='pad'] {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(60, 220, 130, 0.4) 0 4px,
+    rgba(60, 220, 130, 0.14) 4px 8px
+  );
+  outline: none;
 }
 
 .layout-overlay-label {
@@ -363,16 +388,67 @@
   background: rgba(255, 90, 200, 0.85);
 }
 
+/*
+  A gap or padding band's number is CENTRED IN THE BAND, because the band is
+  the thing being measured -- a caption in its corner would read as belonging to
+  whatever sits next to it. Bands are often only a few px wide, so the number is
+  allowed to overhang; `overflow: visible` on a zero-width strip is what keeps a
+  2px gap legible instead of clipped to nothing.
+*/
+.layout-overlay-box[data-kind='gap'] .layout-overlay-label,
+.layout-overlay-box[data-kind='pad'] .layout-overlay-label {
+  top: 50%;
+  left: 50%;
+  padding: 0 2px;
+  font-size: 9px;
+  line-height: 1.2;
+  color: #1a1000;
+  background: rgba(255, 200, 90, 0.95);
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+}
+
+.layout-overlay-box[data-kind='pad'] .layout-overlay-label {
+  color: #002014;
+  background: rgba(120, 245, 180, 0.95);
+}
+
 .layout-overlay-legend {
   position: fixed;
   right: 8px;
   bottom: 8px;
+  display: flex;
+  gap: 10px;
   margin: 0;
-  padding: 3px 7px;
+  padding: 3px 8px;
   font:
     11px/1.4 ui-monospace,
     Consolas,
     monospace;
-  color: #001018;
+  color: #f0f8ff;
+  background: rgba(10, 16, 24, 0.92);
+}
+
+.layout-overlay-legend span[data-swatch]::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  content: '';
+}
+
+.layout-overlay-legend span[data-swatch='container']::before {
   background: rgba(0, 200, 255, 0.9);
+}
+
+.layout-overlay-legend span[data-swatch='area']::before {
+  background: rgba(255, 90, 200, 0.85);
+}
+
+.layout-overlay-legend span[data-swatch='gap']::before {
+  background: rgba(255, 170, 0, 0.85);
+}
+
+.layout-overlay-legend span[data-swatch='pad']::before {
+  background: rgba(60, 220, 130, 0.85);
 }

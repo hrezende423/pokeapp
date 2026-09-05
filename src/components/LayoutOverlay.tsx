@@ -7,12 +7,20 @@
  * because neither the element nor the amount is identified. Every one of those
  * notes then costs a round trip. This draws the structure the CSS actually
  * declares, over the real page, so a note can say "put `kana` in the `shiny`
- * row" -- which is precise, and is literally the code.
+ * row" or "spreads gap 32 -> 20" -- which is precise, and is literally the code.
+ *
+ * IT DRAWS THE SPACE, NOT JUST THE BOXES. Outlines alone answer "where does
+ * this region sit" and say nothing about the two things every layout note is
+ * actually about: the GAP between siblings and the PADDING inside a parent.
+ * Both are invisible by construction -- they are the absence of content -- so
+ * an inspector that only outlines elements leaves the reviewer describing them
+ * in prose again. Each band is filled and carries its own measurement, so the
+ * number sits where the space is rather than in a caption somewhere else.
  *
  * IT SHIPS IN THE PRODUCTION BUNDLE, deliberately. The whole point is to be
  * usable against the deployed preview from a phone, which is where this app
  * gets reviewed; a `import.meta.env.DEV` gate would put it exactly where it is
- * no use. It costs ~2KB and does nothing at all until switched on.
+ * no use. It costs a couple of KB and does nothing at all until switched on.
  *
  * TWO WAYS IN, because one of them has to work without a keyboard:
  *   ?layout=1  on any URL   -- the phone route, and shareable in a screenshot
@@ -26,7 +34,7 @@
 
 import { useEffect, useState, type CSSProperties } from 'react'
 
-/** What the overlay draws for one element. */
+/** What the overlay draws for one rectangle. */
 interface Box {
   key: string
   /** Viewport rect, in CSS px. */
@@ -35,12 +43,17 @@ interface Box {
   w: number
   h: number
   label: string
-  kind: 'container' | 'area'
-  /** How many named containers this sits inside. Drives the label's offset. */
+  kind: 'container' | 'area' | 'gap' | 'pad'
+  /** How many named containers this sits inside. Staggers the caption. */
   depth: number
 }
 
 const PARAM = 'layout'
+
+/** Sub-pixel track sizes are noise in a caption; 20.0004 is a 20. */
+const round = (n: number) => Math.round(n * 10) / 10
+
+const num = (v: string) => (v === '' || v === 'normal' ? 0 : parseFloat(v) || 0)
 
 function initiallyOn(): boolean {
   try {
@@ -74,6 +87,93 @@ function depthOf(el: HTMLElement): number {
   return n
 }
 
+/**
+ * The four padding bands of one element.
+ *
+ * Four separate strips rather than one inset rectangle, so each side carries
+ * its own number: `padding: 0 14 0 0` is a different fact from `padding: 14`,
+ * and an inset rectangle cannot tell you which of the two you are looking at.
+ * Sides with no padding draw nothing.
+ */
+function padBands(el: Element, style: CSSStyleDeclaration, key: string, depth: number): Box[] {
+  const r = el.getBoundingClientRect()
+  const t = num(style.paddingTop)
+  const rt = num(style.paddingRight)
+  const b = num(style.paddingBottom)
+  const l = num(style.paddingLeft)
+  const out: Box[] = []
+  const push = (k: string, x: number, y: number, w: number, h: number, v: number) => {
+    if (v <= 0 || w <= 0 || h <= 0) return
+    out.push({ key: `${key}${k}`, x, y, w, h, label: String(round(v)), kind: 'pad', depth })
+  }
+  push('pt', r.x, r.y, r.width, t, t)
+  push('pb', r.x, r.bottom - b, r.width, b, b)
+  push('pl', r.x, r.y + t, l, r.height - t - b, l)
+  push('pr', r.right - rt, r.y + t, rt, r.height - t - b, rt)
+  return out
+}
+
+/**
+ * The gutters of one container.
+ *
+ * TWO STRATEGIES, because the two layout modes expose their gutters
+ * differently. A grid publishes its resolved track sizes, so the gutters can be
+ * walked exactly -- including the ones beside an EMPTY track, which has no
+ * child to measure from. A flex container publishes no such thing, so its
+ * gutters are read as the space between consecutive children instead.
+ */
+function gapBands(el: HTMLElement, style: CSSStyleDeclaration, key: string, depth: number): Box[] {
+  const out: Box[] = []
+  const colGap = num(style.columnGap)
+  const rowGap = num(style.rowGap)
+  if (colGap <= 0 && rowGap <= 0) return out
+
+  const r = el.getBoundingClientRect()
+  const push = (k: string, x: number, y: number, w: number, h: number, v: number) => {
+    if (w <= 0 || h <= 0) return
+    out.push({ key: `${key}${k}`, x, y, w, h, label: String(round(v)), kind: 'gap', depth })
+  }
+
+  if (style.display.includes('grid')) {
+    const padT = num(style.paddingTop)
+    const padL = num(style.paddingLeft)
+    const cols = style.gridTemplateColumns.split(' ').map(parseFloat).filter(Number.isFinite)
+    const rows = style.gridTemplateRows.split(' ').map(parseFloat).filter(Number.isFinite)
+    const innerH = r.height - padT - num(style.paddingBottom)
+    const innerW = r.width - padL - num(style.paddingRight)
+
+    let x = r.x + padL
+    cols.forEach((w, i) => {
+      x += w
+      if (i < cols.length - 1) {
+        push(`gc${i}`, x, r.y + padT, colGap, innerH, colGap)
+        x += colGap
+      }
+    })
+    let y = r.y + padT
+    rows.forEach((h, i) => {
+      y += h
+      if (i < rows.length - 1) {
+        push(`gr${i}`, r.x + padL, y, innerW, rowGap, rowGap)
+        y += rowGap
+      }
+    })
+    return out
+  }
+
+  const kids = Array.from(el.children)
+    .map((c) => c.getBoundingClientRect())
+    .filter((b) => b.width > 0 && b.height > 0)
+  for (let i = 0; i < kids.length - 1; i += 1) {
+    const a = kids[i]
+    const b = kids[i + 1]
+    const stacked = b.y >= a.bottom - 1
+    if (stacked && rowGap > 0) push(`gf${i}`, a.x, a.bottom, a.width, b.y - a.bottom, rowGap)
+    else if (!stacked && colGap > 0) push(`gf${i}`, a.right, a.y, b.x - a.right, a.height, colGap)
+  }
+  return out
+}
+
 function measure(): Box[] {
   const boxes: Box[] = []
   /*
@@ -81,40 +181,46 @@ function measure(): Box[] {
     produces a screenshot nobody can read -- the value here is a small, curated
     vocabulary, so a container opts in by carrying `data-layout`.
   */
-  const containers = document.querySelectorAll<HTMLElement>('[data-layout]')
-
-  containers.forEach((el, i) => {
+  document.querySelectorAll<HTMLElement>('[data-layout]').forEach((el, i) => {
     const rect = el.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return
     const style = getComputedStyle(el)
+    const depth = depthOf(el)
+    const key = `c${i}`
     const cols = style.gridTemplateColumns
     const tracks = cols && cols !== 'none' ? ` · ${cols.replace(/px/g, '')}` : ''
+
     boxes.push({
-      key: `c${i}`,
+      key,
       x: rect.x,
       y: rect.y,
       w: rect.width,
       h: rect.height,
       label: `${el.dataset.layout} ${Math.round(rect.width)}×${Math.round(rect.height)}${tracks}`,
       kind: 'container',
-      depth: depthOf(el),
+      depth,
     })
+    boxes.push(...padBands(el, style, key, depth))
+    boxes.push(...gapBands(el, style, key, depth))
 
     Array.from(el.children).forEach((child, j) => {
-      const name = areaName(getComputedStyle(child))
+      const childStyle = getComputedStyle(child)
+      const name = areaName(childStyle)
       if (!name) return
-      const r = child.getBoundingClientRect()
-      if (r.width === 0 || r.height === 0) return
+      const cr = child.getBoundingClientRect()
+      if (cr.width === 0 || cr.height === 0) return
+      const childKey = `${key}a${j}`
       boxes.push({
-        key: `c${i}a${j}`,
-        x: r.x,
-        y: r.y,
-        w: r.width,
-        h: r.height,
+        key: childKey,
+        x: cr.x,
+        y: cr.y,
+        w: cr.width,
+        h: cr.height,
         label: name,
         kind: 'area',
-        depth: depthOf(el) + 1,
+        depth: depth + 1,
       })
+      boxes.push(...padBands(child, childStyle, childKey, depth + 1))
     })
   })
   return boxes
@@ -138,20 +244,15 @@ export function LayoutOverlay() {
   useEffect(() => {
     if (!on) return
     /*
-      Re-measured from a ResizeObserver on <body> plus scroll, rather than on a
-      timer: the thing being inspected is a layout, so it must be re-read
-      whenever one could have changed, and never in between.
+      COALESCED ONTO ONE FRAME. A MutationObserver over the whole document fires
+      in bursts -- React commits several nodes per render -- and measuring on
+      each one would both thrash and force a layout mid-commit.
 
       EVERY READ IS ON A FRAME, the first one included. Measuring synchronously
       in the effect body would be a setState inside an effect -- which this
       project's lint rules reject and React documents as a cascading render --
       and it would also be reading geometry before the browser has finished
       laying it out. A frame callback is both legal and more correct.
-    */
-    /*
-      COALESCED ONTO ONE FRAME. A MutationObserver over the whole document fires
-      in bursts -- React commits several nodes per render -- and measuring on
-      each one would both thrash and force a layout mid-commit.
     */
     let frame = 0
     const read = () => {
@@ -165,8 +266,7 @@ export function LayoutOverlay() {
       this app pins #root to the viewport and scrolls inside .scroll-area, so
       <body> never changes size. Navigating from the Build Library to the Build
       Form replaces the entire screen without resizing anything, and the overlay
-      simply kept drawing the previous screen's regions -- which is to say, it
-      was blank on arrival, since the form's regions had never been measured.
+      simply kept drawing the previous screen's regions.
     */
     const mo = new MutationObserver(read)
     mo.observe(document.body, { childList: true, subtree: true, attributes: true })
@@ -196,10 +296,10 @@ export function LayoutOverlay() {
           className="layout-overlay-box"
           data-kind={b.kind}
           /*
-            The label is stepped down by nesting depth. Without it a container
+            The caption is stepped down by nesting depth. Without it a container
             and the first area inside it share a top-left corner, and the two
-            captions print on top of each other -- which is precisely the
-            information the overlay exists to give.
+            print on top of each other -- which is precisely the information the
+            overlay exists to give.
           */
           style={
             { left: b.x, top: b.y, width: b.w, height: b.h, '--depth': b.depth } as CSSProperties
@@ -209,7 +309,11 @@ export function LayoutOverlay() {
         </div>
       ))}
       <p className="layout-overlay-legend">
-        layout names · ctrl+shift+L or ?layout=1 · {boxes.length} regions
+        <span data-swatch="container">region</span>
+        <span data-swatch="area">area</span>
+        <span data-swatch="gap">gap</span>
+        <span data-swatch="pad">padding</span>
+        <span>ctrl+shift+L · ?layout=1</span>
       </p>
     </div>
   )
