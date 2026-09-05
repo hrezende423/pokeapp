@@ -391,23 +391,30 @@ function BuildFormFields({
       data-testid="tb-build-form"
       data-build-id={build.id}
     >
-      <header className="tb-screen-head">
-        <GhostButton onClick={back} testId="tb-build-back" bare>
-          <IconChevronLeft size={18} stroke={1.5} />
-          {origin.kind === 'team' ? 'Back to team' : 'Build Library'}
-        </GhostButton>
-        {/*
-          There is no Save button by design, so the only honest way to say "this
-          is not written down yet" is to say it. It is a status, not a control.
-        */}
-        {dirty && (
-          <span className="tb-dirty-note" data-testid="tb-dirty-note">
-            Unsaved changes
-          </span>
-        )}
-      </header>
-
       <div className="tb-form-grid" data-layout="form-grid">
+        {/*
+          INSIDE THE GRID, in the `head` area above the identity panel. As a
+          sibling above it, this was a full-width 48px band holding one back
+          control -- and `main`, `dock` and `rail` all began below it for no
+          reason of their own. Sitting in column one it costs only the column
+          that had the room, and the other three start at the navbar.
+        */}
+        <header className="tb-screen-head">
+          <GhostButton onClick={back} testId="tb-build-back" bare>
+            <IconChevronLeft size={18} stroke={1.5} />
+            {origin.kind === 'team' ? 'Back to team' : 'Build Library'}
+          </GhostButton>
+          {/*
+            There is no Save button by design, so the only honest way to say
+            "this is not written down yet" is to say it. A status, not a control.
+          */}
+          {dirty && (
+            <span className="tb-dirty-note" data-testid="tb-dirty-note">
+              Unsaved changes
+            </span>
+          )}
+        </header>
+
         {/* ------------------------------------------------- identity panel */}
         <aside className="tb-identity" data-layout="identity" data-testid="tb-identity">
           {/*

@@ -39,6 +39,9 @@
     it is a hundred independent decisions nobody can hold in their head. Six
     steps, doubling, and NOTHING in this file may write a raw px gap again.
   */
+  /* One declared height for every field control in the module; see .tb-select. */
+  --tb-control-h: 25px;
+
   --tb-1: 2px;
   --tb-2: 4px;
   --tb-3: 6px;
@@ -840,10 +843,55 @@
 */
 .tb-form-grid {
   display: grid;
+  /*
+    THE HEADER IS A GRID AREA, which is what lets the other three columns start
+    at the navbar instead of below it. As a sibling above the grid it was a
+    full-width band -- 48px of it, holding one back control and otherwise empty
+    all the way across -- and every column paid for it. In column one it costs
+    only the identity panel, which was already the tallest column and had the
+    room. `main`, `dock` and `rail` span both rows and so begin at the top.
+
+    ROW GAP IS ZERO on purpose: the head row's own min-height is what reserves
+    the space, so the identity panel below it does not move when the header's
+    contents change. A row gap here would move it.
+  */
+  grid-template-areas:
+    'head  main dock rail'
+    'ident main dock rail';
   grid-template-columns: 210px minmax(0, 1fr) 30px 168px;
-  gap: var(--space-gap-lg);
+  grid-template-rows: auto 1fr;
+  column-gap: var(--space-gap-lg);
+  row-gap: 0;
   align-items: start;
   max-width: 1180px;
+}
+.tb-build-form .tb-screen-head {
+  /*
+    Stacked, not a row: in a 210px column the back control and the unsaved note
+    cannot sit side by side. The min-height holds the row open at the height it
+    had as a full-width band, so the identity panel keeps its position whether
+    or not there is anything unsaved to announce.
+  */
+  grid-area: head;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  min-height: 48px;
+  padding-bottom: 0;
+}
+.tb-identity {
+  grid-area: ident;
+}
+.tb-form-main {
+  grid-area: main;
+}
+.tb-form-dock-col {
+  grid-area: dock;
+}
+.tb-rail {
+  grid-area: rail;
 }
 
 /*
@@ -877,7 +925,7 @@
 .tb-identity {
   display: flex;
   flex-direction: column;
-  gap: var(--tb-3);
+  gap: var(--tb-1);
   padding-right: var(--space-gap-md);
   border-right: 1px solid var(--hairline);
 }
@@ -906,7 +954,7 @@
     'kana  .   ' auto
     '.     .   ' 1fr
     'shiny item' auto / 1fr auto;
-  height: 150px;
+  height: 160px;
   overflow: hidden;
 }
 /*
@@ -981,7 +1029,11 @@
 */
 .tb-shiny-dock {
   z-index: 3;
+  /* END/START, so growing the stage grows the 1fr spacer above this row and the
+     switch stays welded to the bottom-left corner rather than drifting. */
   grid-area: shiny;
+  align-self: end;
+  justify-self: start;
   display: flex;
   align-items: center;
   gap: var(--tb-3);
@@ -1012,31 +1064,53 @@
 .tb-form-main {
   display: flex;
   flex-direction: column;
-  gap: var(--space-gap-md);
+  gap: var(--tb-1);
 }
 .tb-field-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-gap-lg);
 }
+/* FLUSH. A label belongs to the control under it, and a gap between the two
+   said they were two things. The label's leading is separation enough. */
 .tb-field {
   display: flex;
   flex-direction: column;
-  gap: var(--tb-1);
+  gap: 0;
   min-width: 0;
 }
+/*
+  AN EXPLICIT LINE-HEIGHT, and it is the whole fix for "the labels are too tall".
+  :root sets `font: 18px/145%`, and a percentage line-height computes to a LENGTH
+  at that element -- 26.1px -- which then inherits down unchanged. So an 11px
+  label was sitting in a 26.1px box: more than twice its own text, with no
+  padding anywhere to explain it. Nothing about the label declared that height,
+  which is why it could not be found by reading the rule.
+*/
 .tb-field-label {
   font-size: var(--font-size-label);
+  line-height: 1.35;
   letter-spacing: 0.1em;
   color: var(--text-secondary);
 }
+/*
+  ONE HEIGHT FOR EVERY CONTROL, declared rather than emergent. Left to their
+  intrinsic sizing these disagreed: a <select> came out 29px and an <input> 35px,
+  because the input inherited the root's 26.1px line-height and the select did
+  not. Two controls side by side in the same row, 6px apart in height, for a
+  reason visible in neither rule.
+*/
 .tb-select,
 .tb-input,
-.tb-number {
+.tb-number,
+.tb-readout {
+  box-sizing: border-box;
   width: 100%;
-  padding: 4px 2px;
+  height: var(--tb-control-h);
+  padding: 0 2px;
   font: inherit;
   font-size: var(--font-size-body);
+  line-height: calc(var(--tb-control-h) - 2px);
   color: var(--text-primary);
   background: transparent;
   border: none;
@@ -1060,10 +1134,7 @@
 .tb-readout {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 2px;
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
+  gap: var(--tb-2);
 }
 /* Derived, so not editable. Carries the same underline as the fields beside it
    -- it is one of the row, not a caption floating in it -- at the form's own
@@ -1144,7 +1215,7 @@
 .tb-move-slot {
   display: flex;
   flex-direction: column;
-  gap: var(--tb-1);
+  gap: 0;
   min-width: 0;
 }
 .tb-move-meta {
@@ -1199,7 +1270,6 @@
   nudging, the box is the fastest route to 252 or 31, and both write one field.
 */
 .tb-spread-input {
-  padding: 2px 0;
   font-size: var(--font-size-caption);
 }
 .tb-spread-row[data-locked='true'] {
