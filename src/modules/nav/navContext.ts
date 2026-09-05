@@ -30,6 +30,12 @@ export interface NavState {
    * search result can still only point at a module that actually has entries.
    */
   moduleId: PageId
+  /**
+   * Increments on EVERY setModule, even one that re-selects the current id.
+   * A module with its own sub-screens depends on this so that picking its nav
+   * entry again returns to its root instead of silently doing nothing.
+   */
+  moduleNonce: number
   setModule: (moduleId: PageId) => void
   /** The open entry in `moduleId`, or null when nothing is open. */
   selectionFor: (moduleId: DexModuleId) => number | null

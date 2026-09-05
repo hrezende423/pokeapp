@@ -16,11 +16,11 @@
  * Usage: node scripts/verify-movedex.mjs
  */
 
-import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls, fillDexSearch } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
+import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4187
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
@@ -37,19 +37,6 @@ const hr = (t) => {
 function check(label, ok, detail = '') {
   log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  ${detail}` : ''}`)
   if (!ok) failures.push(label)
-}
-
-async function waitForServer(url, timeoutMs = 60000) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    try {
-      if ((await fetch(url)).ok) return
-    } catch {
-      /* not up yet */
-    }
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  throw new Error(`preview server never became ready at ${url}`)
 }
 
 mkdirSync(SHOTS, { recursive: true })
@@ -169,15 +156,17 @@ check(
   /data-testid=\{`\$\{testIdPrefix\}-any`\}/.test(filterSrc),
 )
 
-const preview = spawn(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['vite', 'preview', '--port', String(PORT), '--strictPort'],
-  { stdio: 'ignore', shell: process.platform === 'win32' },
-)
+/*
+  THE PREVIEW SERVER IS STARTED THROUGH lib/devServer.mjs, which spawns vite
+  directly (no shell, so stop() actually stops it) and REFUSES to run against a
+  server it did not start. Polling the URL until it answers was not enough: an
+  orphaned vite on this port answers too, with a stale build, and the whole suite
+  then silently checks previous code. See that file's header.
+*/
+const preview = await startPreviewServer({ port: PORT })
 
 let browser
 try {
-  await waitForServer(APP_URL)
   log('')
   log(`preview ready at ${APP_URL}`)
   browser = await chromium.launch({ channel: 'chrome' })
@@ -694,7 +683,7 @@ try {
   check('no failed HTTP responses', bad.length === 0, `(${bad.length})`)
 } finally {
   if (browser) await browser.close()
-  preview.kill()
+  preview.stop()
 }
 
 hr('SUMMARY')

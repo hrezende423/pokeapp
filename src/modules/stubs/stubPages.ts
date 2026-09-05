@@ -8,10 +8,13 @@
  * real component instead and delete the line.
  */
 export const STUB_PAGES = [
-  { id: 'new-team', label: 'New Team' },
-  { id: 'new-build', label: 'New Build' },
-  { id: 'team-library', label: 'Team Library' },
-  { id: 'build-library', label: 'Build Library' },
+  /*
+    GRADUATED, so deliberately absent: new-team, new-build, my-teams (which was
+    "Team Library") and build-library are real Team Building screens now and are
+    registered in ../team-builder/pages.ts. This is the graduation the note above
+    describes -- the entries left this list and the nav resolves them from that
+    registry instead.
+  */
   { id: 'pokemon-collection', label: 'Pokemon Collection' },
   { id: 'compare-pokemon', label: 'Compare Pokemon' },
   { id: 'battle-simulator', label: 'Battle Simulator' },

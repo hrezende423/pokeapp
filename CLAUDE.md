@@ -229,3 +229,29 @@ that isn't explicitly about design.)
 - A global font-family default and a per-module opt-in are mutually
   exclusive, same as the --accent situation — moving one to "everywhere"
   moves it everywhere, including untouched legacy modules.
+
+## Known deferred debt (logged, not fixed)
+
+Real, reproducible, and deliberately left alone. Each entry says why it is
+not worth fixing yet — read that before "fixing" one as a drive-by, because
+the reason is usually that the cheap fix is the wrong one.
+
+- **Leaving Build Form via the global app nav bar does not prompt for a
+  shared build's unsaved edits.** Team Building intercepts every *in-module*
+  exit from Build Form and, when the build is attached to 2+ teams, offers
+  save-back / discard / save-as-new. Exiting through the top app bar instead
+  bypasses that entirely: the module just unmounts and the uncommitted edit
+  is dropped. The failure direction is safe — the shared build itself is
+  untouched, so no data is corrupted and no other team sees a surprise
+  change — but it does contradict the module's "nothing is lost silently"
+  intent for this one path. **Do not patch this inside Team Building.** The
+  app has no router and no navigation-guard infrastructure; a real fix is a
+  cross-module concern (a guard the nav layer consults before switching
+  modules), and anything Team-Building-local would be a second, divergent
+  mechanism for the same job.
+- **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
+  one species whose HP does not follow the normal formula — it is always 1,
+  at every level, with any DV/IV or EV spread — and `statMath.ts` computes it
+  like everything else. Affects exactly one species (Gen 3+ only, since it
+  does not exist before then). Low priority and an easy guarded early return
+  whenever convenient.

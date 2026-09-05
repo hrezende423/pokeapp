@@ -23,11 +23,12 @@
  * Usage: node scripts/verify-design-system.mjs
  */
 
-import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
 import { goToDex, openTab } from './lib/nav.mjs'
+import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4192
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
@@ -48,22 +49,6 @@ const hr = (t) => {
 function check(label, ok, detail = '') {
   log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  ${detail}` : ''}`)
   if (!ok) failures.push(label)
-}
-
-async function waitForServer(url, timeoutMs = 120000) {
-  const deadline = Date.now() + timeoutMs
-  let last = 'never attempted'
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(url)
-      if (res.ok) return
-      last = `HTTP ${res.status}`
-    } catch (err) {
-      last = (err.cause && (err.cause.code || err.cause.message)) || err.message
-    }
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  throw new Error(`preview server never became ready at ${url} (last: ${last})`)
 }
 
 mkdirSync(SHOTS, { recursive: true })
@@ -431,35 +416,17 @@ check(
   JSON.stringify(remoteTints) === JSON.stringify(localTints),
 )
 
-const previewLog = []
-const preview = spawn(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['vite', 'preview', '--port', String(PORT), '--strictPort'],
-  { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' },
-)
-preview.stdout.on('data', (d) => previewLog.push(String(d).trimEnd()))
-preview.stderr.on('data', (d) => previewLog.push(String(d).trimEnd()))
-
-const stopPreview = () => {
-  try {
-    if (process.platform === 'win32' && preview.pid) {
-      spawnSync('taskkill', ['/pid', String(preview.pid), '/T', '/F'], { stdio: 'ignore' })
-    }
-  } catch {
-    /* best effort */
-  }
-  preview.kill()
-}
+/*
+  THE PREVIEW SERVER IS STARTED THROUGH lib/devServer.mjs, which spawns vite
+  directly (no shell, so stop() actually stops it) and REFUSES to run against a
+  server it did not start. Polling the URL until it answers was not enough: an
+  orphaned vite on this port answers too, with a stale build, and the whole suite
+  then silently checks previous code. See that file's header.
+*/
+const preview = await startPreviewServer({ port: PORT })
 
 let browser
 try {
-  try {
-    await waitForServer(APP_URL)
-  } catch (err) {
-    log('')
-    previewLog.forEach((l) => log(`    ${l}`))
-    throw err
-  }
   log('')
   log(`preview ready at ${APP_URL}`)
   browser = await chromium.launch({ channel: 'chrome' })
@@ -1817,14 +1784,10 @@ try {
   log('  team items: ' + JSON.stringify(team))
   check(
     'Team Building lists its five destinations, in order',
+    /* "Team Library" is now "My Teams": the stub graduated into a real screen and
+       the nav label matches the screen's own name. The other four are unchanged. */
     JSON.stringify(team.labels) ===
-      JSON.stringify([
-        'New Team',
-        'New Build',
-        'Team Library',
-        'Build Library',
-        'Pokemon Collection',
-      ]),
+      JSON.stringify(['New Team', 'New Build', 'My Teams', 'Build Library', 'Pokemon Collection']),
     team.labels.join(','),
   )
   // They lead to stub pages, but they are real destinations now, so nothing is
@@ -2589,7 +2552,7 @@ try {
   check('no failed HTTP responses', badResponses.length === 0, `(${badResponses.length})`)
 } finally {
   if (browser) await browser.close()
-  stopPreview()
+  preview.stop()
 }
 
 hr('SUMMARY')

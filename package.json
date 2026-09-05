@@ -15,6 +15,8 @@
     "verify:pokedex": "node scripts/verify-pokedex.mjs",
     "verify:ux": "node scripts/verify-ux.mjs",
     "verify:eggmoves": "node scripts/verify-eggmoves.mjs",
+    "verify:legal-moveset": "node scripts/verify-legal-moveset.mjs",
+    "verify:team-builder": "node scripts/verify-team-builder.mjs",
     "verify:dexes": "node scripts/verify-dexes.mjs",
     "verify:movedex": "node scripts/verify-movedex.mjs",
     "verify:search": "node scripts/verify-search.mjs",

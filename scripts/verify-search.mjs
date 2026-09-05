@@ -24,12 +24,12 @@
  * Usage: node scripts/verify-search.mjs
  */
 
-import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { controls, fillDexSearch } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
+import { startPreviewServer } from './lib/devServer.mjs'
 
 // NOT 4190: that is on the WHATWG fetch spec's blocked-port list (ManageSieve),
 // so vite serves it happily while every fetch() to it rejects with "bad port".
@@ -48,37 +48,6 @@ const hr = (t) => {
 function check(label, ok, detail = '') {
   log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  ${detail}` : ''}`)
   if (!ok) failures.push(label)
-}
-
-// 120s, not 60: npx plus a cold vite preview can take well over a minute on a
-// loaded machine, and a timeout that fires early leaves a server bound to the port
-// that the next run then collides with.
-async function waitForServer(url, timeoutMs = 120000) {
-  const deadline = Date.now() + timeoutMs
-  let attempts = 0
-  let last = 'never attempted'
-  while (Date.now() < deadline) {
-    attempts++
-    try {
-      const res = await fetch(url)
-      if (res.ok) return
-      last = 'HTTP ' + res.status
-    } catch (err) {
-      last = (err.cause && (err.cause.code || err.cause.message)) || err.message
-    }
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  // The reason matters: a stale server on the port and a server that never came
-  // up look identical without it.
-  throw new Error(
-    'preview server never became ready at ' +
-      url +
-      ' after ' +
-      attempts +
-      ' attempts (last: ' +
-      last +
-      ')',
-  )
 }
 
 mkdirSync(SHOTS, { recursive: true })
@@ -275,45 +244,17 @@ check(
   catModules.filter((m) => !registryIds.includes(m)).join(',') || 'all registered',
 )
 
-// The preview server's own output is captured rather than discarded: when it
-// fails to start (a port still held by an earlier run is the usual cause) the
-// reason has to reach the log, or the failure reads as "the app is broken".
-const previewLog = []
-const preview = spawn(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['vite', 'preview', '--port', String(PORT), '--strictPort'],
-  { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' },
-)
-preview.stdout.on('data', (d) => previewLog.push(String(d).trimEnd()))
-preview.stderr.on('data', (d) => previewLog.push(String(d).trimEnd()))
-preview.on('exit', (code) => previewLog.push('preview exited with code ' + code))
-
-/**
- * Kill the whole tree, not just the shell wrapper: on Windows the npx.cmd shell is
- * the direct child and the node server is its grandchild, so preview.kill() alone
- * leaves the port bound after the suite exits.
- */
-const stopPreview = () => {
-  try {
-    if (process.platform === 'win32' && preview.pid) {
-      spawnSync('taskkill', ['/pid', String(preview.pid), '/T', '/F'], { stdio: 'ignore' })
-    }
-  } catch {
-    /* best effort */
-  }
-  preview.kill()
-}
+/*
+  THE PREVIEW SERVER IS STARTED THROUGH lib/devServer.mjs, which spawns vite
+  directly (no shell, so stop() actually stops it) and REFUSES to run against a
+  server it did not start. Polling the URL until it answers was not enough: an
+  orphaned vite on this port answers too, with a stale build, and the whole suite
+  then silently checks previous code. See that file's header.
+*/
+const preview = await startPreviewServer({ port: PORT })
 
 let browser
 try {
-  try {
-    await waitForServer(APP_URL)
-  } catch (err) {
-    log('')
-    log('  preview server output:')
-    previewLog.forEach((line) => log('    ' + line))
-    throw err
-  }
   log('')
   log(`preview ready at ${APP_URL}`)
   browser = await chromium.launch({ channel: 'chrome' })
@@ -864,7 +805,7 @@ try {
   check('no failed HTTP responses', badResponses.length === 0, `(${badResponses.length})`)
 } finally {
   if (browser) await browser.close()
-  stopPreview()
+  preview.stop()
 }
 
 hr('SUMMARY')

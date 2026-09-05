@@ -16,10 +16,10 @@
  * Usage: node scripts/verify-app.mjs
  */
 
-import { spawn } from 'node:child_process'
 import { get as httpGet } from 'node:http'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
+import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4178
 const ORIGIN = `http://localhost:${PORT}`
@@ -79,28 +79,17 @@ function wireBytes(url) {
   })
 }
 
-async function waitForServer(url, timeoutMs = 60000) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    try {
-      if ((await fetch(url, { redirect: 'follow' })).ok) return
-    } catch {
-      /* server not up yet */
-    }
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  throw new Error(`preview server did not become ready at ${url}`)
-}
-
-const preview = spawn(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['vite', 'preview', '--port', String(PORT), '--strictPort'],
-  { stdio: 'ignore', shell: process.platform === 'win32' },
-)
+/*
+  THE PREVIEW SERVER IS STARTED THROUGH lib/devServer.mjs, which spawns vite
+  directly (no shell, so stop() actually stops it) and REFUSES to run against a
+  server it did not start. Polling the URL until it answers was not enough: an
+  orphaned vite on this port answers too, with a stale build, and the whole suite
+  then silently checks previous code. See that file's header.
+*/
+const preview = await startPreviewServer({ port: PORT })
 
 let browser
 try {
-  await waitForServer(APP_URL)
   log(`preview server ready at ${APP_URL}`)
 
   browser = await chromium.launch({ channel: 'chrome' })
@@ -674,7 +663,7 @@ try {
   }
 } finally {
   if (browser) await browser.close()
-  preview.kill()
+  preview.stop()
 }
 
 process.exit(failures.length ? 1 : 0)
