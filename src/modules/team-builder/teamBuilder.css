@@ -867,17 +867,16 @@
 }
 .tb-build-form .tb-screen-head {
   /*
-    Stacked, not a row: in a 210px column the back control and the unsaved note
-    cannot sit side by side. The min-height holds the row open at the height it
-    had as a full-width band, so the identity panel keeps its position whether
-    or not there is anything unsaved to announce.
+    A ROW, which only fits because the unsaved state is a single glyph now. As
+    the words "Unsaved changes" it could not sit beside the back control in a
+    210px column and had to stack under it. The min-height holds the row open at
+    the height it had as a full-width band, so the identity panel below keeps
+    its position whether or not there is anything unsaved to announce.
   */
   grid-area: head;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0;
+  align-items: center;
+  gap: var(--tb-3);
   min-height: 48px;
   padding-bottom: 0;
 }
@@ -915,10 +914,14 @@
   margin: var(--tb-2) 0;
 }
 
-/* A status, not a control -- this form has no Save button to press. */
+/*
+  A status, not a control -- this form has no Save button to press. The accent
+  is its second sanctioned use, a binary state indicator: there are unsaved
+  edits, or there are not.
+*/
 .tb-dirty-note {
-  font-size: var(--font-size-label);
-  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
   color: var(--accent);
 }
 
@@ -954,7 +957,7 @@
     'kana  .   ' auto
     '.     .   ' 1fr
     'shiny item' auto / 1fr auto;
-  height: 160px;
+  height: 190px;
   overflow: hidden;
 }
 /*
@@ -977,7 +980,14 @@
   grid-area: 1 / 1 / -1 / -1;
   width: 100%;
   height: 100%;
-  padding: var(--tb-5) var(--tb-2) var(--tb-1) var(--tb-6);
+  /*
+    THE BOTTOM PADDING IS THE SWITCH'S ROW. The sprite spans every cell of this
+    grid, so without it the artwork ran under the switch and the two overlapped
+    in the bottom-left corner -- which is what "the toggle needs somewhere to go"
+    was about. `contain` letterboxes inside the padding box, so reserving the
+    height here moves the artwork up and leaves the row clear.
+  */
+  padding: var(--tb-5) var(--tb-2) 32px var(--tb-6);
   object-fit: contain;
 }
 /*
@@ -1064,7 +1074,7 @@
 .tb-form-main {
   display: flex;
   flex-direction: column;
-  gap: var(--tb-1);
+  gap: var(--tb-3);
 }
 .tb-field-row {
   display: grid;

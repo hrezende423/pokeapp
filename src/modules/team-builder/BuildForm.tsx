@@ -47,6 +47,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   IconChevronLeft,
   IconCopy,
+  IconDeviceFloppy,
   IconInfoCircle,
   IconPlus,
   IconRotate,
@@ -405,12 +406,21 @@ function BuildFormFields({
             {origin.kind === 'team' ? 'Back to team' : 'Build Library'}
           </GhostButton>
           {/*
-            There is no Save button by design, so the only honest way to say
-            "this is not written down yet" is to say it. A status, not a control.
+            A STATUS, NOT A CONTROL, which is why it is a <span> and not a
+            button however much a floppy disc looks like one. This form has no
+            Save button by design -- it writes at the save points listed at the
+            top of this file -- so the icon reports a state rather than offering
+            an action. The accessible name carries what the words used to.
           */}
           {dirty && (
-            <span className="tb-dirty-note" data-testid="tb-dirty-note">
-              Unsaved changes
+            <span
+              className="tb-dirty-note"
+              role="status"
+              aria-label="Unsaved changes"
+              title="Unsaved changes — saved when you leave, add a member, or duplicate"
+              data-testid="tb-dirty-note"
+            >
+              <IconDeviceFloppy size={17} stroke={1.6} />
             </span>
           )}
         </header>
@@ -487,42 +497,6 @@ function BuildFormFields({
             ))}
           </div>
 
-          <Field label="Pokémon">
-            <select
-              className="tb-select"
-              value={build.speciesId}
-              data-testid="tb-species"
-              onChange={(e) => {
-                const speciesId = Number(e.target.value)
-                /* A species change re-derives gender and ability: the old values
-                   may be impossible for the new species. */
-                const fresh = newBuildInit(generation, speciesId)
-                commit({
-                  speciesId,
-                  pokemonId: fresh.pokemonId,
-                  gender: fresh.gender,
-                  abilityId: fresh.abilityId,
-                  moveIds: [null, null, null, null],
-                })
-              }}
-            >
-              {listSpecies().map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.display_name}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Nickname">
-            <input
-              className="tb-input"
-              defaultValue={build.nickname}
-              data-testid="tb-nickname"
-              onBlur={(e) => commit({ nickname: e.target.value })}
-            />
-          </Field>
-
           {facts && (
             <div className="tb-stats-block">
               <span className="tb-field-label">Stats</span>
@@ -540,6 +514,55 @@ function BuildFormFields({
 
         {/* ---------------------------------------------------- main column */}
         <div className="tb-form-main" data-layout="main">
+          {/*
+            IDENTITY FIELDS, MOVED OUT OF THE IDENTITY PANEL. Species and
+            nickname are inputs like every other input on this form, and sitting
+            in the left column they were the only two -- which made that column
+            half portrait and half form, and pushed the stat table below the
+            fold. Here they are the form's first row, and the left column is
+            purely the picture of the build plus its numbers.
+
+            SAME FOUR-COLUMN TRACK as every row below, with two cells left empty
+            rather than stretched: a field on this form is one column wide
+            everywhere, and a double-width nickname would be the only exception.
+          */}
+          <div className="tb-field-row" data-layout="field-row">
+            <Field label="Pokémon">
+              <select
+                className="tb-select"
+                value={build.speciesId}
+                data-testid="tb-species"
+                onChange={(e) => {
+                  const speciesId = Number(e.target.value)
+                  /* A species change re-derives gender and ability: the old
+                     values may be impossible for the new species. */
+                  const fresh = newBuildInit(generation, speciesId)
+                  commit({
+                    speciesId,
+                    pokemonId: fresh.pokemonId,
+                    gender: fresh.gender,
+                    abilityId: fresh.abilityId,
+                    moveIds: [null, null, null, null],
+                  })
+                }}
+              >
+                {listSpecies().map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.display_name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Nickname">
+              <input
+                className="tb-input"
+                defaultValue={build.nickname}
+                data-testid="tb-nickname"
+                onBlur={(e) => commit({ nickname: e.target.value })}
+              />
+            </Field>
+          </div>
+
           <div className="tb-field-row" data-layout="field-row">
             {generation >= 2 && (
               <Field label="Item">
