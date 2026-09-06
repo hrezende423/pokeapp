@@ -18,7 +18,9 @@ import { TeamBuilding } from './TeamBuilding'
 export const TEAM_BUILDING_PAGES = [
   { id: 'new-team', label: 'New Team' },
   { id: 'new-build', label: 'New Build' },
-  { id: 'my-teams', label: 'My Teams' },
+  /* The nav ID stays `my-teams`: it is a key, not a caption, and every screen
+     transition and test in the module addresses it by that name. */
+  { id: 'my-teams', label: 'Team Library' },
   { id: 'build-library', label: 'Build Library' },
 ] as const
 

@@ -25,7 +25,14 @@ export type BuildOrigin = { kind: 'team'; teamId: string } | { kind: 'library' }
 export type TbScreen =
   | { kind: 'my-teams' }
   | { kind: 'team-viewer'; teamId: string }
-  | { kind: 'build-library' }
+  /*
+    `pickFor` turns the library into a PICKER for one team slot. Choosing "Pick
+    an existing build" used to send the reader here with no memory of why, so
+    clicking a card opened the Build Form and the team they were assembling was
+    simply left behind. Carrying the slot means the card click can put the build
+    where it was going and hand the reader back to the team.
+  */
+  | { kind: 'build-library'; pickFor?: { teamId: string; slot: number } }
   | { kind: 'build-form'; buildId: string; origin: BuildOrigin }
 
 const INITIAL: TbScreen = { kind: 'my-teams' }

@@ -25,7 +25,7 @@
  * or Steel column and Gen 1's own type chart.
  */
 
-import { typeEffectivenessAgainst } from '../../../data'
+import { defensiveChart } from '../typeDefence'
 import { TypeLabel } from '../../../components/ds/TypeLabel'
 import { attackingTypesFor, offensiveCoverage } from '../buildFacts'
 
@@ -82,14 +82,17 @@ function Column({
 
 export function SpeciesMatchup({
   typeIds,
+  abilityId = null,
   generation,
   title,
 }: {
   typeIds: number[]
+  /** The build's ability. Levitate and Flash Fire change this chart outright. */
+  abilityId?: number | null
   generation: number
   title: string
 }) {
-  const rows = typeEffectivenessAgainst(typeIds, generation).map((r) => ({
+  const rows = defensiveChart(typeIds, abilityId, generation).map((r) => ({
     name: r.type.name,
     multiplier: r.multiplier,
   }))
@@ -181,7 +184,9 @@ export function TeamMatchup({
   members,
   generation,
 }: {
-  members: { label: string; typeIds: number[] }[]
+  /* `abilityId` per member, because a team's weaknesses are the sum of its
+     members' REAL ones -- a team of six Bronzong is not weak to Ground. */
+  members: { label: string; typeIds: number[]; abilityId?: number | null }[]
   generation: number
 }) {
   if (members.length === 0) {
@@ -195,7 +200,7 @@ export function TeamMatchup({
 
   const tally = new Map<number, { name: string; weak: number; resist: number }>()
   for (const member of members) {
-    for (const row of typeEffectivenessAgainst(member.typeIds, generation)) {
+    for (const row of defensiveChart(member.typeIds, member.abilityId ?? null, generation)) {
       const entry = tally.get(row.type.id) ?? { name: row.type.name, weak: 0, resist: 0 }
       if (row.multiplier > 1) entry.weak += 1
       if (row.multiplier < 1) entry.resist += 1

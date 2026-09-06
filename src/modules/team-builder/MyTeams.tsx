@@ -1,5 +1,5 @@
 /**
- * Screen 1: every team, as a flat list of rows.
+ * The Team Library: every team, as a flat list of rows.
  *
  * A LIST, NOT A CARD GRID. Each row is one team: its kebab, its id, its members
  * inline, and a chevron. Row-border only, no box -- the same hairline treatment
@@ -25,30 +25,58 @@ import {
   IconChevronRight,
   IconCopy,
   IconInfoCircle,
+  IconListCheck,
   IconPlus,
   IconShieldHalf,
   IconTrash,
 } from '@tabler/icons-react'
 import { goTo } from './tbNav'
 import { GhostButton } from './ui/GhostButton'
-import { Kebab } from './ui/Dock'
+import { Dock, Kebab } from './ui/Dock'
+import { BulkBar, SelectCircle } from './ui/BulkSelect'
+import { useBulkSelect } from './ui/useBulkSelect'
 import { Modal, Popover } from './ui/Overlay'
 import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
 import { MemberCard } from './ui/MemberCard'
 import { TeamMatchup } from './ui/TypeMatchup'
 import { buildSpecies, typeIdsFor } from './buildFacts'
-import { teamLabel, type Build, type Team } from './model'
+import { orderedTeams, uiId, type Build, type Team } from './model'
 import { createTeam, deleteTeam, duplicateTeam, updateTeam, useTeamBuilderData } from './store'
 
 export function MyTeams({ generation }: { generation: number }) {
   const data = useTeamBuilderData()
   const prompt = usePrompt()
+  const bulk = useBulkSelect()
 
   const buildById = new Map(data.builds.map((b) => [b.id, b]))
-  /* Sorted by id, which is the only sort the spec allows -- and since there is no
-     team name, it is also the only one there is data for. */
-  const teams = [...data.teams].sort((a, b) => a.seq - b.seq)
+  /*
+    EMPTY TEAMS ARE NOT LISTED. A team with no members is not a team yet -- it is
+    the moment between "New team" and choosing the first one -- and listing it
+    puts a row of nothing at the top of the library. The shell deletes any it
+    finds that nobody is looking at; see TeamBuilding's prune.
+
+    Creation order is the numbering order, and since there is no team name it is
+    also the only sort there is data for.
+  */
+  const teams = orderedTeams(data).filter((t) => t.memberIds.some((m) => m != null))
+
+  const deleteSelected = () => {
+    const ids = [...bulk.selected]
+    if (ids.length === 0) return
+    prompt.confirm(
+      `Delete ${ids.length} team${ids.length === 1 ? '' : 's'}?`,
+      () => {
+        ids.forEach((id) => deleteTeam(id))
+        bulk.exit()
+      },
+      {
+        body: 'Builds used only by these teams are deleted with them. Builds that other teams also use are kept.',
+        testId: 'tb-bulk-delete-teams-prompt',
+        confirmLabel: 'Delete',
+      },
+    )
+  }
 
   const newTeam = () => {
     const team = createTeam(generation)
@@ -85,16 +113,42 @@ export function MyTeams({ generation }: { generation: number }) {
           data-testid="tb-team-search"
           disabled
         />
+        <div className="tb-dock-anchor tb-library-dock-anchor">
+          <Dock
+            testId="tb-teams-dock"
+            items={[
+              {
+                icon: <IconListCheck size={18} stroke={1.5} />,
+                label: 'Select teams',
+                onClick: bulk.enter,
+                testId: 'tb-teams-select',
+              },
+            ]}
+          />
+        </div>
       </header>
 
+      {bulk.active && (
+        <BulkBar
+          count={bulk.selected.size}
+          noun="team"
+          onCancel={bulk.exit}
+          onDelete={deleteSelected}
+          testId="tb-teams-bulk"
+        />
+      )}
+
       <div className="tb-team-rows" data-testid="tb-team-rows">
-        {teams.map((team) => (
+        {teams.map((team, index) => (
           <TeamRow
             key={team.id}
             team={team}
+            label={uiId(index)}
             buildById={buildById}
+            selecting={bulk.active}
+            selectProps={bulk.itemProps(team.id)}
             onDelete={() =>
-              prompt.confirm(`Delete team ${teamLabel(team)}?`, () => deleteTeam(team.id), {
+              prompt.confirm(`Delete team ${uiId(index)}?`, () => deleteTeam(team.id), {
                 body: 'Builds used only by this team are deleted with it. Builds that other teams also use are kept.',
                 testId: 'tb-delete-team-prompt',
               })
@@ -110,11 +164,22 @@ export function MyTeams({ generation }: { generation: number }) {
 
 function TeamRow({
   team,
+  label,
   buildById,
+  selecting,
+  selectProps,
   onDelete,
 }: {
   team: Team
+  /** The "#001". Derived from position by the caller -- see model.ts. */
+  label: string
   buildById: Map<string, Build>
+  selecting: boolean
+  selectProps: {
+    selected: boolean
+    onPointerDown: (e: React.PointerEvent) => void
+    onPointerEnter: () => void
+  }
   onDelete: () => void
 }) {
   const [coverage, setCoverage] = useState(false)
@@ -131,15 +196,44 @@ function TeamRow({
         ? {
             label: facts.species.display_name,
             typeIds: typeIdsFor(facts.variety, build.generation),
+            /* The member's OWN ability, so Levitate and friends count. */
+            abilityId: build.abilityId,
           }
         : null
     })
-    .filter((m): m is { label: string; typeIds: number[] } => m != null)
+    .filter(
+      (m): m is { label: string; typeIds: number[]; abilityId: number | null } => m != null,
+    )
+
+  const open = () => goTo({ kind: 'team-viewer', teamId: team.id })
 
   return (
-    <div className="tb-team-row" data-testid={`tb-team-${team.id}`} data-team-id={team.id}>
+    /*
+      THE WHOLE LANE OPENS THE TEAM. It is a <div> with a click handler rather
+      than a <button> because it CONTAINS buttons -- the kebab, the check circle
+      -- and a button inside a button is markup React rejects. The keyboard gets
+      the chevron, which is a real button and stays the visible affordance.
+
+      In selection mode the lane selects instead of opening: a grid where a click
+      sometimes opens and sometimes selects is a grid you cannot trust.
+    */
+    <div
+      className="tb-team-row"
+      data-testid={`tb-team-${team.id}`}
+      data-team-id={team.id}
+      data-clickable={selecting ? undefined : 'true'}
+      data-selected={selecting && selectProps.selected ? 'true' : undefined}
+      onClick={selecting ? undefined : open}
+    >
       <div className="tb-team-row-lead">
-        <Kebab
+        {selecting ? (
+          <SelectCircle
+            {...selectProps}
+            label={`Select team ${label}`}
+            testId={`tb-team-${team.id}-check`}
+          />
+        ) : (
+          <Kebab
           testId={`tb-team-${team.id}-kebab`}
           items={[
             {
@@ -168,7 +262,8 @@ function TeamRow({
               testId: `tb-team-${team.id}-delete`,
             },
           ]}
-        />
+          />
+        )}
         {coverage && (
           <Popover
             onClose={() => setCoverage(false)}
@@ -179,7 +274,7 @@ function TeamRow({
           </Popover>
         )}
         <span className="tb-team-id num" data-testid={`tb-team-${team.id}-label`}>
-          {teamLabel(team)}
+          {label}
         </span>
       </div>
 
@@ -194,20 +289,25 @@ function TeamRow({
         ))}
       </div>
 
-      {/* The chevron is the whole open affordance for the row. */}
+      {/* Still the visible affordance, and the keyboard's way in, now that the
+          lane itself is clickable. */}
       <button
         type="button"
         className="tb-team-open"
-        aria-label={`Open team ${teamLabel(team)}`}
+        aria-label={`Open team ${label}`}
         data-testid={`tb-team-${team.id}-open`}
-        onClick={() => goTo({ kind: 'team-viewer', teamId: team.id })}
+        disabled={selecting}
+        onClick={(e) => {
+          e.stopPropagation()
+          open()
+        }}
       >
         <IconChevronRight size={28} stroke={1.5} />
       </button>
 
       {info && (
         <Modal
-          title={`Team ${teamLabel(team)} info`}
+          title={`Team ${label} info`}
           onClose={() => setInfo(false)}
           testId={`tb-team-${team.id}-info-modal`}
         >

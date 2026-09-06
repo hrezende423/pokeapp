@@ -18,7 +18,7 @@ import { MemberCard } from './MemberCard'
 import { Modal } from './Overlay'
 import { ConfirmPrompt } from './ConfirmPrompt'
 import { usePrompt } from './usePrompt'
-import { TEAM_SIZE, teamLabel, type Build } from '../model'
+import { TEAM_SIZE, orderedTeams, uiId, type Build } from '../model'
 import { setTeamMember, useTeamBuilderData } from '../store'
 
 export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose: () => void }) {
@@ -27,8 +27,18 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
   const [teamId, setTeamId] = useState<string | null>(null)
 
   const buildById = new Map(data.builds.map((b) => [b.id, b]))
-  const teams = [...data.teams].sort((a, b) => a.seq - b.seq)
-  const team = teamId == null ? null : (teams.find((t) => t.id === teamId) ?? null)
+  const teams = orderedTeams(data)
+  const teamIndex = teamId == null ? -1 : teams.findIndex((t) => t.id === teamId)
+  const team = teamIndex < 0 ? null : teams[teamIndex]
+
+  /*
+    THE FIRST EMPTY SLOT, or -1 when the team is full. Only that one gets an
+    "Add here": offering six identical buttons asks the reader to choose a slot
+    number, which is not a decision they have -- members have no meaning by
+    position, and the team fills in order everywhere else in the module.
+  */
+  const firstEmpty = team ? team.memberIds.findIndex((m) => m == null) : -1
+  const isFull = team != null && firstEmpty === -1
 
   const place = (slot: number) => {
     if (!team) return
@@ -39,7 +49,16 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
   return (
     <>
       <Modal
-        title={team ? `Add to team ${teamLabel(team)}` : 'Add to team'}
+        /* A full team offers no empty slot, so the only thing left to do on
+           this screen is pick who goes. The title says so rather than leaving
+           the reader to work it out from six occupied cards. */
+        title={
+          isFull
+            ? 'Chose a member to replace'
+            : team
+              ? `Add to team ${uiId(teamIndex)}`
+              : 'Add to team'
+        }
         onClose={onClose}
         testId="tb-add-to-team"
         wide={team != null}
@@ -50,7 +69,7 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
           ) : (
             /* Step 1: the My Teams list, scoped down to a picker. */
             <div className="tb-picker-list" data-testid="tb-add-to-team-teams">
-              {teams.map((t) => {
+              {teams.map((t, i) => {
                 const members = t.memberIds
                   .map((id) => (id == null ? null : (buildById.get(id) ?? null)))
                   .filter((b): b is Build => b != null)
@@ -62,7 +81,7 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
                     data-testid={`tb-add-to-team-${t.id}`}
                     onClick={() => setTeamId(t.id)}
                   >
-                    <span className="tb-team-id num">{teamLabel(t)}</span>
+                    <span className="tb-team-id num">{uiId(i)}</span>
                     <span className="tb-picker-members">
                       {members.map((m) => (
                         <MemberCard key={m.id} build={m} variant="compact" />
@@ -84,15 +103,17 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
               if (!member) {
                 return (
                   <div className="tb-card tb-card-empty" key={`slot-${slot}`}>
-                    <button
-                      type="button"
-                      className="tb-ghost tb-ghost-md"
-                      data-testid={`tb-add-to-team-slot-${slot}`}
-                      onClick={() => place(slot)}
-                    >
-                      <IconPlus size={18} stroke={1.5} />
-                      Add here
-                    </button>
+                    {slot === firstEmpty && (
+                      <button
+                        type="button"
+                        className="tb-ghost tb-ghost-md"
+                        data-testid={`tb-add-to-team-slot-${slot}`}
+                        onClick={() => place(slot)}
+                      >
+                        <IconPlus size={18} stroke={1.5} />
+                        Add here
+                      </button>
+                    )}
                   </div>
                 )
               }

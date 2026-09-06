@@ -1784,10 +1784,18 @@ try {
   log('  team items: ' + JSON.stringify(team))
   check(
     'Team Building lists its five destinations, in order',
-    /* "Team Library" is now "My Teams": the stub graduated into a real screen and
-       the nav label matches the screen's own name. The other four are unchanged. */
+    /* "Team Library", which is what the design system called it all along. It
+       spent a while as "My Teams" while the screen was being built and is back
+       to sitting beside "Build Library", which is the pair it belongs to. The
+       nav ID underneath is still `my-teams` -- an ID is a key, not a caption. */
     JSON.stringify(team.labels) ===
-      JSON.stringify(['New Team', 'New Build', 'My Teams', 'Build Library', 'Pokemon Collection']),
+      JSON.stringify([
+        'New Team',
+        'New Build',
+        'Team Library',
+        'Build Library',
+        'Pokemon Collection',
+      ]),
     team.labels.join(','),
   )
   // They lead to stub pages, but they are real destinations now, so nothing is

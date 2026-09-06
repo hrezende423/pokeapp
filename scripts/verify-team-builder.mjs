@@ -150,14 +150,16 @@ try {
   )
   log(`  Team Building entries: ${tbLabels.join(', ')}`)
   check(
-    'the dropdown lists New Team, New Build, My Teams, Build Library',
+    'the dropdown lists New Team, New Build, Team Library, Build Library',
+    /* "Team Library", to sit beside "Build Library" -- the nav ID underneath is
+       still `my-teams`, because an ID is a key and not a caption. */
     JSON.stringify(tbLabels.slice(0, 4)) ===
-      JSON.stringify(['New Team', 'New Build', 'My Teams', 'Build Library']),
+      JSON.stringify(['New Team', 'New Build', 'Team Library', 'Build Library']),
     tbLabels.join(','),
   )
   await page.click('[data-testid="nav-my-teams"]')
   await page.waitForSelector('[data-testid="tb-my-teams"]')
-  check('My Teams is a real screen, not the stub placeholder', true)
+  check('the Team Library is a real screen, not the stub placeholder', true)
 
   // =====================================================================
   hr('1. MY TEAMS')
@@ -352,7 +354,14 @@ try {
       mkBuild('b1', { speciesId: 373, pokemonId: 373, nickname: 'SalaMENACE' }),
       mkBuild('b2', { speciesId: 6, pokemonId: 6 }),
     ],
-    teams: [mkTeam('t1', 1, [])],
+    /*
+      NOT AN EMPTY TEAM ANY MORE. Empty teams are pruned when the module mounts,
+      and seedStore reloads the page -- so a `[]` here was deleted before the
+      first assertion could run. b2 sits in slot 3 rather than slot 1, which
+      leaves slot 1 as the first empty one and keeps this section testing what it
+      always tested: placing a build into the team's next free slot.
+    */
+    teams: [mkTeam('t1', 1, [null, null, 'b2'])],
   })
   await goTo('build-library')
   await page.waitForSelector('[data-testid="tb-build-grid"]')
@@ -1506,6 +1515,231 @@ try {
   )
 
   // =====================================================================
+  /*
+    10. TYPE DEFENCE — the chart, then the ability's say over it.
+
+    THE FOUR CASES ARE FOUR DIFFERENT MECHANISMS and only one of them was ever
+    working. Dual-type immunity (Zapdos, Quagsire) is the chart multiplying
+    across both types, which src/data has always done. The other three are the
+    ability, which src/data cannot know about because an ability belongs to a
+    BUILD: Levitate replacing a 2x weakness with an immunity, Flash Fire
+    replacing a chart-neutral 1x with one, and the era gate that stops either
+    applying in a generation where abilities do not exist.
+  */
+  hr('10. TYPE DEFENCE')
+  const defence2 = await page.evaluate(async () => {
+    const d = await import('/pokeapp/src/data/index.ts')
+    const td = await import('/pokeapp/src/modules/team-builder/typeDefence.ts')
+    const typesOf = (id) => {
+      const sp = d.getSpecies(id)
+      const v = sp.varieties.find((x) => x.is_default) ?? sp.varieties[0]
+      return v.types.map((t) => t.type_id)
+    }
+    const at = (typeIds, abilityId, gen, name) =>
+      td.defensiveChart(typeIds, abilityId, gen).find((r) => r.type.name === name)?.multiplier
+    const ability = (name) => d.listAbilities().find((a) => a.name === name)?.id ?? null
+    return {
+      /* Electric/Flying: Ground is 2x on Electric and 0x on Flying. */
+      zapdosGround: at(typesOf(145), null, 4, 'ground'),
+      /* Water/Ground: Electric is 2x on Water and 0x on Ground. */
+      quagsireElectric: at(typesOf(195), null, 4, 'electric'),
+      /* Steel/Psychic, so Ground is genuinely 2x -- until Levitate. */
+      bronzongPlain: at(typesOf(437), null, 4, 'ground'),
+      bronzongLevitate: at(typesOf(437), ability('levitate'), 4, 'ground'),
+      /* Fire/Steel: 2x on Steel x 0.5x on Fire = a neutral 1, which is exactly
+         why Flash Fire has to REPLACE the number rather than multiply it. */
+      heatranPlain: at(typesOf(485), null, 4, 'fire'),
+      heatranFlashFire: at(typesOf(485), ability('flash-fire'), 4, 'fire'),
+      /* Water/Flying: Electric 2x x 2x. A 4x weakness must survive all this. */
+      gyaradosElectric: at(typesOf(130), null, 4, 'electric'),
+      /* Abilities do not exist before Gen 3. */
+      levitateInGen2: at(typesOf(437), ability('levitate'), 2, 'ground'),
+      /* A halving ability multiplies rather than replaces: Thick Fat on a
+         species already resistant to Ice compounds with the chart. */
+      thickFatIce: at(typesOf(143), ability('thick-fat'), 4, 'ice'),
+    }
+  })
+  log(`  ${JSON.stringify(defence2)}`)
+  check(
+    'dual-type immunity: Zapdos takes nothing from Ground, Quagsire nothing from Electric',
+    defence2.zapdosGround === 0 && defence2.quagsireElectric === 0,
+    `zapdos=${defence2.zapdosGround} quagsire=${defence2.quagsireElectric}`,
+  )
+  check(
+    "Levitate turns Bronzong's real 2x Ground weakness into an immunity",
+    defence2.bronzongPlain === 2 && defence2.bronzongLevitate === 0,
+    `plain=${defence2.bronzongPlain} levitate=${defence2.bronzongLevitate}`,
+  )
+  check(
+    'Flash Fire REPLACES the chart rather than multiplying it, so a neutral 1x becomes 0',
+    defence2.heatranPlain === 1 && defence2.heatranFlashFire === 0,
+    `plain=${defence2.heatranPlain} flashfire=${defence2.heatranFlashFire}`,
+  )
+  check(
+    'a 4x weakness still reads 4x — the ability layer changes only what it names',
+    defence2.gyaradosElectric === 4,
+    String(defence2.gyaradosElectric),
+  )
+  check(
+    'and no ability applies before Gen 3, where abilities do not exist',
+    defence2.levitateInGen2 === 2,
+    String(defence2.levitateInGen2),
+  )
+
+  // =====================================================================
+  /*
+    11. THE LIBRARIES — two IDs, bulk delete, and the picker that comes back.
+
+    THE DISPLAYED ID IS DERIVED FROM POSITION, which is the whole point of the
+    two-ID split: `id` is the immutable key every record refers to, and "#002"
+    is where a thing sits in the list right now. Deleting the second of three
+    must renumber the third WITHOUT touching any stored field, so the check
+    below reads the numbers off the screen after a delete rather than the store.
+  */
+  hr('11. THE LIBRARIES')
+
+  const threeBuilds = () => ({
+    nextBuildSeq: 4,
+    nextTeamSeq: 2,
+    builds: [
+      mkBuild('b1', { speciesId: 1, pokemonId: 1 }),
+      mkBuild('b2', { speciesId: 4, pokemonId: 4 }),
+      mkBuild('b3', { speciesId: 7, pokemonId: 7 }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1'])],
+  })
+
+  await seedStore(threeBuilds())
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.waitForTimeout(400)
+  const idsBefore = await page.$$eval('.tb-build-id', (els) => els.map((e) => e.textContent.trim()))
+  check(
+    'builds carry a UI id numbered from their position',
+    JSON.stringify(idsBefore) === JSON.stringify(['#001', '#002', '#003']),
+    idsBefore.join(' '),
+  )
+
+  // ---- bulk selection: enter, sweep two, delete
+  await page.click('[data-testid="tb-builds-select"]')
+  await page.waitForSelector('[data-testid="tb-builds-bulk"]')
+  const circles = await page.$$('.tb-select-circle')
+  check('selection mode puts a check circle on every card', circles.length === 3, String(circles.length))
+  /*
+    A SWEEP, not three clicks. Press on the second circle and drag across the
+    third: pointerdown decides the direction (both were unselected, so this is
+    selecting) and every circle the pointer enters takes the same decision. A
+    per-item toggle would turn the second one back off on the way past.
+  */
+  const boxOf = async (i) => (await circles[i].boundingBox())
+  const from = await boxOf(1)
+  const to = await boxOf(2)
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const swept = (await page.textContent('[data-testid="tb-builds-bulk-count"]'))?.trim()
+  check(
+    'dragging across two cards selects both, rather than toggling each in turn',
+    swept === '2 builds selected',
+    swept,
+  )
+  await page.click('[data-testid="tb-builds-bulk-delete"]')
+  await page.waitForSelector('[data-testid="tb-bulk-delete-builds-prompt"]')
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(700)
+  const afterBulk = await readStore()
+  check(
+    'bulk delete removes exactly the selected builds and asks first',
+    afterBulk.builds.map((b) => b.id).join(',') === 'b1',
+    afterBulk.builds.map((b) => b.id).join(',') || 'none',
+  )
+
+  // ---- the numbering closes the gap
+  await seedStore(threeBuilds())
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.waitForTimeout(400)
+  await page.hover('[data-testid="tb-build-b2-cell"]')
+  await page.click('[data-testid="tb-build-b2-delete"]')
+  await page.waitForSelector('[data-testid="tb-delete-build-prompt"]')
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(600)
+  const idsAfter = await page.$$eval('.tb-build-id', (els) => els.map((e) => e.textContent.trim()))
+  const keyAfter = await page.$$eval('.tb-library-cell', (els) =>
+    els.map((e) => e.dataset.testid.replace('tb-build-', '').replace('-cell', '')),
+  )
+  log(`  after deleting #002: ids ${idsAfter.join(' ')} · keys ${keyAfter.join(' ')}`)
+  check(
+    'deleting #002 renumbers #003 to #002 — no gap, nothing renumbered in storage',
+    JSON.stringify(idsAfter) === JSON.stringify(['#001', '#002']) &&
+      JSON.stringify(keyAfter) === JSON.stringify(['b1', 'b3']),
+    `${idsAfter.join(' ')} / ${keyAfter.join(' ')}`,
+  )
+
+  /*
+    ---- "Pick an existing build" comes BACK
+
+    It used to send the reader to the library with no memory of why, so choosing
+    a build opened the Build Form and the team being assembled was left behind.
+  */
+  await seedStore({
+    nextBuildSeq: 3,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1', { speciesId: 1, pokemonId: 1 }), mkBuild('b2', { speciesId: 4, pokemonId: 4 })],
+    teams: [mkTeam('t1', 1, ['b1'])],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.click('[data-testid="tb-slot-1-add"]')
+  await page.waitForSelector('[data-testid="tb-add-member-modal"]')
+  await page.click('[data-testid="tb-add-member-existing"]')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  check(
+    'picking an existing member opens the library IN PICK MODE, which says so',
+    (await page.$$('[data-testid="tb-pick-note"]')).length === 1,
+  )
+  await page.click('[data-testid="tb-build-b2"] .tb-card-open')
+  await page.waitForTimeout(800)
+  const afterPick = await readStore()
+  check(
+    'and choosing one adds it to the team and returns there, rather than opening the Build Form',
+    (await page.$$('[data-testid="tb-team-viewer"]')).length === 1 &&
+      afterPick.teams[0].memberIds[1] === 'b2',
+    `screen=${(await page.$$('[data-testid="tb-team-viewer"]')).length ? 'team-viewer' : 'elsewhere'} slots=${afterPick.teams[0].memberIds.join(',')}`,
+  )
+
+  // ---- an empty team is not a team
+  await seedStore({
+    nextBuildSeq: 2,
+    nextTeamSeq: 3,
+    builds: [mkBuild('b1', { speciesId: 1, pokemonId: 1 })],
+    teams: [mkTeam('t1', 1, ['b1']), mkTeam('t2', 2, [])],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.waitForTimeout(600)
+  const listedTeams = await page.$$eval('.tb-team-row', (els) => els.map((e) => e.dataset.teamId))
+  const storedTeams = (await readStore()).teams.map((t) => t.id)
+  check(
+    'an empty team is neither listed nor kept',
+    JSON.stringify(listedTeams) === JSON.stringify(['t1']) &&
+      JSON.stringify(storedTeams) === JSON.stringify(['t1']),
+    `listed=${listedTeams.join(',')} stored=${storedTeams.join(',')}`,
+  )
+
+  // ---- the whole lane opens the team
+  await page.click('.tb-team-row .tb-team-members')
+  await page.waitForTimeout(700)
+  check(
+    'clicking anywhere in a team lane opens it, not only the chevron',
+    (await page.$$('[data-testid="tb-team-viewer"]')).length === 1,
+  )
+
+  // =====================================================================
   hr('CONVENTIONS — across the whole module')
   const savey = await page.evaluate(() =>
     [...document.querySelectorAll('button')]
@@ -1538,6 +1772,23 @@ try {
   const realErrors = consoleErrors.filter(
     (e) => !/raw\.githubusercontent|objects\.githubusercontent|ERR_|favicon/.test(e),
   )
+  /*
+    GHOST MEANS NO BOX. Every visible action in this module is glyph-and-text on
+    the page; an outlined button is an outlined button whatever its fill. Checked
+    as a computed style rather than by reading the stylesheet, so a border
+    arriving from any other rule is caught too.
+  */
+  const boxed = await page.evaluate(() =>
+    [...document.querySelectorAll('.tb button, .tb .tb-card-empty')]
+      .filter((el) => {
+        const cs = getComputedStyle(el)
+        return cs.borderTopStyle !== 'none' && cs.borderTopWidth !== '0px'
+      })
+      .map((el) => el.className)
+      .slice(0, 8),
+  )
+  check('no button or empty slot in the module draws an outline', boxed.length === 0, boxed.join(' | '))
+
   check('no console or page errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '))
 
   hr(failures.length ? `FAILED — ${failures.length} check(s)` : 'ALL CHECKS PASSED')

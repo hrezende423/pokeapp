@@ -112,17 +112,24 @@
 
 /* ------------------------------------------------------------------ ghosts */
 
+/*
+  NO BORDER, ANYWHERE IN THE MODULE. "Ghost" here means glyph and text on the
+  page -- an outlined button is an outlined button, whatever its fill. The
+  padding stays so the hit target and the spacing between adjacent actions do
+  not collapse, and the hover tint stays because without a box it is the only
+  thing left that says this is pressable.
+*/
 .tb-ghost {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 6px 10px;
   font: inherit;
   font-size: var(--font-size-body);
   color: var(--text-primary);
   cursor: pointer;
   background: transparent;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-control);
 }
 .tb-ghost-sm {
@@ -138,13 +145,12 @@
 }
 .tb-ghost[data-danger='true'] {
   color: var(--accent);
-  border-color: var(--accent-border);
 }
-/* Chevron and text on the page, no box. The screens' back control. */
+/* `bare` now differs only in tone and in shedding the side padding, since the
+   box it used to remove is gone from every ghost button. */
 .tb-ghost[data-bare='true'] {
   padding: 4px 0;
   color: var(--text-secondary);
-  border: none;
 }
 .tb-ghost[data-bare='true']:hover:not(:disabled) {
   color: var(--text-primary);
@@ -408,11 +414,29 @@
   letter-spacing: 0.14em;
   color: var(--text-secondary);
 }
+/*
+  WIDER MEMBER CARDS. Six across a row with a 20px gap left each about 110px,
+  which ellipsed every name; the gap is the cheapest width to buy back, and the
+  cards stretch to take it. `flex-basis: 0` with `flex: 1` on the card makes the
+  six share the row equally rather than sizing to their own content.
+*/
 .tb-team-members {
   display: flex;
   flex: 1;
-  gap: var(--space-gap-lg);
+  gap: var(--space-gap-sm);
   min-width: 0;
+}
+.tb-team-members .tb-card-compact {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* The whole lane opens the team, so the row is the button. The chevron stays as
+   the affordance that says so. */
+.tb-team-row[data-clickable='true'] {
+  cursor: pointer;
+}
+.tb-team-row[data-clickable='true']:hover {
+  background: var(--surface-hover);
 }
 .tb-team-open {
   display: flex;
@@ -435,6 +459,19 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   /* Gap and NO per-card border: the other half of the hairline-band rule. */
   gap: var(--space-gap-xl);
+  padding-top: var(--space-gap-md);
+}
+/*
+  THE BUILD LIBRARY IS NOT THE TEAM'S SIX SLOTS. A team has exactly six members
+  in three columns and that shape is the team; a library has as many builds as
+  you have made, so it fills the width with as many narrower cards as fit.
+  Separate class rather than a modifier because the two only ever looked alike
+  by coincidence.
+*/
+.tb-build-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  gap: var(--space-gap-md);
   padding-top: var(--space-gap-md);
 }
 .tb-slot-count {
@@ -508,6 +545,36 @@
   height: 64px;
 }
 
+/*
+  THE ARTWORK'S OWN BOX. Square, because official artwork is, and bottom-aligned
+  inside the art area so the Pokemon stays exactly where it was. The held-item
+  badge positions against THIS rather than against the art area, which is what
+  puts it on the picture's bottom-right corner instead of adrift in the
+  letterbox margin beside it. See .tb-held-item.
+*/
+.tb-card-frame {
+  position: relative;
+  display: block;
+  height: 100%;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+/*
+  :not() AGAIN, and for the same reason as `.tb-card-art img` above -- this rule
+  is 0-1-1 and `.tb-held-item` is 0-1-0, so without it the badge inherits
+  `inset: 0` and lands in the frame's TOP-LEFT corner instead of hanging off the
+  bottom-right one. Measured: held.x came back equal to frame.x.
+
+  Any rule added here that targets a bare `img` has to exclude the badge. It is
+  a sibling of the artwork, not another copy of it.
+*/
+.tb-card-frame img:not(.tb-held-item) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 /* The one deliberately loud move: an oversized dex number at 5% opacity. */
 .tb-card-ghost {
   position: absolute;
@@ -526,6 +593,16 @@
   opacity: calc(var(--ghost-watermark-opacity) * 2);
   transform: translateX(-50%);
 }
+/* Three quarters on a library card, and smaller again where six sit on a row.
+   The numeral is a watermark, not a heading: at the grid size it was wider than
+   the card it sat behind. */
+.tb-card-library .tb-card-ghost,
+.tb-card-full .tb-card-ghost {
+  font-size: calc(var(--font-size-ghost-watermark-grid) * 0.75);
+}
+.tb-card-compact .tb-card-ghost {
+  font-size: calc(var(--font-size-ghost-watermark-grid) * 0.5);
+}
 .tb-card-ghost-ja {
   position: absolute;
   bottom: 0;
@@ -539,12 +616,24 @@
   opacity: calc(var(--ghost-watermark-opacity) * 2);
   transform: translateX(-50%);
 }
+/* Half again: the kana reads as texture rather than as a name at body size. */
+.tb-card-library .tb-card-ghost-ja,
+.tb-card-full .tb-card-ghost-ja {
+  font-size: calc(var(--font-size-body) * 1.5);
+}
 
 .tb-card-facts {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+/* Tighter rows: these lines are one fact each and the gap was reading as a
+   paragraph break between them. */
+.tb-card-library .tb-card-facts,
+.tb-card-full .tb-card-facts,
+.tb-card-compact .tb-card-facts {
+  gap: 0;
 }
 /* Capped, not stretched: a 500px-wide grid track would otherwise push each move's
    type and category to the far right, away from the name they belong to. */
@@ -555,6 +644,11 @@
 .tb-card-full .tb-card-art,
 .tb-card-library .tb-card-art {
   max-width: 330px;
+}
+/* Shorter art on a library card, which is what lets the cards sit closer
+   together without the grid growing taller than the screen. */
+.tb-card-library .tb-card-art {
+  height: 78px;
 }
 .tb-card-headline {
   display: flex;
@@ -574,8 +668,14 @@
 .tb-card-compact .tb-card-name {
   font-size: var(--font-size-caption);
 }
+/* The nickname sits level with "Lv.50" beside it, so it is set at the same size
+   -- at body size it was the loudest thing on a card that is mostly numbers. */
+.tb-card-library .tb-card-name {
+  font-size: var(--font-size-caption);
+}
 .tb-card-gender {
   font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 .tb-card-gender[data-gender='male'] {
   color: var(--type-water);
@@ -614,18 +714,27 @@
   color: var(--text-secondary);
 }
 
+/*
+  ONE GRID FOR ALL FOUR MOVES, so type and category line up as columns down the
+  card. As a grid per ROW each line sized its own tracks, and four moves with
+  different name lengths put their types at four different x positions -- which
+  is what "align the move types across the rows" is about.
+
+  `max-content` on both, and the default `justify-items: start`, so each column
+  is as wide as its widest entry and everything in it is left-aligned.
+*/
 .tb-card-moves {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: 4px;
-}
-.tb-move {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
+  grid-template-columns: 1fr max-content max-content;
+  column-gap: 8px;
+  row-gap: 1px;
   align-items: baseline;
+  margin-top: 4px;
   font-size: var(--font-size-caption);
+}
+/* Each line dissolves so its three cells become cells of the grid above. */
+.tb-move {
+  display: contents;
 }
 .tb-move-name {
   font-family: var(--font-numeric);
@@ -648,12 +757,13 @@
   color: var(--text-secondary);
 }
 
+/* NO DASHED OUTLINE. An empty slot is an absence; drawing a box around it makes
+   six of them the loudest thing on a new team's screen. It keeps its height so
+   the grid does not collapse as members are added. */
 .tb-card-empty {
   display: grid;
   place-items: center;
   min-height: 140px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-card);
 }
 
 .tb-card-missing {
@@ -1175,6 +1285,9 @@
 }
 /* Scaled to the card it sits on, not to the identity panel's 34px. */
 .tb-card-rail .tb-held-item,
+.tb-card-compact .tb-card-art {
+  height: 64px;
+}
 .tb-card-compact .tb-held-item {
   width: 18px;
   height: 18px;
@@ -1724,4 +1837,88 @@
 .tb-toggle {
   width: 34px;
   accent-color: var(--accent);
+}
+
+/* ------------------------------------------------------ bulk selection */
+
+/*
+  THE CHECK CIRCLE, over the card's top-left corner. Left, because every card in
+  this module already keeps a dock or a kebab in its top-RIGHT corner, and the
+  two would sit on each other.
+*/
+.tb-select-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  /* The sweep reads pointerenter on every circle it crosses; a text selection
+     dragging along with it makes that look like a broken drag. */
+  user-select: none;
+  touch-action: none;
+}
+.tb-select-circle[data-selected='true'] {
+  color: var(--accent);
+}
+.tb-library-check {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+}
+/* A selected card is tinted rather than outlined -- no box-shadow, no border,
+   the same rule the rest of the module follows. */
+.tb-library-cell[data-selected='true'],
+.tb-team-row[data-selected='true'] {
+  background: var(--surface-hover);
+}
+
+.tb-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gap-md);
+  padding: var(--tb-4) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.tb-bulk-count {
+  margin-right: auto;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* The library docks sit at the end of their header row rather than floating in
+   the page corner, which is where the Build Form put its own. */
+.tb-library-dock-anchor {
+  position: relative;
+  margin-left: auto;
+}
+
+.tb-pick-note {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* The build's own "#001", beside "Used in N teams" in the card foot. */
+.tb-build-id {
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-label);
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+}
+
+/* --------------------------------------------------- team viewer density */
+
+/*
+  TIGHTER ROWS. The slot grid inherited the library's extra-large gap, which on a
+  screen showing one team of six put more space between the cards than the cards
+  spend on their own moves.
+*/
+.tb-team-viewer .tb-slot-grid {
+  gap: var(--space-gap-lg);
+}
+.tb-team-viewer .tb-card-full .tb-card-art {
+  height: 84px;
 }

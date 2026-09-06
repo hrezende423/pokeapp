@@ -299,6 +299,15 @@ the reason is usually that the cheap fix is the wrong one.
   cross-module navigation guard the entry above wants; **do not build a
   Team-Building-local version of it.**
 
+- **Three defensive abilities are deliberately not modelled**, all in
+  `src/modules/team-builder/typeDefence.ts`: Filter and Solid Rock (0.75x on
+  super-effective) and Dry Skin's 1.25x Fire penalty. Each would put a build on a
+  multiplier that is not a chart tier — 1.5x, 3x, 2.5x — and the matchup panel
+  groups by tier. Dry Skin's Water immunity IS modelled. **Lightning Rod and
+  Storm Drain are absent on purpose and are an era trap, not an omission**: in
+  Gen 3-4 both only REDIRECT the move and the holder still takes normal damage;
+  the immunity arrives in Gen 5, which is outside this app's scope.
+
 - **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
   one species whose HP does not follow the normal formula — it is always 1,
   at every level, with any DV/IV or EV spread — and `statMath.ts` computes it

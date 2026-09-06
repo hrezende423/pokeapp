@@ -38,7 +38,7 @@ import { usePrompt } from './ui/usePrompt'
 import { EmptySlot, MemberCard } from './ui/MemberCard'
 import { SpeciesMatchup, TeamMatchup } from './ui/TypeMatchup'
 import { buildSpecies, newBuildInit, typeIdsFor } from './buildFacts'
-import { TEAM_SIZE, teamLabel, type Build, type Team } from './model'
+import { TEAM_SIZE, teamUiId, type Build, type Team } from './model'
 import {
   createBuild,
   deleteTeam,
@@ -68,11 +68,13 @@ export function TeamViewer({ teamId }: { teamId: string }) {
     return (
       <section className="tb-screen" data-testid="tb-team-viewer">
         <p className="tb-empty-note">This team no longer exists.</p>
-        <GhostButton onClick={() => goTo({ kind: 'my-teams' })}>Back to My Teams</GhostButton>
+        <GhostButton onClick={() => goTo({ kind: 'my-teams' })}>Back to the Team Library</GhostButton>
       </section>
     )
   }
 
+  /* Position in the library, not a stored counter -- see model.ts. */
+  const label = teamUiId(data, team.id)
   const buildById = new Map(data.builds.map((b) => [b.id, b]))
   const members = team.memberIds.map((id) => (id == null ? null : (buildById.get(id) ?? null)))
   const firstOpen = members.findIndex((m) => m == null)
@@ -85,10 +87,14 @@ export function TeamViewer({ teamId }: { teamId: string }) {
         ? {
             label: facts.species.display_name,
             typeIds: typeIdsFor(facts.variety, build.generation),
+            /* The member's OWN ability, so Levitate and friends count. */
+            abilityId: build.abilityId,
           }
         : null
     })
-    .filter((m): m is { label: string; typeIds: number[] } => m != null)
+    .filter(
+      (m): m is { label: string; typeIds: number[]; abilityId: number | null } => m != null,
+    )
 
   /*
     NO `setTeamMember` HERE ANY MORE. The new build is a draft: it opens in the
@@ -119,10 +125,10 @@ export function TeamViewer({ teamId }: { teamId: string }) {
       <header className="tb-screen-head">
         <GhostButton onClick={() => goTo({ kind: 'my-teams' })} testId="tb-back-to-teams">
           <IconChevronLeft size={18} stroke={1.5} />
-          My Teams
+          Team Library
         </GhostButton>
         <span className="tb-team-id num" data-testid="tb-viewer-team-id">
-          {teamLabel(team)}
+          {label}
         </span>
         <div className="tb-dock-anchor">
           <Dock
@@ -156,7 +162,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
                 testId: 'tb-viewer-delete',
                 onClick: () =>
                   prompt.confirm(
-                    `Delete team ${teamLabel(team)}?`,
+                    `Delete team ${label}?`,
                     () => {
                       deleteTeam(team.id)
                       goTo({ kind: 'my-teams' })
@@ -238,8 +244,10 @@ export function TeamViewer({ teamId }: { teamId: string }) {
             </GhostButton>
             <GhostButton
               onClick={() => {
+                const slot = picking
                 setPicking(null)
-                goTo({ kind: 'build-library' })
+                /* WITH THE SLOT, so the library knows to come back here. */
+                goTo({ kind: 'build-library', pickFor: { teamId: team.id, slot } })
               }}
               testId="tb-add-member-existing"
             >
@@ -251,7 +259,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
 
       {info && (
         <Modal
-          title={`Team ${teamLabel(team)} info`}
+          title={`Team ${label} info`}
           onClose={() => setInfo(false)}
           testId="tb-viewer-info-modal"
         >
@@ -300,6 +308,8 @@ function MemberSlot({
     <MemberCard
       build={build}
       variant="full"
+      /* One team on screen, so the stored animation is worth its decode. */
+      animated
       testId={`tb-slot-${slot}`}
       onOpen={onOpen}
       draggable
@@ -333,6 +343,7 @@ function MemberSlot({
                 {facts && (
                   <SpeciesMatchup
                     typeIds={typeIdsFor(facts.variety, build.generation)}
+                    abilityId={build.abilityId}
                     generation={build.generation}
                     title={facts.species.display_name}
                   />

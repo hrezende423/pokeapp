@@ -91,7 +91,7 @@ import {
   NICKNAME_MAX,
   clearMoveSlot,
   setMoveSlot,
-  teamLabel,
+  teamUiId,
   teamsUsingBuild,
   type Build,
 } from './model'
@@ -399,7 +399,7 @@ function BuildFormFields({
     prompt.ask({
       title: 'This build is used by more than one team',
       body: `Saving changes it for all ${attachedTeams.length} teams that use it (${attachedTeams
-        .map((t) => teamLabel(t))
+        .map((t) => teamUiId(data, t.id))
         .join(', ')}).`,
       testId: 'tb-shared-prompt',
       actions: [
@@ -1016,6 +1016,7 @@ function BuildFormFields({
               {facts && (
                 <SpeciesMatchup
                   typeIds={typeIdsFor(facts.variety, generation)}
+                  abilityId={build.abilityId}
                   generation={generation}
                   title={facts.species.display_name}
                 />
@@ -1142,7 +1143,7 @@ function BuildFormFields({
           )}
           {railTeam && (
             <span className="tb-rail-team num" data-testid="tb-rail-team">
-              {teamLabel(railTeam)}
+              {teamUiId(data, railTeam.id)}
             </span>
           )}
         </aside>

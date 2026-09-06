@@ -133,9 +133,45 @@ export function zeroSpread(): StatNumbers {
   return {}
 }
 
-/** "#001" -- the only identity a team has. */
-export function teamLabel(team: Pick<Team, 'seq'>): string {
-  return `#${String(team.seq).padStart(3, '0')}`
+/*
+  ------------------------------------------------------------ THE TWO IDS
+
+  `id` ("t3", "b12") is the PRIMARY KEY: immutable, never reused, never shown.
+  Every reference between records is one of these, so nothing below can break a
+  team's link to its members.
+
+  The "#001" the reader sees is a different thing entirely and is DERIVED FROM
+  POSITION rather than stored. That is the whole mechanism: delete #002 and the
+  one after it is now second in the list, so it IS #002, with no renumbering
+  pass to run and nothing to keep in sync. A stored counter cannot do this --
+  it either leaves a hole at #002 or has to rewrite every record after it.
+
+  It also means the displayed number is not stable across a deletion, which is
+  exactly what was asked for. Never persist one, and never use one to look a
+  record up: `uiId` is for showing, `id` is for finding.
+*/
+
+/** The reader-facing number for a position in a list. */
+export function uiId(index: number): string {
+  return index < 0 ? '#---' : `#${String(index + 1).padStart(3, '0')}`
+}
+
+/** Teams in creation order, which is the order the numbering counts in. */
+export function orderedTeams(data: TeamBuilderData): Team[] {
+  return [...data.teams].sort((a, b) => a.seq - b.seq)
+}
+
+/** Builds in creation order. Drafts are not builds yet, so they are not numbered. */
+export function orderedBuilds(data: TeamBuilderData): Build[] {
+  return data.builds.filter((b) => !b.draft)
+}
+
+export function teamUiId(data: TeamBuilderData, teamId: string): string {
+  return uiId(orderedTeams(data).findIndex((t) => t.id === teamId))
+}
+
+export function buildUiId(data: TeamBuilderData, buildId: string): string {
+  return uiId(orderedBuilds(data).findIndex((b) => b.id === buildId))
 }
 
 /** Every team this build is a member of. Length >= 2 is what gates the prompt. */

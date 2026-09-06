@@ -26,7 +26,7 @@ import { BuildLibrary } from './BuildLibrary'
 import { MyTeams } from './MyTeams'
 import { TeamViewer } from './TeamViewer'
 import { newBuildInit } from './buildFacts'
-import { createBuild, createTeam, deleteBuild, readData } from './store'
+import { createBuild, createTeam, deleteBuild, deleteTeam, readData } from './store'
 import { goTo, readTbScreen, useTbScreen, type TbScreen } from './tbNav'
 import './teamBuilder.css'
 
@@ -110,6 +110,17 @@ export function TeamBuilding() {
     for (const build of readData().builds) {
       if (build.draft && build.id !== open) deleteBuild(build.id)
     }
+    /*
+      AND EMPTY TEAMS, for the same reason and by the same rule. "New team"
+      creates one before there is anything to put in it, so abandoning that
+      screen used to leave a row of nothing at the top of the Team Library
+      forever. The team being LOOKED AT is spared, because that is the one
+      being filled right now.
+    */
+    const openTeam = live.kind === 'team-viewer' ? live.teamId : null
+    for (const team of readData().teams) {
+      if (team.id !== openTeam && team.memberIds.every((m) => m == null)) deleteTeam(team.id)
+    }
     /* Mount only: a draft created LATER is the one being edited right now. */
   }, [])
 
@@ -125,7 +136,9 @@ export function TeamBuilding() {
       <ScrollArea testId="tb-scroll" hint={false}>
         {screen.kind === 'my-teams' && <MyTeams generation={generation} />}
         {screen.kind === 'team-viewer' && <TeamViewer teamId={screen.teamId} />}
-        {screen.kind === 'build-library' && <BuildLibrary generation={generation} />}
+        {screen.kind === 'build-library' && (
+          <BuildLibrary generation={generation} pickFor={screen.pickFor} />
+        )}
         {screen.kind === 'build-form' && (
           <BuildForm buildId={screen.buildId} origin={screen.origin} generation={generation} />
         )}

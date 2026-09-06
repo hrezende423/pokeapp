@@ -49,11 +49,22 @@ import { spreadStatKeys, statKeysForGeneration, type Build } from '../model'
 export type MemberCardVariant = 'compact' | 'full' | 'library' | 'rail'
 
 /** Type-coloured move name, its event asterisk, and its category. */
+/**
+ * One move on a card: name, type, category.
+ *
+ * ALWAYS THREE CELLS, EMPTY SLOTS INCLUDED. The moves list is one grid and each
+ * line is `display: contents`, which is what makes the type and category line up
+ * as COLUMNS down the card instead of each row sizing its own. A line that
+ * emitted a single cell would put the next row's name in the type column and
+ * shear the whole block, so the empty state fills all three too.
+ */
 export function MoveLine({ row, testId }: { row: MoveRow | null; testId?: string }) {
   if (!row) {
     return (
       <span className="tb-move tb-move-empty" data-testid={testId} data-empty="true">
-        —
+        <span className="tb-move-name">—</span>
+        <span />
+        <span />
       </span>
     )
   }
@@ -66,7 +77,9 @@ export function MoveLine({ row, testId }: { row: MoveRow | null; testId?: string
       data-event={row.isEvent ? 'true' : undefined}
     >
       <span className="tb-move-name">
-        ~{row.name}
+        {/* A space after the tilde: "~Razor Leaf", not "~Razor Leaf" run together. */}
+        {'~ '}
+        {row.name}
         {/* The asterisk IS the event affordance; which event it came from is
             deliberately not tracked. */}
         {row.isEvent && <span className="tb-move-event">*</span>}
@@ -91,6 +104,7 @@ export function MemberCard({
   onDrop,
   onDragEnd,
   testId,
+  animated = false,
 }: {
   build: Build
   variant?: MemberCardVariant
@@ -106,6 +120,15 @@ export function MemberCard({
   onDrop?: (e: React.DragEvent) => void
   onDragEnd?: (e: React.DragEvent) => void
   testId?: string
+  /**
+   * Ask for the stored animated artwork instead of the still.
+   *
+   * OPT-IN, not the default. Six animated WebPs on a Team Library row is six
+   * decoders running for a screen you are scanning, and the library's job is to
+   * be read quickly. The Team Viewer shows one team at a time, which is where
+   * the motion is worth its cost.
+   */
+  animated?: boolean
 }) {
   const facts = buildSpecies(build)
   if (!facts) {
@@ -126,12 +149,17 @@ export function MemberCard({
      three on the in-game sprite -- so one screen showed a Pokemon at 475px of
      smooth artwork and the next showed the same build as a 64px pixel tile. The
      module now shows one picture of a species everywhere. */
-  const art = resolveArtworkUrl(species, variety, {
+  const view = {
     source: 'artwork',
-    motion: 'static',
     shiny: build.shiny,
-    gender: build.gender === 'female' ? 'female' : 'male',
-  })
+    gender: build.gender === 'female' ? 'female' : ('male' as const),
+  } as const
+  /* FALLS BACK TO THE STILL. The animated set covers 1,174 slots, not all of
+     them, and `resolveArtworkUrl` answers null rather than inventing a URL --
+     so a species without one shows its artwork instead of a broken image. */
+  const art =
+    (animated ? resolveArtworkUrl(species, variety, { ...view, motion: 'animated' }) : null) ??
+    resolveArtworkUrl(species, variety, { ...view, motion: 'static' })
 
   /* Natures and abilities do not exist before Gen 3, so the line is absent then
      rather than showing two em-dashes. */
@@ -140,6 +168,12 @@ export function MemberCard({
   const showLevel = variant !== 'compact'
 
   const art_ = art ? <img src={art} alt="" loading="lazy" /> : <span className="tb-card-art-none" />
+
+  /* Nature first, then ability -- the same order on every variant. */
+  const metaParts = [
+    build.natureId != null ? natureName(build.natureId) : null,
+    build.abilityId != null ? abilityName(build.abilityId) : null,
+  ].filter((x): x is string => x != null)
 
   /* Gen 1 has no held items, so no badge -- not an empty one. The same
      artwork-then-icon pairing the Build Form's identity panel uses. */
@@ -178,8 +212,10 @@ export function MemberCard({
       >
         <button type="button" className="tb-card-rail-open" onClick={onOpen}>
           <span className="tb-card-art">
-            {art_}
-            {heldBadge}
+            <span className="tb-card-frame">
+              {art_}
+              {heldBadge}
+            </span>
           </span>
           <span className="tb-rail-lines">
             <span className="tb-rail-line">
@@ -210,8 +246,22 @@ export function MemberCard({
             {species.name_ja}
           </span>
         )}
-        {art_}
-        {heldBadge}
+        {/*
+          A SQUARE FRAME AROUND THE ARTWORK, so the held item can be pinned to
+          the PICTURE rather than to the art box. Official artwork is square and
+          `object-fit: contain` centres it, so in a box wider than it is tall the
+          rendered image's corner is nowhere near the element's corner -- the
+          badge floated off in the letterbox margin, more than 100px clear of
+          the Pokemon on a library card. The frame carries the artwork's own 1:1
+          ratio, which makes its bottom-right corner the picture's.
+
+          The watermarks stay OUTSIDE the frame: they are positioned against the
+          whole art box on purpose, because they bleed off the card.
+        */}
+        <span className="tb-card-frame">
+          {art_}
+          {heldBadge}
+        </span>
       </span>
       <span className="tb-card-facts">
         <span className="tb-card-headline">
@@ -236,16 +286,15 @@ export function MemberCard({
             </span>
           ))}
         </span>
-        {showMeta &&
-          (variant === 'compact' ? (
-            <span className="tb-card-meta">
-              {abilityName(build.abilityId)} · {natureName(build.natureId)}
-            </span>
-          ) : (
-            <span className="tb-card-meta">
-              {natureName(build.natureId)} Nature &nbsp; {abilityName(build.abilityId)}
-            </span>
-          ))}
+        {/*
+          ONLY WHAT IS SET, joined by a dot. The word "Nature" is gone and so is
+          the em-dash placeholder: a build with no nature said "— Nature" on
+          every card, which is a label for an absence rather than information.
+          Nothing set at all renders no line, not an empty one.
+        */}
+        {showMeta && metaParts.length > 0 && (
+          <span className="tb-card-meta">{metaParts.join(' · ')}</span>
+        )}
         {showMoves && (
           <>
             <span
