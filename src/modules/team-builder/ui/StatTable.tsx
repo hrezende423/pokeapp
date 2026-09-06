@@ -1,5 +1,12 @@
 /**
- * The four-column stat table: name | base | computed total | bar.
+ * The stat table: Stat | Base | Total, with a bar.
+ *
+ * TWO TOTALS, AND THEY ARE DIFFERENT NUMBERS. The Base column sums to the BST --
+ * a property of the species, the number people quote when comparing Pokemon --
+ * while the Total column sums the computed stats at this level, spread and
+ * nature, which is a property of this build. Showing only the second, as this
+ * table did, silently answered a question nobody asked with a number that looks
+ * like the familiar one.
  *
  * THE BAR IS THE ONE SANCTIONED REVERSAL of "stats are a plain table" -- six
  * values on one scale where the spread is the fact. It is scoped to this block
@@ -39,10 +46,25 @@ export function StatTable({ build, facts }: { build: Build; facts: SpeciesFacts 
     return { key, base, total, mod }
   })
 
+  const bst = rows.reduce((acc, r) => acc + r.base, 0)
   const sum = rows.reduce((acc, r) => acc + r.total, 0)
 
   return (
     <table className="tb-stats" data-testid="tb-stat-table">
+      <thead>
+        <tr>
+          <th scope="col" className="tb-stat-head">
+            Stat
+          </th>
+          <th scope="col" className="tb-stat-head">
+            Base
+          </th>
+          <th scope="col" className="tb-stat-head">
+            Total
+          </th>
+          <th />
+        </tr>
+      </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.key} data-stat={row.key}>
@@ -75,7 +97,10 @@ export function StatTable({ build, facts }: { build: Build; facts: SpeciesFacts 
           <th scope="row" className="tb-stat-name">
             Total
           </th>
-          <td />
+          {/* The BST, under the column it sums. */}
+          <td className="tb-stat-base num" title="Base stat total" data-testid="tb-stat-bst">
+            {bst}
+          </td>
           <td className="tb-stat-total num" data-testid="tb-stat-sum">
             {sum}
           </td>

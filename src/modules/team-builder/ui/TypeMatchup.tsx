@@ -1,13 +1,19 @@
 /**
- * Type coverage, at two scopes, from one component.
+ * Type coverage, at three scopes, from one file.
  *
- * PER-SPECIES it is the ordinary defensive chart: how hard each attacking type
- * hits this Pokemon. PER-TEAM it is the question that actually matters when
- * building -- for each attacking type, how many of your members it hits super
- * effectively, and how many resist it. A team with four members weak to Ice has a
- * problem no single member's chart reveals.
+ * DEFENSIVE (per species) -- how hard each attacking type hits this Pokemon.
+ * OFFENSIVE (per moveset) -- what this build's damaging moves can hit back.
+ * TEAM -- for each attacking type, how many members it hits super effectively.
  *
- * Both are computed live from `typeEffectivenessAgainst`, per the spec's
+ * THE PANELS ARE GROUPED BY MULTIPLIER, NOT JUST BY SIGN. "Weak to" that mixes
+ * 4x and 2x buries the two types that will actually kill you among the six that
+ * merely hurt, and a 4x weakness is a different fact about a build than a 2x
+ * one. Same on the other side: a 0.25x resistance is a switch-in and a 0.5x is
+ * not. So each column splits into rows, one per distinct multiplier, ordered
+ * worst-first -- and a row with nothing in it is not rendered at all rather than
+ * printed empty.
+ *
+ * Everything is computed live from `typeEffectivenessAgainst`, per the spec's
  * "Must-have live computed value" -- nothing here is cached or precomputed, and
  * the generation is always passed through, so a Gen 1 team correctly sees no Dark
  * or Steel column and Gen 1's own type chart.
@@ -15,18 +21,57 @@
 
 import { typeEffectivenessAgainst } from '../../../data'
 import { TypeLabel } from '../../../components/ds/TypeLabel'
+import { attackingTypesFor, offensiveCoverage } from '../buildFacts'
 
-/** x4 and x2 both read as "weak"; x0 and x0.25/x0.5 as "resists". */
-function bucket(multiplier: number): 'weak' | 'resist' | 'neutral' {
-  if (multiplier > 1) return 'weak'
-  if (multiplier < 1) return 'resist'
-  return 'neutral'
+interface Row {
+  name: string
+  multiplier: number
 }
 
+/** "4x", "0.5x", "0x". Fractions keep their decimals; whole numbers do not gain any. */
 function formatMultiplier(multiplier: number): string {
-  if (multiplier === 0) return '0'
-  if (Number.isInteger(multiplier)) return `${multiplier}x`
   return `${multiplier}x`
+}
+
+/**
+ * One column: a heading, then one row per distinct multiplier present.
+ *
+ * `order` decides which multiplier leads. Weaknesses read worst-first (4 before
+ * 2); resistances read best-first (0.25 before 0.5), because in both cases the
+ * first row is the one that changes a decision.
+ */
+function Column({
+  label,
+  rows,
+  order,
+  testId,
+}: {
+  label: string
+  rows: Row[]
+  order: 'desc' | 'asc'
+  testId: string
+}) {
+  if (rows.length === 0) return null
+  const multipliers = [...new Set(rows.map((r) => r.multiplier))].sort((a, b) =>
+    order === 'desc' ? b - a : a - b,
+  )
+  return (
+    <div className="tb-matchup-col" data-testid={testId}>
+      <span className="tb-matchup-label">{label}</span>
+      {multipliers.map((multiplier) => (
+        <div className="tb-matchup-tier" key={multiplier} data-mult={multiplier}>
+          <span className="tb-matchup-mult num">{formatMultiplier(multiplier)}</span>
+          <span className="tb-matchup-rows">
+            {rows
+              .filter((r) => r.multiplier === multiplier)
+              .map((r) => (
+                <TypeLabel key={r.name} type={r.name} small />
+              ))}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export function SpeciesMatchup({
@@ -38,42 +83,84 @@ export function SpeciesMatchup({
   generation: number
   title: string
 }) {
-  const rows = typeEffectivenessAgainst(typeIds, generation)
-  const weak = rows.filter((r) => bucket(r.multiplier) === 'weak')
-  const resist = rows.filter((r) => bucket(r.multiplier) === 'resist')
+  const rows = typeEffectivenessAgainst(typeIds, generation).map((r) => ({
+    name: r.type.name,
+    multiplier: r.multiplier,
+  }))
+  const weak = rows.filter((r) => r.multiplier > 1)
+  const resist = rows.filter((r) => r.multiplier < 1 && r.multiplier > 0)
+  const immune = rows.filter((r) => r.multiplier === 0)
 
   return (
     <div className="tb-matchup" data-testid="tb-matchup-species">
-      <p className="tb-matchup-title">{title}</p>
-      <MatchupGroup label="Weak to" rows={weak} empty="Nothing" />
-      <MatchupGroup label="Resists" rows={resist} empty="Nothing" />
+      <p className="tb-matchup-title">{title} · taking damage</p>
+      <div className="tb-matchup-cols">
+        <Column label="Weak to" rows={weak} order="desc" testId="tb-matchup-weak" />
+        <Column label="Resists" rows={resist} order="asc" testId="tb-matchup-resist" />
+        <Column label="Immune to" rows={immune} order="desc" testId="tb-matchup-immune" />
+      </div>
+      {weak.length === 0 && resist.length === 0 && immune.length === 0 && (
+        <span className="tb-matchup-empty">Neutral against everything.</span>
+      )}
     </div>
   )
 }
 
-function MatchupGroup({
-  label,
-  rows,
-  empty,
+/**
+ * What the four move slots can hit.
+ *
+ * THE EMPTY CASE IS ITS OWN ANSWER. A build with no damaging moves is not
+ * "neutral coverage" -- it has none, and saying so is the useful thing. The
+ * ignored count is shown because "3 moves, 1 counted" is a question the reader
+ * would otherwise have to ask: status and fixed-damage moves do not scale with
+ * the chart, so they buy no coverage. See `attackingTypesFor`.
+ */
+export function MovesetCoverage({
+  moveIds,
+  generation,
+  title,
 }: {
-  label: string
-  rows: { type: { id: number; name: string }; multiplier: number }[]
-  empty: string
+  moveIds: (number | null)[]
+  generation: number
+  title: string
 }) {
+  const { types, counted, ignored } = attackingTypesFor(moveIds, generation)
+  const rows: Row[] = offensiveCoverage(types, generation).map((r) => ({
+    name: r.type,
+    multiplier: r.multiplier,
+  }))
+  const superEff = rows.filter((r) => r.multiplier > 1)
+  const resisted = rows.filter((r) => r.multiplier < 1 && r.multiplier > 0)
+  const immune = rows.filter((r) => r.multiplier === 0)
+
   return (
-    <div className="tb-matchup-group">
-      <span className="tb-matchup-label">{label}</span>
-      {rows.length === 0 ? (
-        <span className="tb-matchup-empty">{empty}</span>
-      ) : (
-        <span className="tb-matchup-rows">
-          {rows.map((row) => (
-            <span key={row.type.id} className="tb-matchup-row">
-              <TypeLabel type={row.type.name} small />
-              <span className="tb-matchup-mult num">{formatMultiplier(row.multiplier)}</span>
-            </span>
-          ))}
+    <div className="tb-matchup" data-testid="tb-matchup-offense">
+      <p className="tb-matchup-title">{title} · dealing damage</p>
+      {types.length === 0 ? (
+        <span className="tb-matchup-empty" data-testid="tb-matchup-offense-empty">
+          No damaging moves selected, so there is no coverage to show. Status and fixed-damage moves
+          do not scale with the type chart.
         </span>
+      ) : (
+        <>
+          <p className="tb-matchup-note">
+            <span className="tb-matchup-rows">
+              {types.map((t) => (
+                <TypeLabel key={t} type={t} small />
+              ))}
+            </span>
+            {ignored > 0 && (
+              <span className="tb-matchup-ignored">
+                {counted} of {counted + ignored} moves counted
+              </span>
+            )}
+          </p>
+          <div className="tb-matchup-cols">
+            <Column label="Hits hard" rows={superEff} order="desc" testId="tb-matchup-super" />
+            <Column label="Resisted by" rows={resisted} order="asc" testId="tb-matchup-resisted" />
+            <Column label="No effect on" rows={immune} order="desc" testId="tb-matchup-noeffect" />
+          </div>
+        </>
       )}
     </div>
   )
@@ -104,9 +191,8 @@ export function TeamMatchup({
   for (const member of members) {
     for (const row of typeEffectivenessAgainst(member.typeIds, generation)) {
       const entry = tally.get(row.type.id) ?? { name: row.type.name, weak: 0, resist: 0 }
-      const kind = bucket(row.multiplier)
-      if (kind === 'weak') entry.weak += 1
-      if (kind === 'resist') entry.resist += 1
+      if (row.multiplier > 1) entry.weak += 1
+      if (row.multiplier < 1) entry.resist += 1
       tally.set(row.type.id, entry)
     }
   }

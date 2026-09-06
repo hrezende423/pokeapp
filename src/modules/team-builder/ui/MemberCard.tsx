@@ -37,6 +37,7 @@ import {
   categoryLabel,
   displayName,
   genderGlyph,
+  itemArtFor,
   itemName,
   moveRowsFor,
   natureName,
@@ -140,28 +141,59 @@ export function MemberCard({
 
   const art_ = art ? <img src={art} alt="" loading="lazy" /> : <span className="tb-card-art-none" />
 
+  /* Gen 1 has no held items, so no badge -- not an empty one. The same
+     artwork-then-icon pairing the Build Form's identity panel uses. */
+  const heldArt = build.generation >= 2 ? itemArtFor(build.itemId) : null
+  const heldBadge = heldArt ? (
+    <img
+      className="tb-held-item"
+      src={heldArt.artwork}
+      alt=""
+      loading="lazy"
+      title={itemName(build.itemId)}
+      data-testid={testId ? `${testId}-item` : undefined}
+      onError={(e) => {
+        const img = e.currentTarget
+        if (img.dataset.fallback === 'true') return
+        img.dataset.fallback = 'true'
+        img.src = heldArt.icon
+      }}
+    />
+  ) : null
+
   if (variant === 'rail') {
+    /*
+      A DIV WRAPPING A BUTTON, not a button. This card used to BE the button,
+      which left nowhere to put the delete control: a <button> inside a <button>
+      is markup React rejects, and the corner controls every other variant has
+      are buttons. The open action is now its own child, and `corners` sits
+      beside it -- the same shape the other three variants already use.
+    */
     return (
-      <button
-        type="button"
+      <div
         className="tb-card tb-card-rail"
         data-tb="member-card"
         data-testid={testId}
         data-build-id={build.id}
-        onClick={onOpen}
       >
-        <span className="tb-card-art">{art_}</span>
-        <span className="tb-rail-lines">
-          <span className="tb-rail-line">
-            {showMeta ? natureName(build.natureId) : primary}
-            {build.itemId != null && ` @${itemName(build.itemId)}`}
+        <button type="button" className="tb-card-rail-open" onClick={onOpen}>
+          <span className="tb-card-art">
+            {art_}
+            {heldBadge}
           </span>
-          <span className="tb-rail-line">
-            {showMeta ? abilityName(build.abilityId) : species.display_name} · Lv.{build.level}
+          <span className="tb-rail-lines">
+            <span className="tb-rail-line">
+              {showMeta ? natureName(build.natureId) : primary}
+              {build.itemId != null && ` @${itemName(build.itemId)}`}
+            </span>
+            <span className="tb-rail-line">
+              {showMeta ? abilityName(build.abilityId) : species.display_name} · Lv.{build.level}
+            </span>
+            <span className="tb-rail-line num">{spread ?? 'No investment'}</span>
           </span>
-          <span className="tb-rail-line num">{spread ?? 'No investment'}</span>
-        </span>
-      </button>
+        </button>
+        {corners}
+      </div>
     )
   }
 
@@ -179,6 +211,7 @@ export function MemberCard({
           </span>
         )}
         {art_}
+        {heldBadge}
       </span>
       <span className="tb-card-facts">
         <span className="tb-card-headline">

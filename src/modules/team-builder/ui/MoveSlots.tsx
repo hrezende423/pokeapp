@@ -17,7 +17,8 @@
  */
 
 import { TypeLabel } from '../../../components/ds/TypeLabel'
-import { categoryLabel, moveRowFor } from '../buildFacts'
+import { categoryLabel, moveInfoFor, moveRowFor } from '../buildFacts'
+import { InfoTip, MoveTipFacts } from './InfoTip'
 import { MOVE_SLOTS } from '../model'
 import type { LegalMove } from '../legalMoveset'
 
@@ -50,9 +51,32 @@ export function MoveSlots({
         const type = chosen?.type ?? fallback?.type ?? null
         const category = chosen?.category ?? fallback?.category ?? null
 
+        /* Reads the SELECTED move, so the tip describes what is in the slot
+           rather than whatever the dropdown is hovering. Null when empty, and
+           InfoTip then renders no icon at all. */
+        const info = moveInfoFor(moveId, generation)
+
         return (
           <div className="tb-move-slot" key={slot} data-testid={`tb-move-slot-${slot}`}>
-            <span className="tb-field-label">Move {slot + 1}</span>
+            <span className="tb-field-label">
+              Move {slot + 1}
+              {info && (
+                <InfoTip
+                  summary={info.text}
+                  label={`${info.name} info`}
+                  testId={`tb-move-info-${slot}`}
+                >
+                  <span className="tb-infotip-name">{info.name}</span>
+                  <MoveTipFacts
+                    power={info.power}
+                    pp={info.pp}
+                    accuracy={info.accuracy}
+                    category={categoryLabel(info.category)}
+                    type={info.type ? <TypeLabel type={info.type} small /> : null}
+                  />
+                </InfoTip>
+              )}
+            </span>
             <select
               className="tb-select"
               value={moveId ?? ''}

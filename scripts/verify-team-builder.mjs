@@ -491,7 +491,10 @@ try {
   )
 
   // ---- the right rail shows the team's REAL other members
-  const railIds = await page.$$eval('[data-testid^="tb-rail-b"]', (els) =>
+  /* SCOPED TO THE CARD, because each rail member now also carries a delete
+     control whose testid starts with the same prefix. Matching on the card
+     marker is what keeps this counting members rather than controls. */
+  const railIds = await page.$$eval('[data-tb="member-card"][data-testid^="tb-rail-b"]', (els) =>
     els.map((e) => e.dataset.buildId),
   )
   check(
@@ -859,13 +862,15 @@ try {
   await page.click('[data-testid="tb-build-b1-open"]')
   await page.waitForSelector('[data-testid="tb-build-form"]')
   check(
-    'the seeded build really is holding an item, so the `item` area exists',
+    'the seeded build really is holding an item, so the badge renders',
     (await page.$$('[data-testid="tb-held-item"]')).length === 1,
   )
 
-  /* Deliberately cruel: shorter than any real laptop, so the form MUST overflow
-     and the scroll area is the only thing that can save it. */
-  await page.setViewportSize({ width: 1440, height: 620 })
+  /* Deliberately cruel, and it has to STAY cruel: the form has been tightened
+     twice since this was written and at 620px it now simply fits, which made
+     this assert the opposite of what it means. 420 is shorter than any real
+     window and guarantees the overflow the scroll area exists to absorb. */
+  await page.setViewportSize({ width: 1440, height: 420 })
   await page.waitForTimeout(400)
   const scrollState = await page.evaluate(() => {
     const area = document.querySelector('[data-testid="tb-scroll"]')
@@ -921,8 +926,11 @@ try {
   log(`  regions: ${regions.join(', ')}`)
   check(
     '?layout=1 names the form regions, including the artwork grid areas',
-    ['form-grid', 'identity', 'identity-art', 'main', 'rail', 'dex', 'kana', 'shiny', 'item'].every(
-      (n) => regions.includes(n),
+    /* No `item`: the held badge stopped being a grid area when it moved inside
+       .tb-sprite-frame to sit on the artwork's own corner. It is positioned
+       against that frame now, not placed in a track. */
+    ['form-grid', 'identity', 'identity-art', 'main', 'rail', 'dex', 'kana', 'shiny'].every((n) =>
+      regions.includes(n),
     ),
     regions.join(','),
   )
@@ -939,6 +947,221 @@ try {
   await page.waitForSelector('[data-testid="tb-build-grid"]')
   await page.click('[data-testid="tb-build-b1-open"]')
   await page.waitForSelector('[data-testid="tb-build-form"]')
+
+  // =====================================================================
+  /*
+    8. COVERAGE, TOOLTIPS AND THE RAIL — the panels with real logic in them.
+
+    THE MOVESET RULE IS THE POINT OF THIS SECTION. Attacking coverage counts a
+    move only if it deals type-scaled damage, which rules out status moves AND
+    fixed-damage ones: Seismic Toss is a physical Fighting move that deals a flat
+    number, so counting it as Fighting coverage would promise a super-effective
+    hit that cannot happen. The build below carries exactly one of each -- two
+    real attacks, one status, one fixed-damage -- so a suite that got the rule
+    wrong in either direction fails here rather than looking plausible.
+  */
+  hr('8. COVERAGE, TOOLTIPS AND THE RAIL')
+  const moveIds2 = await page.evaluate(async () => {
+    const d = await import('/pokeapp/src/data/index.ts')
+    const m = {}
+    for (const x of d.listMoves()) m[x.name] = x.id
+    const it = {}
+    for (const x of d.listItems()) it[x.name] = x.id
+    return {
+      razorLeaf: m['razor-leaf'],
+      sludgeBomb: m['sludge-bomb'],
+      toxic: m['toxic'],
+      seismicToss: m['seismic-toss'],
+      leftovers: it['leftovers'],
+    }
+  })
+  await seedStore({
+    nextBuildSeq: 4,
+    nextTeamSeq: 2,
+    builds: [
+      mkBuild('b1', {
+        speciesId: 1,
+        pokemonId: 1,
+        itemId: moveIds2.leftovers,
+        abilityId: 65,
+        moveIds: [moveIds2.razorLeaf, moveIds2.sludgeBomb, moveIds2.toxic, moveIds2.seismicToss],
+      }),
+      mkBuild('b2', { speciesId: 4, pokemonId: 4 }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1', 'b2'])],
+  })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(500)
+
+  // ---- the stat table gained a Base column and the BST
+  const statHeads = await page.$$eval('.tb-stat-head', (els) =>
+    els.map((e) => e.textContent.trim()),
+  )
+  check(
+    'the stat table is headed Stat | Base | Total',
+    JSON.stringify(statHeads) === JSON.stringify(['Stat', 'Base', 'Total']),
+    statHeads.join(' | '),
+  )
+  const bst = await page.textContent('[data-testid="tb-stat-bst"]')
+  check(
+    'the BST is the sum of the BASE column, not of the computed one',
+    /* Bulbasaur: 45+49+49+65+65+45. The computed total differs at every level,
+       which is exactly why both are shown. */
+    bst.trim() === '318',
+    `BST reads ${bst.trim()}`,
+  )
+
+  // ---- attacking coverage counts only type-scaled damage
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-offence"]')
+  await page.waitForSelector('[data-testid="tb-form-offence-popover"]')
+  const offence = await page.evaluate(() => {
+    const scope = document.querySelector('[data-testid="tb-matchup-offense"]')
+    return {
+      note: scope.querySelector('.tb-matchup-ignored')?.textContent?.trim() ?? '',
+      brought: [...scope.querySelectorAll('.tb-matchup-note [data-ds="type-label"]')].map(
+        (e) => e.dataset.type,
+      ),
+      cols: [...scope.querySelectorAll('.tb-matchup-col')].map((c) => ({
+        label: c.querySelector('.tb-matchup-label').textContent.trim(),
+        tiers: [...c.querySelectorAll('.tb-matchup-tier')].map((t) => ({
+          mult: t.querySelector('.tb-matchup-mult').textContent.trim(),
+          types: [...t.querySelectorAll('[data-ds="type-label"]')].map((x) => x.dataset.type),
+        })),
+      })),
+    }
+  })
+  log(`  brought: ${offence.brought.join(',')} · ${offence.note}`)
+  check(
+    'attacking coverage counts Razor Leaf and Sludge Bomb, and ignores Toxic (status) and Seismic Toss (fixed damage)',
+    JSON.stringify([...offence.brought].sort()) === JSON.stringify(['grass', 'poison']) &&
+      offence.note === '2 of 4 moves counted',
+    `${offence.brought.join(',')} | ${offence.note}`,
+  )
+  const hits = offence.cols.find((c) => c.label === 'Hits hard')
+  check(
+    'and it reports the BEST multiplier per defending type, not a sum',
+    /* Grass hits Ground/Rock/Water for 2x and Poison hits Grass for 2x. Nothing
+       here reaches 4x, because one move cannot be two types. */
+    hits != null &&
+      hits.tiers.length === 1 &&
+      hits.tiers[0].mult === '2x' &&
+      ['grass', 'ground', 'rock', 'water'].every((t) => hits.tiers[0].types.includes(t)),
+    JSON.stringify(hits),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // ---- the defensive panel splits its tiers
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-matchup"]')
+  await page.waitForSelector('[data-testid="tb-form-matchup-popover"]')
+  const defence = await page.evaluate(() => {
+    const scope = document.querySelector('[data-testid="tb-matchup-species"]')
+    const cols = [...scope.querySelectorAll('.tb-matchup-col')]
+    return {
+      sideBySide: new Set(cols.map((c) => Math.round(c.getBoundingClientRect().y))).size === 1,
+      cols: cols.map((c) => ({
+        label: c.querySelector('.tb-matchup-label').textContent.trim(),
+        tiers: [...c.querySelectorAll('.tb-matchup-tier')].map((t) =>
+          t.querySelector('.tb-matchup-mult').textContent.trim(),
+        ),
+      })),
+    }
+  })
+  log(`  ${defence.cols.map((c) => `${c.label}[${c.tiers.join(' ')}]`).join('  ')}`)
+  const resists = defence.cols.find((c) => c.label === 'Resists')
+  check(
+    'the defensive panel splits Resists into its own 0.25x and 0.5x tiers, best first',
+    resists != null && JSON.stringify(resists.tiers) === JSON.stringify(['0.25x', '0.5x']),
+    JSON.stringify(resists),
+  )
+  check(
+    'and the rails sit side by side rather than stacking',
+    defence.sideBySide,
+    JSON.stringify(defence.cols.map((c) => c.label)),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // ---- natures say what they do
+  const natures = await page.$$eval('[data-testid="tb-nature"] option', (els) =>
+    els.map((e) => e.textContent.trim()),
+  )
+  check(
+    'every nature option carries its stat change, neutral ones included',
+    natures.includes('Adamant (+Atk -SpA)') &&
+      natures.includes('Modest (+SpA -Atk)') &&
+      natures.includes('Hardy (—)'),
+    natures.slice(1, 4).join(' | '),
+  )
+
+  // ---- info tips exist and carry real facts
+  const tip = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="tb-move-info-0"] .tb-infotip-panel')
+    return el ? el.textContent.replace(/\s+/g, ' ').trim() : null
+  })
+  log(`  move tip: ${tip}`)
+  check(
+    "the move tooltip carries the selected move's power, PP and accuracy",
+    tip != null &&
+      /Razor Leaf/.test(tip) &&
+      /Power 55/.test(tip) &&
+      /PP 25/.test(tip) &&
+      /Acc 95%/.test(tip),
+    tip ?? 'absent',
+  )
+  check(
+    'and the item and ability fields have one too',
+    (await page.$$('[data-testid="tb-item-info"]')).length === 1 &&
+      (await page.$$('[data-testid="tb-ability-info"]')).length === 1,
+  )
+  const tipHidden = await page.evaluate(
+    () =>
+      getComputedStyle(document.querySelector('[data-testid="tb-move-info-0"] .tb-infotip-panel'))
+        .display,
+  )
+  check('the tooltip is hidden until hovered', tipHidden === 'none', tipHidden)
+
+  // ---- the rail delete offers three answers, and each does what it says
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.click('[data-testid="tb-slot-0-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(400)
+  check(
+    'each rail member carries a delete control',
+    (await page.$$('[data-testid="tb-rail-b2-delete"]')).length === 1,
+  )
+  await page.hover('[data-testid="tb-rail-b2"]')
+  await page.click('[data-testid="tb-rail-b2-delete"]')
+  await page.waitForSelector('[data-testid="tb-rail-remove-prompt"]')
+  const removeOptions = await page.$$eval(
+    '[data-testid="tb-rail-remove-prompt"] .tb-prompt-actions button',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
+  check(
+    'removing a member asks: cancel, remove but keep the build, or delete it entirely',
+    removeOptions.length === 3 &&
+      /Cancel/i.test(removeOptions[0]) &&
+      /keep the build/i.test(removeOptions[1]) &&
+      /Delete the build/i.test(removeOptions[2]),
+    removeOptions.join(' | '),
+  )
+  await page.click('[data-testid="tb-rail-remove-keep"]')
+  await page.waitForTimeout(500)
+  const afterKeep = await readStore()
+  check(
+    '"remove, keep the build" empties the slot and leaves the build in the library',
+    afterKeep.teams[0].memberIds.filter((m) => m === 'b2').length === 0 &&
+      afterKeep.builds.some((b) => b.id === 'b2'),
+    `slots=${afterKeep.teams[0].memberIds.join(',')} builds=${afterKeep.builds.map((b) => b.id).join(',')}`,
+  )
 
   // =====================================================================
   hr('CONVENTIONS — across the whole module')

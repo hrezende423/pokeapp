@@ -249,10 +249,21 @@
   position: absolute;
   top: calc(100% + 6px);
   z-index: 40;
+  /*
+    WIDTH: max-content, and it is load-bearing. An absolutely positioned box is
+    shrink-to-fit against its CONTAINING BLOCK, and this one hangs off the dock
+    strip -- which is 30px wide. So "available width" was 30px and the panel
+    collapsed to its minimum, stacking the coverage columns one per line however
+    they were laid out. Sizing to content ignores the containing block entirely.
+  */
+  width: max-content;
+  max-width: min(560px, 90vw);
   padding: var(--space-gap-md);
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius-card);
+  /* Half the card radius. A 20px corner reads as a card -- something you might
+     drag or stack -- and these are transient panels hanging off an icon. */
+  border-radius: calc(var(--radius-card) / 2);
 }
 .tb-popover[data-align='right'] {
   right: 0;
@@ -276,7 +287,7 @@
   overflow: auto;
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius-drawer);
+  border-radius: calc(var(--radius-drawer) / 2);
 }
 .tb-modal[data-wide='true'] {
   width: min(880px, 100%);
@@ -293,6 +304,9 @@
   font-weight: var(--font-weight-medium);
 }
 .tb-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tb-2);
   padding: var(--space-gap-lg);
 }
 
@@ -314,7 +328,16 @@
   flex: 1;
 }
 
+/*
+  BOX-SIZING, which is the whole of the "the notes box touches the right edge"
+  bug. `width: 100%` on a textarea with 10px of padding and a 1px border comes
+  to 100% + 22px unless the border box is what 100% means -- so it overhung the
+  modal body's right gutter by exactly that. The left gutter looked fine because
+  the overflow only ever grows rightwards.
+*/
 .tb-notes {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
   min-height: 160px;
   padding: 10px;
@@ -561,7 +584,11 @@
   align-items: baseline;
   gap: 2px;
 }
+/* A HAIR EITHER SIDE. The row's own gap falls between the two <span> wrappers,
+   not between the dot and the label that follows it inside one, so "GRASS
+   ·POISON" had a space before the separator and none after it. */
 .tb-type-sep {
+  margin: 0 3px 0 1px;
   color: var(--text-secondary);
 }
 .tb-card-meta {
@@ -669,6 +696,74 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+/*
+  FLEX, NOT auto-fit GRID. The popover is absolutely positioned with no width of
+  its own, so it shrink-wraps its content -- which means an `auto-fit` track list
+  resolves against a container that is itself sized by the tracks, and every
+  column collapsed into one. Flex children size to their content and the panel
+  grows to hold them, which is what puts the three rails side by side.
+*/
+/*
+  A NOWRAP FLEX ROW, and both halves of that matter.
+
+  Flex rather than an `auto-fit` grid: the popover is absolutely positioned with
+  no width of its own, so an auto-fit track list resolves against a container
+  that is itself sized by the tracks, and every column collapsed into one.
+
+  NOWRAP rather than wrap: Chrome computes the max-content width of a MULTI-LINE
+  flex container as its widest single item, not as the sum of a line -- so with
+  `flex-wrap: wrap` the panel asked for one column's width, got it, and then
+  dutifully wrapped the rest onto their own lines. The two settings fought each
+  other into exactly the layout this replaced.
+*/
+.tb-matchup-cols {
+  display: flex;
+  gap: var(--space-gap-lg);
+  align-items: start;
+}
+/* Shrinkable, so when three rails together exceed the panel's cap they share it
+   and the type labels wrap inside each one rather than the rails stacking. */
+.tb-matchup-col {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--tb-3);
+  /*
+    A FLOOR, not just a cap, and it is what actually widens the panel. The
+    popover sizes to content, but every flex row in here wraps, and Chrome takes
+    a wrapping flex container's max-content to be its widest ITEM -- so the
+    columns' real width never propagated up and the panel stayed narrow enough
+    to squeeze two type labels per line. A min-width gives the shrink-to-fit
+    calculation a number it cannot argue with.
+  */
+  min-width: 168px;
+  max-width: 210px;
+}
+/*
+  One tier per distinct multiplier: 4x above 2x, 0.25x above 0.5x. The number
+  leads the row because it is what the reader is scanning for.
+
+  A GRID, so the multiplier gets a fixed track and the types get the rest. As a
+  flex row a wrapped second line of types started under the multiplier instead
+  of under the first type, which read as a new tier with a missing number.
+*/
+.tb-matchup-tier {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: var(--tb-3);
+  align-items: baseline;
+}
+.tb-matchup-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tb-3) var(--tb-4);
+  align-items: baseline;
+  margin: 0;
+  font-size: var(--font-size-caption);
+}
+.tb-matchup-ignored {
+  color: var(--text-secondary);
+}
 .tb-matchup-group {
   display: flex;
   flex-direction: column;
@@ -727,6 +822,21 @@
 
 /* ------------------------------------------------------------------- rail */
 
+/* The open action, now that the card itself is a wrapper holding it plus the
+   delete corner. Everything the card used to be, minus being a <button>. */
+.tb-card-rail-open {
+  display: flex;
+  gap: var(--tb-4);
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
 .tb-card-rail {
   display: flex;
   align-items: center;
@@ -966,28 +1076,33 @@
   left to fit inside, so a wide sprite lost its edges. Given the full stage and
   an explicit padding, `contain` can only ever letterbox.
 */
-.tb-identity-sprite {
+/*
+  A SQUARE FRAME, EXACTLY THE LETTERBOX. Official artwork is square and
+  `object-fit: contain` centres it inside whatever box it is given, so the
+  rendered picture's corner is nowhere near the <img> element's corner -- a held
+  item pinned to the grid area floated off in the empty margin beside the
+  Pokemon. Giving the pair a frame with the artwork's own 1:1 ratio makes the
+  frame's bottom-right corner the picture's bottom-right corner.
+
+  The margins are the padding the sprite used to carry, so the artwork lands
+  exactly where it did: 32px at the foot reserves the shiny switch's row, and
+  the wider left margin leaves the katakana watermark room to read.
+*/
+.tb-sprite-frame {
+  position: relative;
   z-index: 1;
-  /*
-    EXPLICIT 100%, and box-sizing, because this is a REPLACED element. Box
-    alignment's `normal` behaves as `stretch` for an ordinary box but as `start`
-    for a replaced one, so an <img> spanning the grid with `min-width: 0` was
-    free to resolve its content box to nothing -- which it did, leaving a 24x14
-    element that was pure padding. Sizing it outright is what gives `contain`
-    something to letterbox inside.
-  */
-  box-sizing: border-box;
   grid-area: 1 / 1 / -1 / -1;
+  align-self: start;
+  justify-self: center;
+  margin: var(--tb-5) var(--tb-2) 32px var(--tb-6);
+  height: calc(100% - 44px);
+  aspect-ratio: 1;
+}
+.tb-identity-sprite {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  /*
-    THE BOTTOM PADDING IS THE SWITCH'S ROW. The sprite spans every cell of this
-    grid, so without it the artwork ran under the switch and the two overlapped
-    in the bottom-left corner -- which is what "the toggle needs somewhere to go"
-    was about. `contain` letterboxes inside the padding box, so reserving the
-    height here moves the artwork up and leaves the row clear.
-  */
-  padding: var(--tb-5) var(--tb-2) 32px var(--tb-6);
   object-fit: contain;
 }
 /*
@@ -1016,20 +1131,41 @@
   font-size: var(--font-size-body);
   letter-spacing: 0.16em;
 }
-/* The held item, in the corner of the sprite. Official item artwork, so it is
-   rendered smoothly; the 30x30 game icon is only the onError fallback and asks
-   for `pixelated`, which is set on the element when that swap happens. */
+/*
+  IN FRONT, AT THE PICTURE'S BOTTOM-RIGHT. Positioned against .tb-sprite-frame
+  (or a card's .tb-card-art), both of which are the artwork's own box, so the
+  badge lands on the Pokemon rather than in the margin beside it. It overhangs
+  the corner slightly on purpose: sitting fully inside reads as part of the
+  artwork, and overlapping reads as held.
+
+  Dream World renders are smooth. The 30x30 game icon is only the onError
+  fallback -- PokeAPI has no Sugimori-style item art, and the Dream World set
+  covers about 60% of the bag: every real held item, no TMs, mail or key items.
+  `data-fallback` is what tells this rule it is drawing pixel art.
+*/
 .tb-held-item {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
   z-index: 2;
-  grid-area: item;
   width: 34px;
   height: 34px;
   object-fit: contain;
+  pointer-events: none;
 }
 .tb-held-item[data-fallback='true'] {
-  width: 28px;
-  height: 28px;
   image-rendering: pixelated;
+}
+/* Scaled to the card it sits on, not to the identity panel's 34px. */
+.tb-card-rail .tb-held-item,
+.tb-card-compact .tb-held-item {
+  width: 18px;
+  height: 18px;
+}
+.tb-card-full .tb-held-item,
+.tb-card-library .tb-held-item {
+  width: 26px;
+  height: 26px;
 }
 /*
   THE SHINY SWITCH LIVES ON THE ARTWORK, bottom-left, because that is what it
@@ -1063,12 +1199,6 @@
   flex-direction: column;
   gap: var(--tb-1);
   padding-top: var(--tb-1);
-}
-.tb-genus,
-.tb-ja {
-  margin: 0;
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
 }
 
 .tb-form-main {
@@ -1213,6 +1343,76 @@
 .tb-switch input:focus-visible + .tb-switch-track {
   outline: 2px solid var(--field-focus-border);
   outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- info tips */
+
+/*
+  HOVER AND FOCUS, NO JAVASCRIPT. See ui/InfoTip.tsx for why: ten of these on one
+  screen, each needing two timers and cleanup if it were stateful.
+*/
+.tb-infotip {
+  position: relative;
+  display: inline-flex;
+  margin-left: var(--tb-2);
+  vertical-align: middle;
+}
+.tb-infotip-trigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  color: var(--text-secondary);
+  cursor: help;
+  background: transparent;
+  border: none;
+}
+.tb-infotip-trigger:hover,
+.tb-infotip:focus-within .tb-infotip-trigger {
+  color: var(--accent);
+}
+/*
+  ABOVE THE FIELD, not below it. These sit on labels in a dense form, and a panel
+  opening downwards covers the control the label belongs to -- which is the one
+  thing the reader is looking at when they reach for the tip.
+*/
+.tb-infotip-panel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -8px;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  gap: var(--tb-2);
+  width: max-content;
+  max-width: 280px;
+  padding: var(--tb-4) var(--tb-5);
+  font-size: var(--font-size-caption);
+  letter-spacing: 0;
+  color: var(--text-primary);
+  text-transform: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-control) / 2);
+}
+.tb-infotip:hover .tb-infotip-panel,
+.tb-infotip:focus-within .tb-infotip-panel {
+  display: flex;
+}
+.tb-infotip-name {
+  font-weight: var(--font-weight-medium);
+}
+.tb-infotip-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tb-3) var(--tb-4);
+  align-items: baseline;
+  color: var(--text-secondary);
+}
+.tb-infotip-cat {
+  color: var(--text-secondary);
+}
+.tb-infotip-text {
+  color: var(--text-secondary);
 }
 
 /* ------------------------------------------------------------------- moves */
@@ -1411,8 +1611,27 @@
 }
 .tb-stats th,
 .tb-stats td {
-  padding: 1px 4px;
+  padding: 0 var(--tb-2);
+  line-height: 1.5;
   border-bottom: 1px solid var(--hairline);
+}
+/*
+  SMALLER THAN THE ROWS IT LABELS, in the label size the rest of the form uses
+  for the same job. A column heading set at the data's own size competes with
+  the data; this is the one place in the table that is not a number.
+*/
+.tb-stat-head {
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  text-align: right;
+}
+.tb-stats thead th:first-child {
+  text-align: left;
+}
+.tb-stats thead th {
+  padding-bottom: var(--tb-1);
 }
 .tb-stat-name {
   font-weight: var(--font-weight-regular);
@@ -1449,7 +1668,13 @@
 }
 .tb-stat-total-row th,
 .tb-stat-total-row td {
+  padding-top: var(--tb-1);
   border-bottom: none;
+}
+/* The BST is a fact about the species, not about this build, so it is set like
+   the base column above it rather than like the computed total beside it. */
+.tb-stat-total-row .tb-stat-base {
+  color: var(--text-secondary);
 }
 
 /* -------------------------------------------------------------- right rail */

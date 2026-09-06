@@ -34,6 +34,8 @@ import {
   resolveAbilitiesForGeneration,
   resolveStatsForGeneration,
   resolveTypesForGeneration,
+  typeEffectivenessAgainst,
+  typesInGeneration,
 } from '../../data'
 import type { Species, StatEntry, Variety } from '../../data'
 import { itemArtworkUrl, itemIconUrl } from '../../data/itemArtwork'
@@ -140,10 +142,28 @@ export function abilityOptionsFor(variety: Variety, generation: number): Option[
     .map((resolved) => ({ value: resolved.ability.id, label: resolved.ability.display_name }))
 }
 
+/** "Adamant (+Atk -SpA)", or "Hardy (—)" for the five neutral ones. */
+export function natureEffectLabel(natureId: number | null): string {
+  const nature = natureId == null ? null : getNature(natureId)
+  if (!nature) return ''
+  const up = nature.increased_stat as StatKey | null
+  const down = nature.decreased_stat as StatKey | null
+  /* The five neutral natures raise and lower the SAME stat in the data rather
+     than carrying nulls, so "no effect" is up === down, not up == null. */
+  if (!up || !down || up === down) return '—'
+  return `+${SHORT_STAT[up] ?? up} -${SHORT_STAT[down] ?? down}`
+}
+
+/**
+ * Natures, each labelled with what it actually does.
+ *
+ * The name alone is a memory test -- there is nothing in "Adamant" that says
+ * +Atk -SpA -- and this dropdown is the one place the answer is needed.
+ */
 export function natureOptionsFor(generation: number): Option[] {
   if (!naturesExistInGeneration(generation)) return []
   return listNatures()
-    .map((n) => ({ value: n.id, label: n.display_name }))
+    .map((n) => ({ value: n.id, label: `${n.display_name} (${natureEffectLabel(n.id)})` }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
 
@@ -191,6 +211,128 @@ export function itemArtFor(itemId: number | null): { artwork: string; icon: stri
   const icon = itemIconUrl(item)
   if (!artwork && !icon) return null
   return { artwork: artwork ?? icon!, icon: icon ?? artwork! }
+}
+
+/* ------------------------------------------------------------------ tooltips */
+
+/**
+ * PokeAPI's effect text is written for a wiki, not a tooltip: several sentences,
+ * often with a leading "Inflicts regular damage." and a trailing sentence about
+ * a mechanic the move does not have. `short_effect` is the one-liner, and where
+ * it is missing the long one is truncated rather than dumped whole.
+ */
+function effectLine(short: string | null, long: string | null): string | null {
+  const text = (short ?? long ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return null
+  if (text.length <= 180) return text
+  return `${text.slice(0, 177)}...`
+}
+
+export interface MoveInfo {
+  name: string
+  power: number | null
+  pp: number | null
+  accuracy: number | null
+  /** Era-correct, through the same resolver every other type read here uses. */
+  type: string | null
+  category: string | null
+  text: string | null
+}
+
+/** Everything the move tooltip shows. Null when the move is not in the bundle. */
+export function moveInfoFor(moveId: number | null, generation: number): MoveInfo | null {
+  if (moveId == null) return null
+  const move = getMove(moveId)
+  if (!move) return null
+  return {
+    name: move.display_name,
+    power: move.power,
+    pp: move.pp,
+    accuracy: move.accuracy,
+    type: resolveMoveTypeNameForGeneration(move, generation),
+    category: move.damage_class,
+    text: effectLine(move.short_effect, move.effect),
+  }
+}
+
+export function itemEffectFor(itemId: number | null): string | null {
+  if (itemId == null) return null
+  const item = getItem(itemId)
+  return item ? effectLine(item.short_effect, item.effect) : null
+}
+
+export function abilityEffectFor(abilityId: number | null): string | null {
+  if (abilityId == null) return null
+  const ability = getAbility(abilityId)
+  return ability ? effectLine(ability.short_effect, ability.effect) : null
+}
+
+/* --------------------------------------------------------- attacking coverage */
+
+/**
+ * The ATTACKING types this build actually brings, from its four slots.
+ *
+ * A MOVE COUNTS ONLY IF IT DEALS TYPE-SCALED DAMAGE, which rules out two groups.
+ * Status moves are obvious. The subtler one is fixed-damage: Seismic Toss, Night
+ * Shade, Dragon Rage and Sonic Boom are all physical or special and all deal a
+ * flat number regardless of the chart, so counting Seismic Toss as Fighting
+ * coverage would claim a super-effective hit that cannot happen. The signal for
+ * both is `power == null` -- a move with no base power has no damage for a
+ * multiplier to scale.
+ *
+ * That test also drops the OHKO moves and the variable-power ones (Return, Low
+ * Kick, Magnitude), which is a deliberate over-exclusion rather than an
+ * oversight: they are rare on a Gen 1-4 build, and a coverage chart that
+ * overstates is worse than one that understates.
+ */
+export function attackingTypesFor(
+  moveIds: (number | null)[],
+  generation: number,
+): { types: string[]; counted: number; ignored: number } {
+  const types = new Set<string>()
+  let counted = 0
+  let ignored = 0
+  for (const id of moveIds) {
+    if (id == null) continue
+    const move = getMove(id)
+    if (!move) continue
+    if (move.damage_class === 'status' || move.power == null) {
+      ignored += 1
+      continue
+    }
+    const name = resolveMoveTypeNameForGeneration(move, generation)
+    if (!name) continue
+    types.add(name)
+    counted += 1
+  }
+  return { types: [...types], counted, ignored }
+}
+
+/**
+ * What this moveset hits, and what walls it.
+ *
+ * One row per defending type that EXISTS in this generation, carrying the BEST
+ * multiplier the moveset can manage against it. Best rather than an average or a
+ * sum, because in a battle you pick the move: a set with Fire and Ground hits
+ * Steel for 2x on either, and the number that matters is the one you would use.
+ *
+ * Defending types are single, not the real dual-type combinations. A 17x17 grid
+ * of pairs is the honest full answer and is unreadable; "which types do I have
+ * an answer for" is the question a builder is actually asking.
+ */
+export function offensiveCoverage(
+  attackingTypeNames: string[],
+  generation: number,
+): { type: string; multiplier: number }[] {
+  if (attackingTypeNames.length === 0) return []
+  const attacking = new Set(attackingTypeNames)
+  return typesInGeneration(generation).map((defender) => {
+    /* Reading the DEFENDER's own chart gives every attacking type's multiplier
+       against it in one pass, which is the same call the defensive panel makes. */
+    const rows = typeEffectivenessAgainst([defender.id], generation)
+    const mine = rows.filter((r) => attacking.has(r.type.name)).map((r) => r.multiplier)
+    return { type: defender.name, multiplier: mine.length ? Math.max(...mine) : 1 }
+  })
 }
 
 /* ------------------------------------------------------------------ factory */

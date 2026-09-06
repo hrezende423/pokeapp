@@ -52,6 +52,7 @@ import {
   IconPlus,
   IconRotate,
   IconShieldHalf,
+  IconSwords,
   IconTrash,
   IconUsersPlus,
 } from '@tabler/icons-react'
@@ -63,14 +64,19 @@ import { Modal, Popover } from './ui/Overlay'
 import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
 import { MemberCard } from './ui/MemberCard'
-import { SpeciesMatchup } from './ui/TypeMatchup'
+import { MovesetCoverage, SpeciesMatchup } from './ui/TypeMatchup'
+import { InfoTip } from './ui/InfoTip'
 import { AddToTeamModal } from './ui/AddToTeamModal'
 import { StatTable } from './ui/StatTable'
 import { MoveSlots } from './ui/MoveSlots'
 import { SpreadControls } from './ui/SpreadControls'
 import {
+  abilityEffectFor,
+  abilityName,
   abilityOptionsFor,
   buildSpecies,
+  displayName,
+  itemEffectFor,
   genderOptionsFor,
   itemArtFor,
   itemName,
@@ -115,6 +121,7 @@ function BuildFormFields({
   const [draft, setDraft] = useState<Build | null>(stored)
   const [dirty, setDirty] = useState(false)
   const [matchup, setMatchup] = useState(false)
+  const [offence, setOffence] = useState(false)
   const [info, setInfo] = useState(false)
   const [addTo, setAddTo] = useState(false)
   const [railOpen, setRailOpen] = useState(false)
@@ -261,6 +268,52 @@ function BuildFormFields({
     })
   }
 
+  /**
+   * Removing a member is TWO different actions wearing one icon, and the prompt
+   * exists because the destructive one is not recoverable.
+   *
+   * Taking a Pokemon off a team usually means "not on this team", and the build
+   * is still worth keeping -- it stays in the Build Library and every other team
+   * using it is untouched. Sometimes it means "this build was a mistake", and
+   * then it should go entirely. Guessing either way is wrong, so the prompt
+   * offers both, with Cancel first and neither destructive answer as a default.
+   */
+  const removeMember = (teamId: string, memberId: string) => {
+    const member = data.builds.find((b) => b.id === memberId)
+    const species = member ? buildSpecies(member)?.species : null
+    const label = member && species ? displayName(member, species).primary : 'this member'
+    const alsoOn = teamsUsingBuild(data, memberId).length - 1
+    prompt.ask({
+      title: `Remove ${label} from this team?`,
+      body:
+        alsoOn > 0
+          ? `This build is also on ${alsoOn} other team${alsoOn === 1 ? '' : 's'}, and deleting it would empty its slot there too.`
+          : 'Keeping the build leaves it in the Build Library to reuse.',
+      testId: 'tb-rail-remove-prompt',
+      actions: [
+        { label: 'Cancel', testId: 'tb-rail-remove-cancel' },
+        {
+          label: 'Remove, keep the build',
+          testId: 'tb-rail-remove-keep',
+          onPick: () => {
+            const slot = data.teams
+              .find((t) => t.id === teamId)
+              ?.memberIds.findIndex((m) => m === memberId)
+            if (slot != null && slot >= 0) setTeamMember(teamId, slot, null)
+          },
+        },
+        {
+          label: 'Delete the build too',
+          danger: true,
+          testId: 'tb-rail-remove-delete',
+          /* deleteBuild detaches from every team as well, so this is the
+             "gone everywhere" answer rather than "gone from here". */
+          onPick: () => deleteBuild(memberId),
+        },
+      ],
+    })
+  }
+
   const back = () =>
     saveThen(() =>
       origin.kind === 'team'
@@ -309,9 +362,15 @@ function BuildFormFields({
     },
     {
       icon: <IconShieldHalf size={18} stroke={1.5} />,
-      label: 'Type matchups',
+      label: 'Defensive type coverage',
       onClick: () => setMatchup(true),
       testId: 'tb-form-matchup',
+    },
+    {
+      icon: <IconSwords size={18} stroke={1.5} />,
+      label: 'Attacking type coverage',
+      onClick: () => setOffence(true),
+      testId: 'tb-form-offence',
     },
     {
       icon: <IconUsersPlus size={18} stroke={1.5} />,
@@ -443,25 +502,38 @@ function BuildFormFields({
                 {facts.species.name_ja}
               </span>
             )}
-            {art && <img className="tb-identity-sprite" src={art} alt="" />}
-            {heldArt && (
-              <img
-                className="tb-held-item"
-                src={heldArt.artwork}
-                alt=""
-                title={itemName(build.itemId)}
-                data-testid="tb-held-item"
-                /* Roughly half the bag has no Dream World render. Falling back to
-                   the 30x30 game icon on the 404 is what itemArtwork.ts asks for;
-                   `data-fallback` is what tells the CSS to draw it pixelated. */
-                onError={(e) => {
-                  const img = e.currentTarget
-                  if (img.dataset.fallback === 'true') return
-                  img.dataset.fallback = 'true'
-                  img.src = heldArt.icon
-                }}
-              />
-            )}
+            {/*
+              A SQUARE FRAME AROUND THE ARTWORK, which exists so the held item
+              can be positioned against the PICTURE rather than against the
+              stage. Official artwork is square and letterboxed by `contain`, so
+              the rendered image's corner is nowhere near the element's corner --
+              an item pinned to the grid area floated off in the margin. The
+              frame is exactly the letterbox, so its bottom-right corner is the
+              artwork's bottom-right corner, and the item sits in front.
+            */}
+            <span className="tb-sprite-frame">
+              {art && <img className="tb-identity-sprite" src={art} alt="" />}
+              {heldArt && (
+                <img
+                  className="tb-held-item"
+                  src={heldArt.artwork}
+                  alt=""
+                  title={itemName(build.itemId)}
+                  data-testid="tb-held-item"
+                  /* PokeAPI has no Sugimori-style item artwork; the Dream World
+                     render is the closest thing and covers about 60% of the bag
+                     -- every real held item, but no TMs, mail or key items.
+                     Those fall back to the 30x30 game icon, and `data-fallback`
+                     is what tells the CSS to draw that one pixelated. */
+                  onError={(e) => {
+                    const img = e.currentTarget
+                    if (img.dataset.fallback === 'true') return
+                    img.dataset.fallback = 'true'
+                    img.src = heldArt.icon
+                  }}
+                />
+              )}
+            </span>
             {generation >= 3 && (
               <span className="tb-shiny-dock">
                 <span className="tb-field-label">Shiny</span>
@@ -502,13 +574,6 @@ function BuildFormFields({
               <span className="tb-field-label">Stats</span>
               <StatTable build={build} facts={facts} />
             </div>
-          )}
-
-          {facts && (
-            <>
-              <p className="tb-genus">{facts.species.genus}</p>
-              <p className="tb-ja">{facts.species.name_ja_romanized}</p>
-            </>
           )}
         </aside>
 
@@ -565,7 +630,18 @@ function BuildFormFields({
 
           <div className="tb-field-row" data-layout="field-row">
             {generation >= 2 && (
-              <Field label="Item">
+              <Field
+                label="Item"
+                info={
+                  <InfoTip
+                    summary={itemEffectFor(build.itemId)}
+                    label={`${itemName(build.itemId)} info`}
+                    testId="tb-item-info"
+                  >
+                    <span className="tb-infotip-name">{itemName(build.itemId)}</span>
+                  </InfoTip>
+                }
+              >
                 <select
                   className="tb-select"
                   value={build.itemId ?? ''}
@@ -584,7 +660,18 @@ function BuildFormFields({
               </Field>
             )}
             {generation >= 3 && (
-              <Field label="Ability">
+              <Field
+                label="Ability"
+                info={
+                  <InfoTip
+                    summary={abilityEffectFor(build.abilityId)}
+                    label={`${abilityName(build.abilityId)} info`}
+                    testId="tb-ability-info"
+                  >
+                    <span className="tb-infotip-name">{abilityName(build.abilityId)}</span>
+                  </InfoTip>
+                }
+              >
                 <select
                   className="tb-select"
                   value={build.abilityId ?? ''}
@@ -754,6 +841,19 @@ function BuildFormFields({
               )}
             </Popover>
           )}
+          {offence && (
+            <Popover
+              onClose={() => setOffence(false)}
+              align="right"
+              testId="tb-form-offence-popover"
+            >
+              <MovesetCoverage
+                moveIds={build.moveIds}
+                generation={generation}
+                title={facts?.species.display_name ?? 'This build'}
+              />
+            </Popover>
+          )}
         </div>
 
         {/* ----------------------------------------------------- right rail */}
@@ -775,6 +875,17 @@ function BuildFormFields({
                     build={member}
                     variant="rail"
                     testId={`tb-rail-${member.id}`}
+                    corners={
+                      <span className="tb-corner tb-corner-tr">
+                        <IconButton
+                          icon={<IconTrash size={15} stroke={1.5} />}
+                          label="Remove from this team"
+                          danger
+                          testId={`tb-rail-${member.id}-delete`}
+                          onClick={() => removeMember(railTeam.id, member.id)}
+                        />
+                      </span>
+                    }
                     /* Save point: opening a sibling replaces this form. */
                     onOpen={() =>
                       saveThen(() =>
@@ -881,10 +992,22 @@ function BuildFormFields({
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  info,
+}: {
+  label: string
+  children: React.ReactNode
+  /** An InfoTip, rendered after the label text. */
+  info?: React.ReactNode
+}) {
   return (
     <label className="tb-field">
-      <span className="tb-field-label">{label}</span>
+      <span className="tb-field-label">
+        {label}
+        {info}
+      </span>
       {children}
     </label>
   )
