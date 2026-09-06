@@ -9,9 +9,15 @@
  * 4x and 2x buries the two types that will actually kill you among the six that
  * merely hurt, and a 4x weakness is a different fact about a build than a 2x
  * one. Same on the other side: a 0.25x resistance is a switch-in and a 0.5x is
- * not. So each column splits into rows, one per distinct multiplier, ordered
- * worst-first -- and a row with nothing in it is not rendered at all rather than
- * printed empty.
+ * not. So each group splits into tiers, one per distinct multiplier, ordered
+ * worst-first -- and a tier with nothing in it is not rendered at all rather
+ * than printed empty.
+ *
+ * THE GROUPS STACK, one under the next. Side by side they were about 170px each
+ * and a four-type tier wrapped onto three lines; full width, a tier is one line
+ * and the reader gets "Weak to" before "Resists" in the order they would say
+ * them. `Column` is still the right name for the component -- it lays its tiers
+ * out in a column -- but the groups themselves no longer sit in a row.
  *
  * Everything is computed live from `typeEffectivenessAgainst`, per the spec's
  * "Must-have live computed value" -- nothing here is cached or precomputed, and

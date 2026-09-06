@@ -14,6 +14,13 @@
  * CLEARING A SLOT CLOSES THE GAP. Emptying slot 2 pulls 3 into 2 and 4 into 3 --
  * `clearMoveSlot` in model.ts does it, so the same rule applies wherever a slot is
  * cleared. An empty slot is always valid, never a validation error.
+ *
+ * NO SLOT OFFERS A MOVE ANOTHER SLOT ALREADY HAS. A moveset cannot contain the
+ * same move twice in any generation, so a duplicate is not a choice the reader
+ * could want -- it is a slip waiting to happen, and one that silently costs a
+ * quarter of the build. This is a per-slot VIEW of the legal list, not a change
+ * to it: `getLegalMoveset` still decides what is legal, and the filter below
+ * only hides what is already spoken for elsewhere. See `available`.
  */
 
 import { TypeLabel } from '../../../components/ds/TypeLabel'
@@ -38,6 +45,8 @@ export function MoveSlots({
   onChange: (slot: number, moveId: number | null) => void
 }) {
   const byName = [...options].sort((a, b) => a.name.localeCompare(b.name))
+  /* Everything picked anywhere on the build. Read once, not per slot. */
+  const taken = new Set(moveIds.filter((id): id is number => id != null))
 
   return (
     <div className="tb-moves" data-layout="moves" data-testid="tb-move-slots">
@@ -55,6 +64,16 @@ export function MoveSlots({
            rather than whatever the dropdown is hovering. Null when empty, and
            InfoTip then renders no icon at all. */
         const info = moveInfoFor(moveId, generation)
+
+        /*
+          THIS SLOT'S OWN MOVE SURVIVES THE FILTER, which is the whole subtlety.
+          Drop every taken move and the selected one goes with it, leaving a
+          <select> whose value matches no option -- browsers then show the first
+          option instead, so the slot would read as empty while the build still
+          held the move. The identity check is what keeps it listed here and
+          hidden from the other three.
+        */
+        const available = byName.filter((m) => m.move_id === moveId || !taken.has(m.move_id))
 
         return (
           <div className="tb-move-slot" key={slot} data-testid={`tb-move-slot-${slot}`}>
@@ -87,7 +106,7 @@ export function MoveSlots({
               }
             >
               <option value="">—</option>
-              {byName.map((move) => (
+              {available.map((move) => (
                 <option key={move.move_id} value={move.move_id}>
                   {move.name}
                   {/* The asterisk IS the event affordance. */}

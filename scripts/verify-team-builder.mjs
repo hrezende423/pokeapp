@@ -434,6 +434,56 @@ try {
   )
 
   /*
+    ---- WAIT FOR THE LEGAL MOVESET FIRST.
+
+    Everything below reads the move <select>s, and a <select> can only show a
+    value that is present as an option -- so until getLegalMoveset resolves,
+    every slot reads as empty whether it holds a move or not. Without this the
+    next three checks race the fetch and fail roughly one run in five, with the
+    seeded moveset reported as blank.
+  */
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-testid="tb-move-select-0"] option').length > 5,
+  )
+
+  /*
+    ---- no slot offers a move another slot already holds
+
+    THE SELECTED MOVE MUST SURVIVE ITS OWN FILTER, and that is the half worth
+    testing. Filtering out everything taken removes the slot's own move too,
+    which leaves a <select> whose value matches no option -- browsers then fall
+    back to displaying the first option, so the slot reads as empty while the
+    build still holds the move. So this asserts both directions at once: each
+    slot lists its own move, and lists none of the other three.
+  */
+  const dupes = await page.evaluate(() => {
+    const selects = [...document.querySelectorAll('[data-testid^="tb-move-select-"]')]
+    const chosen = selects.map((sel) => sel.value).filter((v) => v !== '')
+    return selects.map((sel, i) => {
+      const opts = [...sel.options].map((o) => o.value)
+      const mine = sel.value
+      return {
+        slot: i,
+        listsItsOwn: mine === '' || opts.includes(mine),
+        listsOthers: chosen.filter((v) => v !== mine && opts.includes(v)),
+      }
+    })
+  })
+  log(
+    `  per slot: ${dupes.map((d) => `${d.slot}:own=${d.listsItsOwn} leaks=${d.listsOthers.length}`).join(' ')}`,
+  )
+  check(
+    'a move chosen in one slot is gone from the other three dropdowns',
+    dupes.length === 4 && dupes.every((d) => d.listsOthers.length === 0),
+    JSON.stringify(dupes.map((d) => d.listsOthers)),
+  )
+  check(
+    "and each slot still lists its OWN move, so the <select> keeps showing it",
+    dupes.every((d) => d.listsItsOwn),
+    JSON.stringify(dupes.map((d) => d.listsItsOwn)),
+  )
+
+  /*
     ---- clearing slot 2 shifts 3 and 4 up
 
     READ OFF THE FORM, NOT OUT OF THE STORE. The form edits a draft and writes
@@ -1063,7 +1113,9 @@ try {
     const scope = document.querySelector('[data-testid="tb-matchup-species"]')
     const cols = [...scope.querySelectorAll('.tb-matchup-col')]
     return {
-      sideBySide: new Set(cols.map((c) => Math.round(c.getBoundingClientRect().y))).size === 1,
+      /* One distinct y per group is what stacking means. Two groups sharing a
+         y would be the old side-by-side layout. */
+      stacked: new Set(cols.map((c) => Math.round(c.getBoundingClientRect().y))).size === cols.length,
       cols: cols.map((c) => ({
         label: c.querySelector('.tb-matchup-label').textContent.trim(),
         tiers: [...c.querySelectorAll('.tb-matchup-tier')].map((t) =>
@@ -1080,8 +1132,8 @@ try {
     JSON.stringify(resists),
   )
   check(
-    'and the rails sit side by side rather than stacking',
-    defence.sideBySide,
+    'and the groups stack vertically rather than sitting side by side',
+    defence.cols.length > 1 && defence.stacked,
     JSON.stringify(defence.cols.map((c) => c.label)),
   )
   await page.keyboard.press('Escape')

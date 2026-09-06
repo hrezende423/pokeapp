@@ -697,47 +697,31 @@
   text-transform: uppercase;
 }
 /*
-  FLEX, NOT auto-fit GRID. The popover is absolutely positioned with no width of
-  its own, so it shrink-wraps its content -- which means an `auto-fit` track list
-  resolves against a container that is itself sized by the tracks, and every
-  column collapsed into one. Flex children size to their content and the panel
-  grows to hold them, which is what puts the three rails side by side.
-*/
-/*
-  A NOWRAP FLEX ROW, and both halves of that matter.
+  ONE GROUP UNDER THE NEXT, full width each.
 
-  Flex rather than an `auto-fit` grid: the popover is absolutely positioned with
-  no width of its own, so an auto-fit track list resolves against a container
-  that is itself sized by the tracks, and every column collapsed into one.
+  Side by side, the three groups were each about 170px, so a tier with four
+  types wrapped to two and three lines and the columns ended up different
+  heights for no reason a reader could use. Stacked, every tier gets the panel's
+  whole width, "Weak to" reads before "Resists" the way it is spoken, and the
+  panel is narrow enough to sit under the dock icon rather than running off the
+  right edge of a phone.
 
-  NOWRAP rather than wrap: Chrome computes the max-content width of a MULTI-LINE
-  flex container as its widest single item, not as the sum of a line -- so with
-  `flex-wrap: wrap` the panel asked for one column's width, got it, and then
-  dutifully wrapped the rest onto their own lines. The two settings fought each
-  other into exactly the layout this replaced.
+  The width cap lives on .tb-matchup (320px). The popover is `width: max-content`
+  against a 30px containing block, so without a cap somewhere a tier would put
+  all eight of its types on one line and take the panel with it; a child's
+  max-width limits its max-content contribution, which is what holds the panel
+  to a readable measure and lets the type labels wrap inside it.
 */
 .tb-matchup-cols {
   display: flex;
-  gap: var(--space-gap-lg);
-  align-items: start;
+  flex-direction: column;
+  gap: var(--space-gap-md);
 }
-/* Shrinkable, so when three rails together exceed the panel's cap they share it
-   and the type labels wrap inside each one rather than the rails stacking. */
 .tb-matchup-col {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--tb-3);
-  /*
-    A FLOOR, not just a cap, and it is what actually widens the panel. The
-    popover sizes to content, but every flex row in here wraps, and Chrome takes
-    a wrapping flex container's max-content to be its widest ITEM -- so the
-    columns' real width never propagated up and the panel stayed narrow enough
-    to squeeze two type labels per line. A min-width gives the shrink-to-fit
-    calculation a number it cannot argue with.
-  */
-  min-width: 168px;
-  max-width: 210px;
+  min-width: 0;
 }
 /*
   One tier per distinct multiplier: 4x above 2x, 0.25x above 0.5x. The number
@@ -968,9 +952,23 @@
   grid-template-areas:
     'head  main dock rail'
     'ident main dock rail';
-  grid-template-columns: 210px minmax(0, 1fr) 30px 168px;
+  /*
+    THE RAIL IS 192, NOT 168, AND IT COST NOTHING. A team member's card is a
+    38px sprite, a held-item badge overhanging its corner, and three lines of
+    text -- which at 168px left the text about 120px and the third line was
+    always ellipsed. The width came out of the two gaps flanking the dock
+    rather than out of `main`: 20 + 20 becomes 8 + 8, and the 24px freed goes
+    to the rail.
+
+    COLUMN ONE IS 222 FOR A 210 PANEL. `column-gap` is one value for all three
+    gaps, so tightening the dock's two would have tightened the identity
+    panel's as well. Padding the track instead (see .tb-identity's margin)
+    keeps that gap reading as 20 while the other two are 8, and leaves the
+    panel itself exactly the width it was.
+  */
+  grid-template-columns: 222px minmax(0, 1fr) 30px 192px;
   grid-template-rows: auto 1fr;
-  column-gap: var(--space-gap-lg);
+  column-gap: var(--tb-4);
   row-gap: 0;
   align-items: start;
   max-width: 1180px;
@@ -988,9 +986,15 @@
   align-items: center;
   gap: var(--tb-3);
   min-height: 48px;
+  /* Matches .tb-identity below it, so the back control stays left-aligned with
+     the panel rather than with the track that now holds it. */
+  margin-right: 12px;
   padding-bottom: 0;
 }
 .tb-identity {
+  /* The other 12px of column one's 20px gap -- see the grid above. The panel is
+     210px wide in a 222px track, so nothing inside it moved. */
+  margin-right: 12px;
   grid-area: ident;
 }
 .tb-form-main {
