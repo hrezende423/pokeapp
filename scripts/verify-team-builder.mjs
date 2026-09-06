@@ -1036,7 +1036,9 @@ try {
         abilityId: 65,
         moveIds: [moveIds2.razorLeaf, moveIds2.sludgeBomb, moveIds2.toxic, moveIds2.seismicToss],
       }),
-      mkBuild('b2', { speciesId: 4, pokemonId: 4 }),
+      /* HOLDING AN ITEM ON PURPOSE: b2 is the build that appears in the rail
+         while b1 is open, and the badge checks below are about the rail. */
+      mkBuild('b2', { speciesId: 4, pokemonId: 4, itemId: moveIds2.leftovers }),
     ],
     teams: [mkTeam('t1', 1, ['b1', 'b2'])],
   })
@@ -1189,6 +1191,46 @@ try {
   check(
     'each rail member carries a delete control',
     (await page.$$('[data-testid="tb-rail-b2-delete"]')).length === 1,
+  )
+
+  /*
+    ---- the artwork stays inside its own box
+
+    THIS IS A SPECIFICITY REGRESSION GUARD, not a layout preference. The badge
+    is `.tb-held-item { position: absolute }` at 0-1-0, and it lives inside a
+    box styled by `.tb-card-art img` at 0-1-1 -- which matched it too and won,
+    so the badge computed `relative`, stayed IN FLOW, and laid out BESIDE the
+    artwork: 38 + 18 of content centred in a 38px box, hanging 9px off each
+    side. The left 9px was clipped by the rail's edge and read as "the sprite
+    is cut off". Asserting the computed `position` catches the cause; asserting
+    the artwork's own box catches any other way it could end up outside.
+  */
+  const railArt = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-layout="rail"] .tb-card-art')].map((art) => {
+      const a = art.getBoundingClientRect()
+      const img = art.querySelector('img:not(.tb-held-item)')
+      const held = art.querySelector('.tb-held-item')
+      const i = img?.getBoundingClientRect()
+      return {
+        overflowLeft: i ? +(a.x - i.x).toFixed(1) : 0,
+        overflowRight: i ? +(i.right - a.right).toFixed(1) : 0,
+        heldPosition: held ? getComputedStyle(held).position : null,
+      }
+    }),
+  )
+  log(`  rail art: ${JSON.stringify(railArt)}`)
+  check(
+    "a rail member's artwork sits inside its own box, not hanging off either edge",
+    railArt.length > 0 && railArt.every((a) => a.overflowLeft <= 0.5 && a.overflowRight <= 0.5),
+    JSON.stringify(railArt.map((a) => [a.overflowLeft, a.overflowRight])),
+  )
+  const badges = railArt.filter((a) => a.heldPosition != null)
+  check(
+    'and the held-item badge is positioned OUT OF FLOW, so it overlaps rather than displaces',
+    /* The length test is what stops this passing on an empty set -- the seed
+       above puts an item on the rail member precisely so it cannot. */
+    badges.length > 0 && badges.every((a) => a.heldPosition === 'absolute'),
+    JSON.stringify(railArt.map((a) => a.heldPosition)),
   )
   await page.hover('[data-testid="tb-rail-b2"]')
   await page.click('[data-testid="tb-rail-b2-delete"]')

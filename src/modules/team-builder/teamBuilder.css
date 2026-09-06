@@ -481,9 +481,22 @@
   justify-content: center;
   height: 96px;
 }
-/* Official artwork in every variant now, so nothing here is pixel art and
-   nothing asks for `pixelated`. */
-.tb-card-art img {
+/*
+  THE ARTWORK ONLY -- :not() is load-bearing, not tidiness.
+
+  This rule predates the held-item badge, and as `.tb-card-art img` it also
+  matched it: 0-1-1 against `.tb-held-item`'s 0-1-0, so it won `position` and
+  the badge computed `relative` instead of `absolute`. A relatively positioned
+  badge is still IN FLOW, so it laid out beside the artwork rather than over it
+  -- 38px + 18px of content in a 38px centred flex box, overflowing 9px each
+  side. The left 9px is the sprite the rail appeared to be cutting off; it was
+  never a spacing problem, the picture was simply outside its own box. It also
+  won `z-index: 1`, quietly cancelling the badge's `z-index: 2`.
+
+  Official artwork in every variant, so nothing here is pixel art and nothing
+  asks for `pixelated`.
+*/
+.tb-card-art img:not(.tb-held-item) {
   position: relative;
   z-index: 1;
   max-width: 100%;
