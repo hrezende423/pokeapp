@@ -63,6 +63,7 @@ import { Dock } from './ui/Dock'
 import { Modal, Popover } from './ui/Overlay'
 import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
+import type { PromptAction } from './ui/usePrompt'
 import { MemberCard } from './ui/MemberCard'
 import { MovesetCoverage, SpeciesMatchup } from './ui/TypeMatchup'
 import { InfoTip } from './ui/InfoTip'
@@ -76,6 +77,7 @@ import {
   abilityOptionsFor,
   buildSpecies,
   displayName,
+  isPristineBuild,
   itemEffectFor,
   genderOptionsFor,
   itemArtFor,
@@ -85,7 +87,14 @@ import {
   newBuildInit,
   typeIdsFor,
 } from './buildFacts'
-import { clearMoveSlot, setMoveSlot, teamLabel, teamsUsingBuild, type Build } from './model'
+import {
+  NICKNAME_MAX,
+  clearMoveSlot,
+  setMoveSlot,
+  teamLabel,
+  teamsUsingBuild,
+  type Build,
+} from './model'
 import { hiddenPower, isShinyByDvs, type StatNumbers } from './statMath'
 import {
   createBuild,
@@ -140,6 +149,26 @@ function BuildFormFields({
   const isShared = attachedTeams.length >= 2
   const build = draft ?? stored
 
+  /*
+    A NEW MEMBER THAT HAS NOT EARNED A SLOT YET. See Build.draft in model.ts.
+
+    Mind the name: `draft` in this file is already the unsaved EDIT of whichever
+    build is open, which is a different idea entirely. This one is about the
+    build's standing in its team, not about unsaved text.
+  */
+  const isDraftMember = stored?.draft === true
+  const untouched = build != null && isPristineBuild(build) && !dirty
+
+  /*
+    What the unmount path needs to know, kept in a ref because that listener is
+    registered ONCE and must not be torn down and re-added as the form changes
+    -- its cleanup IS the save, so a re-run would fire it mid-edit.
+  */
+  const onLeave = useRef({ isDraftMember: false, untouched: true, id: '' })
+  useEffect(() => {
+    onLeave.current = { isDraftMember, untouched, id: stored?.id ?? '' }
+  })
+
   /** Write the outstanding draft. The ONLY function in this file that saves. */
   const flush = useCallback(() => {
     const next = pending.current
@@ -159,10 +188,26 @@ function BuildFormFields({
   */
   useEffect(() => {
     const flushUnattended = () => {
+      const { isDraftMember: wasDraft } = onLeave.current
+      /*
+        NOTHING DESTRUCTIVE HAPPENS HERE, and that is deliberate. This cleanup
+        runs on a SIMULATED unmount under StrictMode, immediately after mount --
+        so an untouched draft deleted from here was deleted the instant it was
+        created. Every exit this component owns resolves its own draft through
+        `leaveDraft`; an untouched draft abandoned through a door it does not own
+        is left alone and pruned when the module next mounts. See TeamBuilding.
+      */
       const next = pending.current
       if (!next) return
       if (teamsUsingBuild(readData(), next.id).length >= 2) return
-      flush()
+      /*
+        A TOUCHED DRAFT LEAVING THROUGH A DOOR THIS COMPONENT DOES NOT OWN keeps
+        its work and becomes an ordinary library build. There is nobody left to
+        ask which team slot was meant, and of the two ways to be wrong, silently
+        deleting what someone typed is the worse one.
+      */
+      pending.current = null
+      updateBuild(next.id, wasDraft ? { ...next, draft: false } : next)
     }
     window.addEventListener('pagehide', flushUnattended)
     return () => {
@@ -203,6 +248,117 @@ function BuildFormFields({
     setDirty(true)
   }
 
+  /*
+    The team this form's rail shows. Declared up here rather than beside the rail
+    markup because the draft rules below need it: which question a draft gets
+    asked depends on whether that team has a slot going spare.
+  */
+  const railTeam =
+    origin.kind === 'team'
+      ? (data.teams.find((t) => t.id === origin.teamId) ?? null)
+      : (attachedTeams[0] ?? null)
+
+  /**
+   * How a save point should treat a draft member.
+   *
+   * `ask` -- the reader is leaving, so the draft has to be resolved.
+   * `attaches` -- whatever runs next puts the build in a team by itself, so the
+   * draft simply becomes a real build and nothing needs asking.
+   */
+  type LeaveMode = { kind: 'ask'; replaceTarget?: string } | { kind: 'attaches' }
+
+  /**
+   * Leaving a draft member: keep it, or it never existed.
+   *
+   * THREE SHAPES, and which one you get depends on the team rather than on a
+   * preference. Untouched, there is nothing to ask about and nothing to keep.
+   * Touched with a free slot, the choice is keep-or-bin. Touched with the team
+   * full, keeping means taking someone else's place, so the offer names the
+   * member being displaced rather than pretending a slot exists.
+   *
+   * `replaceTarget` is the member the reader clicked. It is the only member they
+   * have pointed at, so it is the only sensible one to offer to displace.
+   */
+  const leaveDraft = (after: () => void, replaceTarget?: string) => {
+    if (!stored) return
+    if (untouched) {
+      pending.current = null
+      deleteBuild(stored.id)
+      after()
+      return
+    }
+
+    const freeSlot = railTeam ? railTeam.memberIds.findIndex((m) => m == null) : -1
+    const replaceSlot = replaceTarget && railTeam ? railTeam.memberIds.indexOf(replaceTarget) : -1
+    const displaced = replaceTarget ? data.builds.find((b) => b.id === replaceTarget) : null
+    const displacedFacts = displaced ? buildSpecies(displaced) : null
+    const displacedName =
+      displaced && displacedFacts
+        ? displayName(displaced, displacedFacts.species).primary
+        : 'that member'
+
+    const keepIn = (slot: number) => {
+      /* Flush FIRST, then clear the flag: the pending copy still carries
+         `draft: true` and would otherwise write it straight back. */
+      flush()
+      updateBuild(stored.id, { draft: false })
+      if (railTeam && slot >= 0) setTeamMember(railTeam.id, slot, stored.id)
+      setDirty(false)
+      after()
+    }
+
+    const actions: PromptAction[] = [{ label: 'Cancel', testId: 'tb-draft-cancel' }]
+    if (freeSlot >= 0) {
+      actions.push({
+        label: 'Keep this build too',
+        testId: 'tb-draft-keep',
+        onPick: () => keepIn(freeSlot),
+      })
+    } else if (replaceSlot >= 0) {
+      actions.push({
+        label: `Replace ${displacedName}`,
+        testId: 'tb-draft-replace',
+        onPick: () => keepIn(replaceSlot),
+      })
+    } else {
+      /*
+        FULL TEAM, AND NOBODY NAMED TO DISPLACE -- leaving by the back button
+        rather than by clicking a member. There is no slot to offer and no
+        obvious member to evict, so the offer is to keep the work without a
+        team. Without this branch the only way out would be to discard, which
+        would make the back button destructive.
+      */
+      actions.push({
+        label: 'Keep it in my library',
+        testId: 'tb-draft-keep-loose',
+        onPick: () => keepIn(-1),
+      })
+    }
+    actions.push({
+      label: 'Discard it',
+      danger: true,
+      testId: 'tb-draft-discard',
+      onPick: () => {
+        pending.current = null
+        setDirty(false)
+        deleteBuild(stored.id)
+        after()
+      },
+    })
+
+    prompt.ask({
+      title: 'This build is not on the team yet',
+      body:
+        freeSlot >= 0
+          ? 'Keeping it puts it in the first empty slot.'
+          : replaceSlot >= 0
+            ? `The team is full, so keeping it means ${displacedName} leaves the team. The build itself stays in your library.`
+            : 'The team is full, so this build can be saved to your library but not added to the team.',
+      testId: 'tb-draft-prompt',
+      actions,
+    })
+  }
+
   /**
    * SAVE, THEN DO THE THING. Every save point in this screen calls this, so the
    * shared-build question is asked in one place and cannot be bypassed by taking
@@ -211,7 +367,24 @@ function BuildFormFields({
    * `after` runs in all three shared-build branches, discard included: the
    * question is what happens to the EDIT, not whether the user gets to leave.
    */
-  const saveThen = (after: () => void) => {
+  const saveThen = (after: () => void, mode: LeaveMode = { kind: 'ask' }) => {
+    /*
+      A DRAFT IS ASKED ABOUT FIRST, because for a draft the question is not "save
+      or not" but "does this build exist at all". Only once it has a slot do the
+      ordinary rules below apply to it -- and a draft is in no team, so it can
+      never be the shared case those rules are mostly about.
+    */
+    if (isDraftMember) {
+      if (mode.kind === 'ask') {
+        leaveDraft(after, mode.replaceTarget)
+        return
+      }
+      flush()
+      updateBuild(stored.id, { draft: false })
+      setDirty(false)
+      after()
+      return
+    }
     if (!pending.current) {
       after()
       return
@@ -327,11 +500,6 @@ function BuildFormFields({
   const natureOptions = natureOptionsFor(generation)
   const hp = generation >= 2 ? hiddenPower(generation, build.individual) : null
 
-  const railTeam =
-    origin.kind === 'team'
-      ? (data.teams.find((t) => t.id === origin.teamId) ?? null)
-      : (attachedTeams[0] ?? null)
-
   /* Gen 1 has no held items, so no badge -- not an empty one. */
   const heldArt = generation >= 2 ? itemArtFor(build.itemId) : null
 
@@ -377,7 +545,9 @@ function BuildFormFields({
       label: 'Add to other team',
       /* Save first: the team is about to point at this build, and it should
          point at what is on screen rather than at the last saved version. */
-      onClick: () => saveThen(() => setAddTo(true)),
+      /* `attaches`: the modal this opens puts the build in a team, which is
+         exactly what a draft needs, so it is promoted rather than questioned. */
+      onClick: () => saveThen(() => setAddTo(true), { kind: 'attaches' }),
       testId: 'tb-form-add-to-team',
     },
     {
@@ -396,8 +566,14 @@ function BuildFormFields({
               ...build,
               itemId: null,
               moveIds: [null, null, null, null],
-              level: 1,
-              friendship: 0,
+              /* THE NEW-BUILD VALUES, not the floor values. Reset means "back to
+                 where a fresh build starts", and a fresh build is Lv.50 with 70
+                 friendship -- Lv.1 with 0 friendship was the bottom of each
+                 field's range, which is a different idea and a worse default.
+                 Friendship stays 0 before Gen 2, where the mechanic does not
+                 exist and the field is not rendered. */
+              level: 50,
+              friendship: generation >= 2 ? 70 : 0,
               nickname: '',
               effort: {},
               individual: {},
@@ -622,8 +798,13 @@ function BuildFormFields({
               <input
                 className="tb-input"
                 defaultValue={build.nickname}
+                maxLength={NICKNAME_MAX}
                 data-testid="tb-nickname"
-                onBlur={(e) => commit({ nickname: e.target.value })}
+                /* BOTH the attribute and the slice. `maxLength` is what makes
+                   the cap visible while typing -- the field simply stops
+                   accepting -- but it only governs user input, so a value that
+                   arrives any other way would sail past it. */
+                onBlur={(e) => commit({ nickname: e.target.value.slice(0, NICKNAME_MAX) })}
               />
             </Field>
           </div>
@@ -886,14 +1067,21 @@ function BuildFormFields({
                         />
                       </span>
                     }
-                    /* Save point: opening a sibling replaces this form. */
+                    /*
+                      Save point: opening a sibling replaces this form. The
+                      member's id goes with it because if the form holds a draft
+                      and the team is full, THIS is the member the reader pointed
+                      at, and so the one worth offering to displace.
+                    */
                     onOpen={() =>
-                      saveThen(() =>
-                        goTo({
-                          kind: 'build-form',
-                          buildId: member.id,
-                          origin: { kind: 'team', teamId: railTeam.id },
-                        }),
+                      saveThen(
+                        () =>
+                          goTo({
+                            kind: 'build-form',
+                            buildId: member.id,
+                            origin: { kind: 'team', teamId: railTeam.id },
+                          }),
+                        { kind: 'ask', replaceTarget: member.id },
                       )
                     }
                   />
@@ -907,10 +1095,17 @@ function BuildFormFields({
                    you had just typed into the build you were on. */
                 onClick={() =>
                   saveThen(() => {
-                    const slot = railTeam.memberIds.findIndex((m) => m == null)
-                    if (slot === -1) return
-                    const fresh = createBuild(newBuildInit(railTeam.generation))
-                    setTeamMember(railTeam.id, slot, fresh.id)
+                    /*
+                      NO SLOT IS CLAIMED HERE. The new member is a draft; it earns
+                      a slot when the reader keeps it. That is also why there is
+                      no longer a guard on the team being full -- starting one is
+                      always allowed, and a full team simply changes the question
+                      asked on the way out from "keep it?" to "replace whom?".
+                    */
+                    const fresh = createBuild({
+                      ...newBuildInit(railTeam.generation),
+                      draft: true,
+                    })
                     goTo({
                       kind: 'build-form',
                       buildId: fresh.id,
@@ -932,7 +1127,10 @@ function BuildFormFields({
               label="Start a team with this build"
               testId="tb-rail-create-team"
               /* Save point: the new team is about to reference this build. */
-              onClick={() => saveThen(() => createTeam(generation, [build.id]))}
+              /* `attaches`: the new team is built around this build. */
+              onClick={() =>
+                saveThen(() => createTeam(generation, [build.id]), { kind: 'attaches' })
+              }
             />
           ) : (
             <IconButton

@@ -19,6 +19,14 @@ export type Gender = 'male' | 'female'
 export const TEAM_SIZE = 6
 export const MOVE_SLOTS = 4
 
+/**
+ * The in-game nickname limit, and it is 10 for every generation this app
+ * covers -- Gen 1 through 5 all cap at 10 characters. Enforced in the model
+ * rather than only as an `maxLength` on the input, because the attribute stops
+ * typing and pasting but says nothing about a value that arrives any other way.
+ */
+export const NICKNAME_MAX = 10
+
 /** The 510-point budget on a Gen 3-4 EV spread. */
 export const MAX_EV_TOTAL = 510
 
@@ -47,6 +55,19 @@ export interface Build {
   individual: StatNumbers
   tags: string[]
   notes: string
+  /**
+   * A BUILD THAT HAS NOT CLAIMED ITS PLACE YET.
+   *
+   * Starting a new member used to write it into a team slot immediately, before
+   * a single field was filled -- so abandoning it left a blank Bulbasaur sitting
+   * in the team and in the library forever. A draft is created, edited and shown
+   * exactly like any other build; what it does not have is a slot. It gets one
+   * when the reader says to keep it, and is deleted when they say not to.
+   *
+   * Optional because every build stored before this existed is not one, and
+   * `undefined` reads as false without a migration.
+   */
+  draft?: boolean
 }
 
 export interface Team {

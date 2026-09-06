@@ -511,6 +511,24 @@ try {
     movesAfter.join(','),
   )
 
+  /*
+    ---- the nickname is capped at the in-game limit
+
+    ATTRIBUTE **AND** STORED VALUE. `maxLength` alone would pass a check that
+    only typed into the field, because the browser enforces it during input --
+    so this asserts what actually reached the store as well, which is what the
+    slice in `commit` is for.
+  */
+  await page.fill('[data-testid="tb-nickname"]', 'ABCDEFGHIJKLMNOP')
+  const nickAttr = await page.getAttribute('[data-testid="tb-nickname"]', 'maxlength')
+  const nickTyped = await page.inputValue('[data-testid="tb-nickname"]')
+  log(`  nickname: maxlength=${nickAttr} typed="${nickTyped}" (${nickTyped.length})`)
+  check(
+    'the nickname field caps at 10 characters, the in-game limit',
+    nickAttr === '10' && nickTyped.length === 10,
+    `maxlength=${nickAttr} value="${nickTyped}"`,
+  )
+
   // ---- reset clears exactly the listed fields, and confirms first
   const beforeReset = (await readStore()).builds.find((b) => b.id === 'b1')
   await page.hover('[data-testid="tb-build-form"]')
@@ -521,11 +539,11 @@ try {
   await page.waitForTimeout(300)
   const afterReset = (await readStore()).builds.find((b) => b.id === 'b1')
   check(
-    'reset clears item, moves, level, friendship, nickname, spread and shiny',
+    'reset clears item, moves, nickname, spread and shiny, and returns level and friendship to their NEW-BUILD values (50 / 70), not to the bottom of their ranges',
     afterReset.itemId === null &&
       afterReset.moveIds.every((m) => m === null) &&
-      afterReset.level === 1 &&
-      afterReset.friendship === 0 &&
+      afterReset.level === 50 &&
+      afterReset.friendship === 70 &&
       afterReset.nickname === '' &&
       Object.values(afterReset.effort).every((v) => !v) &&
       Object.values(afterReset.individual).every((v) => !v) &&
@@ -680,7 +698,7 @@ try {
 
   // ---- the GLOBAL nav bar is a save point too, which was logged debt
   await openBuild('b1')
-  await page.fill('[data-testid="tb-nickname"]', 'ViaGlobalNav')
+  await page.fill('[data-testid="tb-nickname"]', 'ViaNavBar')
   await page.click('[data-testid="tb-level"]')
   await page.waitForTimeout(300)
   /* Out of the module entirely, by the app bar -- the route that used to drop
@@ -693,7 +711,7 @@ try {
   const afterGlobalNav = await nickOf('b1')
   check(
     'leaving through the GLOBAL app nav bar saves it as well',
-    afterGlobalNav === 'ViaGlobalNav',
+    afterGlobalNav === 'ViaNavBar',
     `stored nickname is "${afterGlobalNav}"`,
   )
 
@@ -761,7 +779,7 @@ try {
   const afterReset2 = (await readStore()).builds.find((b) => b.id === 'b1')
   check(
     'Reset writes immediately rather than leaving a reset sitting in the draft',
-    afterReset2.nickname === '' && afterReset2.level === 1,
+    afterReset2.nickname === '' && afterReset2.level === 50,
     `nickname="${afterReset2.nickname}" level=${afterReset2.level}`,
   )
 
@@ -776,7 +794,7 @@ try {
     teams: [],
   })
   await openBuild('b1')
-  await page.fill('[data-testid="tb-nickname"]', 'EditedThenDeleted')
+  await page.fill('[data-testid="tb-nickname"]', 'EditedThen')
   await page.click('[data-testid="tb-level"]')
   await page.waitForTimeout(300)
   await page.hover('[data-testid="tb-build-form"]')
@@ -798,7 +816,7 @@ try {
     teams: [mkTeam('t1', 1, ['b3']), mkTeam('t2', 2, ['b3'])],
   })
   await openBuild('b3')
-  await page.fill('[data-testid="tb-nickname"]', 'ShouldVanish')
+  await page.fill('[data-testid="tb-nickname"]', 'Vanishes')
   await page.click('[data-testid="tb-level"]')
   await page.waitForTimeout(300)
   await page.click('[data-testid="tb-build-back"]')
@@ -1255,6 +1273,236 @@ try {
     afterKeep.teams[0].memberIds.filter((m) => m === 'b2').length === 0 &&
       afterKeep.builds.some((b) => b.id === 'b2'),
     `slots=${afterKeep.teams[0].memberIds.join(',')} builds=${afterKeep.builds.map((b) => b.id).join(',')}`,
+  )
+
+  // =====================================================================
+  /*
+    9. DRAFT MEMBERS — a new build has no slot until you say so.
+
+    THE OLD BEHAVIOUR IS THE REASON THIS SECTION EXISTS: starting a new member
+    wrote it into a team slot immediately, before a single field was filled, so
+    changing your mind left a blank Bulbasaur in the team and in the library
+    forever. A draft now earns its slot, and the question it is asked on the way
+    out depends on the team: untouched, nothing is asked; touched with room,
+    keep-or-bin; touched with the team full, keeping means displacing whoever
+    was clicked.
+
+    EVERY BRANCH IS DRIVEN TO ITS END AND THE STORE IS READ BACK. A prompt that
+    appears is not the same as a prompt that does what it says.
+  */
+  hr('9. DRAFT MEMBERS')
+
+  const twoMemberTeam = () => ({
+    nextBuildSeq: 3,
+    nextTeamSeq: 2,
+    builds: [
+      mkBuild('b1', { speciesId: 1, pokemonId: 1 }),
+      mkBuild('b2', { speciesId: 4, pokemonId: 4 }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1', 'b2'])],
+  })
+  const slotsOf = (d) => d.teams[0].memberIds.map((m) => m ?? '·').join(',')
+  const idsOf = (d) => d.builds.map((b) => b.id).join(',')
+  /** Open the team, open slot 0, then start a new member from the rail. */
+  const startDraft = async () => {
+    await goTo('my-teams')
+    await page.waitForSelector('[data-testid="tb-my-teams"]')
+    await page.click('[data-testid="tb-team-t1-open"]')
+    await page.waitForSelector('[data-testid="tb-team-viewer"]')
+    await page.click('[data-testid="tb-slot-0-open"]')
+    await page.waitForSelector('[data-testid="tb-build-form"]')
+    await page.waitForTimeout(400)
+    await page.click('[data-testid="tb-rail-add"]')
+    await page.waitForSelector('[data-testid="tb-build-form"]')
+    await page.waitForTimeout(600)
+  }
+  const touchDraft = async (nickname) => {
+    await page.fill('[data-testid="tb-nickname"]', nickname)
+    await page.click('[data-testid="tb-level"]')
+    await page.waitForTimeout(300)
+  }
+  const formBuildId = () =>
+    page.evaluate(
+      () => document.querySelector('[data-testid="tb-build-form"]')?.dataset.buildId ?? null,
+    )
+
+  // ---- a draft exists, holds no slot, and is not in the library
+  await seedStore(twoMemberTeam())
+  await startDraft()
+  const draftId = await formBuildId()
+  const withDraft = await readStore()
+  log(`  draft ${draftId} · slots ${slotsOf(withDraft)} · builds ${idsOf(withDraft)}`)
+  check(
+    'starting a new member creates a build that holds NO team slot',
+    draftId === 'b3' &&
+      withDraft.builds.some((b) => b.id === 'b3' && b.draft === true) &&
+      slotsOf(withDraft) === 'b1,b2,·,·,·,·',
+    `slots=${slotsOf(withDraft)} builds=${idsOf(withDraft)}`,
+  )
+  await goTo('build-library')
+  await page.waitForTimeout(400)
+  const libIds = await page.$$eval('[data-tb="member-card"]', (els) =>
+    els.map((e) => e.dataset.buildId),
+  )
+  check(
+    'and it is not listed in the Build Library, because it is not a build yet',
+    !libIds.includes('b3') && libIds.length === 2,
+    libIds.join(',') || 'none',
+  )
+
+  // ---- RULE 1: untouched + click a member = just load it
+  await seedStore(twoMemberTeam())
+  await startDraft()
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
+  await page.waitForTimeout(700)
+  const afterUntouched = await readStore()
+  check(
+    'an UNTOUCHED draft asks nothing: the member opens and the draft is deleted',
+    (await page.$$('[data-testid="tb-draft-prompt"]')).length === 0 &&
+      (await formBuildId()) === 'b2' &&
+      idsOf(afterUntouched) === 'b1,b2',
+    `builds=${idsOf(afterUntouched)} form=${await formBuildId()}`,
+  )
+
+  // ---- RULE 2: touched + a free slot = keep or discard
+  await seedStore(twoMemberTeam())
+  await startDraft()
+  await touchDraft('Mine')
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
+  await page.waitForSelector('[data-testid="tb-draft-prompt"]')
+  const freeOffers = await page.$$eval(
+    '[data-testid="tb-draft-prompt"] .tb-prompt-actions button',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
+  log(`  free slot offers: ${freeOffers.join(' | ')}`)
+  check(
+    'a TOUCHED draft with a slot going spare offers keep or discard',
+    freeOffers.length === 3 &&
+      /Cancel/i.test(freeOffers[0]) &&
+      /Keep/i.test(freeOffers[1]) &&
+      /Discard/i.test(freeOffers[2]),
+    freeOffers.join(' | '),
+  )
+  await page.click('[data-testid="tb-draft-keep"]')
+  await page.waitForTimeout(700)
+  const afterKeepDraft = await readStore()
+  const kept = afterKeepDraft.builds.find((b) => b.id === 'b3')
+  check(
+    '"Keep" gives it the first empty slot, saves the edit, and clears the draft flag',
+    slotsOf(afterKeepDraft) === 'b1,b2,b3,·,·,·' &&
+      kept?.nickname === 'Mine' &&
+      kept?.draft !== true,
+    `slots=${slotsOf(afterKeepDraft)} nickname=${kept?.nickname} draft=${kept?.draft}`,
+  )
+
+  await seedStore(twoMemberTeam())
+  await startDraft()
+  await touchDraft('Bin')
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
+  await page.waitForSelector('[data-testid="tb-draft-prompt"]')
+  await page.click('[data-testid="tb-draft-discard"]')
+  await page.waitForTimeout(700)
+  const afterDiscard = await readStore()
+  check(
+    '"Discard" deletes it outright — no orphan left in the library',
+    idsOf(afterDiscard) === 'b1,b2' && slotsOf(afterDiscard) === 'b1,b2,·,·,·,·',
+    `builds=${idsOf(afterDiscard)} slots=${slotsOf(afterDiscard)}`,
+  )
+
+  // ---- RULE 3: touched + a FULL team = displace the member you clicked
+  await seedStore({
+    nextBuildSeq: 7,
+    nextTeamSeq: 2,
+    builds: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'].map((id, i) =>
+      mkBuild(id, { speciesId: 1 + i * 3, pokemonId: 1 + i * 3 }),
+    ),
+    teams: [mkTeam('t1', 1, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'])],
+  })
+  await startDraft()
+  await touchDraft('Pushy')
+  await page.click('[data-testid="tb-rail-b3"] .tb-card-rail-open')
+  await page.waitForSelector('[data-testid="tb-draft-prompt"]')
+  const fullOffers = await page.$$eval(
+    '[data-testid="tb-draft-prompt"] .tb-prompt-actions button',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
+  log(`  full team offers: ${fullOffers.join(' | ')}`)
+  check(
+    'with the team full the offer NAMES the member being displaced, rather than pretending a slot exists',
+    fullOffers.length === 3 && /^Replace \S/.test(fullOffers[1]),
+    fullOffers.join(' | '),
+  )
+  await page.click('[data-testid="tb-draft-replace"]')
+  await page.waitForTimeout(700)
+  const afterReplace = await readStore()
+  check(
+    '"Replace" takes that slot, and the displaced build survives in the library',
+    slotsOf(afterReplace) === 'b1,b2,b7,b4,b5,b6' &&
+      afterReplace.builds.some((b) => b.id === 'b3'),
+    `slots=${slotsOf(afterReplace)} builds=${idsOf(afterReplace)}`,
+  )
+
+  // ---- the back button is a resolution too, not a bypass
+  await seedStore(twoMemberTeam())
+  await startDraft()
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(700)
+  const afterBack = await readStore()
+  check(
+    'backing out of an untouched draft deletes it, so blanks cannot accumulate',
+    idsOf(afterBack) === 'b1,b2',
+    `builds=${idsOf(afterBack)}`,
+  )
+
+  /*
+    ---- the global nav bar, which this module does not own
+
+    TWO DIFFERENT ANSWERS, on purpose. There is nobody left to ask, so an
+    untouched draft is left to be pruned on the way back in, while a TOUCHED one
+    keeps its work and becomes an ordinary library build. Deleting something
+    somebody typed is the worse of the two ways to be wrong.
+
+    The delete deliberately does NOT live in the form's unmount cleanup: that
+    cleanup also runs on StrictMode's simulated unmount, immediately after mount,
+    which destroyed the draft the instant it was created.
+  */
+  await seedStore(twoMemberTeam())
+  await startDraft()
+  await page.hover('[data-testid="nav-tab-pokepedia"]')
+  await page.waitForSelector('[data-testid="nav-dropdown-pokepedia"]', { state: 'visible' })
+  await page.click('[data-testid="nav-dropdown-pokepedia"] button')
+  await page.waitForTimeout(900)
+  const strandedUntouched = await readStore()
+  check(
+    'an untouched draft survives a global-nav exit only until the module is next entered',
+    strandedUntouched.builds.some((b) => b.id === 'b3' && b.draft === true),
+    `builds=${idsOf(strandedUntouched)}`,
+  )
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.waitForTimeout(700)
+  const afterReturn = await readStore()
+  check(
+    'and re-entering Team Building prunes it',
+    idsOf(afterReturn) === 'b1,b2',
+    `builds=${idsOf(afterReturn)}`,
+  )
+
+  await seedStore(twoMemberTeam())
+  await startDraft()
+  await touchDraft('Rescued')
+  await page.hover('[data-testid="nav-tab-pokepedia"]')
+  await page.waitForSelector('[data-testid="nav-dropdown-pokepedia"]', { state: 'visible' })
+  await page.click('[data-testid="nav-dropdown-pokepedia"] button')
+  await page.waitForTimeout(900)
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.waitForTimeout(500)
+  const rescued = (await readStore()).builds.find((b) => b.id === 'b3')
+  check(
+    'but a TOUCHED draft keeps its work and becomes an ordinary library build',
+    rescued?.nickname === 'Rescued' && rescued?.draft !== true,
+    rescued ? `nickname=${rescued.nickname} draft=${rescued.draft}` : 'gone',
   )
 
   // =====================================================================

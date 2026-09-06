@@ -26,8 +26,8 @@ import { BuildLibrary } from './BuildLibrary'
 import { MyTeams } from './MyTeams'
 import { TeamViewer } from './TeamViewer'
 import { newBuildInit } from './buildFacts'
-import { createBuild, createTeam } from './store'
-import { goTo, useTbScreen, type TbScreen } from './tbNav'
+import { createBuild, createTeam, deleteBuild, readData } from './store'
+import { goTo, readTbScreen, useTbScreen, type TbScreen } from './tbNav'
 import './teamBuilder.css'
 
 /** The two ids that are real screens. The other two are verbs, handled below. */
@@ -56,6 +56,7 @@ export function TeamBuilding() {
   */
   const consumed = useRef<string | null>(null)
 
+
   useEffect(() => {
     const token = `${nav.moduleId}|${nav.moduleNonce}`
     if (consumed.current === token) return
@@ -79,6 +80,38 @@ export function TeamBuilding() {
     const root = rootScreenFor(nav.moduleId)
     if (root) goTo(root)
   }, [nav.moduleId, nav.moduleNonce, generation])
+
+  /*
+    PRUNE ABANDONED DRAFTS, once, on the way in.
+
+    A draft member (Build.draft) is resolved by whichever exit the reader takes --
+    but leaving through the global app nav bar is not an exit this module owns,
+    and the Build Form cannot do it from its unmount cleanup: that cleanup also
+    runs on StrictMode's SIMULATED unmount, immediately after mount, so deleting
+    from there destroyed the draft the moment it was created. Doing it here
+    means an abandoned draft survives until the next visit and no longer.
+
+    DECLARED AFTER THE NAV EFFECT, and it reads the screen through
+    `readTbScreen()` rather than the `screen` this render closed over. Effects
+    run in declaration order, so by this point the nav effect above has already
+    redirected -- and the closed-over value still named the Build Form the reader
+    had just left, which spared the very draft this is here to collect.
+
+    The open build form is spared, because returning to a draft you are in the
+    middle of is the one case where it is not abandoned. Deleting is idempotent,
+    so the double-invoked effect is harmless.
+  */
+  const pruned = useRef(false)
+  useEffect(() => {
+    if (pruned.current) return
+    pruned.current = true
+    const live = readTbScreen()
+    const open = live.kind === 'build-form' ? live.buildId : null
+    for (const build of readData().builds) {
+      if (build.draft && build.id !== open) deleteBuild(build.id)
+    }
+    /* Mount only: a draft created LATER is the one being edited right now. */
+  }, [])
 
   /*
     EVERY SCREEN SCROLLS INSIDE A ScrollArea, which is the app's scroll model:

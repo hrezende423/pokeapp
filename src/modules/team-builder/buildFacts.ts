@@ -372,6 +372,37 @@ export function newBuildInit(generation: number, speciesId = 1): Omit<Build, 'id
   }
 }
 
+/**
+ * Is this build still exactly what `newBuildInit` produced?
+ *
+ * STRUCTURAL, NOT A DIRTY FLAG, and that is the point: a draft the reader opened,
+ * left, and came back to has no live edit state to consult, but it is still
+ * untouched and should still leave without a prompt. Comparing against a fresh
+ * build of the same generation answers that at any moment.
+ *
+ * `gender` and `abilityId` are omitted on purpose -- both are DERIVED from the
+ * species, so a build that still has the default species necessarily still has
+ * their defaults too, and a build that does not has already failed the
+ * `speciesId` test.
+ */
+export function isPristineBuild(build: Build): boolean {
+  const fresh = newBuildInit(build.generation)
+  return (
+    build.speciesId === fresh.speciesId &&
+    build.nickname === '' &&
+    build.shiny === false &&
+    build.level === fresh.level &&
+    build.friendship === fresh.friendship &&
+    build.itemId == null &&
+    build.natureId == null &&
+    build.moveIds.every((m) => m == null) &&
+    Object.keys(build.effort).length === 0 &&
+    Object.keys(build.individual).length === 0 &&
+    build.tags.length === 0 &&
+    build.notes === ''
+  )
+}
+
 /* ------------------------------------------------------------------- gender */
 
 /**

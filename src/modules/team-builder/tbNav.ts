@@ -46,6 +46,18 @@ export function useTbScreen(): TbScreen {
   )
 }
 
+/**
+ * The current screen, outside React.
+ *
+ * For effects that must read the screen as it is NOW rather than as it was when
+ * their render closed over it. The module shell's prune needs exactly that: on
+ * re-entry the nav effect has just redirected the screen, and the stale value
+ * would still name the Build Form the reader has already left.
+ */
+export function readTbScreen(): TbScreen {
+  return screen
+}
+
 export function goTo(next: TbScreen) {
   screen = next
   listeners.forEach((fn) => fn())

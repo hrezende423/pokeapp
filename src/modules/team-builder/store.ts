@@ -117,7 +117,15 @@ export function duplicateBuild(id: string): Build | null {
   const data = readData()
   const source = data.builds.find((b) => b.id === id)
   if (!source) return null
-  return createBuild({ ...source, moveIds: [...source.moveIds], tags: [...source.tags] })
+  /* `draft: false` explicitly: a copy is a build in its own right, and
+     inheriting the flag would produce a second draft that no form is editing
+     and nothing would ever resolve. */
+  return createBuild({
+    ...source,
+    draft: false,
+    moveIds: [...source.moveIds],
+    tags: [...source.tags],
+  })
 }
 
 /**

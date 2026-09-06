@@ -288,6 +288,17 @@ the reason is usually that the cheap fix is the wrong one.
   original is untouched. A real fix is still a cross-module navigation guard the
   nav layer consults BEFORE switching modules; **do not build a
   Team-Building-local version of that.**
+- **An untouched draft member abandoned through the GLOBAL app nav bar lingers
+  until the module is next entered.** A new team member is a draft (`Build.draft`)
+  and holds no slot until it is kept; every exit Team Building owns resolves it,
+  but the app bar is not one of those, and the Build Form cannot delete it from
+  its unmount cleanup because that cleanup also runs on StrictMode's simulated
+  unmount — which destroyed the draft the instant it was created. So the shell
+  prunes on mount instead. The lingering draft is invisible (not in the library,
+  not in a team) and costs a few bytes of localStorage. A real fix is the same
+  cross-module navigation guard the entry above wants; **do not build a
+  Team-Building-local version of it.**
+
 - **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
   one species whose HP does not follow the normal formula — it is always 1,
   at every level, with any DV/IV or EV spread — and `statMath.ts` computes it

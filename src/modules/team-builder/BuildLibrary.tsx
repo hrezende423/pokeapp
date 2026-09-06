@@ -42,6 +42,7 @@ import { goTo } from './tbNav'
 export function BuildLibrary({ generation }: { generation: number }) {
   const data = useTeamBuilderData()
   const prompt = usePrompt()
+  const libraryBuilds = data.builds.filter((b) => !b.draft)
 
   const newBuild = () => {
     const build = createBuild(newBuildInit(generation))
@@ -57,13 +58,15 @@ export function BuildLibrary({ generation }: { generation: number }) {
         </GhostButton>
       </header>
 
-      {data.builds.length === 0 ? (
+      {/* DRAFTS ARE NOT LISTED. A draft is a member being made right now, in a
+          form somewhere; it has no slot and no place here until it is kept. */}
+      {libraryBuilds.length === 0 ? (
         <div className="tb-empty" data-testid="tb-build-library-empty">
           <p className="tb-empty-note">No builds yet.</p>
         </div>
       ) : (
         <div className="tb-slot-grid" data-testid="tb-build-grid">
-          {data.builds.map((build) => (
+          {libraryBuilds.map((build) => (
             <LibraryCard
               key={build.id}
               build={build}

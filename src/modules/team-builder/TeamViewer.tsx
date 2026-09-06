@@ -90,9 +90,17 @@ export function TeamViewer({ teamId }: { teamId: string }) {
     })
     .filter((m): m is { label: string; typeIds: number[] } => m != null)
 
-  const buildNewInSlot = (slot: number) => {
-    const build = createBuild(newBuildInit(team.generation))
-    setTeamMember(team.id, slot, build.id)
+  /*
+    NO `setTeamMember` HERE ANY MORE. The new build is a draft: it opens in the
+    form with no slot, and the form is where it either earns one or is thrown
+    away. Writing it into the slot up front is what used to leave a blank
+    Bulbasaur behind whenever someone changed their mind.
+
+    The slot is no longer an argument because the draft does not go anywhere
+    yet -- the first empty slot at KEEP time is the one it takes.
+  */
+  const buildNew = () => {
+    const build = createBuild({ ...newBuildInit(team.generation), draft: true })
     goTo({ kind: 'build-form', buildId: build.id, origin: { kind: 'team', teamId: team.id } })
   }
 
@@ -221,9 +229,8 @@ export function TeamViewer({ teamId }: { teamId: string }) {
           <div className="tb-choice">
             <GhostButton
               onClick={() => {
-                const slot = picking
                 setPicking(null)
-                buildNewInSlot(slot)
+                buildNew()
               }}
               testId="tb-add-member-new"
             >
