@@ -548,11 +548,11 @@ try {
   await page.waitForTimeout(300)
   const afterReset = (await readStore()).builds.find((b) => b.id === 'b1')
   check(
-    'reset clears item, moves, nickname, spread and shiny, and returns level and friendship to their NEW-BUILD values (50 / 70), not to the bottom of their ranges',
+    'reset clears item, moves, friendship, nickname, spread and shiny, and puts level back to 1',
     afterReset.itemId === null &&
       afterReset.moveIds.every((m) => m === null) &&
-      afterReset.level === 50 &&
-      afterReset.friendship === 70 &&
+      afterReset.level === 1 &&
+      afterReset.friendship === 0 &&
       afterReset.nickname === '' &&
       Object.values(afterReset.effort).every((v) => !v) &&
       Object.values(afterReset.individual).every((v) => !v) &&
@@ -567,17 +567,39 @@ try {
       afterReset.gender === beforeReset.gender,
   )
 
-  // ---- the right rail shows the team's REAL other members
-  /* SCOPED TO THE CARD, because each rail member now also carries a delete
-     control whose testid starts with the same prefix. Matching on the card
-     marker is what keeps this counting members rather than controls. */
+  /*
+    ---- the right rail shows the team's REAL members, the open one included
+
+    IT USED TO FILTER THE OPEN BUILD OUT, which turned a team of three into a
+    rail of two and left no way to see where in the team you were. The open one
+    is now present and MARKED, and carries no open handler at all -- clicking it
+    is a no-op rather than a navigation to where you already are.
+
+    Scoped to the card marker because each rail member also carries a delete
+    control whose testid starts with the same prefix.
+  */
   const railIds = await page.$$eval('[data-tb="member-card"][data-testid^="tb-rail-b"]', (els) =>
     els.map((e) => e.dataset.buildId),
   )
   check(
-    "the right rail lists the attached team's actual other members, not fixed data",
-    railIds.length === 1 && railIds[0] === 'b3',
+    "the right rail lists the attached team's actual members, the open one included",
+    JSON.stringify(railIds) === JSON.stringify(['b1', 'b3']),
     railIds.join(','),
+  )
+  const currentCard = await page.evaluate(() => {
+    const el = document.querySelector('[data-tb="member-card"][data-current="true"]')
+    if (!el) return null
+    return {
+      id: el.dataset.buildId,
+      /* A <span>, not a <button>: see MemberCard's rail branch. */
+      openTag: el.querySelector('.tb-card-rail-open')?.tagName,
+      buttons: el.querySelectorAll('.tb-card-rail-open button, button.tb-card-rail-open').length,
+    }
+  })
+  check(
+    'the member open in the form is marked, and is not a control at all',
+    currentCard?.id === 'b1' && currentCard?.openTag === 'SPAN',
+    JSON.stringify(currentCard),
   )
 
   // ---- a build on ONE team autosaves with no prompt
@@ -788,7 +810,7 @@ try {
   const afterReset2 = (await readStore()).builds.find((b) => b.id === 'b1')
   check(
     'Reset writes immediately rather than leaving a reset sitting in the draft',
-    afterReset2.nickname === '' && afterReset2.level === 50,
+    afterReset2.nickname === '' && afterReset2.level === 1,
     `nickname="${afterReset2.nickname}" level=${afterReset2.level}`,
   )
 
@@ -1286,233 +1308,385 @@ try {
 
   // =====================================================================
   /*
-    9. DRAFT MEMBERS — a new build has no slot until you say so.
+    9. BUILD FORM'S RAIL AND ITS SAVE TIMING.
 
-    THE OLD BEHAVIOUR IS THE REASON THIS SECTION EXISTS: starting a new member
-    wrote it into a team slot immediately, before a single field was filled, so
-    changing your mind left a blank Bulbasaur in the team and in the library
-    forever. A draft now earns its slot, and the question it is asked on the way
-    out depends on the team: untouched, nothing is asked; touched with room,
-    keep-or-bin; touched with the team full, keeping means displacing whoever
-    was clicked.
+    BUILD FORM DELIBERATELY DOES NOT BEHAVE LIKE THE REST OF THE MODULE, and
+    that is the point of this section rather than a wrinkle in it. My Teams,
+    Team Viewer and Build Library all commit a field on blur. Build Form holds
+    its edits in local state and writes them only at a TRANSITION -- switching
+    rail member, adding one, duplicating, adding to a team, going back, or
+    leaving by the app bar. Nothing else saves, and nothing announces a save.
 
-    EVERY BRANCH IS DRIVEN TO ITS END AND THE STORE IS READ BACK. A prompt that
-    appears is not the same as a prompt that does what it says.
+    THE ONLY PROMPT ON A TRANSITION IS THE SHARED-BUILD ONE. Everything else
+    commits silently, because a build one team uses is nobody else's business.
   */
-  hr('9. DRAFT MEMBERS')
+  hr('9. BUILD FORM — RAIL AND SAVE TIMING')
 
   const twoMemberTeam = () => ({
-    nextBuildSeq: 3,
+    nextBuildSeq: 4,
     nextTeamSeq: 2,
     builds: [
       mkBuild('b1', { speciesId: 1, pokemonId: 1 }),
       mkBuild('b2', { speciesId: 4, pokemonId: 4 }),
+      mkBuild('b3', { speciesId: 7, pokemonId: 7 }),
     ],
     teams: [mkTeam('t1', 1, ['b1', 'b2'])],
   })
   const slotsOf = (d) => d.teams[0].memberIds.map((m) => m ?? '·').join(',')
   const idsOf = (d) => d.builds.map((b) => b.id).join(',')
-  /** Open the team, open slot 0, then start a new member from the rail. */
-  const startDraft = async () => {
-    await goTo('my-teams')
-    await page.waitForSelector('[data-testid="tb-my-teams"]')
-    await page.click('[data-testid="tb-team-t1-open"]')
-    await page.waitForSelector('[data-testid="tb-team-viewer"]')
-    await page.click('[data-testid="tb-slot-0-open"]')
-    await page.waitForSelector('[data-testid="tb-build-form"]')
-    await page.waitForTimeout(400)
-    await page.click('[data-testid="tb-rail-add"]')
-    await page.waitForSelector('[data-testid="tb-build-form"]')
-    await page.waitForTimeout(600)
-  }
-  const touchDraft = async (nickname) => {
-    await page.fill('[data-testid="tb-nickname"]', nickname)
-    await page.click('[data-testid="tb-level"]')
-    await page.waitForTimeout(300)
-  }
   const formBuildId = () =>
     page.evaluate(
       () => document.querySelector('[data-testid="tb-build-form"]')?.dataset.buildId ?? null,
     )
+  const nickOfBuild = async (id) =>
+    (await readStore()).builds.find((b) => b.id === id)?.nickname ?? null
+  /** Type into the form WITHOUT triggering any transition. */
+  const typeNickname = async (value) => {
+    await page.fill('[data-testid="tb-nickname"]', value)
+    await page.click('[data-testid="tb-level"]')
+    await page.waitForTimeout(250)
+  }
+  const openTeamMember = async (slot) => {
+    await goTo('my-teams')
+    await page.waitForSelector('[data-testid="tb-my-teams"]')
+    await page.click('[data-testid="tb-team-t1-open"]')
+    await page.waitForSelector('[data-testid="tb-team-viewer"]')
+    await page.click(`[data-testid="tb-slot-${slot}-open"]`)
+    await page.waitForSelector('[data-testid="tb-build-form"]')
+    await page.waitForTimeout(400)
+  }
 
-  // ---- a draft exists, holds no slot, and is not in the library
-  await seedStore(twoMemberTeam())
-  await startDraft()
-  const draftId = await formBuildId()
-  const withDraft = await readStore()
-  log(`  draft ${draftId} · slots ${slotsOf(withDraft)} · builds ${idsOf(withDraft)}`)
-  check(
-    'starting a new member creates a build that holds NO team slot',
-    draftId === 'b3' &&
-      withDraft.builds.some((b) => b.id === 'b3' && b.draft === true) &&
-      slotsOf(withDraft) === 'b1,b2,·,·,·,·',
-    `slots=${slotsOf(withDraft)} builds=${idsOf(withDraft)}`,
-  )
+  // ---- PART 1: the collapse mechanic is gone
+  await seedStore({
+    nextBuildSeq: 2,
+    nextTeamSeq: 1,
+    builds: [mkBuild('b1', { speciesId: 1, pokemonId: 1 })],
+    teams: [],
+  })
   await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
   await page.waitForTimeout(400)
-  const libIds = await page.$$eval('[data-tb="member-card"]', (els) =>
+  const looseRail = await page.evaluate(() => {
+    const rail = document.querySelector('[data-testid="tb-rail"]')
+    return {
+      state: rail?.dataset.state,
+      addNow: document.querySelectorAll('[data-testid="tb-rail-create-team"]').length,
+      chevron: document.querySelectorAll('[data-testid="tb-rail-expand"]').length,
+      cards: rail?.querySelectorAll('[data-tb="member-card"]').length ?? 0,
+    }
+  })
+  log(`  loose rail: ${JSON.stringify(looseRail)}`)
+  check(
+    'UC2: an unattached build shows the "+" immediately — no chevron, no collapsed state',
+    looseRail.state === 'loose' &&
+      looseRail.addNow === 1 &&
+      looseRail.chevron === 0 &&
+      looseRail.cards === 0,
+    JSON.stringify(looseRail),
+  )
+
+  // ---- UC2: clicking it creates a real team with this build in it
+  await page.click('[data-testid="tb-rail-create-team"]')
+  await page.waitForTimeout(700)
+  const afterCreate = await readStore()
+  const attachedRail = await page.$$eval('[data-tb="member-card"][data-testid^="tb-rail-"]', (els) =>
     els.map((e) => e.dataset.buildId),
   )
   check(
-    'and it is not listed in the Build Library, because it is not a build yet',
-    !libIds.includes('b3') && libIds.length === 2,
-    libIds.join(',') || 'none',
-  )
-
-  // ---- RULE 1: untouched + click a member = just load it
-  await seedStore(twoMemberTeam())
-  await startDraft()
-  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
-  await page.waitForTimeout(700)
-  const afterUntouched = await readStore()
-  check(
-    'an UNTOUCHED draft asks nothing: the member opens and the draft is deleted',
-    (await page.$$('[data-testid="tb-draft-prompt"]')).length === 0 &&
-      (await formBuildId()) === 'b2' &&
-      idsOf(afterUntouched) === 'b1,b2',
-    `builds=${idsOf(afterUntouched)} form=${await formBuildId()}`,
-  )
-
-  // ---- RULE 2: touched + a free slot = keep or discard
-  await seedStore(twoMemberTeam())
-  await startDraft()
-  await touchDraft('Mine')
-  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
-  await page.waitForSelector('[data-testid="tb-draft-prompt"]')
-  const freeOffers = await page.$$eval(
-    '[data-testid="tb-draft-prompt"] .tb-prompt-actions button',
-    (els) => els.map((e) => e.textContent.trim()),
-  )
-  log(`  free slot offers: ${freeOffers.join(' | ')}`)
-  check(
-    'a TOUCHED draft with a slot going spare offers keep or discard',
-    freeOffers.length === 3 &&
-      /Cancel/i.test(freeOffers[0]) &&
-      /Keep/i.test(freeOffers[1]) &&
-      /Discard/i.test(freeOffers[2]),
-    freeOffers.join(' | '),
-  )
-  await page.click('[data-testid="tb-draft-keep"]')
-  await page.waitForTimeout(700)
-  const afterKeepDraft = await readStore()
-  const kept = afterKeepDraft.builds.find((b) => b.id === 'b3')
-  check(
-    '"Keep" gives it the first empty slot, saves the edit, and clears the draft flag',
-    slotsOf(afterKeepDraft) === 'b1,b2,b3,·,·,·' &&
-      kept?.nickname === 'Mine' &&
-      kept?.draft !== true,
-    `slots=${slotsOf(afterKeepDraft)} nickname=${kept?.nickname} draft=${kept?.draft}`,
-  )
-
-  await seedStore(twoMemberTeam())
-  await startDraft()
-  await touchDraft('Bin')
-  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
-  await page.waitForSelector('[data-testid="tb-draft-prompt"]')
-  await page.click('[data-testid="tb-draft-discard"]')
-  await page.waitForTimeout(700)
-  const afterDiscard = await readStore()
-  check(
-    '"Discard" deletes it outright — no orphan left in the library',
-    idsOf(afterDiscard) === 'b1,b2' && slotsOf(afterDiscard) === 'b1,b2,·,·,·,·',
-    `builds=${idsOf(afterDiscard)} slots=${slotsOf(afterDiscard)}`,
-  )
-
-  // ---- RULE 3: touched + a FULL team = displace the member you clicked
-  await seedStore({
-    nextBuildSeq: 7,
-    nextTeamSeq: 2,
-    builds: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'].map((id, i) =>
-      mkBuild(id, { speciesId: 1 + i * 3, pokemonId: 1 + i * 3 }),
-    ),
-    teams: [mkTeam('t1', 1, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'])],
-  })
-  await startDraft()
-  await touchDraft('Pushy')
-  await page.click('[data-testid="tb-rail-b3"] .tb-card-rail-open')
-  await page.waitForSelector('[data-testid="tb-draft-prompt"]')
-  const fullOffers = await page.$$eval(
-    '[data-testid="tb-draft-prompt"] .tb-prompt-actions button',
-    (els) => els.map((e) => e.textContent.trim()),
-  )
-  log(`  full team offers: ${fullOffers.join(' | ')}`)
-  check(
-    'with the team full the offer NAMES the member being displaced, rather than pretending a slot exists',
-    fullOffers.length === 3 && /^Replace \S/.test(fullOffers[1]),
-    fullOffers.join(' | '),
-  )
-  await page.click('[data-testid="tb-draft-replace"]')
-  await page.waitForTimeout(700)
-  const afterReplace = await readStore()
-  check(
-    '"Replace" takes that slot, and the displaced build survives in the library',
-    slotsOf(afterReplace) === 'b1,b2,b7,b4,b5,b6' &&
-      afterReplace.builds.some((b) => b.id === 'b3'),
-    `slots=${slotsOf(afterReplace)} builds=${idsOf(afterReplace)}`,
-  )
-
-  // ---- the back button is a resolution too, not a bypass
-  await seedStore(twoMemberTeam())
-  await startDraft()
-  await page.click('[data-testid="tb-build-back"]')
-  await page.waitForTimeout(700)
-  const afterBack = await readStore()
-  check(
-    'backing out of an untouched draft deletes it, so blanks cannot accumulate',
-    idsOf(afterBack) === 'b1,b2',
-    `builds=${idsOf(afterBack)}`,
+    'UC2: it creates the team, makes this build member 1, persists, and the rail flips to the team',
+    afterCreate.teams.length === 1 &&
+      afterCreate.teams[0].memberIds[0] === 'b1' &&
+      JSON.stringify(attachedRail) === JSON.stringify(['b1']),
+    `teams=${afterCreate.teams.length} slots=${slotsOf(afterCreate)} rail=${attachedRail.join(',')}`,
   )
 
   /*
-    ---- the global nav bar, which this module does not own
+    ---- UC3 + UC6: switching member commits silently, and only when needed
 
-    TWO DIFFERENT ANSWERS, on purpose. There is nobody left to ask, so an
-    untouched draft is left to be pruned on the way back in, while a TOUCHED one
-    keeps its work and becomes an ordinary library build. Deleting something
-    somebody typed is the worse of the two ways to be wrong.
-
-    The delete deliberately does NOT live in the form's unmount cleanup: that
-    cleanup also runs on StrictMode's simulated unmount, immediately after mount,
-    which destroyed the draft the instant it was created.
+    THE EDIT IS MADE AND THEN LEFT ALONE. No blur handler, no timer, nothing --
+    the point is that it is STILL uncommitted right up until the rail click.
   */
   await seedStore(twoMemberTeam())
-  await startDraft()
-  await page.hover('[data-testid="nav-tab-pokepedia"]')
-  await page.waitForSelector('[data-testid="nav-dropdown-pokepedia"]', { state: 'visible' })
-  await page.click('[data-testid="nav-dropdown-pokepedia"] button')
-  await page.waitForTimeout(900)
-  const strandedUntouched = await readStore()
+  await openTeamMember(0)
+  await typeNickname('EditedA')
+  const midEdit = await nickOfBuild('b1')
   check(
-    'an untouched draft survives a global-nav exit only until the module is next entered',
-    strandedUntouched.builds.some((b) => b.id === 'b3' && b.draft === true),
-    `builds=${idsOf(strandedUntouched)}`,
+    'UC3: an edit sits in form state only — nothing is written before the transition',
+    midEdit === '',
+    `stored nickname is "${midEdit}"`,
   )
-  await goTo('my-teams')
-  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
   await page.waitForTimeout(700)
-  const afterReturn = await readStore()
+  const switched = await formBuildId()
+  const promptsShown = (await page.$$('[data-testid="tb-shared-prompt"]')).length
   check(
-    'and re-entering Team Building prunes it',
-    idsOf(afterReturn) === 'b1,b2',
-    `builds=${idsOf(afterReturn)}`,
+    "UC3: clicking another member commits the edit silently and loads that member's real data",
+    (await nickOfBuild('b1')) === 'EditedA' && switched === 'b2' && promptsShown === 0,
+    `stored="${await nickOfBuild('b1')}" form=${switched} prompts=${promptsShown}`,
   )
 
-  await seedStore(twoMemberTeam())
-  await startDraft()
-  await touchDraft('Rescued')
-  await page.hover('[data-testid="nav-tab-pokepedia"]')
-  await page.waitForSelector('[data-testid="nav-dropdown-pokepedia"]', { state: 'visible' })
-  await page.click('[data-testid="nav-dropdown-pokepedia"] button')
-  await page.waitForTimeout(900)
-  await goTo('build-library')
-  await page.waitForSelector('[data-testid="tb-build-grid"]')
-  await page.waitForTimeout(500)
-  const rescued = (await readStore()).builds.find((b) => b.id === 'b3')
-  check(
-    'but a TOUCHED draft keeps its work and becomes an ordinary library build',
-    rescued?.nickname === 'Rescued' && rescued?.draft !== true,
-    rescued ? `nickname=${rescued.nickname} draft=${rescued.draft}` : 'gone',
+  // ---- UC4: clicking the member already open does nothing at all
+  const beforeNoop = JSON.stringify(await readStore())
+  const inertTag = await page.evaluate(
+    () =>
+      document.querySelector('[data-testid="tb-rail-b2"] .tb-card-rail-open')?.tagName ?? 'ABSENT',
   )
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
+  await page.waitForTimeout(500)
+  check(
+    'UC4: the open member is inert — a <span>, not a button, and clicking changes nothing',
+    inertTag === 'SPAN' &&
+      (await formBuildId()) === 'b2' &&
+      JSON.stringify(await readStore()) === beforeNoop,
+    `tag=${inertTag} form=${await formBuildId()}`,
+  )
+
+  /*
+    ---- UC5: the "+" commits, then asks which kind of member
+
+    ONE "+", FOR THE NEXT FREE SLOT. Six of them would ask the reader to pick a
+    slot number, which is not a decision they have.
+  */
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await typeNickname('BeforeAdd')
+  const addButtons = (await page.$$('[data-testid="tb-rail-add"]')).length
+  await page.click('[data-testid="tb-rail-add"]')
+  await page.waitForSelector('[data-testid="tb-rail-add-modal"]')
+  check(
+    'UC5: the rail offers exactly one "+", and it commits the pending edit before asking',
+    addButtons === 1 && (await nickOfBuild('b1')) === 'BeforeAdd',
+    `buttons=${addButtons} stored="${await nickOfBuild('b1')}"`,
+  )
+  const addChoices = await page.$$eval('[data-testid="tb-rail-add-modal"] .tb-ghost', (els) =>
+    els.map((e) => e.textContent.trim()),
+  )
+  check(
+    'UC5: and offers both a new member and an existing one',
+    addChoices.length === 2 &&
+      /new member/i.test(addChoices[0]) &&
+      /existing build/i.test(addChoices[1]),
+    addChoices.join(' | '),
+  )
+  await page.click('[data-testid="tb-rail-add-new"]')
+  await page.waitForTimeout(800)
+  const afterAddNew = await readStore()
+  check(
+    'UC5: "build a new member" fills the slot immediately and the form now edits it',
+    slotsOf(afterAddNew) === 'b1,b2,b4,·,·,·' && (await formBuildId()) === 'b4',
+    `slots=${slotsOf(afterAddNew)} form=${await formBuildId()}`,
+  )
+
+  // ---- UC5, the other branch: pick an existing build
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await page.click('[data-testid="tb-rail-add"]')
+  await page.waitForSelector('[data-testid="tb-rail-add-modal"]')
+  await page.click('[data-testid="tb-rail-add-existing"]')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b3"] .tb-card-open')
+  await page.waitForTimeout(800)
+  const afterPickExisting = await readStore()
+  check(
+    'UC5: "pick an existing build" places it in that slot and returns to the team',
+    slotsOf(afterPickExisting) === 'b1,b2,b3,·,·,·',
+    slotsOf(afterPickExisting),
+  )
+
+  /*
+    ---- UC7: two teams, and every transition asks first
+
+    ADDITIVE TO UC3, not a replacement: the transition still happens, but only
+    after the reader has said what the edit should do to the OTHER teams.
+  */
+  await seedStore({
+    nextBuildSeq: 4,
+    nextTeamSeq: 3,
+    builds: [
+      mkBuild('b1', { speciesId: 1, pokemonId: 1, nickname: 'Shared' }),
+      mkBuild('b2', { speciesId: 4, pokemonId: 4 }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1', 'b2']), mkTeam('t2', 2, ['b1'])],
+  })
+  await openTeamMember(0)
+  await typeNickname('SharedEdit')
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
+  await page.waitForTimeout(600)
+  const sharedBlocked = {
+    prompt: (await page.$$('[data-testid="tb-shared-prompt"]')).length,
+    stillOn: await formBuildId(),
+    stored: await nickOfBuild('b1'),
+  }
+  log(`  shared: ${JSON.stringify(sharedBlocked)}`)
+  check(
+    'UC7: a build on two teams prompts and BLOCKS the switch until it is answered',
+    sharedBlocked.prompt === 1 &&
+      sharedBlocked.stillOn === 'b1' &&
+      sharedBlocked.stored === 'Shared',
+    JSON.stringify(sharedBlocked),
+  )
+  const sharedOptions = await page.$$eval(
+    '[data-testid="tb-shared-prompt"] .tb-prompt-actions button',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
+  check(
+    'UC7: and it is the three-way prompt, not a yes/no',
+    sharedOptions.length === 3,
+    sharedOptions.join(' | '),
+  )
+  await page.click('[data-testid="tb-shared-save"]')
+  await page.waitForTimeout(700)
+  check(
+    'UC7: answering it lets the transition through',
+    (await nickOfBuild('b1')) === 'SharedEdit' && (await formBuildId()) === 'b2',
+    `stored="${await nickOfBuild('b1')}" form=${await formBuildId()}`,
+  )
+
+  /*
+    ---- UC8: reset discards rather than committing
+
+    THE EDIT MUST NEVER REACH THE STORE. Reset used to spread the DRAFT, which
+    quietly committed whatever was uncommitted on the fields reset does not
+    touch -- so a species change made and then abandoned was saved by the act of
+    resetting. Species is checked below precisely because reset does not clear
+    it: if the pending edit had been committed, it would show here.
+  */
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await typeNickname('NeverSaved')
+  await page.selectOption('[data-testid="tb-species"]', '25')
+  await page.waitForTimeout(250)
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-reset"]')
+  await page.waitForSelector('[data-testid="tb-reset-prompt"]')
+  check('UC8: reset asks first, like any destructive action', true)
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(600)
+  const afterUc8 = (await readStore()).builds.find((b) => b.id === 'b1')
+  log(`  after reset: nickname="${afterUc8.nickname}" species=${afterUc8.speciesId} level=${afterUc8.level}`)
+  check(
+    'UC8: the uncommitted edit is discarded, not saved-then-reset',
+    afterUc8.nickname === '' && afterUc8.speciesId === 1,
+    `nickname="${afterUc8.nickname}" species=${afterUc8.speciesId}`,
+  )
+  check(
+    'UC8: and the reset defaults are what actually landed',
+    afterUc8.level === 1 &&
+      afterUc8.friendship === 0 &&
+      afterUc8.itemId === null &&
+      afterUc8.shiny === false &&
+      afterUc8.moveIds.every((m) => m === null) &&
+      Object.values(afterUc8.effort).every((v) => !v) &&
+      Object.values(afterUc8.individual).every((v) => !v),
+    JSON.stringify({ level: afterUc8.level, friendship: afterUc8.friendship }),
+  )
+
+  // ---- UC9: duplicate commits to the ORIGINAL, then follows the copy
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await typeNickname('Original')
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-duplicate"]')
+  await page.waitForTimeout(800)
+  const dupForm = await formBuildId()
+  check(
+    'UC9: the pending edit lands on the ORIGINAL and the form follows the new copy',
+    (await nickOfBuild('b1')) === 'Original' && dupForm === 'b4' && dupForm !== 'b1',
+    `original="${await nickOfBuild('b1')}" form=${dupForm}`,
+  )
+  await typeNickname('OnTheCopy')
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(700)
+  check(
+    'UC9: and further typing goes to the copy, leaving the original alone',
+    (await nickOfBuild('b4')) === 'OnTheCopy' && (await nickOfBuild('b1')) === 'Original',
+    `copy="${await nickOfBuild('b4')}" original="${await nickOfBuild('b1')}"`,
+  )
+
+  // ---- UC11: delete removes the build and empties the screen
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-delete"]')
+  await page.waitForSelector('[data-testid="tb-delete-build-prompt"]')
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(700)
+  const deletedStore = await readStore()
+  const emptyState = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="tb-build-form"]')
+    return {
+      state: el?.dataset.state ?? null,
+      note: document.querySelector('[data-testid="tb-build-form-empty-note"]')?.textContent ?? null,
+      fields: document.querySelectorAll('[data-testid="tb-nickname"]').length,
+    }
+  })
+  log(`  after delete: ${JSON.stringify(emptyState)}`)
+  check(
+    'UC11: the build is gone from the store and the form visibly empties rather than sitting there',
+    !deletedStore.builds.some((b) => b.id === 'b1') &&
+      emptyState.state === 'deleted' &&
+      emptyState.fields === 0,
+    JSON.stringify(emptyState),
+  )
+
+  /*
+    ---- UC12: the info modal commits only its own fields
+
+    OPENING AND CLOSING IS NOT A TRANSITION. The main form's pending edit must
+    still be pending afterwards -- the modal is a different surface with its own
+    save-on-blur, and the two must not leak into each other.
+  */
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await typeNickname('StillPending')
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-info"]')
+  await page.waitForSelector('[data-testid="tb-form-info-modal"]')
+  /* Escape, because the overlay has no close button -- it dismisses on Escape
+     or an outside click, both of which are "close" for this check's purposes. */
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  check(
+    'UC12: opening and closing the info modal commits nothing',
+    (await nickOfBuild('b1')) === '',
+    `stored nickname is "${await nickOfBuild('b1')}"`,
+  )
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-info"]')
+  await page.waitForSelector('[data-testid="tb-form-info-modal"]')
+  await page.fill('[data-testid="tb-form-notes"]', 'A note')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const uc12 = (await readStore()).builds.find((b) => b.id === 'b1')
+  check(
+    "UC12: typing a note saves the NOTE and still leaves the form's own edit pending",
+    uc12.notes === 'A note' && uc12.nickname === '',
+    `notes="${uc12.notes}" nickname="${uc12.nickname}"`,
+  )
+
+  // ---- an untouched draft from Team Viewer is still dropped, silently
+  await seedStore(twoMemberTeam())
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.click('[data-testid="tb-slot-2-add"]')
+  await page.waitForSelector('[data-testid="tb-add-member-modal"]')
+  await page.click('[data-testid="tb-add-member-new"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(600)
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(700)
+  const afterAbandon = await readStore()
+  check(
+    "an untouched draft started from Team Viewer is dropped on the way out, with no prompt asked",
+    idsOf(afterAbandon) === 'b1,b2,b3' &&
+      (await page.$$('[data-testid="tb-draft-prompt"]')).length === 0,
+    idsOf(afterAbandon),
+  )
+
 
   // =====================================================================
   /*

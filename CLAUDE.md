@@ -288,6 +288,15 @@ the reason is usually that the cheap fix is the wrong one.
   original is untouched. A real fix is still a cross-module navigation guard the
   nav layer consults BEFORE switching modules; **do not build a
   Team-Building-local version of that.**
+- **Build Form does not autosave; every other screen does.** This is deliberate
+  and is not an inconsistency to "fix". Build Form holds field edits in local
+  state and writes them only at a transition — switching rail member, adding
+  one, duplicating, adding to a team, going back, or leaving by the app bar.
+  My Teams, Team Viewer and Build Library all still commit on blur. The one
+  prompt on a Build Form transition is the shared-build question (2+ teams);
+  everything else commits silently. Reset and Delete are the two actions that
+  deliberately do NOT commit first.
+
 - **An untouched draft member abandoned through the GLOBAL app nav bar lingers
   until the module is next entered.** A new team member is a draft (`Build.draft`)
   and holds no slot until it is kept; every exit Team Building owns resolves it,

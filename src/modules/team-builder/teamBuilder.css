@@ -1922,3 +1922,22 @@
 .tb-team-viewer .tb-card-full .tb-card-art {
   height: 84px;
 }
+
+/* The rail member that IS the form. Marked with the module's one indicator
+   colour rather than a box, and inert -- see MemberCard's rail branch. */
+.tb-card-rail[data-current='true'] {
+  background: var(--surface-hover);
+}
+.tb-card-rail[data-current='true'] .tb-rail-line:first-child {
+  color: var(--text-primary);
+}
+.tb-card-rail-open[data-inert='true'] {
+  cursor: default;
+}
+.tb-build-form-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-md);
+  align-items: flex-start;
+  padding-top: var(--space-gap-lg);
+}

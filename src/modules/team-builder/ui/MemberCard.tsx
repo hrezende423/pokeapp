@@ -105,6 +105,7 @@ export function MemberCard({
   onDragEnd,
   testId,
   animated = false,
+  current = false,
 }: {
   build: Build
   variant?: MemberCardVariant
@@ -129,6 +130,14 @@ export function MemberCard({
    * the motion is worth its cost.
    */
   animated?: boolean
+  /**
+   * This card IS the thing being edited right now (the rail's open member).
+   *
+   * It marks the card and, with no `onOpen`, makes clicking it do nothing at
+   * all -- see the rail branch below for why that is a <span> and not a
+   * disabled button.
+   */
+  current?: boolean
 }) {
   const facts = buildSpecies(build)
   if (!facts) {
@@ -195,6 +204,20 @@ export function MemberCard({
     />
   ) : null
 
+  /* The three lines are the same whichever element wraps them. */
+  const railLines = (
+    <>
+      <span className="tb-rail-line">
+        {showMeta ? natureName(build.natureId) : primary}
+        {build.itemId != null && ` @${itemName(build.itemId)}`}
+      </span>
+      <span className="tb-rail-line">
+        {showMeta ? abilityName(build.abilityId) : species.display_name} · Lv.{build.level}
+      </span>
+      <span className="tb-rail-line num">{spread ?? 'No investment'}</span>
+    </>
+  )
+
   if (variant === 'rail') {
     /*
       A DIV WRAPPING A BUTTON, not a button. This card used to BE the button,
@@ -209,25 +232,36 @@ export function MemberCard({
         data-tb="member-card"
         data-testid={testId}
         data-build-id={build.id}
+        data-current={current ? 'true' : undefined}
       >
-        <button type="button" className="tb-card-rail-open" onClick={onOpen}>
-          <span className="tb-card-art">
-            <span className="tb-card-frame">
-              {art_}
-              {heldBadge}
+        {/*
+          NO HANDLER MEANS NO BUTTON. The open member's card must be a true
+          no-op: a <button> with an undefined onClick still takes focus, still
+          announces itself as a control, and still gives a pressed state on
+          click -- all of which read as "that did something" when nothing
+          happened. A <span> cannot.
+        */}
+        {onOpen ? (
+          <button type="button" className="tb-card-rail-open" onClick={onOpen}>
+            <span className="tb-card-art">
+              <span className="tb-card-frame">
+                {art_}
+                {heldBadge}
+              </span>
             </span>
+            <span className="tb-rail-lines">{railLines}</span>
+          </button>
+        ) : (
+          <span className="tb-card-rail-open" data-inert="true">
+            <span className="tb-card-art">
+              <span className="tb-card-frame">
+                {art_}
+                {heldBadge}
+              </span>
+            </span>
+            <span className="tb-rail-lines">{railLines}</span>
           </span>
-          <span className="tb-rail-lines">
-            <span className="tb-rail-line">
-              {showMeta ? natureName(build.natureId) : primary}
-              {build.itemId != null && ` @${itemName(build.itemId)}`}
-            </span>
-            <span className="tb-rail-line">
-              {showMeta ? abilityName(build.abilityId) : species.display_name} · Lv.{build.level}
-            </span>
-            <span className="tb-rail-line num">{spread ?? 'No investment'}</span>
-          </span>
-        </button>
+        )}
         {corners}
       </div>
     )

@@ -63,7 +63,6 @@ import { Dock } from './ui/Dock'
 import { Modal, Popover } from './ui/Overlay'
 import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
-import type { PromptAction } from './ui/usePrompt'
 import { MemberCard } from './ui/MemberCard'
 import { MovesetCoverage, SpeciesMatchup } from './ui/TypeMatchup'
 import { InfoTip } from './ui/InfoTip'
@@ -133,7 +132,23 @@ function BuildFormFields({
   const [offence, setOffence] = useState(false)
   const [info, setInfo] = useState(false)
   const [addTo, setAddTo] = useState(false)
-  const [railOpen, setRailOpen] = useState(false)
+  /*
+    The info modal's two fields, read from the DOM when it closes.
+
+    ITS FIELDS SAVE THEMSELVES, which is UC12 and needed two fixes. They used to
+    call `commit`, which only STAGES into the form's pending draft -- so a note
+    was never really saved, it was merely queued behind whatever the main form
+    was doing. And they saved on blur, which never fires when the modal is
+    dismissed with Escape or an outside click: React unmounts the field and the
+    typing is simply gone.
+  */
+  const tagsRef = useRef<HTMLInputElement | null>(null)
+  const notesRef = useRef<HTMLTextAreaElement | null>(null)
+
+  /** Which empty slot the "add member" choice is being made for, if any. */
+  const [addingAt, setAddingAt] = useState<number | null>(null)
+  /** Set by Delete so the screen can say so rather than looking merely broken. */
+  const [deleted, setDeleted] = useState(false)
   const [shinyLock, setShinyLock] = useState(() =>
     stored ? isShinyByDvs(stored.individual) : false,
   )
@@ -216,6 +231,37 @@ function BuildFormFields({
     }
   }, [flush])
 
+  /**
+   * Write the info modal's fields straight through to the store.
+   *
+   * ONLY WHAT CHANGED. Closing the modal without typing must not write at all --
+   * "opening and closing commits nothing" is the rule -- so each field is
+   * compared against the stored value first.
+   *
+   * The pending draft is patched too. `flush` writes the whole snapshot it took
+   * when the last field was edited, notes included, so a note saved here and a
+   * main-form edit flushed a moment later would otherwise see the stale note
+   * put back.
+   */
+  const saveInfoFields = () => {
+    if (!stored) return
+    const patch: Partial<Build> = {}
+    const tagsEl = tagsRef.current
+    if (tagsEl) {
+      const tags = tagsEl.value
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+      if (JSON.stringify(tags) !== JSON.stringify(stored.tags)) patch.tags = tags
+    }
+    const notesEl = notesRef.current
+    if (notesEl && notesEl.value !== stored.notes) patch.notes = notesEl.value
+    if (Object.keys(patch).length === 0) return
+    updateBuild(stored.id, patch)
+    if (pending.current) pending.current = { ...pending.current, ...patch }
+    setDraft((d) => (d ? { ...d, ...patch } : d))
+  }
+
   const moveset = useLegalMoveset({
     speciesId: build?.speciesId ?? 1,
     pokemonId: build?.pokemonId ?? 1,
@@ -224,10 +270,33 @@ function BuildFormFields({
   })
 
   if (!build || !stored) {
+    /* `deleted` distinguishes "you just deleted this" from "the id in the URL
+       does not resolve", which are the same absence but not the same message. */
     return (
-      <section className="tb-screen" data-testid="tb-build-form">
-        <p className="tb-empty-note">This build no longer exists.</p>
-        <GhostButton onClick={() => goTo({ kind: 'build-library' })}>Build Library</GhostButton>
+      <section
+        className="tb-screen tb-build-form-empty"
+        data-testid="tb-build-form"
+        data-state={deleted ? 'deleted' : 'missing'}
+      >
+        <p className="tb-empty-note" data-testid="tb-build-form-empty-note">
+          {deleted ? 'Build deleted.' : 'This build no longer exists.'}
+        </p>
+        <div className="tb-choice">
+          {origin.kind === 'team' && (
+            <GhostButton
+              onClick={() => goTo({ kind: 'team-viewer', teamId: origin.teamId })}
+              testId="tb-build-form-empty-team"
+            >
+              Back to the team
+            </GhostButton>
+          )}
+          <GhostButton
+            onClick={() => goTo({ kind: 'build-library' })}
+            testId="tb-build-form-empty-library"
+          >
+            Build Library
+          </GhostButton>
+        </div>
       </section>
     )
   }
@@ -257,107 +326,19 @@ function BuildFormFields({
     origin.kind === 'team'
       ? (data.teams.find((t) => t.id === origin.teamId) ?? null)
       : (attachedTeams[0] ?? null)
+  /** The slot the "+" belongs to, or -1 when the team is full. */
+  const railFirstOpen = railTeam ? railTeam.memberIds.findIndex((m) => m == null) : -1
 
   /**
-   * How a save point should treat a draft member.
+   * How a save point should treat a draft member -- a build that was started
+   * from Team Viewer and has not been given a slot yet.
    *
-   * `ask` -- the reader is leaving, so the draft has to be resolved.
-   * `attaches` -- whatever runs next puts the build in a team by itself, so the
-   * draft simply becomes a real build and nothing needs asking.
+   * `leave` -- the reader is going somewhere else. An untouched draft is
+   * nothing and is dropped; a touched one keeps its work.
+   * `attaches` -- whatever runs next puts this build in a team, so it must
+   * survive whatever else happens.
    */
-  type LeaveMode = { kind: 'ask'; replaceTarget?: string } | { kind: 'attaches' }
-
-  /**
-   * Leaving a draft member: keep it, or it never existed.
-   *
-   * THREE SHAPES, and which one you get depends on the team rather than on a
-   * preference. Untouched, there is nothing to ask about and nothing to keep.
-   * Touched with a free slot, the choice is keep-or-bin. Touched with the team
-   * full, keeping means taking someone else's place, so the offer names the
-   * member being displaced rather than pretending a slot exists.
-   *
-   * `replaceTarget` is the member the reader clicked. It is the only member they
-   * have pointed at, so it is the only sensible one to offer to displace.
-   */
-  const leaveDraft = (after: () => void, replaceTarget?: string) => {
-    if (!stored) return
-    if (untouched) {
-      pending.current = null
-      deleteBuild(stored.id)
-      after()
-      return
-    }
-
-    const freeSlot = railTeam ? railTeam.memberIds.findIndex((m) => m == null) : -1
-    const replaceSlot = replaceTarget && railTeam ? railTeam.memberIds.indexOf(replaceTarget) : -1
-    const displaced = replaceTarget ? data.builds.find((b) => b.id === replaceTarget) : null
-    const displacedFacts = displaced ? buildSpecies(displaced) : null
-    const displacedName =
-      displaced && displacedFacts
-        ? displayName(displaced, displacedFacts.species).primary
-        : 'that member'
-
-    const keepIn = (slot: number) => {
-      /* Flush FIRST, then clear the flag: the pending copy still carries
-         `draft: true` and would otherwise write it straight back. */
-      flush()
-      updateBuild(stored.id, { draft: false })
-      if (railTeam && slot >= 0) setTeamMember(railTeam.id, slot, stored.id)
-      setDirty(false)
-      after()
-    }
-
-    const actions: PromptAction[] = [{ label: 'Cancel', testId: 'tb-draft-cancel' }]
-    if (freeSlot >= 0) {
-      actions.push({
-        label: 'Keep this build too',
-        testId: 'tb-draft-keep',
-        onPick: () => keepIn(freeSlot),
-      })
-    } else if (replaceSlot >= 0) {
-      actions.push({
-        label: `Replace ${displacedName}`,
-        testId: 'tb-draft-replace',
-        onPick: () => keepIn(replaceSlot),
-      })
-    } else {
-      /*
-        FULL TEAM, AND NOBODY NAMED TO DISPLACE -- leaving by the back button
-        rather than by clicking a member. There is no slot to offer and no
-        obvious member to evict, so the offer is to keep the work without a
-        team. Without this branch the only way out would be to discard, which
-        would make the back button destructive.
-      */
-      actions.push({
-        label: 'Keep it in my library',
-        testId: 'tb-draft-keep-loose',
-        onPick: () => keepIn(-1),
-      })
-    }
-    actions.push({
-      label: 'Discard it',
-      danger: true,
-      testId: 'tb-draft-discard',
-      onPick: () => {
-        pending.current = null
-        setDirty(false)
-        deleteBuild(stored.id)
-        after()
-      },
-    })
-
-    prompt.ask({
-      title: 'This build is not on the team yet',
-      body:
-        freeSlot >= 0
-          ? 'Keeping it puts it in the first empty slot.'
-          : replaceSlot >= 0
-            ? `The team is full, so keeping it means ${displacedName} leaves the team. The build itself stays in your library.`
-            : 'The team is full, so this build can be saved to your library but not added to the team.',
-      testId: 'tb-draft-prompt',
-      actions,
-    })
-  }
+  type LeaveMode = { kind: 'leave' } | { kind: 'attaches' }
 
   /**
    * SAVE, THEN DO THE THING. Every save point in this screen calls this, so the
@@ -367,30 +348,39 @@ function BuildFormFields({
    * `after` runs in all three shared-build branches, discard included: the
    * question is what happens to the EDIT, not whether the user gets to leave.
    */
-  const saveThen = (after: () => void, mode: LeaveMode = { kind: 'ask' }) => {
+  const saveThen = (after: () => void, mode: LeaveMode = { kind: 'leave' }) => {
     /*
-      A DRAFT IS ASKED ABOUT FIRST, because for a draft the question is not "save
-      or not" but "does this build exist at all". Only once it has a slot do the
-      ordinary rules below apply to it -- and a draft is in no team, so it can
-      never be the shared case those rules are mostly about.
+      NO PROMPT EXCEPT THE SHARED ONE. Every transition below commits SILENTLY --
+      switching rail member, adding a member, duplicating, adding to a team,
+      going back, leaving by the app bar. The one exception is a build two or
+      more teams reference, further down, where saving is not a private act.
+
+      An untouched draft is the one thing that gets dropped rather than saved:
+      it is a build nobody has typed into, so there is nothing to keep and
+      leaving it behind is how blank Bulbasaurs used to accumulate. Silent, with
+      no question asked, because there is nothing to decide.
     */
-    if (isDraftMember) {
-      if (mode.kind === 'ask') {
-        leaveDraft(after, mode.replaceTarget)
-        return
-      }
-      flush()
-      updateBuild(stored.id, { draft: false })
+    if (isDraftMember && untouched && mode.kind === 'leave') {
+      pending.current = null
       setDirty(false)
+      deleteBuild(stored.id)
       after()
       return
     }
+    /* A draft that survives a transition has earned its place as a real build. */
+    const promote = () => {
+      if (isDraftMember) updateBuild(stored.id, { draft: false })
+    }
     if (!pending.current) {
+      /* UC6: nothing outstanding, so there is no save to perform and the
+         transition happens on this tick. */
+      promote()
       after()
       return
     }
     if (!isShared) {
       flush()
+      promote()
       setDirty(false)
       after()
       return
@@ -408,6 +398,7 @@ function BuildFormFields({
           testId: 'tb-shared-save',
           onPick: () => {
             flush()
+            promote()
             setDirty(false)
             after()
           },
@@ -558,30 +549,34 @@ function BuildFormFields({
         prompt.confirm(
           'Reset this build?',
           () => {
-            /* Clears item, moves, level, friendship, nickname, spread and shiny.
-               KEEPS species, nature, ability and gender -- those are identity,
-               not tuning. Confirmed and destructive, so unlike an ordinary field
-               edit it is written straight through rather than left in the draft. */
+            /*
+              RESET IS THE ONE ACTION THAT DOES NOT SAVE FIRST, and `...stored`
+              rather than `...build` is what makes that true. `build` is the
+              DRAFT -- it carries whatever is sitting uncommitted in the form --
+              so spreading it would have quietly committed those edits on the
+              fields reset does not touch. Species, nature, ability and gender
+              are identity, not tuning, and they keep their STORED values;
+              anything typed into them since the last save is discarded, which
+              is what "reset" means.
+
+              Clearing `pending` before the write is the other half: without it
+              the unmount flush would put the discarded edit back afterwards.
+            */
             const reset = {
-              ...build,
+              ...stored,
               itemId: null,
               moveIds: [null, null, null, null],
-              /* THE NEW-BUILD VALUES, not the floor values. Reset means "back to
-                 where a fresh build starts", and a fresh build is Lv.50 with 70
-                 friendship -- Lv.1 with 0 friendship was the bottom of each
-                 field's range, which is a different idea and a worse default.
-                 Friendship stays 0 before Gen 2, where the mechanic does not
-                 exist and the field is not rendered. */
-              level: 50,
-              friendship: generation >= 2 ? 70 : 0,
+              level: 1,
+              friendship: 0,
               nickname: '',
               effort: {},
               individual: {},
               shiny: false,
             }
-            pending.current = reset
+            pending.current = null
             setDraft(reset)
-            flush()
+            setShinyLock(false)
+            updateBuild(stored.id, reset)
             setDirty(false)
           },
           { confirmLabel: 'Reset', testId: 'tb-reset-prompt' },
@@ -596,16 +591,22 @@ function BuildFormFields({
         prompt.confirm(
           'Delete this build?',
           () => {
-            /* The one exit that must NOT save. Dropping `pending` first stops the
-               unmount flush resurrecting the record we are deleting. */
+            /*
+              NO SAVE, AND NO NAVIGATION EITHER. Dropping `pending` first stops
+              the unmount flush resurrecting the record being deleted; clearing
+              `draft` is what actually empties the screen, because `build` is
+              `draft ?? stored` and a stale draft would keep the deleted build
+              on display as though nothing had happened.
+
+              Staying put is deliberate. Being returned to a list leaves it
+              ambiguous whether the delete happened or the screen simply
+              navigated; an empty form that says so cannot be misread.
+            */
             pending.current = null
             setDirty(false)
+            setDraft(null)
+            setDeleted(true)
             deleteBuild(build.id)
-            goTo(
-              origin.kind === 'team'
-                ? { kind: 'team-viewer', teamId: origin.teamId }
-                : { kind: 'build-library' },
-            )
           },
           { testId: 'tb-delete-build-prompt' },
         ),
@@ -1045,100 +1046,91 @@ function BuildFormFields({
           data-testid="tb-rail"
           data-state={railTeam ? 'attached' : 'loose'}
         >
+          {/*
+            THE WHOLE TEAM, INCLUDING THE ONE OPEN IN THE FORM. The rail used to
+            filter the current build out, which meant the reader could not see
+            where in the team they were -- six slots became five plus a gap. It
+            is rendered from `railTeam.memberIds` in slot order and read live
+            from the store, so an edit made anywhere shows here immediately and
+            nothing on this rail is ever a stale copy.
+          */}
           {railTeam ? (
-            <>
-              {railTeam.memberIds
-                .filter((id): id is string => id != null && id !== build.id)
-                .map((id) => data.builds.find((b) => b.id === id))
-                .filter((b): b is Build => b != null)
-                .map((member) => (
-                  <MemberCard
-                    key={member.id}
-                    build={member}
-                    variant="rail"
-                    testId={`tb-rail-${member.id}`}
-                    corners={
-                      <span className="tb-corner tb-corner-tr">
-                        <IconButton
-                          icon={<IconTrash size={15} stroke={1.5} />}
-                          label="Remove from this team"
-                          danger
-                          testId={`tb-rail-${member.id}-delete`}
-                          onClick={() => removeMember(railTeam.id, member.id)}
-                        />
-                      </span>
-                    }
-                    /*
-                      Save point: opening a sibling replaces this form. The
-                      member's id goes with it because if the form holds a draft
-                      and the team is full, THIS is the member the reader pointed
-                      at, and so the one worth offering to displace.
-                    */
-                    onOpen={() =>
-                      saveThen(
-                        () =>
-                          goTo({
-                            kind: 'build-form',
-                            buildId: member.id,
-                            origin: { kind: 'team', teamId: railTeam.id },
-                          }),
-                        { kind: 'ask', replaceTarget: member.id },
-                      )
-                    }
+            railTeam.memberIds.map((memberId, slot) => {
+              if (memberId == null) {
+                /* ONE "+", for the next free slot only. Six identical buttons
+                   would ask the reader to choose a slot number, which is not a
+                   decision they have -- teams fill in order everywhere else. */
+                return slot === railFirstOpen ? (
+                  <IconButton
+                    key={`add-${slot}`}
+                    icon={<IconPlus size={20} stroke={1.5} />}
+                    label="Add member"
+                    testId="tb-rail-add"
+                    /* Commits first, THEN asks which kind of member. */
+                    onClick={() => saveThen(() => setAddingAt(slot))}
                   />
-                ))}
-              <IconButton
-                icon={<IconPlus size={20} stroke={1.5} />}
-                label="Add member"
-                testId="tb-rail-add"
-                /* Save point, and it used to be a hole: this bypassed the leave
-                   path entirely, so adding a member silently threw away whatever
-                   you had just typed into the build you were on. */
-                onClick={() =>
-                  saveThen(() => {
-                    /*
-                      NO SLOT IS CLAIMED HERE. The new member is a draft; it earns
-                      a slot when the reader keeps it. That is also why there is
-                      no longer a guard on the team being full -- starting one is
-                      always allowed, and a full team simply changes the question
-                      asked on the way out from "keep it?" to "replace whom?".
-                    */
-                    const fresh = createBuild({
-                      ...newBuildInit(railTeam.generation),
-                      draft: true,
-                    })
-                    goTo({
-                      kind: 'build-form',
-                      buildId: fresh.id,
-                      origin: { kind: 'team', teamId: railTeam.id },
-                    })
-                  })
-                }
-              />
-            </>
-          ) : railOpen ? (
+                ) : null
+              }
+              const member = data.builds.find((b) => b.id === memberId)
+              if (!member) return null
+              const isCurrent = member.id === build.id
+              return (
+                <MemberCard
+                  key={member.id}
+                  build={member}
+                  variant="rail"
+                  current={isCurrent}
+                  testId={`tb-rail-${member.id}`}
+                  corners={
+                    <span className="tb-corner tb-corner-tr">
+                      <IconButton
+                        icon={<IconTrash size={15} stroke={1.5} />}
+                        label="Remove from this team"
+                        danger
+                        testId={`tb-rail-${member.id}-delete`}
+                        onClick={() => removeMember(railTeam.id, member.id)}
+                      />
+                    </span>
+                  }
+                  /*
+                    THE OPEN MEMBER GETS NO HANDLER AT ALL, which is what makes
+                    clicking it a true no-op: not a save, not a navigation to
+                    where you already are, not a re-render. MemberCard renders a
+                    plain <span> rather than a disabled button when `onOpen` is
+                    absent, so it is not in the accessibility tree as a control
+                    either.
+                  */
+                  onOpen={
+                    isCurrent
+                      ? undefined
+                      : () =>
+                          saveThen(() =>
+                            goTo({
+                              kind: 'build-form',
+                              buildId: member.id,
+                              origin: { kind: 'team', teamId: railTeam.id },
+                            }),
+                          )
+                  }
+                />
+              )
+            })
+          ) : (
             /*
-              An UNATTACHED build's rail expands to a single "+", which creates a
-              team around this build. The rail then flips to the attached state on
-              its own, because `railTeam` is derived from the store rather than
-              from local state.
+              AN UNATTACHED BUILD GETS THE "+" DIRECTLY. There is no collapsed
+              state and no chevron to open one: the rail has exactly two shapes,
+              a team or an invitation to start one. Clicking creates the team
+              with this build already in it and writes it immediately, and the
+              rail flips to the attached shape on its own because `railTeam` is
+              derived from the store rather than from local state.
             */
             <IconButton
               icon={<IconPlus size={20} stroke={1.5} />}
               label="Start a team with this build"
               testId="tb-rail-create-team"
-              /* Save point: the new team is about to reference this build. */
-              /* `attaches`: the new team is built around this build. */
               onClick={() =>
                 saveThen(() => createTeam(generation, [build.id]), { kind: 'attaches' })
               }
-            />
-          ) : (
-            <IconButton
-              icon={<IconChevronLeft size={20} stroke={1.5} />}
-              label="Show team"
-              testId="tb-rail-expand"
-              onClick={() => setRailOpen(true)}
             />
           )}
           {railTeam && (
@@ -1149,32 +1141,81 @@ function BuildFormFields({
         </aside>
       </div>
 
+      {/*
+        UC5. The commit already happened on the way in, so this is purely the
+        question of WHICH member. "Pick an existing build" hands the slot to the
+        library, which places the build and comes straight back here.
+      */}
+      {addingAt != null && railTeam && (
+        <Modal title="Add member" onClose={() => setAddingAt(null)} testId="tb-rail-add-modal">
+          <div className="tb-choice">
+            <GhostButton
+              testId="tb-rail-add-new"
+              onClick={() => {
+                const slot = addingAt
+                setAddingAt(null)
+                /*
+                  ASSIGNED TO THE SLOT AND WRITTEN NOW, not held back as a draft
+                  the way Team Viewer's own add does. Build Form is deliberately
+                  different here: the reader is looking at the team while they
+                  do it, so a member that did not appear in the rail until some
+                  later confirmation would read as the click having failed.
+                */
+                const fresh = createBuild(newBuildInit(railTeam.generation))
+                setTeamMember(railTeam.id, slot, fresh.id)
+                goTo({
+                  kind: 'build-form',
+                  buildId: fresh.id,
+                  origin: { kind: 'team', teamId: railTeam.id },
+                })
+              }}
+            >
+              Build a new member
+            </GhostButton>
+            <GhostButton
+              testId="tb-rail-add-existing"
+              onClick={() => {
+                const slot = addingAt
+                setAddingAt(null)
+                goTo({ kind: 'build-library', pickFor: { teamId: railTeam.id, slot } })
+              }}
+            >
+              Pick an existing build
+            </GhostButton>
+          </div>
+        </Modal>
+      )}
+
       {info && (
-        <Modal title="Build info" onClose={() => setInfo(false)} testId="tb-form-info-modal">
+        <Modal
+          title="Build info"
+          /* Saves on the way out however it is dismissed -- Escape and an
+             outside click never blur the field they leave behind. */
+          onClose={() => {
+            saveInfoFields()
+            setInfo(false)
+          }}
+          testId="tb-form-info-modal"
+        >
           <label className="tb-field-label" htmlFor="tb-form-tags">
             Tags (comma separated)
           </label>
           <input
             id="tb-form-tags"
+            ref={tagsRef}
             className="tb-input"
             defaultValue={build.tags.join(', ')}
             data-testid="tb-form-tags"
-            onBlur={(e) =>
-              commit({
-                tags: e.target.value
-                  .split(',')
-                  .map((t) => t.trim())
-                  .filter(Boolean),
-              })
-            }
+            onBlur={saveInfoFields}
           />
           <textarea
+            ref={notesRef}
             className="tb-notes"
             defaultValue={build.notes}
             placeholder="Notes about this build"
             aria-label="Build notes"
             data-testid="tb-form-notes"
-            onBlur={(e) => commit({ notes: e.target.value })}
+            onBlur={saveInfoFields}
           />
         </Modal>
       )}
