@@ -94,8 +94,26 @@
   */
   --tb-slot-card: 264px;
   /* Tight leading again: seven lines of one fact each, and the page's
-     inherited 26.1px would spend 183px of a grid row on them. */
-  --tb-slot-line: 15px;
+     inherited 26.1px would spend 183px of a grid row on them. 12px against
+     10px text: tighter than the module's usual 17px because these seven lines
+     are one fact each -- there is no paragraph here for the leading to hold
+     open, and every pixel of it comes off the sprite above. */
+  --tb-slot-line: 12px;
+  /*
+    THE MONO SIZE ON A TEAM CARD, and the whole point of it is that the card
+    reads at ONE size while its two faces are set at two.
+
+    Martian Mono draws about a fifth larger than IBM Plex Sans at the same
+    nominal px -- measured in the rail as 9px mono == 11px sans, cap for cap --
+    so a card where the nickname, the level, the spread and the four move names
+    are mono and everything beside them is sans was reading as 10px in some
+    places and 12px in others. The mono lines are the long ones, so the card as
+    a whole looked a size bigger than it was set.
+
+    0.82 is that measured ratio (9/11), and it is size-independent: cap height is
+    linear in font-size, so the same factor holds at caption as at label.
+  */
+  --tb-slot-mono: calc(var(--font-size-caption) * 0.82);
 
   --slider-track: #e2e2e6;
   --slider-thumb-border: #9b9ba1;
@@ -299,19 +317,28 @@
 
 /* ---------------------------------------------------------------- overlays */
 
+/*
+  FIXED, AND PLACED FROM SCRIPT. `left`/`top`/`max-height` arrive as inline
+  values from Popover, which measures the trigger and the window; see the long
+  note in ui/Overlay.tsx for why an absolutely positioned panel could not work
+  here (`.tb-card` sets `overflow: hidden`, and the team dock sits in a narrow
+  left column where a right-aligned panel starts off-screen).
+*/
 .tb-popover {
-  position: absolute;
-  top: calc(100% + 6px);
+  position: fixed;
   z-index: 40;
   /*
-    WIDTH: max-content, and it is load-bearing. An absolutely positioned box is
-    shrink-to-fit against its CONTAINING BLOCK, and this one hangs off the dock
-    strip -- which is 30px wide. So "available width" was 30px and the panel
-    collapsed to its minimum, stacking the coverage columns one per line however
-    they were laid out. Sizing to content ignores the containing block entirely.
+    WIDTH: max-content, and it is load-bearing. A shrink-to-fit box is sized
+    against its CONTAINING BLOCK, and this one used to hang off the dock strip
+    -- which is 30px wide. So "available width" was 30px and the panel collapsed
+    to its minimum, stacking the coverage columns one per line however they were
+    laid out. Sizing to content ignores the containing block entirely.
   */
   width: max-content;
-  max-width: min(560px, 90vw);
+  max-width: min(560px, calc(100vw - 16px));
+  /* Only ever reached by a panel taller than the room on both sides of its
+     trigger; `max-height` is inline, from the placement pass. */
+  overflow: auto;
   padding: var(--space-gap-md);
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -319,11 +346,12 @@
      drag or stack -- and these are transient panels hanging off an icon. */
   border-radius: calc(var(--radius-card) / 2);
 }
-.tb-popover[data-align='right'] {
-  right: 0;
-}
-.tb-popover[data-align='left'] {
-  left: 0;
+/*
+  THE ANCHOR MARKER. It exists so the portalled panel can find the wrapper it
+  was written inside, and it must take no space and no layout of its own.
+*/
+.tb-popover-anchor {
+  display: none;
 }
 
 .tb-modal-scrim {
@@ -726,20 +754,51 @@
   font-size: var(--font-size-caption);
 }
 /*
-  ONE SIZE FOR EVERY LINE ON A TEAM CARD -- the size the nature and ability were
-  already set at. The name was at body size, which made it the loudest thing on
-  a card whose point is the artwork above it, and made the first line noticeably
-  taller than the six below it. WEIGHTS AND FAMILIES ARE UNTOUCHED: the name
-  stays Martian Mono, the gender stays bold, the type run stays bold uppercase,
-  the spread and the move names stay numeric. Only the size is levelled.
+  ONE DRAWN SIZE FOR EVERY LINE ON A TEAM CARD, which takes TWO nominal sizes:
+  the sans lines at caption, the mono lines at --tb-slot-mono (see the token for
+  the measurement). Levelling the nominal size instead -- which is what this
+  rule used to do -- left the mono lines drawing a size larger than the sans
+  ones beside them, and the mono lines are the long ones: the nickname, the
+  level, the EV spread and all four move names.
+
+  WEIGHTS AND FAMILIES ARE UNTOUCHED: the name stays Martian Mono, the gender
+  stays bold, the type run stays bold uppercase, the spread and the move names
+  stay numeric. Only the size is levelled.
 */
-.tb-card-full .tb-card-name,
 .tb-card-full .tb-card-species,
-.tb-card-full .tb-card-level,
 .tb-card-full .tb-card-gender,
 .tb-card-full .tb-card-meta,
-.tb-card-full .tb-card-spread,
+.tb-card-full .tb-meta-sep,
+/* Inherited by .tb-move-cat, which is the only sans cell in the move grid. */
 .tb-card-full .tb-card-moves {
+  font-size: var(--font-size-caption);
+}
+.tb-card-full .tb-card-name,
+.tb-card-full .tb-card-level,
+.tb-card-full .tb-card-spread,
+.tb-card-full .tb-move-name {
+  font-size: var(--tb-slot-mono);
+}
+/*
+  AND THE BLOCK SETS A SIZE OF ITS OWN, which is not redundant with the rules
+  above: the wrappers between them -- the headline, the id line, the type run,
+  and the little spans that pair a separator with its fact -- set no size and so
+  inherited the PAGE's 18px body. Two things came of that:
+
+    the separators DREW at 18px. `.tb-meta-sep` and `.tb-type-sep` are glyphs
+    with no rule of their own, so the bar between the nature and the ability and
+    the dot between the two types were half again the height of every word
+    around them.
+
+    the LINES GREW. A baseline-aligned flex line is as tall as it must be to sit
+    every item's baseline on one line, and an 18px item in a 13px line box
+    pushes that baseline down: the id line came out 3px taller than its own
+    leading, on every card, twice over per grid row.
+
+  Setting it here fixes both at the source, and any line added to this block
+  later inherits a card-sized default instead of a page-sized one.
+*/
+.tb-card-full .tb-card-facts {
   font-size: var(--font-size-caption);
 }
 /* And the leading, which is where the height actually went. */
@@ -792,6 +851,8 @@
   separator inside the type pair, so re-using it between the pair and the nature
   read as a third type; a bar says "different kind of fact".
 */
+/* Size comes from the facts block, which sets one for exactly this reason --
+   see the note there. Unsized, this bar drew at the page's 18px. */
 .tb-meta-sep {
   margin: 0 5px;
   /* Secondary, not hairline: at hairline weight the bar was invisible against

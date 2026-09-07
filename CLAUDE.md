@@ -152,9 +152,9 @@ imperfections are already logged there deliberately.
   the grid is `flex: 1` with `1fr 1fr` rows, and `.tb-card-art` is `flex: 1`
   against `flex: 0 0 auto` facts — so the artwork absorbs the remainder of a
   grid row and is as large as the window allows at any window size. Measured:
-  164px at a 720px window up to 264px at 1080, against the 84px it was fixed
-  at. All six cards stay on screen with no overflow across that whole range;
-  verify-team-builder §14 drives five heights.
+  188px at a 720px window up to the 264px cap from 900 up, against the 84px it
+  was fixed at. All six cards stay on screen with no overflow across that whole
+  range; verify-team-builder §14 drives five heights.
   **`max-height: var(--tb-slot-card)` on the art box is load-bearing**, not
   taste: the frame is `aspect-ratio: 1` sized from its height, so an art box
   taller than the card is wide makes a square frame WIDER than its card — and
@@ -167,6 +167,44 @@ imperfections are already logged there deliberately.
   **The seven-line order is scoped to `variant="full"`.** The Build Library card
   keeps the layout it was signed off with — species on its own line, nature and
   ability dot-separated — and §14 guards that the two have not merged.
+
+  **ONE DRAWN SIZE, TWO NOMINAL ONES.** The sans lines are at caption; the mono
+  ones (nickname, level, EV spread, all four move names) are at
+  `--tb-slot-mono`, `calc(var(--font-size-caption) * 0.82)`. Martian Mono draws
+  about a fifth larger than Plex Sans at the same px — the rail measured it as
+  9px mono == 11px sans — and the mono lines here are the long ones, so a card
+  levelled at ONE nominal size read as two. Cap heights are now within 0.4px and
+  §14 asserts that rather than nominal equality.
+  `.tb-card-full .tb-card-facts` sets a font-size of its own, and it is NOT
+  redundant with the per-line rules: the wrappers between the block and the
+  lines (headline, id line, type run, the separator+fact spans) set none, so
+  `.tb-meta-sep` and `.tb-type-sep` drew at the PAGE's 18px body — and an 18px
+  item in a 13px line box pushed the baseline down far enough to make the id
+  line 3px taller than its own leading, on every card. Leading is
+  `--tb-slot-line: 12px`. The facts block went 115px → 91px and all 24 of those
+  pixels went to the sprite.
+
+- **A coverage panel is placed in the app frame, not in the card.**
+  `Popover` (`ui/Overlay.tsx`) portals to `document.body` and is
+  `position: fixed`, placed from a measurement of the wrapper it is written
+  inside — so every call site keeps its old anchor contract without passing a
+  ref, via a `display: none` marker whose `parentElement` IS that wrapper. It
+  was `position: absolute`, and two different ancestors cut it: `.tb-card` sets
+  `overflow: hidden` (the watermark and the artwork both bleed to the card's
+  edge), so a member's panel was clipped to a 264px card and lost its bottom
+  rows; and the team's panel hangs off a dock that now sits in the narrow left
+  column, where right-aligned it started at a NEGATIVE x. It is pushed back
+  inside horizontally rather than flipped — a coverage chart's left edge is its
+  labels, and flipping would move the panel out from under the icon that opened
+  it — and it flips ABOVE the trigger when there is more room there, taking a
+  `max-height` of that room so a panel taller than the window scrolls itself.
+  **The frame is `.panel`, not the window**: clamped to the window, the team's
+  panel came to rest outside the app, over the page background beside it.
+  A side effect worth keeping: the panel no longer inherits `.tb-corner`'s
+  `opacity: 0`, so moving the mouse off a card no longer makes an open panel
+  invisible while it is still open. verify-team-builder §15 drives both panels
+  at two window heights and asserts no ancestor cuts them, that they sit inside
+  `.panel`, and that nothing in them is unreachable.
 
 - **The Team Library card's width is a MEASURED CONSTANT.**
   `--tb-compact-card: 127px` is the rendered width of "ELECTRIC · FIGHTING" —
@@ -435,6 +473,17 @@ Rules that must not be re-derived:
   Same class: a card whose species is not in the data bundle renders
   `.tb-card-missing`, which carries no `data-tb="member-card"`, so a selector
   counting members silently misses it.
+
+- **The type-run dot draws at 18px on the Build Library and Team Library
+  cards.** `.tb-type-sep` sets margin and colour and no font-size, so it
+  inherits the page's 18px body — the same defect fixed on the Team Display card
+  by giving `.tb-card-full .tb-card-facts` a size of its own. It is not
+  cosmetic-only: a baseline-aligned flex line is as tall as its tallest item, so
+  the type line measures 29.1px on the Build Library card (against its ~14px
+  leading) and 17px on the Team Library card. Both screens are signed off with
+  it on screen, and the fix is one declaration — `font-size:
+  var(--font-size-caption)` on each variant's `.tb-card-facts` — which WILL
+  change both card heights. Ask before applying it.
 
 - **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
   one species whose HP does not follow the normal formula — it is always 1,

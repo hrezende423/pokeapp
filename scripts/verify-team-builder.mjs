@@ -3282,6 +3282,19 @@ try {
         )
         .filter(Boolean),
     }))
+    /*
+      CAP HEIGHT, MEASURED, because the card is set at two nominal sizes on
+      purpose and the claim is about the DRAWN one. Measured at 100px and scaled
+      by the element's own size: `measureText` at 8px rounds to whole pixels, so
+      comparing two 10px faces directly cannot resolve a difference smaller than
+      the one being tested for.
+    */
+    const cv = document.createElement('canvas').getContext('2d')
+    const drawn = (cs) => {
+      cv.font = `${cs.fontWeight} 100px ${cs.fontFamily}`
+      const m = cv.measureText('H')
+      return r((m.actualBoundingBoxAscent / 100) * parseFloat(cs.fontSize))
+    }
     const style = (sel) => {
       const el = card.querySelector(sel)
       if (!el) return null
@@ -3290,6 +3303,8 @@ try {
         fs: cs.fontSize,
         fw: cs.fontWeight,
         family: cs.fontFamily.split(',')[0].replace(/["']/g, ''),
+        cap: drawn(cs),
+        line: r(el.getBoundingClientRect().height),
       }
     }
     return {
@@ -3305,7 +3320,21 @@ try {
         spread: style('.tb-card-spread'),
         moveName: style('.tb-move-name'),
         moveCat: style('.tb-move-cat'),
+        /* Unsized, this one drew at the PAGE's 18px body -- see the note on
+           .tb-card-full .tb-card-facts. */
+        sep: style('.tb-meta-sep'),
       },
+      /*
+        Every line box in the facts block, which is what the leading buys. The
+        move grid is four lines rather than one, so it contributes its CELLS.
+      */
+      lineBoxes: [
+        ...[...facts.children].filter((el) => !el.classList.contains('tb-card-moves')),
+        ...facts.querySelectorAll('.tb-move-name'),
+      ].map((el) => r(el.getBoundingClientRect().height)),
+      leading: parseFloat(
+        getComputedStyle(document.querySelector('.tb')).getPropertyValue('--tb-slot-line'),
+      ),
       moveRows: card.querySelectorAll('.tb-move').length,
       separators: card.querySelectorAll('.tb-meta-sep').length,
       idLine: card.querySelectorAll('.tb-card-idline').length,
@@ -3356,11 +3385,35 @@ try {
       display.moveRows === 4,
     `${display.order.map((o) => o.cls).join(' / ')} · ${display.moveRows} moves`,
   )
+  /*
+    ONE DRAWN SIZE, TWO NOMINAL ONES. Levelling the nominal size is what this
+    used to assert, and it was not enough: Martian Mono draws about a fifth
+    larger than IBM Plex Sans at the same px, and the mono lines here are the
+    long ones -- the nickname, the level, the EV spread and all four move names
+    -- so the card read as two sizes and looked a size bigger than it was set.
+  */
+  const caps = Object.values(display.styles).map((x) => x.cap)
   check(
-    "every line is set at the nature and ability's own size -- one size for the whole card",
-    new Set(Object.values(display.styles).map((x) => x?.fs)).size === 1 &&
-      display.styles.meta.fs === display.styles.name.fs,
-    [...new Set(Object.values(display.styles).map((x) => x?.fs))].join('/'),
+    'every line on the card DRAWS at one size -- cap heights within half a pixel',
+    Math.max(...caps) - Math.min(...caps) <= 0.5,
+    Object.entries(display.styles)
+      .map(([k, v]) => `${k} ${v.fs}=${v.cap}`)
+      .join(' '),
+  )
+  check(
+    'and it takes two nominal sizes to do it: the mono lines are set SMALLER than the sans ones',
+    parseFloat(display.styles.name.fs) < parseFloat(display.styles.meta.fs) &&
+      display.styles.name.fs === display.styles.spread.fs &&
+      display.styles.name.fs === display.styles.moveName.fs &&
+      display.styles.name.fs === display.styles.level.fs &&
+      /* And nothing is left inheriting the page's 18px body. */
+      display.styles.sep.fs === display.styles.meta.fs,
+    `mono ${display.styles.name.fs} vs sans ${display.styles.meta.fs}, sep ${display.styles.sep.fs}`,
+  )
+  check(
+    "every line box is the module's tight leading, not the page's 26px",
+    new Set(display.lineBoxes).size === 1 && display.lineBoxes[0] === display.leading,
+    `${[...new Set(display.lineBoxes)].join('/')} vs --tb-slot-line ${display.leading}`,
   )
   check(
     'and the weights and families are UNTOUCHED -- only the size was levelled',
@@ -3508,6 +3561,134 @@ try {
       libraryCard.order.some((c) => /tb-card-species/.test(c)) &&
       libraryCard.order.some((c) => /tb-card-meta/.test(c)),
     JSON.stringify(libraryCard),
+  )
+
+  // =====================================================================
+  /*
+    15. THE COVERAGE PANELS ARE NOT CLIPPED
+
+    Both of them were, and by two different ancestors, which is why the fix is
+    "place it in the app frame" rather than a spacing change:
+
+      A MEMBER's panel hung off `.tb-corner-tr` INSIDE `.tb-card`, which sets
+      `overflow: hidden` -- it has to, the ghost watermark and the artwork both
+      bleed to the card's edge. On the Team Display the card is 264px wide and
+      the panel is wider than that and taller than a grid row, so it lost its
+      right edge and its bottom rows.
+
+      THE TEAM's panel hangs off a dock that now sits in the narrow left column,
+      and right-aligned there it started at a NEGATIVE x -- outside the app.
+
+    So this drives the real panels and checks three things about each: that
+    nothing clips them, that they are inside the app frame, and that all of
+    their content is reachable. At two window heights, because the team panel
+    (fourteen rows) is taller than a short window and must then flip or scroll
+    rather than run off the bottom.
+  */
+  hr('15. THE COVERAGE PANELS FIT THE WINDOW')
+  await seedStore(teamOfSix())
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.waitForTimeout(600)
+
+  const panelProbe = (sel) => {
+    const el = document.querySelector(sel)
+    if (!el) return null
+    const r = (n) => +n.toFixed(1)
+    const b = el.getBoundingClientRect()
+    const frame = document.querySelector('.panel').getBoundingClientRect()
+    /* Every ancestor that could clip, and by how much it actually does. */
+    const cuts = []
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const cs = getComputedStyle(p)
+      if (!/hidden|auto|scroll|clip/.test(cs.overflow + cs.overflowX + cs.overflowY)) continue
+      const pb = p.getBoundingClientRect()
+      const cut = {
+        who: (p.className.toString() || p.tagName).slice(0, 30),
+        left: r(Math.max(0, pb.left - b.left)),
+        right: r(Math.max(0, b.right - pb.right)),
+        top: r(Math.max(0, pb.top - b.top)),
+        bottom: r(Math.max(0, b.bottom - pb.bottom)),
+      }
+      if (cut.left || cut.right || cut.top || cut.bottom) cuts.push(cut)
+    }
+    return {
+      /* Portalled: its parent is the body, not the card it hangs off. */
+      portalled: el.parentElement === document.body,
+      box: { x: r(b.x), y: r(b.y), w: r(b.width), h: r(b.height) },
+      cuts,
+      /* Inside the app's own surface, not merely inside the window. */
+      insideFrame:
+        b.left >= frame.left - 0.5 &&
+        b.right <= frame.right + 0.5 &&
+        b.top >= frame.top - 0.5 &&
+        b.bottom <= frame.bottom + 0.5,
+      /* Nothing unreadable: either it all fits, or the panel itself scrolls. */
+      reachable:
+        el.scrollHeight <= el.clientHeight + 1 || getComputedStyle(el).overflowY !== 'visible',
+      hidden: r(el.scrollHeight - el.clientHeight),
+    }
+  }
+
+  const panels = []
+  for (const h of [900, 700]) {
+    await page.setViewportSize({ width: 1600, height: h })
+    await page.waitForTimeout(400)
+    /* A member's own panel, off a card in the BOTTOM row -- the worst case for
+       a panel that opens downwards. */
+    await page.hover('[data-testid="tb-slot-5"]')
+    await page.click('[data-testid="tb-slot-5-matchup"]')
+    await page.waitForSelector('[data-testid="tb-slot-5-matchup-popover"]')
+    await page.waitForTimeout(250)
+    panels.push({
+      h,
+      what: 'member',
+      ...(await page.evaluate(panelProbe, '[data-testid="tb-slot-5-matchup-popover"]')),
+    })
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(150)
+    /* And the team's, off the dock in the narrow left column. */
+    await page.click('[data-testid="tb-viewer-coverage"]')
+    await page.waitForSelector('[data-testid="tb-viewer-coverage-popover"]')
+    await page.waitForTimeout(250)
+    panels.push({
+      h,
+      what: 'team',
+      ...(await page.evaluate(panelProbe, '[data-testid="tb-viewer-coverage-popover"]')),
+    })
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(150)
+  }
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.waitForTimeout(300)
+  for (const p of panels) {
+    log(
+      `  ${p.what}@${p.h}: ${p.box.w}x${p.box.h} at ${p.box.x},${p.box.y}` +
+        ` frame=${p.insideFrame} cuts=${JSON.stringify(p.cuts)} hidden=${p.hidden}`,
+    )
+  }
+  check(
+    'both panels are portalled to the body, so no card can clip them',
+    panels.every((p) => p.portalled),
+    panels.map((p) => `${p.what}@${p.h}:${p.portalled}`).join(' '),
+  )
+  check(
+    'nothing clips either panel on any edge, at either window height',
+    panels.every((p) => p.cuts.length === 0),
+    JSON.stringify(panels.filter((p) => p.cuts.length).map((p) => [p.what, p.h, p.cuts])),
+  )
+  check(
+    "and both sit inside the app's own surface, not just inside the window",
+    panels.every((p) => p.insideFrame),
+    panels.map((p) => `${p.what}@${p.h}:${p.insideFrame}`).join(' '),
+  )
+  check(
+    'every row of them is reachable -- a panel taller than the room scrolls itself',
+    panels.every((p) => p.reachable),
+    panels.map((p) => `${p.what}@${p.h}:${p.hidden}px hidden`).join(' '),
   )
 
   // =====================================================================
