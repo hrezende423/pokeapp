@@ -8,9 +8,13 @@
  * THREE CORNERS ON A CARD, EACH DOING ONE THING, because the upper-right is
  * already spoken for by the spec (this species' matchups) and remove/drag cannot
  * share it:
- *   upper-right  type matchups (popover)
+ *   upper-right  type coverage, defensive then attacking (two popovers)
  *   upper-left   remove from team (confirm first)
  *   lower-left   drag handle
+ * The upper-right holds TWO icons rather than gaining a fourth corner: they are
+ * the same question asked in both directions -- the shield and the swords sit
+ * together in every dock in this module -- and a lower-right corner would land
+ * on the held-item badge.
  * The whole card is ALSO draggable. The handle exists as the guaranteed path --
  * see the note on the drag/click question in the completion report.
  *
@@ -26,6 +30,7 @@ import {
   IconInfoCircle,
   IconPlus,
   IconShieldHalf,
+  IconSwords,
   IconTrash,
   IconX,
 } from '@tabler/icons-react'
@@ -36,7 +41,7 @@ import { Modal, Popover } from './ui/Overlay'
 import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
 import { EmptySlot, MemberCard } from './ui/MemberCard'
-import { SpeciesMatchup, TeamMatchup } from './ui/TypeMatchup'
+import { MovesetCoverage, SpeciesMatchup, TeamMatchup, TeamOffence } from './ui/TypeMatchup'
 import { buildSpecies, typeIdsFor } from './buildFacts'
 import { TEAM_SIZE, teamUiId, type Build, type Team } from './model'
 import {
@@ -58,6 +63,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
   const data = useTeamBuilderData()
   const prompt = usePrompt()
   const [coverage, setCoverage] = useState(false)
+  const [offence, setOffence] = useState(false)
   const [info, setInfo] = useState(false)
   const [picking, setPicking] = useState<number | null>(null)
   const [dragFrom, setDragFrom] = useState<number | null>(null)
@@ -80,8 +86,8 @@ export function TeamViewer({ teamId }: { teamId: string }) {
   const members = team.memberIds.map((id) => (id == null ? null : (buildById.get(id) ?? null)))
   const firstOpen = members.findIndex((m) => m == null)
 
-  const matchupMembers = members
-    .filter((b): b is Build => b != null)
+  const filled = members.filter((b): b is Build => b != null)
+  const matchupMembers = filled
     .map((build) => {
       const facts = buildSpecies(build)
       return facts
@@ -165,9 +171,17 @@ export function TeamViewer({ teamId }: { teamId: string }) {
               },
               {
                 icon: <IconShieldHalf size={18} stroke={1.5} />,
-                label: 'Team type coverage',
+                /* "Team type coverage" until there were two of them. The pair
+                   uses the same two words every dock in the module uses. */
+                label: 'Team defensive coverage',
                 onClick: () => setCoverage(true),
                 testId: 'tb-viewer-coverage',
+              },
+              {
+                icon: <IconSwords size={18} stroke={1.5} />,
+                label: 'Team attacking coverage',
+                onClick: () => setOffence(true),
+                testId: 'tb-viewer-offence',
               },
               {
                 icon: <IconTrash size={18} stroke={1.5} />,
@@ -189,6 +203,14 @@ export function TeamViewer({ teamId }: { teamId: string }) {
           {coverage && (
             <Popover onClose={() => setCoverage(false)} testId="tb-viewer-coverage-popover">
               <TeamMatchup members={matchupMembers} generation={team.generation} />
+            </Popover>
+          )}
+          {offence && (
+            <Popover onClose={() => setOffence(false)} testId="tb-viewer-offence-popover">
+              {/* The BUILDS, not the pre-resolved types: which of a member's
+                  moves buy coverage is TeamOffence's own question, and each
+                  member's moves resolve in its OWN generation. */}
+              <TeamOffence members={filled} generation={team.generation} />
             </Popover>
           )}
         </div>
@@ -316,6 +338,7 @@ function MemberSlot({
   onDropHere: () => void
 }) {
   const [matchup, setMatchup] = useState(false)
+  const [offence, setOffence] = useState(false)
   const facts = buildSpecies(build)
 
   return (
@@ -348,9 +371,17 @@ function MemberSlot({
           <span className="tb-corner tb-corner-tr">
             <IconButton
               icon={<IconShieldHalf size={16} stroke={1.5} />}
-              label="Type matchups"
+              label="Defensive type coverage"
               onClick={() => setMatchup(true)}
               testId={`tb-slot-${slot}-matchup`}
+            />
+            {/* The same pair, in the same order, as the dock on the Build Form
+                and on a Build Library card: shield then swords. */}
+            <IconButton
+              icon={<IconSwords size={16} stroke={1.5} />}
+              label="Attacking type coverage"
+              onClick={() => setOffence(true)}
+              testId={`tb-slot-${slot}-offence`}
             />
             {matchup && (
               <Popover onClose={() => setMatchup(false)} testId={`tb-slot-${slot}-matchup-popover`}>
@@ -362,6 +393,15 @@ function MemberSlot({
                     title={facts.species.display_name}
                   />
                 )}
+              </Popover>
+            )}
+            {offence && (
+              <Popover onClose={() => setOffence(false)} testId={`tb-slot-${slot}-offence-popover`}>
+                <MovesetCoverage
+                  moveIds={build.moveIds}
+                  generation={build.generation}
+                  title={facts?.species.display_name ?? 'This member'}
+                />
               </Popover>
             )}
           </span>

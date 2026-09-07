@@ -20,7 +20,25 @@
   flex-direction: column;
   min-height: 0;
   padding: 0;
+}
 
+/*
+  THE MODULE'S TOKENS, AND THEY ARE HOSTED TWICE.
+
+  `.tb-popover` is portalled to the body so no card's `overflow: hidden` can cut
+  it, which also takes it out of `.tb` -- and a custom property that resolves to
+  nothing does not fall back, it makes the whole declaration invalid at computed
+  value time. `gap: var(--tb-3) var(--tb-4)` on a panel became `gap: normal`,
+  and the type run ran straight into "2 of 4 moves counted" with no space at
+  all. Every rule inside a panel that reaches for this scale is affected, so the
+  scale is declared where both roots can see it rather than each usage being
+  rewritten.
+
+  NOT MOVED TO `:root`, which would be the other way to fix it: the scale exists
+  precisely because it is not the app's, and the note below says so.
+*/
+.tb,
+.tb-popover {
   /*
     Two slider colours the global tokens cannot supply.
 
@@ -126,7 +144,8 @@
   */
   --tb-on-accent: #ffffff;
 }
-[data-theme='dark'] .tb {
+[data-theme='dark'] .tb,
+[data-theme='dark'] .tb-popover {
   --slider-track: #3a3a3e;
   --slider-thumb-border: #ffffff;
 }
@@ -327,6 +346,15 @@
 .tb-popover {
   position: fixed;
   z-index: 40;
+  /*
+    BORDER-BOX, because `max-height` arrives from the placement pass as the room
+    that is actually available. Under the default content-box the panel's own
+    16px padding and 1px border were ADDED to it, so a panel that had to be
+    capped came out 34px taller than the space it was capped to -- and put its
+    bottom edge outside the app frame, which is the one thing the placement is
+    there to prevent.
+  */
+  box-sizing: border-box;
   /*
     WIDTH: max-content, and it is load-bearing. A shrink-to-fit box is sized
     against its CONTAINING BLOCK, and this one used to hang off the dock strip
@@ -951,9 +979,20 @@
 .tb-corner:focus-within {
   opacity: 1;
 }
+/*
+  A ROW, because this corner holds two icons on the Team Display -- the same
+  shield-then-swords pair every dock in the module carries. As a plain span the
+  two buttons were inline-block boxes with a WORD SPACE between them, which put
+  a gap in the middle of what is one control group. `flex` rather than
+  `inline-flex` because the corner is absolutely positioned, and that blockifies
+  the display value anyway -- writing `inline-flex` here would only mean the
+  stylesheet says one thing and the computed style another.
+*/
 .tb-corner-tr {
   top: 0;
   right: 0;
+  display: flex;
+  align-items: center;
 }
 .tb-corner-tl {
   top: 0;
@@ -975,9 +1014,19 @@
 
 /* ---------------------------------------------------------------- matchups */
 
+/*
+  ONE LEADING FOR THE WHOLE PANEL, set here rather than per block. Every line in
+  a coverage panel is one fact -- a tier, a type run, a table row -- and all of
+  them were inheriting the page's 18px/26.1px body, so a row of 10px text stood
+  in a 26px line box. The attacking table is one row per defending type,
+  seventeen of them in Gen 4; at the page's leading the panel did not fit an
+  800px window and capped itself into a scroller, which is a fallback, not a
+  layout. 15px against 10-11px text is the same ratio the cards use.
+*/
 .tb-matchup {
   min-width: 240px;
   max-width: 320px;
+  line-height: 15px;
 }
 .tb-matchup-title {
   margin: 0 0 var(--space-gap-sm);
@@ -1073,15 +1122,28 @@
   font-size: var(--font-size-caption);
 }
 .tb-matchup-table th {
-  padding: 3px 6px;
+  padding: 2px 6px;
   font-size: var(--font-size-label);
   font-weight: var(--font-weight-regular);
   color: var(--text-secondary);
   text-align: left;
   border-bottom: 1px solid var(--hairline);
 }
+/*
+  THE COUNT HEADINGS SIT OVER THEIR COUNTS. The first column is a type name and
+  reads left; every other column is a right-aligned number, and a left-aligned
+  heading over one left the words at the far side of the column from the digits
+  they name -- "Hits hard" is three words wide and its zeros were sitting under
+  "Best".
+*/
+.tb-matchup-table th:not(:first-child) {
+  text-align: right;
+}
+/* 2px, symmetric: these rows draw their own hairline, so the band the reader
+   sees runs from one to the next and the padding has to stay even or the text
+   reads high in its own band (CLAUDE.md, the hairline-band rule). */
 .tb-matchup-table td {
-  padding: 3px 6px;
+  padding: 2px 6px;
   border-bottom: 1px solid var(--hairline);
 }
 .tb-matchup-table td.num {
@@ -1091,6 +1153,14 @@
 }
 /* Three or more members sharing a weakness is the thing worth noticing. */
 .tb-matchup-table td[data-weak='high'] {
+  color: var(--accent);
+}
+/*
+  AND ON THE ATTACKING TABLE IT IS A ZERO: a type no member can hit super
+  effectively is a Pokemon the team cannot break. Same use of --accent as the
+  row above -- the value that changes a decision -- not a fifth one.
+*/
+.tb-matchup-table td[data-hole='true'] {
   color: var(--accent);
 }
 

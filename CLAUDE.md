@@ -202,9 +202,44 @@ imperfections are already logged there deliberately.
   panel came to rest outside the app, over the page background beside it.
   A side effect worth keeping: the panel no longer inherits `.tb-corner`'s
   `opacity: 0`, so moving the mouse off a card no longer makes an open panel
-  invisible while it is still open. verify-team-builder §15 drives both panels
-  at two window heights and asserts no ancestor cuts them, that they sit inside
-  `.panel`, and that nothing in them is unreachable.
+  invisible while it is still open. verify-team-builder §15 drives all four
+  panels at two window heights and asserts no ancestor cuts them, that they sit
+  inside `.panel`, and that nothing in them is unreachable.
+
+  **THE TOKENS ARE HOSTED TWICE BECAUSE OF THIS**, and it is not optional:
+  `.tb, .tb-popover` declares the `--tb-*` scale, because a portalled panel is
+  no longer inside `.tb` and an unresolved custom property does not fall back --
+  it makes the whole declaration invalid, so `gap: var(--tb-3) var(--tb-4)`
+  computed to `normal` and the type run ran straight into "2 of 4 moves
+  counted". §15 reads a real gap back out of a live panel. Anything else the
+  module scopes to `.tb` and a panel might use has to be hosted the same way;
+  moving the scale to `:root` is the wrong fix, since it exists precisely
+  because it is not the app's.
+
+  **`box-sizing: border-box` on `.tb-popover`** is load-bearing for the same
+  placement: `max-height` arrives as the room actually available, and under
+  content-box the panel's own 14px padding and 1px border were added to it, so
+  a capped panel came out 34px taller than the space it was capped to -- with
+  its bottom edge outside the frame, which is the one thing the placement is
+  there to prevent.
+
+- **The team's attacking coverage counts MEMBERS, and its zeros lead.**
+  `TeamOffence` (`ui/TypeMatchup.tsx`) is the fourth coverage scope and the only
+  one whose interesting number is a zero: "Hits hard" is how many members have a
+  super-effective answer to that defending type, so a 0 is a Pokemon the team
+  cannot break, and the table sorts fewest-first with those rows marked in
+  `--accent` -- the same use as the defensive table's three-members-weak, not a
+  fifth one. It does NOT drop its quiet rows the way `TeamMatchup` drops types
+  nothing is weak to; here the quiet rows are the answer. "Best" is the best
+  multiplier the whole team can manage, from `offensiveCoverage` over the UNION
+  of everyone's attacking types -- only informative once the count is zero (1x
+  is chip damage, 0.5x a wall, 0x untouchable). Each member's moves resolve in
+  the MEMBER's own generation while the chart is the TEAM's, the same split the
+  defensive panel makes.
+  **The panel's leading is its own** (`.tb-matchup { line-height: 15px }`, table
+  cells at 2px): seventeen rows at the page's inherited 26.1px did not fit an
+  800px window and the panel capped itself into a scroller. verify-team-builder
+  §16 derives every number in it by hand from a three-member team.
 
 - **The Team Library card's width is a MEASURED CONSTANT.**
   `--tb-compact-card: 127px` is the rendered width of "ELECTRIC · FIGHTING" —

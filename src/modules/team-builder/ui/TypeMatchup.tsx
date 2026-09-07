@@ -1,9 +1,11 @@
 /**
- * Type coverage, at three scopes, from one file.
+ * Type coverage, at four scopes, from one file.
  *
  * DEFENSIVE (per species) -- how hard each attacking type hits this Pokemon.
  * OFFENSIVE (per moveset) -- what this build's damaging moves can hit back.
- * TEAM -- for each attacking type, how many members it hits super effectively.
+ * TEAM, TAKING DAMAGE -- for each attacking type, how many members are weak to it.
+ * TEAM, DEALING DAMAGE -- for each defending type, how many members have a
+ * super-effective answer to it, and the best the team can manage if none do.
  *
  * THE PANELS ARE GROUPED BY MULTIPLIER, NOT JUST BY SIGN. "Weak to" that mixes
  * 4x and 2x buries the two types that will actually kill you among the six that
@@ -28,6 +30,7 @@
 import { defensiveChart } from '../typeDefence'
 import { TypeLabel } from '../../../components/ds/TypeLabel'
 import { attackingTypesFor, offensiveCoverage } from '../buildFacts'
+import type { Build } from '../model'
 
 interface Row {
   name: string
@@ -243,6 +246,125 @@ export function TeamMatchup({
             ))}
           </tbody>
         </table>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The team, dealing damage.
+ *
+ * THE TWO TEAM PANELS ASK OPPOSITE QUESTIONS AND SO COUNT OPPOSITE THINGS. On
+ * defence the number worth acting on is a HIGH one -- three members weak to
+ * Ground is a team that loses to one Earthquake. On offence it is a ZERO: a
+ * defending type no member can hit super effectively is a Pokemon this team
+ * cannot break, and that is the row a builder is looking for. So this table is
+ * sorted fewest-first, holes at the top, and it does NOT drop its quiet rows
+ * the way the defensive one drops types nothing is weak to -- here the quiet
+ * rows are the answer.
+ *
+ * TWO COLUMNS, BECAUSE THEY SAY DIFFERENT THINGS. "Hits hard" counts MEMBERS,
+ * so it reads as redundancy: one member covering Steel is a plan, four is
+ * comfort. "Best" is the best multiplier the whole team can manage against that
+ * type, which is only interesting once the count is zero -- 1x means chip
+ * damage, 0.5x means a wall, 0x means the team literally cannot touch it.
+ *
+ * ERA CORRECTNESS RUNS BOTH WAYS HERE. Each member's moves are resolved in the
+ * MEMBER's own generation (a Gen 3 build's Charm is Normal, not Fairy), while
+ * the chart itself is the TEAM's generation -- the same split the defensive
+ * panel makes, and the reason a Gen 1 team gets no Dark or Steel row.
+ */
+export function TeamOffence({
+  members,
+  generation,
+}: {
+  /* Whole builds rather than pre-resolved type lists: which of a member's four
+     moves count towards coverage is a question with a real answer in
+     `attackingTypesFor`, and every caller would otherwise have to know it. */
+  members: Pick<Build, 'moveIds' | 'generation'>[]
+  generation: number
+}) {
+  const title = `Team offence · ${members.length} member${members.length === 1 ? '' : 's'}`
+  if (members.length === 0) {
+    return (
+      <div className="tb-matchup" data-testid="tb-matchup-team-offense">
+        <p className="tb-matchup-title">Team offence</p>
+        <span className="tb-matchup-empty">No members yet.</span>
+      </div>
+    )
+  }
+
+  const perMember = members.map((m) => attackingTypesFor(m.moveIds, m.generation))
+  const brought = [...new Set(perMember.flatMap((p) => p.types))]
+  const counted = perMember.reduce((n, p) => n + p.counted, 0)
+  const ignored = perMember.reduce((n, p) => n + p.ignored, 0)
+
+  /* One member at a time, so the count is "how many members can do this" and
+     not "how many of the team's types happen to be super effective". */
+  const hits = new Map<string, number>()
+  for (const p of perMember) {
+    for (const row of offensiveCoverage(p.types, generation)) {
+      if (row.multiplier > 1) hits.set(row.type, (hits.get(row.type) ?? 0) + 1)
+    }
+  }
+  /* And the whole team's types at once, which gives the BEST it can manage --
+     the move you would actually pick. */
+  const rows = offensiveCoverage(brought, generation)
+    .map((r) => ({ type: r.type, best: r.multiplier, hits: hits.get(r.type) ?? 0 }))
+    .sort((a, b) => a.hits - b.hits || a.best - b.best || a.type.localeCompare(b.type))
+
+  return (
+    <div className="tb-matchup" data-testid="tb-matchup-team-offense">
+      <p className="tb-matchup-title">{title}</p>
+      {brought.length === 0 ? (
+        <span className="tb-matchup-empty" data-testid="tb-matchup-team-offense-empty">
+          No damaging moves anywhere on this team, so there is no coverage to show. Status and
+          fixed-damage moves do not scale with the type chart.
+        </span>
+      ) : (
+        <>
+          <p className="tb-matchup-note">
+            <span className="tb-matchup-rows">
+              {brought.map((t) => (
+                <TypeLabel key={t} type={t} small />
+              ))}
+            </span>
+            {ignored > 0 && (
+              <span className="tb-matchup-ignored">
+                {counted} of {counted + ignored} moves counted
+              </span>
+            )}
+          </p>
+          <table className="tb-matchup-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Hits hard</th>
+                <th>Best</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.type}
+                  data-type={row.type}
+                  data-hole={row.hits === 0 ? 'true' : undefined}
+                >
+                  <td>
+                    <TypeLabel type={row.type} small />
+                  </td>
+                  {/* Zero is the fact this panel exists to surface, and it is
+                      marked the same way three-members-weak is on the other
+                      one: the row that changes a decision. */}
+                  <td className="num" data-hole={row.hits === 0 ? 'true' : undefined}>
+                    {row.hits}
+                  </td>
+                  <td className="num">{formatMultiplier(row.best)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
     </div>
   )

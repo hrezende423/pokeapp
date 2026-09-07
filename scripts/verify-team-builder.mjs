@@ -3579,11 +3579,12 @@ try {
       THE TEAM's panel hangs off a dock that now sits in the narrow left column,
       and right-aligned there it started at a NEGATIVE x -- outside the app.
 
-    So this drives the real panels and checks three things about each: that
-    nothing clips them, that they are inside the app frame, and that all of
-    their content is reachable. At two window heights, because the team panel
-    (fourteen rows) is taller than a short window and must then flip or scroll
-    rather than run off the bottom.
+    So this drives all FOUR real panels -- a member's two and the team's two --
+    and checks three things about each: that nothing clips them, that they are
+    inside the app frame, and that all of their content is reachable. At two
+    window heights, because the team panels (fourteen and seventeen rows) are
+    taller than a short window and must then flip or scroll rather than run off
+    the bottom.
   */
   hr('15. THE COVERAGE PANELS FIT THE WINDOW')
   await seedStore(teamOfSix())
@@ -3630,6 +3631,22 @@ try {
       reachable:
         el.scrollHeight <= el.clientHeight + 1 || getComputedStyle(el).overflowY !== 'visible',
       hidden: r(el.scrollHeight - el.clientHeight),
+      /*
+        AND THE MODULE'S TOKENS STILL REACH IT. Portalling to the body took the
+        panel out of `.tb`, where the --tb-* scale is declared -- and an
+        unresolved custom property invalidates the whole declaration rather
+        than falling back, so `gap: var(--tb-3) var(--tb-4)` computed to
+        `normal` and the type run ran into the note beside it with no space.
+
+        `null` for a panel with no such element to measure: a table-only panel
+        has no flex row, and a member with no damaging moves renders a sentence
+        rather than a chart. The check below requires several REAL readings, so
+        this cannot quietly pass by measuring nothing.
+      */
+      gap: (() => {
+        const flex = el.querySelector('.tb-matchup-note, .tb-matchup-col')
+        return flex ? getComputedStyle(flex).gap : null
+      })(),
     }
   }
 
@@ -3637,30 +3654,34 @@ try {
   for (const h of [900, 700]) {
     await page.setViewportSize({ width: 1600, height: h })
     await page.waitForTimeout(400)
-    /* A member's own panel, off a card in the BOTTOM row -- the worst case for
-       a panel that opens downwards. */
-    await page.hover('[data-testid="tb-slot-5"]')
-    await page.click('[data-testid="tb-slot-5-matchup"]')
-    await page.waitForSelector('[data-testid="tb-slot-5-matchup-popover"]')
-    await page.waitForTimeout(250)
-    panels.push({
-      h,
-      what: 'member',
-      ...(await page.evaluate(panelProbe, '[data-testid="tb-slot-5-matchup-popover"]')),
-    })
-    await page.keyboard.press('Escape')
-    await page.waitForTimeout(150)
-    /* And the team's, off the dock in the narrow left column. */
-    await page.click('[data-testid="tb-viewer-coverage"]')
-    await page.waitForSelector('[data-testid="tb-viewer-coverage-popover"]')
-    await page.waitForTimeout(250)
-    panels.push({
-      h,
-      what: 'team',
-      ...(await page.evaluate(panelProbe, '[data-testid="tb-viewer-coverage-popover"]')),
-    })
-    await page.keyboard.press('Escape')
-    await page.waitForTimeout(150)
+    /* A member's own panels, off a card in the BOTTOM row -- the worst case
+       for a panel that opens downwards. */
+    for (const which of ['matchup', 'offence']) {
+      await page.hover('[data-testid="tb-slot-5"]')
+      await page.click(`[data-testid="tb-slot-5-${which}"]`)
+      await page.waitForSelector(`[data-testid="tb-slot-5-${which}-popover"]`)
+      await page.waitForTimeout(250)
+      panels.push({
+        h,
+        what: `member-${which}`,
+        ...(await page.evaluate(panelProbe, `[data-testid="tb-slot-5-${which}-popover"]`)),
+      })
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(150)
+    }
+    /* And the team's two, off the dock in the narrow left column. */
+    for (const which of ['coverage', 'offence']) {
+      await page.click(`[data-testid="tb-viewer-${which}"]`)
+      await page.waitForSelector(`[data-testid="tb-viewer-${which}-popover"]`)
+      await page.waitForTimeout(250)
+      panels.push({
+        h,
+        what: `team-${which}`,
+        ...(await page.evaluate(panelProbe, `[data-testid="tb-viewer-${which}-popover"]`)),
+      })
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(150)
+    }
   }
   await page.setViewportSize({ width: 1600, height: 900 })
   await page.waitForTimeout(300)
@@ -3671,17 +3692,17 @@ try {
     )
   }
   check(
-    'both panels are portalled to the body, so no card can clip them',
-    panels.every((p) => p.portalled),
+    'all four panels are portalled to the body, so no card can clip them',
+    panels.length === 8 && panels.every((p) => p.portalled),
     panels.map((p) => `${p.what}@${p.h}:${p.portalled}`).join(' '),
   )
   check(
-    'nothing clips either panel on any edge, at either window height',
+    'nothing clips any panel on any edge, at either window height',
     panels.every((p) => p.cuts.length === 0),
     JSON.stringify(panels.filter((p) => p.cuts.length).map((p) => [p.what, p.h, p.cuts])),
   )
   check(
-    "and both sit inside the app's own surface, not just inside the window",
+    "and all of them sit inside the app's own surface, not just inside the window",
     panels.every((p) => p.insideFrame),
     panels.map((p) => `${p.what}@${p.h}:${p.insideFrame}`).join(' '),
   )
@@ -3690,6 +3711,275 @@ try {
     panels.every((p) => p.reachable),
     panels.map((p) => `${p.what}@${p.h}:${p.hidden}px hidden`).join(' '),
   )
+  const gaps = panels.filter((p) => p.gap != null)
+  check(
+    "the module's own spacing scale still resolves inside a portalled panel",
+    gaps.length >= 4 && gaps.every((p) => p.gap !== 'normal'),
+    `${gaps.length} measured: ${gaps.map((p) => `${p.what}@${p.h}:${p.gap}`).join(' ')}`,
+  )
+
+  // =====================================================================
+  /*
+    16. THE TEAM, DEALING DAMAGE
+
+    The Team Viewer now answers the offensive question at both scopes: per
+    member it is the same panel the Build Form shows, and for the team it is a
+    new one. Both are checked against a team whose numbers can be derived by
+    hand:
+
+      b1  Razor Leaf, Sludge Bomb, Toxic, Seismic Toss  -> grass, poison
+      b2  Earthquake, Rock Slide, Double-Edge, Rest     -> ground, rock, normal
+      b3  Razor Leaf                                    -> grass
+
+    so six of nine moves count (Toxic and Rest are status, Seismic Toss is fixed
+    damage, and the empty slots are not moves at all), and the team brings five
+    attacking types. From those:
+
+      water   grass hits it 2x, and TWO members carry grass          -> 2, 2x
+      rock    all three have something super effective on it         -> 3, 2x
+      steel   only b2's Earthquake                                   -> 1, 2x
+      normal  nothing here is super effective against it            -> 0, 1x
+      ghost   normal 0x, poison 0.5x; the best is grass/ground at 1x -> 0, 1x
+
+    The zero rows are the point of the panel -- a type no member can hit hard is
+    a Pokemon this team cannot break -- so they sort to the top and carry the
+    same marker the defensive table gives a shared weakness.
+  */
+  hr('16. THE TEAM, DEALING DAMAGE')
+  const offMoves = await page.evaluate(async () => {
+    const d = await import('/pokeapp/src/data/index.ts')
+    const m = {}
+    for (const x of d.listMoves()) m[x.name] = x.id
+    return {
+      razorLeaf: m['razor-leaf'],
+      sludgeBomb: m['sludge-bomb'],
+      toxic: m['toxic'],
+      seismicToss: m['seismic-toss'],
+      earthquake: m['earthquake'],
+      rockSlide: m['rock-slide'],
+      doubleEdge: m['double-edge'],
+      rest: m['rest'],
+    }
+  })
+  await seedStore({
+    nextBuildSeq: 4,
+    nextTeamSeq: 2,
+    builds: [
+      mkBuild('b1', {
+        generation: 4,
+        speciesId: 3,
+        pokemonId: 3,
+        moveIds: [offMoves.razorLeaf, offMoves.sludgeBomb, offMoves.toxic, offMoves.seismicToss],
+      }),
+      mkBuild('b2', {
+        generation: 4,
+        speciesId: 306,
+        pokemonId: 306,
+        moveIds: [offMoves.earthquake, offMoves.rockSlide, offMoves.doubleEdge, offMoves.rest],
+      }),
+      mkBuild('b3', {
+        generation: 4,
+        speciesId: 254,
+        pokemonId: 254,
+        moveIds: [offMoves.razorLeaf, null, null, null],
+      }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1', 'b2', 'b3'], { generation: 4 })],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.waitForTimeout(800)
+
+  // ---- the team's panel
+  await page.click('[data-testid="tb-viewer-offence"]')
+  await page.waitForSelector('[data-testid="tb-viewer-offence-popover"]')
+  await page.waitForTimeout(300)
+  const teamOff = await page.evaluate(() => {
+    const scope = document.querySelector('[data-testid="tb-matchup-team-offense"]')
+    return {
+      title: scope.querySelector('.tb-matchup-title').textContent.trim(),
+      brought: [...scope.querySelectorAll('.tb-matchup-note [data-ds="type-label"]')].map(
+        (e) => e.dataset.type,
+      ),
+      note: scope.querySelector('.tb-matchup-ignored')?.textContent?.trim() ?? '',
+      heads: [...scope.querySelectorAll('th')].map((e) => e.textContent.trim()),
+      rows: [...scope.querySelectorAll('tbody tr')].map((tr) => ({
+        type: tr.dataset.type,
+        hits: +tr.children[1].textContent.trim(),
+        best: tr.children[2].textContent.trim(),
+        marked: tr.children[1].dataset.hole === 'true',
+      })),
+    }
+  })
+  const offRow = (t) => teamOff.rows.find((r) => r.type === t)
+  log(`  ${teamOff.title} · brought ${teamOff.brought.join(',')} · ${teamOff.note}`)
+  log(`  ${teamOff.rows.map((r) => `${r.type}:${r.hits}/${r.best}`).join(' ')}`)
+  check(
+    'the team panel counts the whole team and says how many of its moves it could use',
+    teamOff.title === 'Team offence · 3 members' && teamOff.note === '6 of 9 moves counted',
+    `${teamOff.title} | ${teamOff.note}`,
+  )
+  check(
+    "it brings the UNION of its members' damaging types, status and fixed damage excluded",
+    JSON.stringify([...teamOff.brought].sort()) ===
+      JSON.stringify(['grass', 'ground', 'normal', 'poison', 'rock']),
+    teamOff.brought.join(','),
+  )
+  check(
+    'one row per defending type in this generation, headed Type | Hits hard | Best',
+    teamOff.rows.length === 17 &&
+      JSON.stringify(teamOff.heads) === JSON.stringify(['Type', 'Hits hard', 'Best']),
+    `${teamOff.rows.length} rows: ${teamOff.heads.join(' | ')}`,
+  )
+  check(
+    'the count is MEMBERS with a super-effective answer, not types: two members carry grass, so Water reads 2',
+    offRow('water')?.hits === 2 && offRow('water')?.best === '2x' && offRow('rock')?.hits === 3,
+    `water ${offRow('water')?.hits}/${offRow('water')?.best}, rock ${offRow('rock')?.hits}`,
+  )
+  check(
+    "and one member's Earthquake is the only answer to Steel",
+    offRow('steel')?.hits === 1 && offRow('steel')?.best === '2x',
+    `steel ${offRow('steel')?.hits}/${offRow('steel')?.best}`,
+  )
+  check(
+    'a type nothing on the team hits hard reads 0, and carries the BEST the team can manage',
+    offRow('normal')?.hits === 0 &&
+      offRow('normal')?.best === '1x' &&
+      offRow('ghost')?.hits === 0 &&
+      offRow('ghost')?.best === '1x',
+    `normal ${offRow('normal')?.hits}/${offRow('normal')?.best},` +
+      ` ghost ${offRow('ghost')?.hits}/${offRow('ghost')?.best}`,
+  )
+  check(
+    'the holes sort to the TOP -- the opposite of the defensive table, where the high count leads',
+    teamOff.rows.slice(0, 6).every((r) => r.hits === 0 && r.marked) &&
+      teamOff.rows.slice(6).every((r) => r.hits > 0 && !r.marked) &&
+      teamOff.rows.at(-1).hits === 3,
+    teamOff.rows.map((r) => r.hits).join(''),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  // ---- and each member's own, which is the panel the Build Form shows
+  await page.hover('[data-testid="tb-slot-0"]')
+  await page.click('[data-testid="tb-slot-0-offence"]')
+  await page.waitForSelector('[data-testid="tb-slot-0-offence-popover"]')
+  await page.waitForTimeout(300)
+  const memberOff = await page.evaluate(() => {
+    const scope = document.querySelector('[data-testid="tb-matchup-offense"]')
+    return {
+      title: scope.querySelector('.tb-matchup-title').textContent.trim(),
+      note: scope.querySelector('.tb-matchup-ignored')?.textContent?.trim() ?? '',
+      cols: [...scope.querySelectorAll('.tb-matchup-col')].map((col) => ({
+        label: col.querySelector('.tb-matchup-label').textContent.trim(),
+        tiers: [...col.querySelectorAll('.tb-matchup-tier')].map((t) => ({
+          mult: t.querySelector('.tb-matchup-mult').textContent.trim(),
+          types: [...t.querySelectorAll('[data-ds="type-label"]')].map((x) => x.dataset.type),
+        })),
+      })),
+    }
+  })
+  log(`  ${memberOff.title} · ${memberOff.note}`)
+  const memberHits = memberOff.cols.find((c) => c.label === 'Hits hard')
+  log(`  hits hard: ${JSON.stringify(memberHits)}`)
+  check(
+    "a member's panel is the one the Build Form shows, titled with its own species",
+    memberOff.title === 'Venusaur · dealing damage' && memberOff.note === '2 of 4 moves counted',
+    `${memberOff.title} | ${memberOff.note}`,
+  )
+  check(
+    'and it reports that build alone: Razor Leaf and Sludge Bomb, nothing a team-mate carries',
+    memberHits != null &&
+      memberHits.tiers.length === 1 &&
+      memberHits.tiers[0].mult === '2x' &&
+      ['grass', 'ground', 'rock', 'water'].every((t) => memberHits.tiers[0].types.includes(t)) &&
+      /* Steel is b2's Earthquake, and must not leak into b1's panel. */
+      !memberHits.tiers[0].types.includes('steel'),
+    JSON.stringify(memberHits),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  // ---- both icons live in the same corner, in the module's own order
+  await page.hover('[data-testid="tb-slot-0"]')
+  await page.waitForTimeout(200)
+  const cornerPair = await page.evaluate(() => {
+    const card = document.querySelector('.tb-card-full')
+    const tr = card.querySelector('.tb-corner-tr')
+    const cb = card.getBoundingClientRect()
+    const btns = [...tr.querySelectorAll('button')]
+    return {
+      ids: btns.map((b) => b.dataset.testid),
+      xs: btns.map((b) => +b.getBoundingClientRect().x.toFixed(1)),
+      widths: btns.map((b) => +b.getBoundingClientRect().width.toFixed(1)),
+      /* Still pinned to the card's own corner, not pushed off it. */
+      dx: +(tr.getBoundingClientRect().right - cb.right).toFixed(1),
+      display: getComputedStyle(tr).display,
+    }
+  })
+  log(`  corner: ${cornerPair.ids.join(' ')} at ${cornerPair.xs.join(',')} (${cornerPair.display})`)
+  check(
+    'the shield comes before the swords, the same order as every dock in the module',
+    JSON.stringify(cornerPair.ids) === JSON.stringify(['tb-slot-0-matchup', 'tb-slot-0-offence']) &&
+      cornerPair.xs[0] < cornerPair.xs[1] &&
+      Math.abs(cornerPair.dx) <= 0.5,
+    `${cornerPair.ids.join(',')} dx ${cornerPair.dx}`,
+  )
+  check(
+    'and they sit against each other rather than with a word space between them',
+    /* A flex row, so the two buttons touch. As a plain span they were inline
+       boxes and the newline between them in the JSX was a word space. */
+    /flex$/.test(cornerPair.display) &&
+      Math.abs(cornerPair.xs[1] - cornerPair.xs[0] - cornerPair.widths[0]) <= 0.5,
+    `${cornerPair.display}, ${(cornerPair.xs[1] - cornerPair.xs[0]).toFixed(1)}px apart` +
+      ` for a ${cornerPair.widths[0]}px button`,
+  )
+
+  // ---- a team with nothing but status moves has NO coverage, and says so
+  await seedStore({
+    nextBuildSeq: 2,
+    nextTeamSeq: 2,
+    builds: [
+      mkBuild('b1', {
+        generation: 4,
+        speciesId: 3,
+        pokemonId: 3,
+        moveIds: [offMoves.toxic, offMoves.rest, null, null],
+      }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1'], { generation: 4 })],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.waitForTimeout(600)
+  await page.click('[data-testid="tb-viewer-offence"]')
+  await page.waitForSelector('[data-testid="tb-viewer-offence-popover"]')
+  await page.waitForTimeout(250)
+  const noCoverage = await page.evaluate(() => {
+    const scope = document.querySelector('[data-testid="tb-matchup-team-offense"]')
+    const empty = scope.querySelector('[data-testid="tb-matchup-team-offense-empty"]')
+    return {
+      empty: empty?.textContent ?? '',
+      tables: scope.querySelectorAll('table').length,
+      title: scope.querySelector('.tb-matchup-title').textContent.trim(),
+    }
+  })
+  log(`  ${noCoverage.title}: ${noCoverage.empty.slice(0, 60)}`)
+  check(
+    'a team with only status moves gets the no-coverage answer, not a table of 1x rows',
+    noCoverage.tables === 0 &&
+      /no coverage to show/i.test(noCoverage.empty) &&
+      noCoverage.title === 'Team offence · 1 member',
+    `${noCoverage.tables} tables · ${noCoverage.title}`,
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
 
   // =====================================================================
   hr('CONVENTIONS — across the whole module')
