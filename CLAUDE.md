@@ -138,6 +138,26 @@ disagrees with §1–§11, which were written before implementation.
   are lowercase: `ja-hrkt`, not `ja-Hrkt` — the documented casing
   silently returns null rather than erroring.
 
+## Signed off — do not touch without being asked
+
+Screens the owner has reviewed, accepted and explicitly frozen. Not
+"finished" in the sense of having no debt — frozen in the sense that a
+change here needs a request, not a justification. Read the deferred-debt
+section below before deciding something on this list is a bug: the known
+imperfections are already logged there deliberately.
+
+- **Team Building — Build Form** (`src/modules/team-builder/BuildForm.tsx`
+  and its `.tb-form-*`, `.tb-identity*`, `.tb-rail*` and `.tb-card-rail*`
+  rules in `teamBuilder.css`). Frozen at the right-rail density pass. This
+  screen took several rounds of layout review and every number in it was
+  measured against something — the rail's 17px leading, the spread's 0.82
+  of the label token, the 16px badge, the six cards ending level with the
+  stat table's Total row. Do not re-tune them as a drive-by, and do not
+  "fix" the Gen 1 rail overhang or the Build-Form-only save model; both are
+  logged below as deliberate. Touch it only for a fix that is asked for,
+  or where a change elsewhere genuinely cannot land without it — and say so
+  when that happens rather than quietly widening scope.
+
 ## Verification discipline
 
 - **"Reported done" ≠ "actually verified."** Visual/browser confirmation
