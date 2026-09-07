@@ -55,7 +55,6 @@ export function TeamBuilding() {
   */
   const consumed = useRef<string | null>(null)
 
-
   useEffect(() => {
     const token = `${nav.moduleId}|${nav.moduleNonce}`
     if (consumed.current === token) return

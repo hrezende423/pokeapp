@@ -201,9 +201,7 @@ function TeamRow({
           }
         : null
     })
-    .filter(
-      (m): m is { label: string; typeIds: number[]; abilityId: number | null } => m != null,
-    )
+    .filter((m): m is { label: string; typeIds: number[]; abilityId: number | null } => m != null)
 
   const open = () => goTo({ kind: 'team-viewer', teamId: team.id })
 
@@ -234,34 +232,34 @@ function TeamRow({
           />
         ) : (
           <Kebab
-          testId={`tb-team-${team.id}-kebab`}
-          items={[
-            {
-              icon: <IconShieldHalf size={16} stroke={1.5} />,
-              label: 'Team type coverage',
-              onClick: () => setCoverage(true),
-              testId: `tb-team-${team.id}-coverage`,
-            },
-            {
-              icon: <IconInfoCircle size={16} stroke={1.5} />,
-              label: 'Team info',
-              onClick: () => setInfo(true),
-              testId: `tb-team-${team.id}-info`,
-            },
-            {
-              icon: <IconCopy size={16} stroke={1.5} />,
-              label: 'Duplicate team',
-              onClick: () => duplicateTeam(team.id),
-              testId: `tb-team-${team.id}-duplicate`,
-            },
-            {
-              icon: <IconTrash size={16} stroke={1.5} />,
-              label: 'Delete team',
-              onClick: onDelete,
-              danger: true,
-              testId: `tb-team-${team.id}-delete`,
-            },
-          ]}
+            testId={`tb-team-${team.id}-kebab`}
+            items={[
+              {
+                icon: <IconShieldHalf size={16} stroke={1.5} />,
+                label: 'Team type coverage',
+                onClick: () => setCoverage(true),
+                testId: `tb-team-${team.id}-coverage`,
+              },
+              {
+                icon: <IconInfoCircle size={16} stroke={1.5} />,
+                label: 'Team info',
+                onClick: () => setInfo(true),
+                testId: `tb-team-${team.id}-info`,
+              },
+              {
+                icon: <IconCopy size={16} stroke={1.5} />,
+                label: 'Duplicate team',
+                onClick: () => duplicateTeam(team.id),
+                testId: `tb-team-${team.id}-duplicate`,
+              },
+              {
+                icon: <IconTrash size={16} stroke={1.5} />,
+                label: 'Delete team',
+                onClick: onDelete,
+                danger: true,
+                testId: `tb-team-${team.id}-delete`,
+              },
+            ]}
           />
         )}
         {coverage && (

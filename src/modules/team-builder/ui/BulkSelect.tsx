@@ -35,11 +35,7 @@ export function SelectCircle({
          reachable and operable from the keyboard, where there is no sweep. */
       onClick={(e) => e.preventDefault()}
     >
-      {selected ? (
-        <IconCircleCheckFilled size={20} />
-      ) : (
-        <IconCircle size={20} stroke={1.5} />
-      )}
+      {selected ? <IconCircleCheckFilled size={20} /> : <IconCircle size={20} stroke={1.5} />}
     </button>
   )
 }

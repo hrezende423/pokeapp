@@ -487,7 +487,7 @@ try {
     JSON.stringify(dupes.map((d) => d.listsOthers)),
   )
   check(
-    "and each slot still lists its OWN move, so the <select> keeps showing it",
+    'and each slot still lists its OWN move, so the <select> keeps showing it',
     dupes.every((d) => d.listsItsOwn),
     JSON.stringify(dupes.map((d) => d.listsItsOwn)),
   )
@@ -1183,7 +1183,8 @@ try {
     return {
       /* One distinct y per group is what stacking means. Two groups sharing a
          y would be the old side-by-side layout. */
-      stacked: new Set(cols.map((c) => Math.round(c.getBoundingClientRect().y))).size === cols.length,
+      stacked:
+        new Set(cols.map((c) => Math.round(c.getBoundingClientRect().y))).size === cols.length,
       cols: cols.map((c) => ({
         label: c.querySelector('.tb-matchup-label').textContent.trim(),
         tiers: [...c.querySelectorAll('.tb-matchup-tier')].map((t) =>
@@ -1604,8 +1605,9 @@ try {
   await page.click('[data-testid="tb-rail-create-team"]')
   await page.waitForTimeout(700)
   const afterCreate = await readStore()
-  const attachedRail = await page.$$eval('[data-tb="member-card"][data-testid^="tb-rail-"]', (els) =>
-    els.map((e) => e.dataset.buildId),
+  const attachedRail = await page.$$eval(
+    '[data-tb="member-card"][data-testid^="tb-rail-"]',
+    (els) => els.map((e) => e.dataset.buildId),
   )
   check(
     'UC2: it creates the team, makes this build member 1, persists, and the rail flips to the team',
@@ -1867,7 +1869,16 @@ try {
     `builds=${savedByBack.builds.length} slots=${slotsOf(savedByBack)}`,
   )
 
-  // ---- UC5, the other branch: pick an existing build
+  /*
+    ---- UC5, the other branch: pick an existing build
+
+    AND IT COMES BACK TO THE FORM, not to the team. The two callers of the
+    picker want different answers and both were asked for: Team Viewer's own
+    "add member" returns the TEAM, because being dumped in a build form after
+    adding a member was the original complaint; the Build Form's rail is filling
+    a slot for a form the reader is working in, so it returns the FORM with the
+    build just picked loaded into it. `pickFor.then` carries which.
+  */
   await seedStore(twoMemberTeam())
   await openTeamMember(0)
   await page.click('[data-testid="tb-rail-add"]')
@@ -1875,12 +1886,49 @@ try {
   await page.click('[data-testid="tb-rail-add-existing"]')
   await page.waitForSelector('[data-testid="tb-build-grid"]')
   await page.click('[data-testid="tb-build-b3"] .tb-card-open')
-  await page.waitForTimeout(800)
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(600)
   const afterPickExisting = await readStore()
+  const landedAfterPick = await page.evaluate(() => {
+    const form = document.querySelector('[data-testid="tb-build-form"]')
+    return {
+      id: form?.dataset.buildId,
+      slot: form?.dataset.slot,
+      species: document.querySelector('[data-testid="tb-species"]')?.value,
+      viewers: document.querySelectorAll('[data-testid="tb-team-viewer"]').length,
+    }
+  })
   check(
-    'UC5: "pick an existing build" places it in that slot and returns to the team',
+    'UC5: "pick an existing build" places it in that slot',
     slotsOf(afterPickExisting) === 'b1,b2,b3,·,·,·',
     slotsOf(afterPickExisting),
+  )
+  check(
+    'UC5: and stays on the FORM with the picked build loaded, rather than opening the team',
+    landedAfterPick.id === 'b3' &&
+      landedAfterPick.slot === '2' &&
+      landedAfterPick.species === '7' &&
+      landedAfterPick.viewers === 0,
+    JSON.stringify(landedAfterPick),
+  )
+
+  // ---- while Team Viewer's own add still returns the TEAM
+  await seedStore(twoMemberTeam())
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.click('[data-testid="tb-slot-2-add"]')
+  await page.click('[data-testid="tb-add-member-existing"]')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b3"] .tb-card-open')
+  await page.waitForTimeout(700)
+  check(
+    "UC5: Team Viewer's own add is unchanged -- it comes back to the team, not to a form",
+    (await page.$$('[data-testid="tb-team-viewer"]')).length === 1 &&
+      (await page.$$('[data-testid="tb-build-form"]')).length === 0,
+    `viewer=${(await page.$$('[data-testid="tb-team-viewer"]')).length} form=${(await page.$$('[data-testid="tb-build-form"]')).length}`,
   )
 
   /*
@@ -1953,7 +2001,9 @@ try {
   await page.click('[data-testid="tb-prompt-confirm"]')
   await page.waitForTimeout(600)
   const afterUc8 = (await readStore()).builds.find((b) => b.id === 'b1')
-  log(`  after reset: nickname="${afterUc8.nickname}" species=${afterUc8.speciesId} level=${afterUc8.level}`)
+  log(
+    `  after reset: nickname="${afterUc8.nickname}" species=${afterUc8.speciesId} level=${afterUc8.level}`,
+  )
   check(
     'UC8: the uncommitted edit is discarded, not saved-then-reset',
     afterUc8.nickname === '' && afterUc8.speciesId === 1,
@@ -2069,12 +2119,11 @@ try {
   await page.waitForTimeout(700)
   const afterAbandon = await readStore()
   check(
-    "an untouched draft started from Team Viewer is dropped on the way out, with no prompt asked",
+    'an untouched draft started from Team Viewer is dropped on the way out, with no prompt asked',
     idsOf(afterAbandon) === 'b1,b2,b3' &&
       (await page.$$('[data-testid="tb-draft-prompt"]')).length === 0,
     idsOf(afterAbandon),
   )
-
 
   // =====================================================================
   /*
@@ -2158,6 +2207,123 @@ try {
     must renumber the third WITHOUT touching any stored field, so the check
     below reads the numbers off the screen after a delete rather than the store.
   */
+  /*
+    ---- AND IT HAS TO REACH THE SCREEN
+
+    Everything above tests `defensiveChart` directly. That is the arithmetic; it
+    proves nothing about whether the ability actually gets passed in from the
+    card the reader is looking at. One forgotten `abilityId` on one call site
+    and the chart is right while every screen is wrong -- so this drives the
+    real popovers, on a team built from the four cases.
+  */
+  await seedStore({
+    nextBuildSeq: 7,
+    nextTeamSeq: 2,
+    builds: [
+      /* Heracross bug/fighting, Magnezone electric/steel: ordinary members, so
+         the tallies below have something to count that is not a special case. */
+      mkBuild('b1', { generation: 4, speciesId: 214, pokemonId: 214, abilityId: 62 }),
+      mkBuild('b2', { generation: 4, speciesId: 462, pokemonId: 462, abilityId: 42 }),
+      /* Case 1, dual type: electric alone is 2x weak to Ground; flying is immune. */
+      mkBuild('b3', { generation: 4, speciesId: 145, pokemonId: 145, abilityId: 46 }),
+      /* Case 1 again: ground gives Quagsire an Electric immunity. */
+      mkBuild('b4', { generation: 4, speciesId: 195, pokemonId: 195, abilityId: 6 }),
+      /* Case 2: steel is 2x weak to Ground; LEVITATE is immune. */
+      mkBuild('b5', { generation: 4, speciesId: 437, pokemonId: 437, abilityId: 26 }),
+      /* Case 2 again: fire/steel takes Fire at 1x; FLASH FIRE is immune. */
+      mkBuild('b6', { generation: 4, speciesId: 485, pokemonId: 485, abilityId: 18 }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], { generation: 4 })],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.waitForTimeout(500)
+  await page.hover('[data-testid="tb-team-t1"]')
+  await page.click('[data-testid="tb-team-t1-kebab"]')
+  await page.waitForSelector('[data-testid="tb-team-t1-coverage"]')
+  await page.click('[data-testid="tb-team-t1-coverage"]')
+  await page.waitForSelector('[data-testid="tb-matchup-team"]')
+  await page.waitForTimeout(300)
+  const teamTally = await page.$$eval('[data-testid="tb-matchup-team"] tbody tr', (rows) =>
+    Object.fromEntries(
+      rows.map((r) => {
+        const c = [...r.children].map((x) => x.textContent.trim())
+        return [c[0].toLowerCase(), { weak: Number(c[1]), resist: Number(c[2]) }]
+      }),
+    ),
+  )
+  log(`  team tally: ${JSON.stringify(teamTally)}`)
+  check(
+    "the Team Library's own coverage table counts Levitate and dual types, not raw chart rows",
+    /* Weak: Magnezone and Heatran, both 4x. Resist: Heracross at 0.5x plus
+       Zapdos and Bronzong at 0x. Read raw, Bronzong would be a fourth weakness
+       and Zapdos a fifth -- weak 4, resist 1. */
+    teamTally.ground?.weak === 2 && teamTally.ground?.resist === 3,
+    `ground ${JSON.stringify(teamTally.ground)}`,
+  )
+  check(
+    'and Flash Fire counts as a resistance to Fire rather than a neutral hit',
+    /* Weak: Heracross, Magnezone, Bronzong. Resist: Quagsire 0.5x and Heatran
+       0x. Without the ability Heatran is 1x and counts as neither. */
+    teamTally.fire?.weak === 3 && teamTally.fire?.resist === 2,
+    `fire ${JSON.stringify(teamTally.fire)}`,
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // ---- and each member's own popover, in the Team Viewer
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.waitForTimeout(500)
+  const immunitiesOf = async (slot) => {
+    await page.hover(`[data-testid="tb-slot-${slot}"]`)
+    await page.click(`[data-testid="tb-slot-${slot}-matchup"]`)
+    await page.waitForSelector('[data-testid="tb-matchup-species"]')
+    await page.waitForTimeout(250)
+    const got = await page.evaluate(() => {
+      const col = document.querySelector('[data-testid="tb-matchup-immune"]')
+      const weak = document.querySelector('[data-testid="tb-matchup-weak"]')
+      return {
+        immune: [...(col?.querySelectorAll('[data-ds="type-label"]') ?? [])].map(
+          (e) => e.dataset.type,
+        ),
+        weak: [...(weak?.querySelectorAll('[data-ds="type-label"]') ?? [])].map(
+          (e) => e.dataset.type,
+        ),
+      }
+    })
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(250)
+    return got
+  }
+  const zapdos = await immunitiesOf(2)
+  const quagsire = await immunitiesOf(3)
+  const bronzong = await immunitiesOf(4)
+  const heatran = await immunitiesOf(5)
+  log(`  zapdos ${JSON.stringify(zapdos)}`)
+  log(`  quagsire ${JSON.stringify(quagsire)}`)
+  log(`  bronzong ${JSON.stringify(bronzong)}`)
+  log(`  heatran ${JSON.stringify(heatran)}`)
+  check(
+    'case 1 on screen: Zapdos is IMMUNE to Ground and not weak to it, and Quagsire to Electric',
+    zapdos.immune.includes('ground') &&
+      !zapdos.weak.includes('ground') &&
+      quagsire.immune.includes('electric') &&
+      !quagsire.weak.includes('electric'),
+    `zapdos immune=${zapdos.immune.join(',')} quagsire immune=${quagsire.immune.join(',')}`,
+  )
+  check(
+    'case 2 on screen: Levitate makes Bronzong immune to Ground rather than 2x weak',
+    bronzong.immune.includes('ground') && !bronzong.weak.includes('ground'),
+    `immune=${bronzong.immune.join(',')} weak=${bronzong.weak.join(',')}`,
+  )
+  check(
+    'case 2 on screen: Flash Fire makes Heatran immune to Fire, and its real 4x Ground stays',
+    heatran.immune.includes('fire') && heatran.weak.includes('ground'),
+    `immune=${heatran.immune.join(',')} weak=${heatran.weak.join(',')}`,
+  )
+
   hr('11. THE LIBRARIES')
 
   const threeBuilds = () => ({
@@ -2186,14 +2352,18 @@ try {
   await page.click('[data-testid="tb-builds-select"]')
   await page.waitForSelector('[data-testid="tb-builds-bulk"]')
   const circles = await page.$$('.tb-select-circle')
-  check('selection mode puts a check circle on every card', circles.length === 3, String(circles.length))
+  check(
+    'selection mode puts a check circle on every card',
+    circles.length === 3,
+    String(circles.length),
+  )
   /*
     A SWEEP, not three clicks. Press on the second circle and drag across the
     third: pointerdown decides the direction (both were unselected, so this is
     selecting) and every circle the pointer enters takes the same decision. A
     per-item toggle would turn the second one back off on the way past.
   */
-  const boxOf = async (i) => (await circles[i].boundingBox())
+  const boxOf = async (i) => await circles[i].boundingBox()
   const from = await boxOf(1)
   const to = await boxOf(2)
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
@@ -2249,7 +2419,10 @@ try {
   await seedStore({
     nextBuildSeq: 3,
     nextTeamSeq: 2,
-    builds: [mkBuild('b1', { speciesId: 1, pokemonId: 1 }), mkBuild('b2', { speciesId: 4, pokemonId: 4 })],
+    builds: [
+      mkBuild('b1', { speciesId: 1, pokemonId: 1 }),
+      mkBuild('b2', { speciesId: 4, pokemonId: 4 }),
+    ],
     teams: [mkTeam('t1', 1, ['b1'])],
   })
   await goTo('my-teams')
@@ -2412,7 +2585,9 @@ try {
   await page.waitForTimeout(400)
   const backToTeam = await readStore()
   const newMemberCount = (await page.textContent('[data-testid="tb-slot-count"]')).trim()
-  log(`  after Back to team: ${idsOf(backToTeam)} slots=${slotsOf(backToTeam)} count=${newMemberCount}`)
+  log(
+    `  after Back to team: ${idsOf(backToTeam)} slots=${slotsOf(backToTeam)} count=${newMemberCount}`,
+  )
   check(
     '"Back to team" creates the build AND puts it in the team -- not one without the other',
     backToTeam.builds.length === 1 &&
@@ -2429,7 +2604,9 @@ try {
   await page.waitForTimeout(400)
   await leaveModule()
   const viaAppBar = await readStore()
-  log(`  via app bar: ${idsOf(viaAppBar)} slots=${viaAppBar.teams.map((t) => t.memberIds.join(',')).join(' | ')}`)
+  log(
+    `  via app bar: ${idsOf(viaAppBar)} slots=${viaAppBar.teams.map((t) => t.memberIds.join(',')).join(' | ')}`,
+  )
   check(
     'a TOUCHED new member survives the global app nav bar, in its slot',
     viaAppBar.builds.length === 1 &&
@@ -2630,8 +2807,13 @@ try {
   await page.click('[data-testid="tb-add-member-existing"]')
   await page.waitForTimeout(600)
   const pickerOffers = await page.evaluate(() => ({
-    offered: [...document.querySelectorAll('[data-tb="member-card"]')].map((e) => e.dataset.buildId),
-    note: document.querySelector('[data-testid="tb-pick-note"]')?.textContent.replace(/\s+/g, ' ').trim(),
+    offered: [...document.querySelectorAll('[data-tb="member-card"]')].map(
+      (e) => e.dataset.buildId,
+    ),
+    note: document
+      .querySelector('[data-testid="tb-pick-note"]')
+      ?.textContent.replace(/\s+/g, ' ')
+      .trim(),
   }))
   log(`  picker: ${JSON.stringify(pickerOffers)}`)
   check(
@@ -2696,7 +2878,10 @@ try {
   const crossTeam = await readStore()
   check(
     'a build already on ANOTHER team is still pickable, and becomes a shared build',
-    crossTeam.teams.find((t) => t.id === 't2')?.memberIds.slice(0, 2).join(',') === 'b2,b1',
+    crossTeam.teams
+      .find((t) => t.id === 't2')
+      ?.memberIds.slice(0, 2)
+      .join(',') === 'b2,b1',
     crossTeam.teams.map((t) => `${t.id}:${t.memberIds.filter(Boolean).join(',')}`).join(' | '),
   )
 
@@ -2792,6 +2977,217 @@ try {
   )
 
   // =====================================================================
+  /*
+    13. THE TEAM LIBRARY CARD IS THE SAME CARD ON EVERY ROW.
+
+    The cards were `flex: 1 1 0` and shared the row equally, so a team of one
+    drew a single card as wide as the lane and a team of six drew six narrow
+    ones. That is not only inconsistent: because the sprite is CENTRED in the
+    card and the text is LEFT, the gap between them changed with the number of
+    members, which is the "info position isn't well aligned with the sprites"
+    complaint.
+
+    The width is now a measured constant -- the rendered width of the longest
+    type pair this app can show, plus 5px either side. The assertions below
+    check the constant is still big enough rather than hardcoding it twice: the
+    number lives in `--tb-compact-card` and the longest pair is measured here,
+    in the browser, from the card's own markup.
+  */
+  hr('13. THE TEAM LIBRARY CARD')
+  await seedStore({
+    nextBuildSeq: 11,
+    nextTeamSeq: 4,
+    builds: [
+      /* Magnezone is electric/steel and Heracross bug/fighting -- long pairs,
+         so the row under test is not all four-letter types. */
+      mkBuild('b1', { generation: 4, speciesId: 462, pokemonId: 462, abilityId: 42, itemId: 217 }),
+      mkBuild('b2', { generation: 4, speciesId: 214, pokemonId: 214, abilityId: 62 }),
+      mkBuild('b3', { generation: 4, speciesId: 145, pokemonId: 145, abilityId: 46 }),
+      mkBuild('b4', { generation: 4, speciesId: 195, pokemonId: 195, abilityId: 6 }),
+      mkBuild('b5', { generation: 4, speciesId: 437, pokemonId: 437, abilityId: 26 }),
+      mkBuild('b6', { generation: 4, speciesId: 485, pokemonId: 485, abilityId: 18 }),
+      mkBuild('b7', { generation: 4, speciesId: 1, pokemonId: 1, abilityId: 65 }),
+      mkBuild('b8', { generation: 4, speciesId: 4, pokemonId: 4, abilityId: 66 }),
+      mkBuild('b9', { generation: 4, speciesId: 7, pokemonId: 7, abilityId: 67 }),
+      mkBuild('b10', { generation: 4, speciesId: 25, pokemonId: 25, abilityId: 9 }),
+    ],
+    teams: [
+      mkTeam('t1', 1, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], { generation: 4 }),
+      mkTeam('t2', 2, ['b7', 'b8', 'b9'], { generation: 4 }),
+      mkTeam('t3', 3, ['b10'], { generation: 4 }),
+    ],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.waitForTimeout(700)
+
+  const cardGeometry = await page.evaluate(async () => {
+    await document.fonts.ready
+    const round = (n) => +n.toFixed(1)
+    /*
+      EVERY ORDERED PAIR OF THE 17 TYPES, rendered with the card's own markup in
+      a detached host, so the number includes the uppercase transform, the
+      tracking and the separator's margins. Computed from a font metric it would
+      miss all three; hardcoded it would silently stop being true.
+    */
+    const TYPES = [
+      'normal',
+      'fire',
+      'water',
+      'electric',
+      'grass',
+      'ice',
+      'fighting',
+      'poison',
+      'ground',
+      'flying',
+      'psychic',
+      'bug',
+      'rock',
+      'ghost',
+      'dragon',
+      'dark',
+      'steel',
+    ]
+    const host = document.createElement('div')
+    host.className = 'tb tb-card tb-card-compact'
+    host.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden'
+    const facts = document.createElement('span')
+    facts.className = 'tb-card-facts'
+    host.appendChild(facts)
+    document.body.appendChild(host)
+    const pairWidth = (a, b) => {
+      facts.innerHTML =
+        '<span class="tb-card-types" style="white-space:nowrap">' +
+        `<span><span class="ds-type ds-type-sm" data-ds="type-label">${a}</span></span>` +
+        `<span><span class="tb-type-sep">·</span><span class="ds-type ds-type-sm" data-ds="type-label">${b}</span></span>` +
+        '</span>'
+      return round(facts.querySelector('.tb-card-types').getBoundingClientRect().width)
+    }
+    let widest = { pair: '', w: 0 }
+    for (const a of TYPES) {
+      for (const b of TYPES) {
+        if (a === b) continue
+        const w = pairWidth(a, b)
+        if (w > widest.w) widest = { pair: `${a} · ${b}`, w }
+      }
+    }
+    host.remove()
+
+    const rows = [...document.querySelectorAll('.tb-team-row')]
+    const cards = rows.map((r) => [...r.querySelectorAll('.tb-card-compact')])
+    const first = cards[0][0]
+    const rect = (el) => (el ? el.getBoundingClientRect() : null)
+    const card = rect(first)
+    const art = rect(first.querySelector('.tb-card-art'))
+    const frame = rect(first.querySelector('.tb-card-frame'))
+    const held = rect(first.querySelector('.tb-held-item'))
+    const ghost = rect(first.querySelector('.tb-card-ghost'))
+    const line = (sel) => rect(first.querySelector(sel))
+    const declared = parseFloat(
+      getComputedStyle(document.querySelector('.tb')).getPropertyValue('--tb-compact-card'),
+    )
+    const inset = parseFloat(
+      getComputedStyle(document.querySelector('.tb')).getPropertyValue('--tb-compact-inset'),
+    )
+    return {
+      widest,
+      declaredWidth: declared,
+      inset,
+      /* Every card on every row, however many members the team has. */
+      widths: [...new Set(cards.flat().map((c) => round(c.getBoundingClientRect().width)))],
+      heights: [...new Set(cards.flat().map((c) => round(c.getBoundingClientRect().height)))],
+      rowHeights: rows.map((r) => round(r.getBoundingClientRect().height)),
+      membersJustify: getComputedStyle(rows[0].querySelector('.tb-team-members')).justifyContent,
+      /* The first card of each row starts at the same x: packed left, not centred. */
+      firstCardLefts: cards.map((cs) => round(cs[0].getBoundingClientRect().x)),
+      lineLefts: {
+        name: round(line('.tb-card-headline').x - card.x),
+        types: round(line('.tb-card-types').x - card.x),
+        meta: round(line('.tb-card-meta').x - card.x),
+      },
+      typesJustify: getComputedStyle(first.querySelector('.tb-card-types')).justifyContent,
+      /* Centred on the CARD, not on the inset text box. */
+      artCentreOffset: round(art.x + art.width / 2 - (card.x + card.width / 2)),
+      frameCentreOffset: round(frame.x + frame.width / 2 - (card.x + card.width / 2)),
+      ghostCentreOffset: round(ghost.x + ghost.width / 2 - (card.x + card.width / 2)),
+      /* The badge's own corner against the picture's corner: unchanged. */
+      badge: { dx: round(held.right - frame.right), dy: round(held.bottom - frame.bottom) },
+      lineHeight: getComputedStyle(first.querySelector('.tb-card-facts')).lineHeight,
+    }
+  })
+  log(`  widest pair: ${JSON.stringify(cardGeometry.widest)}`)
+  log(
+    `  card ${cardGeometry.declaredWidth}px, widths ${cardGeometry.widths.join('/')}, heights ${cardGeometry.heights.join('/')}`,
+  )
+  log(
+    `  rows ${cardGeometry.rowHeights.join(', ')} · line lefts ${JSON.stringify(cardGeometry.lineLefts)}`,
+  )
+  log(
+    `  centres art ${cardGeometry.artCentreOffset} frame ${cardGeometry.frameCentreOffset} ghost ${cardGeometry.ghostCentreOffset}`,
+  )
+
+  check(
+    'the fixed width still fits the longest type pair plus its inset either side',
+    cardGeometry.declaredWidth >= cardGeometry.widest.w + cardGeometry.inset * 2,
+    `${cardGeometry.declaredWidth} >= ${cardGeometry.widest.w} + ${cardGeometry.inset * 2} ("${cardGeometry.widest.pair}")`,
+  )
+  check(
+    'and "electric · fighting" really is that pair, which is where the number came from',
+    cardGeometry.widest.pair === 'electric · fighting',
+    cardGeometry.widest.pair,
+  )
+  check(
+    'every card is the same width and height whether its team holds one member or six',
+    cardGeometry.widths.length === 1 &&
+      cardGeometry.widths[0] === cardGeometry.declaredWidth &&
+      cardGeometry.heights.length === 1,
+    `widths ${cardGeometry.widths.join('/')} heights ${cardGeometry.heights.join('/')}`,
+  )
+  check(
+    'the cards pack LEFT, so every row starts at the same x',
+    cardGeometry.membersJustify === 'flex-start' && new Set(cardGeometry.firstCardLefts).size === 1,
+    `${cardGeometry.membersJustify} · ${cardGeometry.firstCardLefts.join(',')}`,
+  )
+  check(
+    'the name, the types and the meta line all start at the inset -- one left edge, not three',
+    [cardGeometry.lineLefts.name, cardGeometry.lineLefts.types, cardGeometry.lineLefts.meta].every(
+      (x) => Math.abs(x - cardGeometry.inset) <= 0.5,
+    ),
+    JSON.stringify(cardGeometry.lineLefts),
+  )
+  check(
+    'the type run is CENTRED inside that box, while the lines around it are not',
+    cardGeometry.typesJustify === 'center',
+    cardGeometry.typesJustify,
+  )
+  check(
+    'the sprite, its frame and the dex watermark are all centred on the CARD, not on the text box',
+    Math.abs(cardGeometry.artCentreOffset) <= 0.5 &&
+      Math.abs(cardGeometry.frameCentreOffset) <= 0.5 &&
+      Math.abs(cardGeometry.ghostCentreOffset) <= 0.5,
+    `art ${cardGeometry.artCentreOffset} frame ${cardGeometry.frameCentreOffset} ghost ${cardGeometry.ghostCentreOffset}`,
+  )
+  check(
+    'and the held item still hangs off the picture’s bottom-right corner -- narrowing the card moved the pair together',
+    Math.abs(cardGeometry.badge.dx) <= 6 && Math.abs(cardGeometry.badge.dy) <= 6,
+    JSON.stringify(cardGeometry.badge),
+  )
+  check(
+    "the card's lines carry the module's tight leading, not the page's 26px",
+    parseFloat(cardGeometry.lineHeight) <= 16,
+    cardGeometry.lineHeight,
+  )
+  check(
+    'which is what makes a lane shorter than the card it used to hold',
+    /* Was 167px with a 148px card. Asserted as a bound rather than a value so a
+       different machine's font metrics cannot fail it. */
+    cardGeometry.rowHeights.every((h) => h <= 140) && cardGeometry.heights[0] <= 120,
+    `rows ${cardGeometry.rowHeights.join(',')} card ${cardGeometry.heights[0]}`,
+  )
+
+  // =====================================================================
   hr('CONVENTIONS — across the whole module')
   const savey = await page.evaluate(() =>
     [...document.querySelectorAll('button')]
@@ -2839,7 +3235,11 @@ try {
       .map((el) => el.className)
       .slice(0, 8),
   )
-  check('no button or empty slot in the module draws an outline', boxed.length === 0, boxed.join(' | '))
+  check(
+    'no button or empty slot in the module draws an outline',
+    boxed.length === 0,
+    boxed.join(' | '),
+  )
 
   check('no console or page errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '))
 

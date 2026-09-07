@@ -67,7 +67,9 @@ export function TeamViewer({ teamId }: { teamId: string }) {
     return (
       <section className="tb-screen" data-testid="tb-team-viewer">
         <p className="tb-empty-note">This team no longer exists.</p>
-        <GhostButton onClick={() => goTo({ kind: 'my-teams' })}>Back to the Team Library</GhostButton>
+        <GhostButton onClick={() => goTo({ kind: 'my-teams' })}>
+          Back to the Team Library
+        </GhostButton>
       </section>
     )
   }
@@ -91,9 +93,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
           }
         : null
     })
-    .filter(
-      (m): m is { label: string; typeIds: number[]; abilityId: number | null } => m != null,
-    )
+    .filter((m): m is { label: string; typeIds: number[]; abilityId: number | null } => m != null)
 
   /*
     NOTHING IS CREATED, AND NOTHING IS RESERVED. The form opens on a member that

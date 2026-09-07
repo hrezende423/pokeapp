@@ -33,7 +33,18 @@ export type TbScreen =
     simply left behind. Carrying the slot means the card click can put the build
     where it was going and hand the reader back to the team.
   */
-  | { kind: 'build-library'; pickFor?: { teamId: string; slot: number } }
+  /*
+    `then` IS WHERE THE PICK GOES BACK TO, and it has to be carried because the
+    two callers want different answers. Team Viewer's own "add member" sends the
+    reader here and expects the TEAM back -- that was asked for explicitly, so
+    that adding a member does not dump you in a build form. The Build Form's
+    rail sends them here to fill a slot it is holding, and expects to keep the
+    FORM, with the build just picked now loaded in it.
+  */
+  | {
+      kind: 'build-library'
+      pickFor?: { teamId: string; slot: number; then?: 'team' | 'form' }
+    }
   /*
     THE FORM'S TARGET IS NOT ALWAYS A RECORD.
 

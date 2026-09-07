@@ -49,6 +49,31 @@
   --tb-5: 12px;
   --tb-6: 20px;
 
+  /*
+    THE TEAM LIBRARY CARD IS A FIXED WIDTH, and this is where it comes from.
+
+    116.6px is the rendered width of the longest type pair this app can show --
+    "ELECTRIC · FIGHTING" -- measured in a browser with the card's own markup, so
+    it includes the uppercase transform, the 0.05em tracking and the separator's
+    margins. All 272 ordered pairs were measured; that one really is the widest.
+    Plus 5px of inset either side.
+
+    A MEASURED CONSTANT, NOT A GUESS, and not `max-content` either: the cards used
+    to be `flex: 1 1 0` and shared the row equally, so a team of one drew a 1300px
+    card and a team of six drew 213px cards -- the same build in a different shape
+    on every row. Sizing to content instead would do the same thing more subtly,
+    since each card would be as wide as its own type pair.
+
+    Re-derive it with scripts/audit-team-builder.mjs if the type scale ever moves;
+    verify-team-builder section 13 asserts the longest pair still fits.
+  */
+  --tb-compact-card: 127px;
+  --tb-compact-inset: 5px;
+  /* Tight leading for a stack of one-fact lines. The page inherits an absolute
+     26.1px from a 18px body, which on a 10px label is a leading of 2.6 -- three
+     of those made a 148px card and a 167px lane. */
+  --tb-compact-line: 14px;
+
   --slider-track: #e2e2e6;
   --slider-thumb-border: #9b9ba1;
   /*
@@ -415,19 +440,28 @@
   color: var(--text-secondary);
 }
 /*
-  WIDER MEMBER CARDS. Six across a row with a 20px gap left each about 110px,
-  which ellipsed every name; the gap is the cheapest width to buy back, and the
-  cards stretch to take it. `flex-basis: 0` with `flex: 1` on the card makes the
-  six share the row equally rather than sizing to their own content.
+  CARDS PACK LEFT AT A FIXED WIDTH, whatever the team holds.
+
+  They used to be `flex: 1 1 0` and share the row equally, which meant a team of
+  one drew a single 1300px-wide card and a team of six drew 213px cards -- so a
+  card's proportions, and where its text sat relative to its sprite, changed with
+  the number of members beside it. A row of six now looks like the first six of
+  a row that happens to have one.
+
+  `0 1` RATHER THAN `0 0`: no growing, ever, but shrinking is allowed. Six cards
+  and their gaps come to 802px, which fits the content column comfortably -- and
+  on a window narrow enough that they do not, compressing them is better than
+  overflowing the page, which the app's scroll model forbids.
 */
 .tb-team-members {
   display: flex;
   flex: 1;
+  justify-content: flex-start;
   gap: var(--space-gap-sm);
   min-width: 0;
 }
 .tb-team-members .tb-card-compact {
-  flex: 1 1 0;
+  flex: 0 1 var(--tb-compact-card);
   min-width: 0;
 }
 /* The whole lane opens the team, so the row is the button. The chevron stays as
@@ -1318,6 +1352,35 @@
 */
 .tb-card-compact .tb-card-art {
   height: 64px;
+}
+/*
+  ------------------------------------------------- the compact card's insides
+
+  THE INSET LIVES ON THE TEXT, NOT ON THE CARD, and that is what lets these two
+  requirements hold at once: the text starts 5px in, and the sprite group is
+  centred on the CARD rather than on the text column. Padding the card would
+  centre the sprite in the padded box and pull the dex watermark's bleed off
+  centre with it -- the watermark is positioned against the art box and is meant
+  to run off both edges evenly.
+
+  Nothing here touches the sprite or the badge. `.tb-card-art` already centres
+  its frame and `.tb-held-item` is positioned against that frame, so narrowing
+  the card moves the pair together and the badge stays on the picture's corner.
+*/
+.tb-card-compact .tb-card-facts {
+  padding: 0 var(--tb-compact-inset);
+  line-height: var(--tb-compact-line);
+}
+/*
+  THE TYPES ARE CENTRED; EVERY OTHER LINE IS LEFT.
+
+  Both are measured from the same left edge -- the 5px inset -- so the type line
+  is a centred run of text inside a box that starts exactly where the name above
+  it starts. At the longest pair the two coincide, which is the case the card
+  width was derived from.
+*/
+.tb-card-compact .tb-card-types {
+  justify-content: center;
 }
 /*
   THE SAME STRUCTURE AS THE IDENTITY PANEL'S SPRITE, at the rail's scale: a

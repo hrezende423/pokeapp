@@ -48,7 +48,7 @@ import {
   updateBuild,
   useTeamBuilderData,
 } from './store'
-import { goTo } from './tbNav'
+import { goTo, type TbScreen } from './tbNav'
 
 export function BuildLibrary({
   pickFor,
@@ -58,7 +58,7 @@ export function BuildLibrary({
      passes the same shape to all four screens. */
   generation?: number
   /** Set when the library was opened to fill one team slot. See tbNav. */
-  pickFor?: { teamId: string; slot: number }
+  pickFor?: { teamId: string; slot: number; then?: 'team' | 'form' }
 }) {
   const data = useTeamBuilderData()
   const prompt = usePrompt()
@@ -110,10 +110,21 @@ export function BuildLibrary({
     : libraryBuilds
   const hiddenFromPicker = libraryBuilds.length - pickable.length
 
+  /** Where cancelling or picking hands the reader back to. See tbNav. */
+  const backFromPick = (buildId: string | null): TbScreen =>
+    pickFor?.then === 'form' && buildId != null
+      ? {
+          kind: 'build-form',
+          buildId,
+          origin: { kind: 'team', teamId: pickFor.teamId },
+          slot: pickFor.slot,
+        }
+      : { kind: 'team-viewer', teamId: pickFor?.teamId ?? '' }
+
   const openOrPick = (buildId: string) => {
     if (pickFor) {
       setTeamMember(pickFor.teamId, pickFor.slot, buildId)
-      goTo({ kind: 'team-viewer', teamId: pickFor.teamId })
+      goTo(backFromPick(buildId))
       return
     }
     goTo({ kind: 'build-form', buildId, origin: { kind: 'library' } })
@@ -143,6 +154,9 @@ export function BuildLibrary({
           <>
             <GhostButton
               bare
+              /* CANCEL GOES BACK TO WHERE THE PICK STARTED, which for the
+                 Build Form's rail is the team, not the form -- there is no
+                 build to load, and the form is still where it was. */
               onClick={() => goTo({ kind: 'team-viewer', teamId: pickFor.teamId })}
               testId="tb-pick-cancel"
             >

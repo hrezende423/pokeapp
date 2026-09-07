@@ -1564,10 +1564,15 @@ function BuildFormFields({
                 const toSlot = addingAt
                 setAddingAt(null)
                 /* No "move the changes" here: the destination is an existing
-                   build, so there is no new member for them to move to. */
+                   build, so there is no new member for them to move to.
+
+                   `then: 'form'` -- picking a build fills the slot and comes
+                   back HERE with that build loaded. It used to land on the Team
+                   Viewer, which threw the reader out of the form they were
+                   working in. */
                 railSwitch(() => ({
                   kind: 'build-library',
-                  pickFor: { teamId: railTeam.id, slot: toSlot },
+                  pickFor: { teamId: railTeam.id, slot: toSlot, then: 'form' },
                 }))
               }}
             >

@@ -146,6 +146,21 @@ change here needs a request, not a justification. Read the deferred-debt
 section below before deciding something on this list is a bug: the known
 imperfections are already logged there deliberately.
 
+- **The Team Library card's width is a MEASURED CONSTANT.**
+  `--tb-compact-card: 127px` is the rendered width of "ELECTRIC · FIGHTING" —
+  the longest type pair in Gen 1–4 scope, 116.6px with the card's own uppercase
+  transform, tracking and separator margins — plus a 5px inset either side.
+  All 272 ordered pairs were measured in a browser to establish that it is the
+  longest. Do not replace it with `max-content` (each card would then be as
+  wide as its own type pair) or with `flex: 1` (a team of one drew a card as
+  wide as the lane, which is what it used to do). verify-team-builder §13
+  re-measures every pair and asserts the constant still fits.
+
+  The 5px inset lives on `.tb-card-facts`, not on the card: the type run is
+  centred inside it and every other line starts at its left edge, while the
+  sprite group and the dex watermark stay centred on the CARD so the watermark's
+  bleed is symmetrical.
+
 - **Team Building — Build Form's LAYOUT** (`.tb-form-*`, `.tb-identity*`,
   `.tb-rail*` and `.tb-card-rail*` in `teamBuilder.css`). Frozen at the
   right-rail density pass. Every number in it was measured against
