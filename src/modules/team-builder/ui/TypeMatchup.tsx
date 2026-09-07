@@ -179,9 +179,28 @@ export function MovesetCoverage({
 }
 
 /**
- * Team-wide coverage: one row per attacking type, counting members weak and
- * resistant. Types that nothing on the team is weak to are dropped -- a full
- * 17-row table of mostly zeroes buries the two rows worth acting on.
+ * The team, taking damage: one row per attacking type, counting members weak,
+ * resistant and IMMUNE.
+ *
+ * AN IMMUNITY IS NOT A RESISTANCE, and counting it as one is what this table
+ * used to do -- `multiplier < 1` swept 0x in with 0.5x. On a team of Zapdos,
+ * Bronzong, Gengar and Aggron that read "Ground: 1 weak, 3 resist" when three
+ * of those members cannot be hit by Ground at all: Zapdos by its Flying half,
+ * Bronzong and Gengar by Levitate. "Resists it" and "cannot be touched by it"
+ * are different answers to the same question and the difference is the whole
+ * reason a builder opens this panel.
+ *
+ * WHICH ALSO CHANGES WHICH ROWS ARE WORTH SHOWING. Dropping every type nothing
+ * is weak to is still right for the noise it removes -- a full 17-row table of
+ * mostly zeroes buries the rows that matter -- but it also dropped the team's
+ * best news: Gengar's Normal immunity never appeared, because nothing on the
+ * team happened to be weak to Normal. A row now earns its place with a weakness
+ * OR an immunity.
+ *
+ * The counts come from `defensiveChart` per member, so every immunity the
+ * per-species panel knows about is counted here too: both halves of a dual
+ * type, the type-and-ability cases (Bronzong's Levitate over Ground, Heatran's
+ * Flash Fire over an otherwise neutral Fire) and the ability-only ones.
  */
 export function TeamMatchup({
   members,
@@ -201,26 +220,33 @@ export function TeamMatchup({
     )
   }
 
-  const tally = new Map<number, { name: string; weak: number; resist: number }>()
+  const tally = new Map<number, { name: string; weak: number; resist: number; immune: number }>()
   for (const member of members) {
     for (const row of defensiveChart(member.typeIds, member.abilityId ?? null, generation)) {
-      const entry = tally.get(row.type.id) ?? { name: row.type.name, weak: 0, resist: 0 }
+      const entry = tally.get(row.type.id) ?? { name: row.type.name, weak: 0, resist: 0, immune: 0 }
+      /* Three exclusive buckets, in order: 0 is an immunity and must not also
+         land in `resist`, which is what `multiplier < 1` on its own did. */
       if (row.multiplier > 1) entry.weak += 1
-      if (row.multiplier < 1) entry.resist += 1
+      else if (row.multiplier === 0) entry.immune += 1
+      else if (row.multiplier < 1) entry.resist += 1
       tally.set(row.type.id, entry)
     }
   }
 
   const rows = [...tally.entries()]
     .map(([id, e]) => ({ id, ...e }))
-    .filter((r) => r.weak > 0)
-    .sort((a, b) => b.weak - a.weak || a.name.localeCompare(b.name))
+    .filter((r) => r.weak > 0 || r.immune > 0)
+    /* Worst first, then best first among the rest: a row with no weakness is
+       here for its immunities, so more of them is more worth reading. */
+    .sort((a, b) => b.weak - a.weak || b.immune - a.immune || a.name.localeCompare(b.name))
 
   return (
     <div className="tb-matchup" data-testid="tb-matchup-team">
       <p className="tb-matchup-title">Team coverage · {members.length} members</p>
       {rows.length === 0 ? (
-        <span className="tb-matchup-empty">Nothing on this team is weak to anything.</span>
+        <span className="tb-matchup-empty">
+          Nothing on this team is weak to anything, and nothing is immune to anything either.
+        </span>
       ) : (
         <table className="tb-matchup-table">
           <thead>
@@ -228,6 +254,7 @@ export function TeamMatchup({
               <th>Type</th>
               <th>Weak</th>
               <th>Resist</th>
+              <th>Immune</th>
             </tr>
           </thead>
           <tbody>
@@ -242,6 +269,7 @@ export function TeamMatchup({
                   {row.weak}
                 </td>
                 <td className="num">{row.resist}</td>
+                <td className="num">{row.immune}</td>
               </tr>
             ))}
           </tbody>

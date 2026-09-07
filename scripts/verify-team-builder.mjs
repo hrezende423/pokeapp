@@ -2245,29 +2245,59 @@ try {
   await page.click('[data-testid="tb-team-t1-coverage"]')
   await page.waitForSelector('[data-testid="tb-matchup-team"]')
   await page.waitForTimeout(300)
-  const teamTally = await page.$$eval('[data-testid="tb-matchup-team"] tbody tr', (rows) =>
-    Object.fromEntries(
-      rows.map((r) => {
-        const c = [...r.children].map((x) => x.textContent.trim())
-        return [c[0].toLowerCase(), { weak: Number(c[1]), resist: Number(c[2]) }]
-      }),
-    ),
-  )
+  const teamTable = await page.evaluate(() => {
+    const scope = document.querySelector('[data-testid="tb-matchup-team"]')
+    return {
+      heads: [...scope.querySelectorAll('th')].map((e) => e.textContent.trim()),
+      tally: Object.fromEntries(
+        [...scope.querySelectorAll('tbody tr')].map((r) => {
+          const c = [...r.children].map((x) => x.textContent.trim())
+          return [c[0].toLowerCase(), { weak: +c[1], resist: +c[2], immune: +c[3] }]
+        }),
+      ),
+    }
+  })
+  const teamTally = teamTable.tally
   log(`  team tally: ${JSON.stringify(teamTally)}`)
   check(
     "the Team Library's own coverage table counts Levitate and dual types, not raw chart rows",
-    /* Weak: Magnezone and Heatran, both 4x. Resist: Heracross at 0.5x plus
-       Zapdos and Bronzong at 0x. Read raw, Bronzong would be a fourth weakness
-       and Zapdos a fifth -- weak 4, resist 1. */
-    teamTally.ground?.weak === 2 && teamTally.ground?.resist === 3,
+    /* Weak: Magnezone and Heatran, both 4x. Read raw, Bronzong would be a third
+       weakness and Zapdos a fourth. */
+    teamTally.ground?.weak === 2,
+    `ground ${JSON.stringify(teamTally.ground)}`,
+  )
+  /*
+    ---- AN IMMUNITY IS NOT A RESISTANCE
+
+    The table counted `multiplier < 1` as a resistance, which swept 0x in with
+    0.5x: three of these six cannot be hit by Ground at all -- Zapdos by its
+    Flying half, Bronzong by Levitate -- and the panel said "resists it". These
+    checks are the reason the column exists, and the two above them USED to
+    assert the conflated numbers.
+  */
+  check(
+    'the table has an Immune column of its own, after Weak and Resist',
+    JSON.stringify(teamTable.heads) === JSON.stringify(['Type', 'Weak', 'Resist', 'Immune']),
+    teamTable.heads.join(' | '),
+  )
+  check(
+    'Ground: Zapdos and Bronzong are IMMUNE, and only Heracross actually resists it',
+    teamTally.ground?.immune === 2 && teamTally.ground?.resist === 1,
     `ground ${JSON.stringify(teamTally.ground)}`,
   )
   check(
-    'and Flash Fire counts as a resistance to Fire rather than a neutral hit',
-    /* Weak: Heracross, Magnezone, Bronzong. Resist: Quagsire 0.5x and Heatran
-       0x. Without the ability Heatran is 1x and counts as neither. */
-    teamTally.fire?.weak === 3 && teamTally.fire?.resist === 2,
+    'Fire: Flash Fire is an immunity, not the resistance it used to be counted as',
+    /* Weak: Heracross, Magnezone, Bronzong. Resist: Quagsire at 0.5x. Immune:
+       Heatran, which without the ability is a neutral 1x and neither. */
+    teamTally.fire?.weak === 3 && teamTally.fire?.resist === 1 && teamTally.fire?.immune === 1,
     `fire ${JSON.stringify(teamTally.fire)}`,
+  )
+  check(
+    'and a type nothing is weak to still earns a row when something is immune to it',
+    /* The old filter was `weak > 0`, so the team's best news was invisible:
+       Magnezone cannot be poisoned by anything, and the row was dropped. */
+    teamTally.poison?.weak === 0 && teamTally.poison?.immune >= 1,
+    `poison ${JSON.stringify(teamTally.poison)}`,
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)

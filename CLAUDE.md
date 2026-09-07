@@ -223,6 +223,21 @@ imperfections are already logged there deliberately.
   its bottom edge outside the frame, which is the one thing the placement is
   there to prevent.
 
+- **An immunity is never counted as a resistance.** The team's defensive table
+  (`TeamMatchup`) has three exclusive buckets — Weak, Resist, **Immune** — and
+  the immune one exists because `multiplier < 1` swept 0x in with 0.5x: a team
+  of Zapdos, Bronzong, Gengar and Aggron read "Ground: 1 weak, 3 resist" when
+  three of those members cannot be hit by Ground at all (Zapdos by its Flying
+  half, the other two by Levitate). Every immunity the per-species panel knows
+  about is counted here: both halves of a dual type, type-and-ability
+  (Bronzong's Levitate, Heatran's Flash Fire over an otherwise neutral Fire) and
+  ability-only. **A row earns its place with a weakness OR an immunity**, not a
+  weakness alone — the old `weak > 0` filter dropped the team's best news, so
+  Gengar's Normal immunity never appeared because nothing on that team happened
+  to be weak to Normal. verify-team-builder §10 asserts the three buckets off
+  the rendered table; the two checks it replaced asserted the conflated numbers,
+  which is how the bug survived a suite that was already driving this panel.
+
 - **The team's attacking coverage counts MEMBERS, and its zeros lead.**
   `TeamOffence` (`ui/TypeMatchup.tsx`) is the fourth coverage scope and the only
   one whose interesting number is a zero: "Hits hard" is how many members have a
