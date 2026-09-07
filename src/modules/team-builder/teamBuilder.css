@@ -1987,11 +1987,54 @@
 
 /* The rail member that IS the form. Marked with the module's one indicator
    colour rather than a box, and inert -- see MemberCard's rail branch. */
+/*
+  THE SLOT BEING EDITED IS OUTLINED, and `outline` is load-bearing rather than a
+  synonym for `border` here. Three reasons, all of them the same reason:
+
+  A BORDER WOULD MOVE THE CARD. It takes part in layout, so the ring appearing
+  would shift the whole rail by 2px and shift it back when the reader moved on.
+  The rail is measured against the stat table's Total row (see 8b); an outline
+  is drawn outside the box and changes nothing.
+
+  IT IS DECLARED ON EVERY CARD, transparent, and only its COLOUR changes -- so
+  the ring fades rather than snapping, which is the "smoothly outlined" part.
+  Transitioning `outline-width` from zero would grow it from the middle out.
+
+  AND IT IS NOT THE MODULE'S BANNED BOX. The no-outlined-buttons convention is
+  about controls that draw themselves as boxes; this is a selection state on the
+  one card out of six that the form is currently editing, which is precisely
+  what the reader needs to see and the one thing the rail could not say before.
+*/
+.tb-card-rail {
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  transition:
+    outline-color 140ms ease,
+    background-color 140ms ease;
+}
 .tb-card-rail[data-current='true'] {
   background: var(--surface-hover);
+  outline-color: var(--text-secondary);
 }
 .tb-card-rail[data-current='true'] .tb-rail-line:first-child {
   color: var(--text-primary);
+}
+/*
+  THE SELECTED SLOT BEFORE ANYTHING IS IN IT. Same ring, same marked
+  background, and deliberately NOT an "add member" button -- it is the slot the
+  member being built is going into, and offering to add another one there is
+  what used to abandon the member in progress.
+*/
+.tb-card-rail-blank .tb-rail-line:first-child {
+  color: var(--text-primary);
+}
+.tb-card-rail-blank .tb-card-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tb-rail-blank-icon {
+  color: var(--text-secondary);
 }
 .tb-card-rail-open[data-inert='true'] {
   cursor: default;

@@ -25,8 +25,7 @@ import { BuildForm } from './BuildForm'
 import { BuildLibrary } from './BuildLibrary'
 import { MyTeams } from './MyTeams'
 import { TeamViewer } from './TeamViewer'
-import { newBuildInit } from './buildFacts'
-import { createBuild, createTeam, deleteBuild, deleteTeam, readData } from './store'
+import { createTeam, deleteBuild, deleteTeam, readData } from './store'
 import { goTo, readTbScreen, useTbScreen, type TbScreen } from './tbNav'
 import './teamBuilder.css'
 
@@ -73,8 +72,13 @@ export function TeamBuilding() {
       return
     }
     if (nav.moduleId === 'new-build') {
-      const build = createBuild(newBuildInit(generation))
-      goTo({ kind: 'build-form', buildId: build.id, origin: { kind: 'library' } })
+      /*
+        NOTHING IS CREATED HERE ANY MORE. "New build" opens the form on a member
+        that does not exist; the form writes it when the reader does something
+        that counts as saving. Creating it up front meant every look at this
+        screen left a blank Bulbasaur in the library and consumed an id.
+      */
+      goTo({ kind: 'build-form', buildId: null, origin: { kind: 'library' }, slot: null })
       return
     }
     const root = rootScreenFor(nav.moduleId)
@@ -82,7 +86,7 @@ export function TeamBuilding() {
   }, [nav.moduleId, nav.moduleNonce, generation])
 
   /*
-    PRUNE ABANDONED DRAFTS, once, on the way in.
+    PRUNE WHAT AN EARLIER SHAPE LEFT BEHIND, once, on the way in.
 
     A draft member (Build.draft) is resolved by whichever exit the reader takes --
     but leaving through the global app nav bar is not an exit this module owns,
@@ -107,6 +111,14 @@ export function TeamBuilding() {
     pruned.current = true
     const live = readTbScreen()
     const open = live.kind === 'build-form' ? live.buildId : null
+    /*
+      `Build.draft` IS LEGACY. Nothing creates one now -- an unsaved member
+      lives in the form's own state and reaches storage only when it is saved --
+      so any that turn up were written by the earlier shape and are invisible
+      everywhere (filtered out of the library, in no team). They are collected
+      here rather than migrated, because a draft is by definition a build
+      nobody finished.
+    */
     for (const build of readData().builds) {
       if (build.draft && build.id !== open) deleteBuild(build.id)
     }
@@ -140,7 +152,16 @@ export function TeamBuilding() {
           <BuildLibrary generation={generation} pickFor={screen.pickFor} />
         )}
         {screen.kind === 'build-form' && (
-          <BuildForm buildId={screen.buildId} origin={screen.origin} generation={generation} />
+          /* SLOT AND SEED TRAVEL TOO. Dropping them here is not a cosmetic
+             omission: without the slot a new member is saved into the library
+             and its team is left empty, which is the whole bug. */
+          <BuildForm
+            buildId={screen.buildId}
+            origin={screen.origin}
+            generation={generation}
+            slot={screen.slot}
+            seed={screen.seed}
+          />
         )}
       </ScrollArea>
     </div>

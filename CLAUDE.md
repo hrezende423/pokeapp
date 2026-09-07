@@ -146,17 +146,16 @@ change here needs a request, not a justification. Read the deferred-debt
 section below before deciding something on this list is a bug: the known
 imperfections are already logged there deliberately.
 
-- **Team Building — Build Form** (`src/modules/team-builder/BuildForm.tsx`
-  and its `.tb-form-*`, `.tb-identity*`, `.tb-rail*` and `.tb-card-rail*`
-  rules in `teamBuilder.css`). Frozen at the right-rail density pass. This
-  screen took several rounds of layout review and every number in it was
-  measured against something — the rail's 17px leading, the spread's 0.82
-  of the label token, the 16px badge, the six cards ending level with the
-  stat table's Total row. Do not re-tune them as a drive-by, and do not
-  "fix" the Gen 1 rail overhang or the Build-Form-only save model; both are
-  logged below as deliberate. Touch it only for a fix that is asked for,
-  or where a change elsewhere genuinely cannot land without it — and say so
-  when that happens rather than quietly widening scope.
+- **Team Building — Build Form's LAYOUT** (`.tb-form-*`, `.tb-identity*`,
+  `.tb-rail*` and `.tb-card-rail*` in `teamBuilder.css`). Frozen at the
+  right-rail density pass. Every number in it was measured against
+  something — the rail's 17px leading, the spread's 0.82 of the label
+  token, the 16px badge, the six cards ending level with the stat table's
+  Total row. Do not re-tune them as a drive-by, and do not "fix" the Gen 1
+  rail overhang; it is logged below as deliberate.
+
+  Its BEHAVIOUR was reopened after the freeze, on request, and rebuilt —
+  see "the unsaved member" below. The layout freeze still stands.
 
 ## Verification discipline
 
@@ -310,23 +309,65 @@ the reason is usually that the cheap fix is the wrong one.
   Team-Building-local version of that.**
 - **Build Form does not autosave; every other screen does.** This is deliberate
   and is not an inconsistency to "fix". Build Form holds field edits in local
-  state and writes them only at a transition — switching rail member, adding
-  one, duplicating, adding to a team, going back, or leaving by the app bar.
-  My Teams, Team Viewer and Build Library all still commit on blur. The one
-  prompt on a Build Form transition is the shared-build question (2+ teams);
-  everything else commits silently. Reset and Delete are the two actions that
-  deliberately do NOT commit first.
+  state and writes them only at a transition — going back, duplicating, adding
+  to a team, answering a rail prompt, or leaving by the app bar. My Teams, Team
+  Viewer and Build Library all still commit on blur. Reset and Delete are the
+  two actions that deliberately do NOT commit first.
 
-- **An untouched draft member abandoned through the GLOBAL app nav bar lingers
-  until the module is next entered.** A new team member is a draft (`Build.draft`)
-  and holds no slot until it is kept; every exit Team Building owns resolves it,
-  but the app bar is not one of those, and the Build Form cannot delete it from
-  its unmount cleanup because that cleanup also runs on StrictMode's simulated
-  unmount — which destroyed the draft the instant it was created. So the shell
-  prunes on mount instead. The lingering draft is invisible (not in the library,
-  not in a team) and costs a few bytes of localStorage. A real fix is the same
-  cross-module navigation guard the entry above wants; **do not build a
-  Team-Building-local version of it.**
+  **THE RAIL ASKS; everything else commits silently.** Clicking another member
+  offers save-first or discard; clicking the "+" adds a third answer, move the
+  edit to the new member; clicking the slot you are already on offers to revert,
+  and is not even a control when there is nothing to revert. A build two or more
+  teams use keeps its own three-way prompt instead of any of those, because it
+  is a superset of them and it carries the warning about how far a save reaches.
+
+## The unsaved member
+
+`Build.draft` IS LEGACY. Nothing writes it; the shell prunes any it finds.
+
+A member that does not exist yet is **a value in the Build Form's state plus
+the rail SLOT it is destined for** (`buildId: null` + `slot` in `tbNav`). The
+build and its slot assignment are written **together**, by `persist`, at the
+first save point — or never. This is not a refactor for its own sake; the
+previous shape (create the record up front, flag it `draft`, place it by a
+later "keep it?" answer) failed in four ways that were all reported at once:
+
+- when that question was removed, **nothing placed it** — filling the form and
+  pressing "Back to team" put the build in the library and returned to a team
+  that was still empty;
+- the id was consumed up front, so **the numbering drifted**;
+- the slot being filled read as free, so the rail drew an "add member" button
+  on it — **the same question the reader had just answered** — and answering it
+  again abandoned the member in progress;
+- and if that member was still untouched it was deleted underneath the open
+  form, which is where **"this build no longer exists" mid-build** came from.
+
+Rules that must not be re-derived:
+
+- **The slot and the record are one write.** Never save one without the other.
+- **The slot being edited is never an "add" affordance.** `railAddSlot` skips it.
+- **A slot holding an id nothing resolves to is an EMPTY slot** (`slotIsFree`).
+  Team Viewer always treated it that way; the rail did not, and skipped it.
+- **`slot` and `seed` must be threaded through the shell.** `TeamBuilding` drops
+  them on the floor if you forget, and the symptom is a member saved into the
+  library with its team left empty — the original bug, exactly.
+- **One build cannot be in two slots of one team.** The picker hides builds
+  already on the target team and "add to other team" disables such a team. Two
+  identical ids in one team's slots is not a cosmetic duplicate: React reports
+  a duplicate key, the coverage panels count that Pokemon twice, "remove from
+  this team" clears only the first slot, and it does not register as a shared
+  build — sharing counts teams, not slots — so editing changes both with no
+  prompt.
+
+- **A build from one generation can be placed on a team of another.** The
+  picker offers every build whatever the team's generation, so a Gen 3 build
+  with a nature, an ability and a held item can sit on a Gen 1 team, and the
+  team then renders cards with two different `data-generation` values. Every
+  field is still gated on the BUILD's own generation, so nothing renders a
+  mechanic that did not exist — the team is simply not a legal team for its
+  era. Left alone because the fix is a product decision, not a bug fix: hide
+  mismatched builds from the picker, warn and allow, or offer to convert. Ask
+  before picking one.
 
 - **Three defensive abilities are deliberately not modelled**, all in
   `src/modules/team-builder/typeDefence.ts`: Filter and Solid Rock (0.75x on
@@ -348,6 +389,15 @@ the reason is usually that the cheap fix is the wrong one.
   percentage-height trick either inflates the row or collapses the rail). Do
   NOT hardcode a per-generation card height -- it would drift the moment the
   leading changes. Nothing is clipped or unreachable either way.
+
+- **`.tb`'s `data-generation` is the APP's generation, not the open build's.**
+  Opening a Gen 3 build while the app is set to Gen 4 gives a module wrapper
+  that says 4 and a form whose fields are all correctly gated on 3. Nothing
+  user-facing reads the attribute — the era gates read `build.generation` — but
+  anything that styles or tests off the wrapper is reading the wrong number.
+  Same class: a card whose species is not in the data bundle renders
+  `.tb-card-missing`, which carries no `data-tb="member-card"`, so a selector
+  counting members silently misses it.
 
 - **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
   one species whose HP does not follow the normal formula — it is always 1,

@@ -41,7 +41,7 @@ import { usePrompt } from './ui/usePrompt'
 import { MemberCard } from './ui/MemberCard'
 import { TeamMatchup } from './ui/TypeMatchup'
 import { buildSpecies, typeIdsFor } from './buildFacts'
-import { orderedTeams, uiId, type Build, type Team } from './model'
+import { listedTeams, uiId, type Build, type Team } from './model'
 import { createTeam, deleteTeam, duplicateTeam, updateTeam, useTeamBuilderData } from './store'
 
 export function MyTeams({ generation }: { generation: number }) {
@@ -59,7 +59,7 @@ export function MyTeams({ generation }: { generation: number }) {
     Creation order is the numbering order, and since there is no team name it is
     also the only sort there is data for.
   */
-  const teams = orderedTeams(data).filter((t) => t.memberIds.some((m) => m != null))
+  const teams = listedTeams(data)
 
   const deleteSelected = () => {
     const ids = [...bulk.selected]

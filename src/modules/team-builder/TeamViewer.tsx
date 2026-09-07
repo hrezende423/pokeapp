@@ -37,10 +37,9 @@ import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
 import { EmptySlot, MemberCard } from './ui/MemberCard'
 import { SpeciesMatchup, TeamMatchup } from './ui/TypeMatchup'
-import { buildSpecies, newBuildInit, typeIdsFor } from './buildFacts'
+import { buildSpecies, typeIdsFor } from './buildFacts'
 import { TEAM_SIZE, teamUiId, type Build, type Team } from './model'
 import {
-  createBuild,
   deleteTeam,
   duplicateTeam,
   reorderTeam,
@@ -97,17 +96,23 @@ export function TeamViewer({ teamId }: { teamId: string }) {
     )
 
   /*
-    NO `setTeamMember` HERE ANY MORE. The new build is a draft: it opens in the
-    form with no slot, and the form is where it either earns one or is thrown
-    away. Writing it into the slot up front is what used to leave a blank
-    Bulbasaur behind whenever someone changed their mind.
+    NOTHING IS CREATED, AND NOTHING IS RESERVED. The form opens on a member that
+    does not exist, holding the slot it is destined for; it writes the build and
+    fills the slot together, at the first thing that counts as saving.
 
-    The slot is no longer an argument because the draft does not go anywhere
-    yet -- the first empty slot at KEEP time is the one it takes.
+    THE SLOT TRAVELS WITH IT, which is the part that was broken. It used to open
+    a `draft` build with no slot at all and rely on a later "keep it?" answer to
+    place it -- and when that question was removed, nothing placed it: filling
+    the form and pressing "Back to team" promoted the build into the library and
+    returned to a team that was still empty.
   */
   const buildNew = () => {
-    const build = createBuild({ ...newBuildInit(team.generation), draft: true })
-    goTo({ kind: 'build-form', buildId: build.id, origin: { kind: 'team', teamId: team.id } })
+    goTo({
+      kind: 'build-form',
+      buildId: null,
+      origin: { kind: 'team', teamId: team.id },
+      slot: firstOpen,
+    })
   }
 
   const onDrop = (to: number) => {

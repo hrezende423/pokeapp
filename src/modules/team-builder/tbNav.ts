@@ -18,6 +18,7 @@
  */
 
 import { useSyncExternalStore } from 'react'
+import type { Build } from './model'
 
 /** Where a Build Form was opened from: decides its back path and its right rail. */
 export type BuildOrigin = { kind: 'team'; teamId: string } | { kind: 'library' }
@@ -33,7 +34,32 @@ export type TbScreen =
     where it was going and hand the reader back to the team.
   */
   | { kind: 'build-library'; pickFor?: { teamId: string; slot: number } }
-  | { kind: 'build-form'; buildId: string; origin: BuildOrigin }
+  /*
+    THE FORM'S TARGET IS NOT ALWAYS A RECORD.
+
+    `buildId: null` means "a member that does not exist yet" -- nothing has
+    been written and nothing will be until the reader does something that
+    counts as saving. This replaced creating the build up front and flagging it
+    `draft`, which had three separate failure modes: the record existed in
+    storage before a single field was filled, an exit that did not resolve it
+    left an orphan, and the id it consumed pushed every later number along.
+
+    `slot` is the rail slot the form occupies. It has to be carried rather than
+    derived, because a member that is not in the store cannot be found in a
+    team's slot array -- and the rail still has to show it in its place while
+    it is being built.
+
+    `seed` opens a new member with values that came from somewhere else: the
+    "move my changes to the new member" answer, which puts the edit in the next
+    slot and leaves the member it came from as it was.
+  */
+  | {
+      kind: 'build-form'
+      buildId: string | null
+      origin: BuildOrigin
+      slot?: number | null
+      seed?: Omit<Build, 'id'> | null
+    }
 
 const INITIAL: TbScreen = { kind: 'my-teams' }
 

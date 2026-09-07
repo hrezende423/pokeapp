@@ -18,7 +18,7 @@ import { MemberCard } from './MemberCard'
 import { Modal } from './Overlay'
 import { ConfirmPrompt } from './ConfirmPrompt'
 import { usePrompt } from './usePrompt'
-import { TEAM_SIZE, orderedTeams, uiId, type Build } from '../model'
+import { TEAM_SIZE, orderedTeams, teamUiId, type Build } from '../model'
 import { setTeamMember, useTeamBuilderData } from '../store'
 
 export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose: () => void }) {
@@ -28,8 +28,7 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
 
   const buildById = new Map(data.builds.map((b) => [b.id, b]))
   const teams = orderedTeams(data)
-  const teamIndex = teamId == null ? -1 : teams.findIndex((t) => t.id === teamId)
-  const team = teamIndex < 0 ? null : teams[teamIndex]
+  const team = teamId == null ? null : (teams.find((t) => t.id === teamId) ?? null)
 
   /*
     THE FIRST EMPTY SLOT, or -1 when the team is full. Only that one gets an
@@ -39,6 +38,10 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
   */
   const firstEmpty = team ? team.memberIds.findIndex((m) => m == null) : -1
   const isFull = team != null && firstEmpty === -1
+  /* THE SAME GUARD THE PICKER NEEDS: a build already on a team must not be
+     added to it again. See BuildLibrary for what two identical ids in one
+     team's slots actually break. */
+  const alreadyOn = (t: { memberIds: (string | null)[] }) => t.memberIds.includes(buildId)
 
   const place = (slot: number) => {
     if (!team) return
@@ -52,11 +55,14 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
         /* A full team offers no empty slot, so the only thing left to do on
            this screen is pick who goes. The title says so rather than leaving
            the reader to work it out from six occupied cards. */
+        /* `teamUiId`, not `uiId(teamIndex)`. The index is into `orderedTeams`,
+           which counts the empty teams the library does not list -- so this
+           title could say #002 for the team the library calls #001. */
         title={
           isFull
             ? 'Chose a member to replace'
             : team
-              ? `Add to team ${uiId(teamIndex)}`
+              ? `Add to team ${teamUiId(data, team.id)}`
               : 'Add to team'
         }
         onClose={onClose}
@@ -69,26 +75,33 @@ export function AddToTeamModal({ buildId, onClose }: { buildId: string; onClose:
           ) : (
             /* Step 1: the My Teams list, scoped down to a picker. */
             <div className="tb-picker-list" data-testid="tb-add-to-team-teams">
-              {teams.map((t, i) => {
+              {teams.map((t) => {
                 const members = t.memberIds
                   .map((id) => (id == null ? null : (buildById.get(id) ?? null)))
                   .filter((b): b is Build => b != null)
+                const has = alreadyOn(t)
                 return (
                   <button
                     key={t.id}
                     type="button"
                     className="tb-picker-row"
                     data-testid={`tb-add-to-team-${t.id}`}
+                    /* SHOWN AND DISABLED here, rather than hidden as in the
+                       library. A list of teams is short and each row is
+                       identifiable, so "this one already has it" is more use
+                       than a team quietly missing from the list. */
+                    disabled={has}
+                    data-already-on={has ? 'true' : undefined}
                     onClick={() => setTeamId(t.id)}
                   >
-                    <span className="tb-team-id num">{uiId(i)}</span>
+                    <span className="tb-team-id num">{teamUiId(data, t.id)}</span>
                     <span className="tb-picker-members">
                       {members.map((m) => (
                         <MemberCard key={m.id} build={m} variant="compact" />
                       ))}
                     </span>
                     <span className="tb-picker-count num">
-                      {members.length} / {TEAM_SIZE}
+                      {has ? 'already on' : `${members.length} / ${TEAM_SIZE}`}
                     </span>
                   </button>
                 )

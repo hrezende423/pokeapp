@@ -161,13 +161,42 @@ export function orderedTeams(data: TeamBuilderData): Team[] {
   return [...data.teams].sort((a, b) => a.seq - b.seq)
 }
 
+/**
+ * The teams that EXIST as far as the reader is concerned.
+ *
+ * An empty team is the moment between "New team" and choosing the first
+ * member. The Team Library does not list one, so it must not be counted when
+ * numbering either -- and that was a real bug: every abandoned attempt left an
+ * invisible team behind, and the next one you started called itself #002, #003,
+ * #004 while the library still showed one team. `teamUiId` counts against this
+ * list rather than against `data.teams`.
+ */
+export function listedTeams(data: TeamBuilderData): Team[] {
+  return orderedTeams(data).filter((t) => t.memberIds.some((m) => m != null))
+}
+
 /** Builds in creation order. Drafts are not builds yet, so they are not numbered. */
 export function orderedBuilds(data: TeamBuilderData): Build[] {
   return data.builds.filter((b) => !b.draft)
 }
 
+/**
+ * The "#001" for a team, INCLUDING one that is not in the library yet.
+ *
+ * A team being filled for the first time is still empty, so it is not in
+ * `listedTeams` and has no position in it -- but it is on screen and has to
+ * show a number, and it has to be the number it will still have once its first
+ * member lands. That is the count of listed teams ahead of it, which is what
+ * the fallback computes. Showing `#---` there, or numbering against every team
+ * including the invisible ones, are the two ways this has been wrong.
+ */
 export function teamUiId(data: TeamBuilderData, teamId: string): string {
-  return uiId(orderedTeams(data).findIndex((t) => t.id === teamId))
+  const listed = listedTeams(data)
+  const index = listed.findIndex((t) => t.id === teamId)
+  if (index >= 0) return uiId(index)
+  const team = data.teams.find((t) => t.id === teamId)
+  if (!team) return uiId(-1)
+  return uiId(listed.filter((t) => t.seq < team.seq).length)
 }
 
 export function buildUiId(data: TeamBuilderData, buildId: string): string {

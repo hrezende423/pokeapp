@@ -746,7 +746,15 @@ try {
     `stored nickname is "${afterGlobalNav}"`,
   )
 
-  // ---- adding a member from the rail saves the build you were on
+  /*
+    ---- adding a member from the rail ASKS, it no longer commits silently
+
+    THIS CHECK USED TO ASSERT THE OPPOSITE, and the reversal was requested: the
+    rail is where the reader chooses what happens to an edit, because the edit
+    could go to the member they are leaving, be thrown away, or -- when the
+    destination is an empty slot -- follow them to the new member. Silently
+    saving picked one of those three for them.
+  */
   await seedStore({
     nextBuildSeq: 3,
     nextTeamSeq: 2,
@@ -758,9 +766,18 @@ try {
   await page.click('[data-testid="tb-level"]')
   await page.waitForTimeout(300)
   await page.click('[data-testid="tb-rail-add"]')
+  await page.waitForSelector('[data-testid="tb-rail-add-modal"]')
+  await page.click('[data-testid="tb-rail-add-new"]')
+  await page.waitForSelector('[data-testid="tb-rail-switch-prompt"]')
+  check(
+    'adding a member from the right rail asks what happens to the edit rather than deciding',
+    (await nickOf('b1')) === 'Original',
+    `stored nickname is still "${await nickOf('b1')}"`,
+  )
+  await page.click('[data-testid="tb-rail-switch-save"]')
   await page.waitForTimeout(700)
   check(
-    'adding a member from the right rail saves the build you were editing',
+    'and "Save this member first" is what writes it',
     (await nickOf('b1')) === 'SavedByAdd',
     `stored nickname is "${await nickOf('b1')}"`,
   )
@@ -1599,10 +1616,16 @@ try {
   )
 
   /*
-    ---- UC3 + UC6: switching member commits silently, and only when needed
+    ---- UC3: an edit is form state until the reader says where it goes
 
     THE EDIT IS MADE AND THEN LEFT ALONE. No blur handler, no timer, nothing --
-    the point is that it is STILL uncommitted right up until the rail click.
+    the point is that it is STILL uncommitted right up until the rail click, and
+    that the rail click ASKS rather than choosing for the reader.
+
+    THIS REPLACES A CHECK THAT ASSERTED THE OPPOSITE. "Commit silently on any
+    transition" was the previous rule and it was reversed on request: an edit
+    made on one member and abandoned by clicking another was saved without
+    anyone deciding it should be.
   */
   await seedStore(twoMemberTeam())
   await openTeamMember(0)
@@ -1614,16 +1637,54 @@ try {
     `stored nickname is "${midEdit}"`,
   )
   await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
-  await page.waitForTimeout(700)
-  const switched = await formBuildId()
-  const promptsShown = (await page.$$('[data-testid="tb-shared-prompt"]')).length
+  await page.waitForSelector('[data-testid="tb-rail-switch-prompt"]')
+  const switchAnswers = await page.$$eval(
+    '[data-testid="tb-rail-switch-prompt"] .tb-prompt-actions button',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
   check(
-    "UC3: clicking another member commits the edit silently and loads that member's real data",
-    (await nickOfBuild('b1')) === 'EditedA' && switched === 'b2' && promptsShown === 0,
-    `stored="${await nickOfBuild('b1')}" form=${switched} prompts=${promptsShown}`,
+    'UC3: clicking another member asks what happens to the edit, and BLOCKS until answered',
+    (await formBuildId()) === 'b1' && (await nickOfBuild('b1')) === '',
+    `form=${await formBuildId()} stored="${await nickOfBuild('b1')}"`,
+  )
+  check(
+    'UC3: two answers for another MEMBER — there is no new member for the edit to move to',
+    switchAnswers.length === 2 &&
+      /Save this member first/i.test(switchAnswers[0]) &&
+      /Discard the changes/i.test(switchAnswers[1]),
+    switchAnswers.join(' | '),
+  )
+  await page.click('[data-testid="tb-rail-switch-save"]')
+  await page.waitForTimeout(700)
+  check(
+    'UC3: "Save this member first" writes it and then loads the other member',
+    (await nickOfBuild('b1')) === 'EditedA' && (await formBuildId()) === 'b2',
+    `stored="${await nickOfBuild('b1')}" form=${await formBuildId()}`,
   )
 
-  // ---- UC4: clicking the member already open does nothing at all
+  // ---- and "Discard the changes" leaves the record exactly as it was
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await typeNickname('Thrown')
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
+  await page.waitForSelector('[data-testid="tb-rail-switch-prompt"]')
+  await page.click('[data-testid="tb-rail-switch-discard"]')
+  await page.waitForTimeout(700)
+  check(
+    'UC3: "Discard the changes" moves on and leaves the record untouched',
+    (await nickOfBuild('b1')) === '' && (await formBuildId()) === 'b2',
+    `stored="${await nickOfBuild('b1')}" form=${await formBuildId()}`,
+  )
+
+  /*
+    ---- UC4: the current slot is inert when clean, and the way back when dirty
+
+    THE REVERSAL HERE WAS REQUESTED TOO. Clicking the card you are already on
+    used to be a hard no-op in both states. It still is when there is nothing
+    outstanding -- and it is not even a control then, so it cannot be otherwise
+    -- but with an edit pending it is the only affordance that can undo it,
+    which is what it now does.
+  */
   const beforeNoop = JSON.stringify(await readStore())
   const inertTag = await page.evaluate(
     () =>
@@ -1632,18 +1693,46 @@ try {
   await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
   await page.waitForTimeout(500)
   check(
-    'UC4: the open member is inert — a <span>, not a button, and clicking changes nothing',
+    'UC4: with nothing pending the open member is inert — a <span>, not a button, and changes nothing',
     inertTag === 'SPAN' &&
       (await formBuildId()) === 'b2' &&
       JSON.stringify(await readStore()) === beforeNoop,
     `tag=${inertTag} form=${await formBuildId()}`,
   )
+  await typeNickname('Revertible')
+  const dirtyTag = await page.evaluate(
+    () =>
+      document.querySelector('[data-testid="tb-rail-b2"] .tb-card-rail-open')?.tagName ?? 'ABSENT',
+  )
+  check(
+    'UC4: with an edit pending the same card BECOMES a control',
+    dirtyTag === 'BUTTON',
+    `tag=${dirtyTag}`,
+  )
+  await page.click('[data-testid="tb-rail-b2"] .tb-card-rail-open')
+  await page.waitForSelector('[data-testid="tb-rail-revert-prompt"]')
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(500)
+  const reverted = await page.evaluate(() => ({
+    field: document.querySelector('[data-testid="tb-nickname"]')?.value,
+    dirty: document.querySelectorAll('[data-testid="tb-dirty-note"]').length,
+  }))
+  check(
+    'UC4: and reverting puts the FIELD back too, not just the state behind it',
+    reverted.field === '' && reverted.dirty === 0 && (await nickOfBuild('b2')) === '',
+    JSON.stringify(reverted),
+  )
 
   /*
-    ---- UC5: the "+" commits, then asks which kind of member
+    ---- UC5: the "+" asks WHICH member first, then what happens to the edit
 
-    ONE "+", FOR THE NEXT FREE SLOT. Six of them would ask the reader to pick a
-    slot number, which is not a decision they have.
+    THAT ORDER IS FORCED. "Move the changes to the new member" is only an answer
+    once the reader has said they want a new member, so the kind has to be
+    settled before the edit's fate can be offered.
+
+    ONE "+", AND NEVER ON THE SLOT BEING EDITED. Six would ask the reader to
+    pick a slot number, which is not a decision they have -- and one on the slot
+    they are already filling re-asked a question they had just answered.
   */
   await seedStore(twoMemberTeam())
   await openTeamMember(0)
@@ -1652,8 +1741,8 @@ try {
   await page.click('[data-testid="tb-rail-add"]')
   await page.waitForSelector('[data-testid="tb-rail-add-modal"]')
   check(
-    'UC5: the rail offers exactly one "+", and it commits the pending edit before asking',
-    addButtons === 1 && (await nickOfBuild('b1')) === 'BeforeAdd',
+    'UC5: the rail offers exactly one "+", and opening it commits NOTHING',
+    addButtons === 1 && (await nickOfBuild('b1')) === '',
     `buttons=${addButtons} stored="${await nickOfBuild('b1')}"`,
   )
   const addChoices = await page.$$eval('[data-testid="tb-rail-add-modal"] .tb-ghost', (els) =>
@@ -1667,12 +1756,115 @@ try {
     addChoices.join(' | '),
   )
   await page.click('[data-testid="tb-rail-add-new"]')
-  await page.waitForTimeout(800)
-  const afterAddNew = await readStore()
+  await page.waitForSelector('[data-testid="tb-rail-switch-prompt"]')
+  const emptySlotAnswers = await page.$$eval(
+    '[data-testid="tb-rail-switch-prompt"] .tb-prompt-actions button',
+    (els) => els.map((e) => e.textContent.trim()),
+  )
   check(
-    'UC5: "build a new member" fills the slot immediately and the form now edits it',
-    slotsOf(afterAddNew) === 'b1,b2,b4,·,·,·' && (await formBuildId()) === 'b4',
-    `slots=${slotsOf(afterAddNew)} form=${await formBuildId()}`,
+    'UC5: an EMPTY slot unlocks the third answer — move the edit to the new member',
+    emptySlotAnswers.length === 3 &&
+      /Save this member first/i.test(emptySlotAnswers[0]) &&
+      /Move the changes to the new member/i.test(emptySlotAnswers[1]) &&
+      /Discard the changes/i.test(emptySlotAnswers[2]),
+    emptySlotAnswers.join(' | '),
+  )
+  await page.click('[data-testid="tb-rail-switch-move"]')
+  await page.waitForTimeout(800)
+  const movedForm = await page.evaluate(() => {
+    const form = document.querySelector('[data-testid="tb-build-form"]')
+    return {
+      saved: form?.dataset.saved,
+      slot: form?.dataset.slot,
+      nickname: document.querySelector('[data-testid="tb-nickname"]')?.value,
+    }
+  })
+  check(
+    'UC5: the edit lands on the NEW member, which is not saved yet and holds the empty slot',
+    movedForm.nickname === 'BeforeAdd' && movedForm.saved === 'false' && movedForm.slot === '2',
+    JSON.stringify(movedForm),
+  )
+  check(
+    'UC5: and the member it came from is back to what it was, with nothing written',
+    (await nickOfBuild('b1')) === '' && (await readStore()).builds.length === 3,
+    `b1="${await nickOfBuild('b1')}" builds=${(await readStore()).builds.length}`,
+  )
+
+  /*
+    ---- UC5: "build a new member" writes NOTHING until it is saved
+
+    The build and its slot are written together, at the first save point. A
+    record created up front is how the previous shape produced blank Bulbasaurs
+    in the library, and an id consumed up front is how the numbering drifted.
+  */
+  await seedStore(twoMemberTeam())
+  await openTeamMember(0)
+  await page.click('[data-testid="tb-rail-add"]')
+  await page.waitForSelector('[data-testid="tb-rail-add-modal"]')
+  await page.click('[data-testid="tb-rail-add-new"]')
+  await page.waitForTimeout(800)
+  const freshMember = await readStore()
+  const freshForm = await page.evaluate(() => {
+    const form = document.querySelector('[data-testid="tb-build-form"]')
+    return { saved: form?.dataset.saved, slot: form?.dataset.slot, id: form?.dataset.buildId }
+  })
+  check(
+    'UC5: with nothing pending it goes straight to a new member — no prompt, no record, no id used',
+    freshMember.builds.length === 3 &&
+      freshMember.nextBuildSeq === 4 &&
+      slotsOf(freshMember) === 'b1,b2,·,·,·,·' &&
+      freshForm.saved === 'false' &&
+      freshForm.slot === '2' &&
+      freshForm.id === undefined,
+    `builds=${freshMember.builds.length} seq=${freshMember.nextBuildSeq} slots=${slotsOf(freshMember)} form=${JSON.stringify(freshForm)}`,
+  )
+  const currentSlotShape = await page.evaluate(() => {
+    const marked = document.querySelector('.tb-card-rail[data-current="true"]')
+    return {
+      markedIsTheBlank: marked?.dataset.testid ?? marked?.getAttribute('data-testid'),
+      addButtonsLeft: document.querySelectorAll('[data-testid="tb-rail-add"]').length,
+    }
+  })
+  check(
+    'UC5: the slot being filled shows as the SELECTED slot, and is not an "add member" button',
+    currentSlotShape.markedIsTheBlank === 'tb-rail-current-empty' &&
+      currentSlotShape.addButtonsLeft === 1,
+    JSON.stringify(currentSlotShape),
+  )
+  /*
+    Change something the rail actually DRAWS, and watch the slot become a live
+    card of it. Asserted on the ability line rather than the nickname, because
+    a rail card shows nature / ability+level / spread and never the nickname --
+    so a nickname would have proved nothing about the preview.
+  */
+  await page.selectOption('[data-testid="tb-species"]', '25')
+  await page.waitForTimeout(400)
+  const livePreview = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="tb-rail-current"]')
+    return {
+      present: card != null,
+      lines: [...(card?.querySelectorAll('.tb-rail-line') ?? [])].map((e) => e.textContent.trim()),
+      blanksLeft: document.querySelectorAll('[data-testid="tb-rail-current-empty"]').length,
+    }
+  })
+  check(
+    'UC5: and once anything is changed the slot previews the LIVE form, still with nothing written',
+    livePreview.present &&
+      livePreview.blanksLeft === 0 &&
+      /* Pikachu's ability. The blank slot was a Bulbasaur with Overgrow. */
+      livePreview.lines.some((l) => /Static/.test(l)) &&
+      (await readStore()).builds.length === 3,
+    JSON.stringify(livePreview),
+  )
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(800)
+  const savedByBack = await readStore()
+  check(
+    'UC5: "Back to team" is what creates it, AND puts it in the slot it was holding',
+    savedByBack.builds.length === 4 &&
+      savedByBack.builds.find((b) => b.id === 'b4')?.speciesId === 25 &&
+      slotsOf(savedByBack) === 'b1,b2,b4,·,·,·',
+    `builds=${savedByBack.builds.length} slots=${slotsOf(savedByBack)}`,
   )
 
   // ---- UC5, the other branch: pick an existing build
@@ -2107,6 +2299,496 @@ try {
   check(
     'clicking anywhere in a team lane opens it, not only the chevron',
     (await page.$$('[data-testid="tb-team-viewer"]')).length === 1,
+  )
+
+  // =====================================================================
+  /*
+    12. THE NEW-MEMBER LIFECYCLE.
+
+    A MEMBER THAT DOES NOT EXIST YET is the case this module kept getting wrong,
+    in three different ways at once, and every check here is one of them:
+
+      THE NUMBER. "New team" creates the team before there is anything to put in
+      it, and an abandoned one is invisible but still in storage. Numbering
+      against every team rather than against the ones the library lists meant
+      the next attempt called itself #002, then #003, while the library still
+      showed nothing.
+
+      THE SLOT. A new member used to be created up front, flagged `draft`, and
+      placed by a later "keep it?" answer. When that question was removed
+      nothing placed it: filling the form and pressing "Back to team" put the
+      build in the library and returned to a team that was still empty. The
+      build and its slot are now written together or not at all.
+
+      THE SECOND ASK. The slot being filled read as free, so the rail drew an
+      "add member" button on it -- the same question the reader had just
+      answered. Answering it again created a second member and abandoned the
+      first, and if the first was untouched it was deleted underneath the open
+      form, which is where "this build no longer exists" came from mid-build.
+  */
+  hr('12. THE NEW-MEMBER LIFECYCLE')
+
+  const leaveModule = async () => {
+    /* Out of the module entirely, by the app bar -- an exit Team Building does
+       not own, and the one its unmount cleanup exists for. */
+    await page.hover('[data-testid="nav-tab-pokepedia"]')
+    await page.waitForSelector('[data-testid="nav-dropdown-pokepedia"]', { state: 'visible' })
+    await page.click('[data-testid="nav-dropdown-pokepedia"] button')
+    await page.waitForTimeout(900)
+  }
+  const startNewMember = async () => {
+    await goTo('new-team')
+    await page.waitForSelector('[data-testid="tb-team-viewer"]')
+    /* OFF THE NAV TAB. The dropdown stays open under the pointer after a nav
+       click and covers the top of the screen, so the first thing clicked on the
+       page below it hits the menu instead. */
+    await page.mouse.move(800, 900)
+    await page.click('[data-testid="tb-slot-0-add"]')
+    await page.click('[data-testid="tb-add-member-new"]')
+    await page.waitForSelector('[data-testid="tb-build-form"]')
+    await page.waitForTimeout(300)
+  }
+
+  // ---- the number does not drift across abandoned attempts
+  await seedStore(null)
+  const numbers = []
+  for (let i = 0; i < 3; i++) {
+    await goTo('new-team')
+    await page.waitForSelector('[data-testid="tb-team-viewer"]')
+    numbers.push((await page.textContent('[data-testid="tb-viewer-team-id"]')).trim())
+    await goTo('my-teams')
+    await page.waitForSelector('[data-testid="tb-my-teams"]')
+  }
+  log(`  team id on three consecutive new teams: ${numbers.join(' ')}`)
+  check(
+    'a new team shows the number it will KEEP, however many attempts were abandoned first',
+    JSON.stringify(numbers) === JSON.stringify(['#001', '#001', '#001']),
+    numbers.join(' '),
+  )
+
+  // ---- new team > add member > build a new member > Back to team
+  await seedStore(null)
+  await startNewMember()
+  const arrival = await page.evaluate(() => {
+    const form = document.querySelector('[data-testid="tb-build-form"]')
+    return {
+      saved: form?.dataset.saved,
+      slot: form?.dataset.slot,
+      railTeam: document.querySelector('[data-testid="tb-rail-team"]')?.textContent.trim(),
+      selectedSlot: document.querySelectorAll('[data-testid="tb-rail-current-empty"]').length,
+      addButtons: document.querySelectorAll('[data-testid="tb-rail-add"]').length,
+    }
+  })
+  log(`  on arrival: ${JSON.stringify(arrival)}`)
+  check(
+    'the form opens on a member that does not exist, holding slot 1 of a team numbered #001',
+    arrival.saved === 'false' &&
+      arrival.slot === '0' &&
+      arrival.railTeam === '#001' &&
+      arrival.selectedSlot === 1,
+    JSON.stringify(arrival),
+  )
+  check(
+    'and NOTHING has been written -- no build, no slot',
+    (await readStore()).builds.length === 0,
+    `${(await readStore()).builds.length} builds`,
+  )
+  check(
+    'the slot being filled is NOT also an "add member" button; the "+" is the NEXT slot',
+    arrival.addButtons === 1,
+    `${arrival.addButtons} add button(s)`,
+  )
+  await page.selectOption('[data-testid="tb-species"]', '25')
+  await page.waitForTimeout(400)
+  check(
+    'choosing a species previews in the rail and STILL writes nothing',
+    (await page.$$('[data-testid="tb-rail-current"]')).length === 1 &&
+      (await page.$$('[data-testid="tb-rail-current-empty"]')).length === 0 &&
+      (await readStore()).builds.length === 0,
+    `builds=${(await readStore()).builds.length}`,
+  )
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.waitForTimeout(400)
+  const backToTeam = await readStore()
+  const newMemberCount = (await page.textContent('[data-testid="tb-slot-count"]')).trim()
+  log(`  after Back to team: ${idsOf(backToTeam)} slots=${slotsOf(backToTeam)} count=${newMemberCount}`)
+  check(
+    '"Back to team" creates the build AND puts it in the team -- not one without the other',
+    backToTeam.builds.length === 1 &&
+      backToTeam.builds[0].speciesId === 25 &&
+      backToTeam.teams[0].memberIds[0] === backToTeam.builds[0].id &&
+      newMemberCount === '1 / 6',
+    `builds=${idsOf(backToTeam)} slots=${slotsOf(backToTeam)} count=${newMemberCount}`,
+  )
+
+  // ---- the app bar is a save point for a new member too
+  await seedStore(null)
+  await startNewMember()
+  await page.selectOption('[data-testid="tb-species"]', '150')
+  await page.waitForTimeout(400)
+  await leaveModule()
+  const viaAppBar = await readStore()
+  log(`  via app bar: ${idsOf(viaAppBar)} slots=${viaAppBar.teams.map((t) => t.memberIds.join(',')).join(' | ')}`)
+  check(
+    'a TOUCHED new member survives the global app nav bar, in its slot',
+    viaAppBar.builds.length === 1 &&
+      viaAppBar.builds[0].speciesId === 150 &&
+      viaAppBar.teams[0].memberIds[0] === viaAppBar.builds[0].id,
+    `builds=${idsOf(viaAppBar)}`,
+  )
+
+  // ---- and an untouched one leaves nothing at all
+  await seedStore(null)
+  await startNewMember()
+  await leaveModule()
+  const untouchedExit = await readStore()
+  check(
+    'an UNTOUCHED new member left the same way creates nothing -- no build, no orphan',
+    untouchedExit.builds.length === 0 && untouchedExit.nextBuildSeq === 1,
+    `builds=${untouchedExit.builds.length} seq=${untouchedExit.nextBuildSeq}`,
+  )
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.waitForTimeout(400)
+  check(
+    'and the empty team it was for is collected on the way back in',
+    (await readStore()).teams.length === 0,
+    `${(await readStore()).teams.length} teams`,
+  )
+
+  // ---- discarding the member being built
+  await seedStore(null)
+  await startNewMember()
+  await page.selectOption('[data-testid="tb-species"]', '150')
+  await page.waitForTimeout(400)
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-delete"]')
+  await page.waitForSelector('[data-testid="tb-delete-build-prompt"]')
+  const discardWording = await page.evaluate(() => ({
+    title: document
+      .querySelector('[data-testid="tb-delete-build-prompt"] .tb-modal-title')
+      ?.textContent.trim(),
+    confirm: document.querySelector('[data-testid="tb-prompt-confirm"]')?.textContent.trim(),
+  }))
+  check(
+    'Delete says DISCARD for a member that was never saved -- there is no build to delete',
+    /Discard this new member/i.test(discardWording.title ?? '') &&
+      /Discard/i.test(discardWording.confirm ?? ''),
+    JSON.stringify(discardWording),
+  )
+  await page.click('[data-testid="tb-prompt-confirm"]')
+  await page.waitForTimeout(600)
+  check(
+    'and it returns to the team rather than showing an empty form for a build that never existed',
+    (await page.$$('[data-testid="tb-team-viewer"]')).length === 1 &&
+      (await readStore()).builds.length === 0 &&
+      (await page.$$('[data-testid="tb-build-form-empty-note"]')).length === 0,
+    `builds=${(await readStore()).builds.length}`,
+  )
+
+  /*
+    ---- UC2 for an UNSAVED build: start a team from the rail
+
+    The build is still not written. The team is created, the form takes slot 1
+    of it, and the edit in progress starts previewing there -- so the reader can
+    see the team forming while nothing has been committed to the library.
+  */
+  await seedStore(null)
+  await goTo('new-build')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(400)
+  const looseNew = await page.evaluate(() => ({
+    saved: document.querySelector('[data-testid="tb-build-form"]')?.dataset.saved,
+    railState: document.querySelector('[data-testid="tb-rail"]')?.dataset.state,
+    cards: document.querySelectorAll('.tb-card-rail').length,
+    startTeam: document.querySelectorAll('[data-testid="tb-rail-create-team"]').length,
+  }))
+  /* NULL, not an empty document: "New build" does not touch localStorage at
+     all, so the key the seed removed is still absent. */
+  const looseDoc = await readStore()
+  check(
+    'UC1: "New build" writes nothing and its rail shows no member info at all',
+    looseNew.saved === 'false' &&
+      looseNew.railState === 'loose' &&
+      looseNew.cards === 0 &&
+      looseNew.startTeam === 1 &&
+      (looseDoc?.builds?.length ?? 0) === 0,
+    `${JSON.stringify(looseNew)} doc=${looseDoc === null ? 'absent' : looseDoc.builds.length}`,
+  )
+  await page.selectOption('[data-testid="tb-species"]', '143')
+  await page.waitForTimeout(400)
+  await page.click('[data-testid="tb-rail-create-team"]')
+  await page.waitForTimeout(700)
+  const afterStartTeam = await readStore()
+  const previewing = await page.evaluate(() => ({
+    railState: document.querySelector('[data-testid="tb-rail"]')?.dataset.state,
+    saved: document.querySelector('[data-testid="tb-build-form"]')?.dataset.saved,
+    slot: document.querySelector('[data-testid="tb-build-form"]')?.dataset.slot,
+    current: document.querySelectorAll('.tb-card-rail[data-current="true"]').length,
+  }))
+  check(
+    'UC2: starting a team from an unsaved build previews it in the rail, still without saving it',
+    previewing.railState === 'attached' &&
+      previewing.saved === 'false' &&
+      previewing.slot === '0' &&
+      previewing.current === 1 &&
+      afterStartTeam.builds.length === 0 &&
+      afterStartTeam.teams.length === 1,
+    `${JSON.stringify(previewing)} builds=${afterStartTeam.builds.length}`,
+  )
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(700)
+  const finallySaved = await readStore()
+  check(
+    'UC2: and leaving is what writes both the build and its slot',
+    finallySaved.builds.length === 1 &&
+      finallySaved.builds[0].speciesId === 143 &&
+      finallySaved.teams[0].memberIds[0] === finallySaved.builds[0].id,
+    `builds=${idsOf(finallySaved)} slots=${finallySaved.teams[0].memberIds.join(',')}`,
+  )
+
+  // ---- deleting the member the form is ON, from the rail
+  await seedStore({
+    nextBuildSeq: 3,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1'), mkBuild('b2', { speciesId: 4, pokemonId: 4 })],
+    teams: [mkTeam('t1', 1, ['b1', 'b2'])],
+  })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(400)
+  await page.hover('[data-testid="tb-rail-b1"]')
+  await page.click('[data-testid="tb-rail-b1-delete"]')
+  await page.waitForSelector('[data-testid="tb-rail-remove-prompt"]')
+  await page.click('[data-testid="tb-rail-remove-delete"]')
+  await page.waitForTimeout(600)
+  const selfDelete = await page.evaluate(() => ({
+    state: document.querySelector('[data-testid="tb-build-form"]')?.dataset.state,
+    note: document.querySelector('[data-testid="tb-build-form-empty-note"]')?.textContent.trim(),
+  }))
+  check(
+    'deleting the member the form is ON reads as a deliberate delete, not "this build no longer exists"',
+    selfDelete.state === 'deleted' &&
+      /Build deleted/i.test(selfDelete.note ?? '') &&
+      idsOf(await readStore()) === 'b2',
+    `${JSON.stringify(selfDelete)} builds=${idsOf(await readStore())}`,
+  )
+
+  // ---- a full team has nothing to add
+  await seedStore({
+    nextBuildSeq: 7,
+    nextTeamSeq: 2,
+    builds: [1, 2, 3, 4, 5, 6].map((n) => mkBuild(`b${n}`, { speciesId: n, pokemonId: n })),
+    teams: [mkTeam('t1', 1, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'])],
+  })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(400)
+  const fullRail = await page.evaluate(() => ({
+    cards: document.querySelectorAll('.tb-card-rail').length,
+    add: document.querySelectorAll('[data-testid="tb-rail-add"]').length,
+    current: document.querySelectorAll('.tb-card-rail[data-current="true"]').length,
+  }))
+  check(
+    'a full team draws six cards, exactly one of them marked, and no "+" anywhere',
+    fullRail.cards === 6 && fullRail.add === 0 && fullRail.current === 1,
+    JSON.stringify(fullRail),
+  )
+
+  /*
+    ---- ONE BUILD CANNOT BE IN TWO SLOTS OF THE SAME TEAM
+
+    Found by driving the picker rather than by reading it, and it was not a
+    cosmetic duplicate. React reported two children with the same key -- which
+    it documents as unsupported and free to duplicate or omit children -- the
+    coverage panels counted that Pokemon twice so a team's weaknesses were
+    computed against a team it did not have, "remove from this team" cleared the
+    first matching slot only and left the other unreachable, and it did NOT
+    register as a shared build, because sharing counts teams and not slots, so
+    editing it changed both slots with no prompt.
+
+    BOTH ROUTES ARE COVERED, because there are two: the library in pick mode,
+    and the form's own "add to other team".
+  */
+  await seedStore({
+    nextBuildSeq: 3,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1'), mkBuild('b2', { speciesId: 4, pokemonId: 4 })],
+    teams: [mkTeam('t1', 1, ['b1'])],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.click('[data-testid="tb-slot-1-add"]')
+  await page.click('[data-testid="tb-add-member-existing"]')
+  await page.waitForTimeout(600)
+  const pickerOffers = await page.evaluate(() => ({
+    offered: [...document.querySelectorAll('[data-tb="member-card"]')].map((e) => e.dataset.buildId),
+    note: document.querySelector('[data-testid="tb-pick-note"]')?.textContent.replace(/\s+/g, ' ').trim(),
+  }))
+  log(`  picker: ${JSON.stringify(pickerOffers)}`)
+  check(
+    'the picker hides builds already on the team it is filling, and says how many',
+    JSON.stringify(pickerOffers.offered) === JSON.stringify(['b2']) &&
+      /1 already on it is hidden/.test(pickerOffers.note ?? ''),
+    JSON.stringify(pickerOffers),
+  )
+  await page.click('[data-testid="tb-pick-cancel"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+
+  // ---- and the same guard on the form's own route
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(400)
+  await page.hover('[data-testid="tb-build-form"]')
+  await page.click('[data-testid="tb-form-add-to-team"]')
+  await page.waitForTimeout(600)
+  const addToTeamRows = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="tb-add-to-team-teams"] button')].map((r) => ({
+      disabled: r.disabled,
+      alreadyOn: r.dataset.alreadyOn ?? null,
+      says: /already on/.test(r.textContent),
+    })),
+  )
+  check(
+    '"add to other team" shows a team that already has this build as unavailable, and says why',
+    addToTeamRows.length === 1 &&
+      addToTeamRows[0].disabled &&
+      addToTeamRows[0].alreadyOn === 'true' &&
+      addToTeamRows[0].says,
+    JSON.stringify(addToTeamRows),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  /*
+    ---- and the ONE case where a picked build must still land: an empty team
+
+    The guard is "not already on THIS team", not "not on any team". A build on
+    one team is a perfectly good member of another, and forbidding that would
+    make the shared-build prompt unreachable.
+  */
+  await seedStore({
+    nextBuildSeq: 3,
+    nextTeamSeq: 3,
+    builds: [mkBuild('b1'), mkBuild('b2', { speciesId: 4, pokemonId: 4 })],
+    teams: [mkTeam('t1', 1, ['b1']), mkTeam('t2', 2, ['b2'])],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.click('[data-testid="tb-team-t2-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.click('[data-testid="tb-slot-1-add"]')
+  await page.click('[data-testid="tb-add-member-existing"]')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1"] .tb-card-open')
+  await page.waitForTimeout(700)
+  const crossTeam = await readStore()
+  check(
+    'a build already on ANOTHER team is still pickable, and becomes a shared build',
+    crossTeam.teams.find((t) => t.id === 't2')?.memberIds.slice(0, 2).join(',') === 'b2,b1',
+    crossTeam.teams.map((t) => `${t.id}:${t.memberIds.filter(Boolean).join(',')}`).join(' | '),
+  )
+
+  /*
+    ---- a slot holding an id nothing resolves to is an EMPTY slot
+
+    Team Viewer has always treated it that way -- it maps unknown ids to null
+    before rendering -- and the rail read `memberIds` raw, so it skipped the
+    slot and aimed at the next one, leaving a hole nothing could fill.
+  */
+  await seedStore({
+    nextBuildSeq: 2,
+    nextTeamSeq: 2,
+    builds: [mkBuild('b1')],
+    teams: [mkTeam('t1', 1, ['b1', 'a-build-that-is-gone'])],
+  })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(400)
+  await page.click('[data-testid="tb-rail-add"]')
+  await page.waitForSelector('[data-testid="tb-rail-add-modal"]')
+  await page.click('[data-testid="tb-rail-add-new"]')
+  await page.waitForTimeout(700)
+  const danglingSlot = await page.evaluate(
+    () => document.querySelector('[data-testid="tb-build-form"]')?.dataset.slot,
+  )
+  check(
+    'the rail aims its "+" at the dangling slot rather than stepping over it',
+    danglingSlot === '1',
+    `slot ${danglingSlot}`,
+  )
+  await page.selectOption('[data-testid="tb-species"]', '25')
+  await page.waitForTimeout(300)
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForTimeout(700)
+  const filledDangling = await readStore()
+  check(
+    'and saving REPLACES the dangling id instead of leaving a permanent hole',
+    filledDangling.teams[0].memberIds[1] === 'b2' &&
+      !filledDangling.teams[0].memberIds.includes('a-build-that-is-gone'),
+    filledDangling.teams[0].memberIds.join(','),
+  )
+
+  await seedStore({
+    nextBuildSeq: 7,
+    nextTeamSeq: 2,
+    builds: [1, 2, 3, 4, 5, 6].map((n) => mkBuild(`b${n}`, { speciesId: n, pokemonId: n })),
+    teams: [mkTeam('t1', 1, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'])],
+  })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-b1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForTimeout(400)
+
+  /*
+    ---- the selected slot is OUTLINED, and it has to be an outline
+
+    A border takes part in layout, so the ring appearing would shift the whole
+    rail -- which is measured against the stat table's Total row in 8b. The
+    outline is declared on every card, transparent, and only its colour
+    changes, which is also what lets it fade rather than snap.
+  */
+  const rings = await page.evaluate(() =>
+    [...document.querySelectorAll('.tb-card-rail')].map((c) => {
+      const cs = getComputedStyle(c)
+      return {
+        current: c.dataset.current === 'true',
+        width: cs.outlineWidth,
+        transparent: /rgba\(0, 0, 0, 0\)|transparent/.test(cs.outlineColor),
+        transitions: cs.transitionProperty,
+        border: cs.borderTopWidth,
+      }
+    }),
+  )
+  const marked = rings.filter((r) => r.current)
+  const plain = rings.filter((r) => !r.current)
+  check(
+    'the slot being edited is the only one with a visible ring, and every card reserves the same width',
+    marked.length === 1 &&
+      !marked[0].transparent &&
+      plain.length === 5 &&
+      plain.every((r) => r.transparent) &&
+      rings.every((r) => r.width === marked[0].width),
+    `marked=${JSON.stringify(marked)} widths=${[...new Set(rings.map((r) => r.width))].join('/')}`,
+  )
+  check(
+    'and it fades in rather than snapping, without a border that would move the rail',
+    marked[0].transitions.includes('outline-color') && rings.every((r) => r.border === '0px'),
+    `${marked[0].transitions} | border ${marked[0].border}`,
   )
 
   // =====================================================================

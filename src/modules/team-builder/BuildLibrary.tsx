@@ -39,10 +39,9 @@ import { MovesetCoverage, SpeciesMatchup } from './ui/TypeMatchup'
 import { BulkBar, SelectCircle } from './ui/BulkSelect'
 import { useBulkSelect } from './ui/useBulkSelect'
 import { AddToTeamModal } from './ui/AddToTeamModal'
-import { buildSpecies, newBuildInit, typeIdsFor } from './buildFacts'
+import { buildSpecies, typeIdsFor } from './buildFacts'
 import { orderedBuilds, teamsUsingBuild, uiId, type Build } from './model'
 import {
-  createBuild,
   deleteBuild,
   duplicateBuild,
   setTeamMember,
@@ -52,10 +51,12 @@ import {
 import { goTo } from './tbNav'
 
 export function BuildLibrary({
-  generation,
   pickFor,
 }: {
-  generation: number
+  /* `generation` is no longer read: the form seeds a new member itself, from
+     the team's generation when there is one. Kept in the props so the shell
+     passes the same shape to all four screens. */
+  generation?: number
   /** Set when the library was opened to fill one team slot. See tbNav. */
   pickFor?: { teamId: string; slot: number }
 }) {
@@ -64,9 +65,11 @@ export function BuildLibrary({
   const bulk = useBulkSelect()
   const libraryBuilds = orderedBuilds(data)
 
+  /* Nothing is created to open the form -- see BuildForm and the shell's
+     `new-build` verb, which this has to match or the same button would behave
+     differently depending on whether it was pressed here or in the nav. */
   const newBuild = () => {
-    const build = createBuild(newBuildInit(generation))
-    goTo({ kind: 'build-form', buildId: build.id, origin: { kind: 'library' } })
+    goTo({ kind: 'build-form', buildId: null, origin: { kind: 'library' }, slot: null })
   }
 
   /*
@@ -76,6 +79,37 @@ export function BuildLibrary({
     for a reason.
   */
   const picking = pickFor != null
+
+  /*
+    A BUILD CANNOT BE ON THE SAME TEAM TWICE, and nothing used to stop it: the
+    picker offered every build in the library, including the ones already on the
+    team it was filling, so choosing one put the SAME id in two slots. That is
+    not a cosmetic duplicate --
+
+      React reported it as two children with the same key, which it documents as
+      unsupported and free to duplicate or omit children;
+      the coverage panels counted that Pokemon twice, so a team's weaknesses
+      were computed against a team it did not have;
+      "remove from this team" clears the first matching slot only, leaving the
+      other one behind with no way to reach it;
+      and it does NOT register as a shared build -- sharing counts teams, not
+      slots -- so editing it changed both slots with no prompt.
+
+    Hidden rather than shown-and-disabled: a disabled card in a grid of
+    identical cards is a puzzle, and the note above the grid says what happened.
+  */
+  const onTeamAlready = new Set(
+    pickFor
+      ? (data.teams
+          .find((t) => t.id === pickFor.teamId)
+          ?.memberIds.filter((m): m is string => m != null) ?? [])
+      : [],
+  )
+  const pickable = picking
+    ? libraryBuilds.filter((build) => !onTeamAlready.has(build.id))
+    : libraryBuilds
+  const hiddenFromPicker = libraryBuilds.length - pickable.length
+
   const openOrPick = (buildId: string) => {
     if (pickFor) {
       setTeamMember(pickFor.teamId, pickFor.slot, buildId)
@@ -117,6 +151,8 @@ export function BuildLibrary({
             </GhostButton>
             <span className="tb-pick-note" data-testid="tb-pick-note">
               Pick a build to add to the team
+              {hiddenFromPicker > 0 &&
+                ` — ${hiddenFromPicker} already on it ${hiddenFromPicker === 1 ? 'is' : 'are'} hidden`}
             </span>
           </>
         ) : (
@@ -152,19 +188,28 @@ export function BuildLibrary({
         />
       )}
 
-      {/* DRAFTS ARE NOT LISTED. A draft is a member being made right now, in a
-          form somewhere; it has no slot and no place here until it is kept. */}
-      {libraryBuilds.length === 0 ? (
+      {/* A MEMBER BEING BUILT RIGHT NOW IS NOT HERE. It has no record until it is
+          saved, so there is nothing to list -- and legacy `draft` rows are
+          filtered by `orderedBuilds`. */}
+      {pickable.length === 0 ? (
         <div className="tb-empty" data-testid="tb-build-library-empty">
-          <p className="tb-empty-note">No builds yet.</p>
+          <p className="tb-empty-note">
+            {picking && libraryBuilds.length > 0
+              ? 'Every build in your library is already on this team.'
+              : 'No builds yet.'}
+          </p>
         </div>
       ) : (
         <div className="tb-build-grid" data-testid="tb-build-grid">
-          {libraryBuilds.map((build, index) => (
+          {pickable.map((build) => (
             <LibraryCard
               key={build.id}
               build={build}
-              label={uiId(index)}
+              /* NUMBERED AGAINST THE WHOLE LIBRARY, not against what is on
+                 screen. In pick mode some cards are hidden, and renumbering the
+                 survivors 1..n would give a build a different number depending
+                 on which team you happened to be filling. */
+              label={uiId(libraryBuilds.indexOf(build))}
               usedIn={teamsUsingBuild(data, build.id).length}
               selecting={bulk.active}
               selectProps={bulk.itemProps(build.id)}
