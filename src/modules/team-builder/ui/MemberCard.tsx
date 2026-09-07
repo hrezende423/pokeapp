@@ -175,6 +175,21 @@ export function MemberCard({
   const showMeta = build.generation >= 3
   const showMoves = variant === 'full' || variant === 'library'
   const showLevel = variant !== 'compact'
+  /*
+    THE TEAM DISPLAY PACKS THE SAME FACTS INTO FEWER LINES, because it shows six
+    of these cards in two grid rows and the sprite is meant to be the largest
+    thing on it. `full` puts the species in the headline and types/nature/ability
+    on one line -- seven lines instead of ten. `library` keeps the layout it was
+    signed off with; the two only ever looked alike by coincidence.
+  */
+  const oneLine = variant === 'full'
+
+  const typeRun = types.map((type, i) => (
+    <span key={type}>
+      {i > 0 && <span className="tb-type-sep">·</span>}
+      <TypeLabel type={type} small />
+    </span>
+  ))
 
   const art_ = art ? <img src={art} alt="" loading="lazy" /> : <span className="tb-card-art-none" />
 
@@ -300,6 +315,15 @@ export function MemberCard({
       <span className="tb-card-facts">
         <span className="tb-card-headline">
           <span className="tb-card-name">{primary}</span>
+          {/*
+            THE SPECIES SITS IN THE HEADLINE ON A TEAM CARD, on its own line on
+            a library card. It is the same fact either way -- "this nickname is
+            a Magnezone" -- but on the team display seven lines have to fit in a
+            grid row twice over, and a parenthetical that only appears when a
+            build HAS a nickname made the card's height depend on its contents.
+            Only rendered when the nickname actually differs from the species.
+          */}
+          {secondary && oneLine && <span className="tb-card-species">({secondary})</span>}
           {/* Genderless renders NOTHING -- not a symbol, not a dash. */}
           {glyph && (
             <span className="tb-card-gender" data-gender={build.gender}>
@@ -308,26 +332,42 @@ export function MemberCard({
           )}
           {showLevel && <span className="tb-card-level num">Lv.{build.level}</span>}
         </span>
-        {/* Only when the nickname actually differs from the species name. */}
-        {secondary && variant !== 'compact' && (
+        {secondary && !oneLine && variant !== 'compact' && (
           <span className="tb-card-species">({secondary})</span>
         )}
-        <span className="tb-card-types">
-          {types.map((type, i) => (
-            <span key={type}>
-              {i > 0 && <span className="tb-type-sep">·</span>}
-              <TypeLabel type={type} small />
-            </span>
-          ))}
-        </span>
         {/*
-          ONLY WHAT IS SET, joined by a dot. The word "Nature" is gone and so is
-          the em-dash placeholder: a build with no nature said "— Nature" on
-          every card, which is a label for an absence rather than information.
-          Nothing set at all renders no line, not an empty one.
+          TYPES, NATURE AND ABILITY ON ONE LINE on a team card -- three facts
+          that are each a word or two, which as three lines spent three line
+          boxes saying very little. Bar-separated rather than dot-separated,
+          because the dot is already the separator INSIDE the type pair and one
+          glyph doing both jobs read as four types.
         */}
-        {showMeta && metaParts.length > 0 && (
-          <span className="tb-card-meta">{metaParts.join(' · ')}</span>
+        {oneLine ? (
+          <span className="tb-card-idline">
+            <span className="tb-card-types">{typeRun}</span>
+            {metaParts.map((part) => (
+              <span key={part}>
+                <span className="tb-meta-sep" aria-hidden>
+                  |
+                </span>
+                <span className="tb-card-meta">{part}</span>
+              </span>
+            ))}
+          </span>
+        ) : (
+          <>
+            <span className="tb-card-types">{typeRun}</span>
+            {/*
+              ONLY WHAT IS SET, joined by a dot. The word "Nature" is gone and
+              so is the em-dash placeholder: a build with no nature said
+              "— Nature" on every card, which is a label for an absence rather
+              than information. Nothing set at all renders no line, not an
+              empty one.
+            */}
+            {showMeta && metaParts.length > 0 && (
+              <span className="tb-card-meta">{metaParts.join(' · ')}</span>
+            )}
+          </>
         )}
         {showMoves && (
           <>

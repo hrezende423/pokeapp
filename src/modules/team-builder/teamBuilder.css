@@ -74,6 +74,29 @@
      of those made a 148px card and a 167px lane. */
   --tb-compact-line: 14px;
 
+  /*
+    THE TEAM DISPLAY CARD, and like the Team Library card it is a MEASURED
+    number rather than a chosen one. It comes from the widest thing the card
+    has to hold, which is not the same row for both candidates:
+
+      the MOVE ROW, which the width was asked to be driven by. The widest move
+      name in Gen 1-4 is "High Jump Kick" / "Smelling Salts" -- 112px at 10px
+      Martian Mono including the "~ " prefix, measured across all 485 moves in
+      the bundle -- plus the type column (53.2px, "FIGHTING") and the category
+      column (37.1px, "Physical") and their two 8px gaps: 218px.
+
+      the ID LINE, types + nature + ability: 259px worst case, measured with
+      the card's own markup so the uppercase transform and the tracking are in
+      the number.
+
+    264px covers both, which leaves the move name's `1fr` column about 158px
+    against the 112px it needs -- comfortably, as asked.
+  */
+  --tb-slot-card: 264px;
+  /* Tight leading again: seven lines of one fact each, and the page's
+     inherited 26.1px would spend 183px of a grid row on them. */
+  --tb-slot-line: 15px;
+
   --slider-track: #e2e2e6;
   --slider-thumb-border: #9b9ba1;
   /*
@@ -702,6 +725,28 @@
 .tb-card-compact .tb-card-name {
   font-size: var(--font-size-caption);
 }
+/*
+  ONE SIZE FOR EVERY LINE ON A TEAM CARD -- the size the nature and ability were
+  already set at. The name was at body size, which made it the loudest thing on
+  a card whose point is the artwork above it, and made the first line noticeably
+  taller than the six below it. WEIGHTS AND FAMILIES ARE UNTOUCHED: the name
+  stays Martian Mono, the gender stays bold, the type run stays bold uppercase,
+  the spread and the move names stay numeric. Only the size is levelled.
+*/
+.tb-card-full .tb-card-name,
+.tb-card-full .tb-card-species,
+.tb-card-full .tb-card-level,
+.tb-card-full .tb-card-gender,
+.tb-card-full .tb-card-meta,
+.tb-card-full .tb-card-spread,
+.tb-card-full .tb-card-moves {
+  font-size: var(--font-size-caption);
+}
+/* And the leading, which is where the height actually went. */
+.tb-card-full .tb-card-facts,
+.tb-card-full .tb-card-moves {
+  line-height: var(--tb-slot-line);
+}
 /* The nickname sits level with "Lv.50" beside it, so it is set at the same size
    -- at body size it was the loudest thing on a card that is mostly numbers. */
 .tb-card-library .tb-card-name {
@@ -741,6 +786,33 @@
 .tb-card-meta {
   font-size: var(--font-size-caption);
   color: var(--text-secondary);
+}
+/*
+  THE BAR BETWEEN GROUPS on the team card's id line. The dot is already the
+  separator inside the type pair, so re-using it between the pair and the nature
+  read as a third type; a bar says "different kind of fact".
+*/
+.tb-meta-sep {
+  margin: 0 5px;
+  /* Secondary, not hairline: at hairline weight the bar was invisible against
+     the page and the three groups ran together as one phrase. It is a
+     separator the reader has to see, not a rule. */
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+/*
+  ONE LINE, THREE GROUPS. `baseline` so the uppercase type run and the
+  sentence-case nature sit on the same line rather than on their own box
+  centres, and `nowrap` because the width was chosen to fit the worst case --
+  wrapping here would change the card's height, and every card's height is what
+  the sprite above it is sized from.
+*/
+.tb-card-idline {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .tb-card-spread {
   font-family: var(--font-numeric);
@@ -2037,15 +2109,97 @@
 /* --------------------------------------------------- team viewer density */
 
 /*
-  TIGHTER ROWS. The slot grid inherited the library's extra-large gap, which on a
-  screen showing one team of six put more space between the cards than the cards
-  spend on their own moves.
+  ===================================================================
+  THE HEADER BESIDE THE GRID, AND THE SPRITE SIZED FROM WHAT IS LEFT.
+
+  The goal is six cards on screen at 100% zoom with the artwork as large as that
+  allows, and the two halves of it are one mechanism:
+
+  `min-height: 100%` ON THE SECTION, `flex: 1` ON THE GRID. The section is at
+  least as tall as the scroller, so the grid -- stretched as a flex item -- has
+  a DEFINITE height, which is what lets its `1fr 1fr` rows divide it. Percentage
+  heights would not survive here: `.scroll-area` is a flex item and the chain
+  from it to a card is four elements long. And `min-height` rather than `height`
+  is what keeps the screen scrollable instead of clipped when a window is too
+  short for the floor sizes below -- CLAUDE.md's rule is that nothing may be
+  unreachable, not that everything must fit.
+
+  THE ART BOX THEN TAKES WHATEVER THE TEXT DOES NOT. `flex: 1` on the art with
+  `flex: 0 0 auto` facts means the sprite absorbs the remainder of the row, so it
+  is as large as the window allows at any window size rather than a number picked
+  for one screen.
+
+  `max-height: var(--tb-slot-card)` IS LOAD-BEARING, not a cap for taste: the
+  frame is `aspect-ratio: 1` sized from its height, so an art box taller than the
+  card is wide would make a square frame WIDER than its card. The card sets
+  `overflow: hidden`, so that clips -- and the held-item badge is positioned
+  against the frame, so it would have been clipped off the picture entirely.
 */
-.tb-team-viewer .tb-slot-grid {
+.tb-team-viewer {
+  display: flex;
+  align-items: stretch;
   gap: var(--space-gap-lg);
+  /*
+    BORDER-BOX, and it is the difference between fitting and not. `.tb .tb-screen`
+    pads every screen 8px/14px vertically, and under the default `content-box` a
+    `min-height: 100%` box is that 100% PLUS the padding -- so the screen came out
+    22px taller than the scroller and the page scrolled by exactly that, for a
+    layout whose whole purpose is not to.
+  */
+  box-sizing: border-box;
+  min-height: 100%;
+}
+.tb-team-viewer .tb-screen-head {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tb-4);
+  padding-bottom: 0;
+}
+/* The four team actions read as a column in a column. */
+.tb-team-viewer .tb-screen-head .tb-dock {
+  flex-direction: column;
+  gap: var(--tb-2);
+}
+.tb-team-viewer .tb-screen-head .tb-dock-sep {
+  width: 16px;
+  height: 1px;
+  margin: var(--tb-2) 0;
+}
+.tb-team-viewer .tb-slot-grid {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  /*
+    THREE FIXED COLUMNS, PACKED LEFT. `1fr` columns made the card as wide as the
+    window divided by three -- 483px for a card whose widest row needs 264 --
+    which is where the wasted space and the tiny sprite both came from.
+  */
+  grid-template-columns: repeat(3, var(--tb-slot-card));
+  grid-template-rows: 1fr 1fr;
+  gap: var(--space-gap-lg);
+  padding-top: 0;
+}
+.tb-team-viewer .tb-slot-grid > * {
+  min-height: 0;
+}
+/* The card fills its row, and its body fills the card, so the art has a
+   definite remainder to grow into. */
+.tb-team-viewer .tb-card-open {
+  height: 100%;
+}
+.tb-team-viewer .tb-card-full .tb-card-facts {
+  flex: 0 0 auto;
+  max-width: none;
 }
 .tb-team-viewer .tb-card-full .tb-card-art {
-  height: 84px;
+  flex: 1 1 auto;
+  height: auto;
+  /* A floor, so a short window shrinks the sprite to something still legible
+     and then scrolls rather than crushing it to nothing. */
+  min-height: 108px;
+  max-height: var(--tb-slot-card);
+  max-width: none;
 }
 
 /* The rail member that IS the form. Marked with the module's one indicator

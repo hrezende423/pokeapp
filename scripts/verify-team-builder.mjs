@@ -3188,6 +3188,329 @@ try {
   )
 
   // =====================================================================
+  /*
+    14. THE TEAM DISPLAY HAS TO FIT THE WINDOW.
+
+    Six cards on screen at 100% zoom with the artwork as large as that allows.
+    The sprite was 84px on a 483px-wide card, in a grid that sat BELOW a
+    full-width header band -- so the one thing the screen exists to show was the
+    smallest thing on it.
+
+    THE SPRITE SIZE IS NOT ASSERTED AS A NUMBER, because it is not one: the art
+    box takes whatever the seven text lines leave of a grid row, so it is a
+    function of the window. What is asserted is the relationship -- all six
+    visible, nothing scrolling, and the sprite growing when the window does.
+  */
+  hr('14. THE TEAM DISPLAY')
+  const teamOfSix = () => ({
+    nextBuildSeq: 7,
+    nextTeamSeq: 2,
+    builds: [
+      /* A nickname on the first one, so the "(species)" parenthetical is on
+         screen; genderless and female members so both glyph cases render. */
+      mkBuild('b1', {
+        generation: 4,
+        speciesId: 462,
+        pokemonId: 462,
+        abilityId: 42,
+        natureId: 3,
+        nickname: 'Magnetron',
+        level: 100,
+        itemId: moveIds2.leftovers,
+        effort: { hp: 252, 'special-attack': 252, speed: 6 },
+        moveIds: [moveIds2.razorLeaf, moveIds2.sludgeBomb, moveIds2.toxic, moveIds2.seismicToss],
+      }),
+      mkBuild('b2', { generation: 4, speciesId: 214, pokemonId: 214, abilityId: 62, natureId: 3 }),
+      mkBuild('b3', { generation: 4, speciesId: 145, pokemonId: 145, abilityId: 46, natureId: 3 }),
+      mkBuild('b4', {
+        generation: 4,
+        speciesId: 195,
+        pokemonId: 195,
+        abilityId: 6,
+        natureId: 3,
+        gender: 'female',
+      }),
+      mkBuild('b5', {
+        generation: 4,
+        speciesId: 437,
+        pokemonId: 437,
+        abilityId: 26,
+        natureId: 3,
+        gender: null,
+      }),
+      mkBuild('b6', {
+        generation: 4,
+        speciesId: 485,
+        pokemonId: 485,
+        abilityId: 18,
+        natureId: 3,
+        gender: null,
+      }),
+    ],
+    teams: [mkTeam('t1', 1, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], { generation: 4 })],
+  })
+  await seedStore(teamOfSix())
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-my-teams"]')
+  await page.mouse.move(800, 940)
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.waitForTimeout(1000)
+
+  const display = await page.evaluate(async () => {
+    await document.fonts.ready
+    const r = (n) => +n.toFixed(1)
+    const rect = (el) => {
+      const b = el.getBoundingClientRect()
+      return { x: r(b.x), y: r(b.y), w: r(b.width), h: r(b.height), right: r(b.right) }
+    }
+    const card = document.querySelector('.tb-card-full')
+    const facts = card.querySelector('.tb-card-facts')
+    /*
+      THE READING ORDER, taken from the DOM rather than from the stylesheet: the
+      direct children of the facts block, in order, with what each one holds.
+    */
+    const order = [...facts.children].map((el) => ({
+      cls: el.className,
+      /* The headline and the id line are each several spans; name what is in
+         them so the assertion can be about the ORDER of facts, not of classes. */
+      /* The module class only: several of these also carry the `num` utility,
+         and the assertion is about which FACT is where, not about class lists. */
+      holds: [...el.querySelectorAll('[class]')]
+        .map(
+          (x) => (/(tb-card-(?:name|species|gender|level|types|meta))/.exec(x.className) ?? [])[1],
+        )
+        .filter(Boolean),
+    }))
+    const style = (sel) => {
+      const el = card.querySelector(sel)
+      if (!el) return null
+      const cs = getComputedStyle(el)
+      return {
+        fs: cs.fontSize,
+        fw: cs.fontWeight,
+        family: cs.fontFamily.split(',')[0].replace(/["']/g, ''),
+      }
+    }
+    return {
+      order,
+      /* Every line, so "one size, weights untouched" can be checked as one fact. */
+      styles: {
+        name: style('.tb-card-name'),
+        species: style('.tb-card-species'),
+        gender: style('.tb-card-gender'),
+        level: style('.tb-card-level'),
+        type: style('.tb-card-types [data-ds="type-label"]'),
+        meta: style('.tb-card-meta'),
+        spread: style('.tb-card-spread'),
+        moveName: style('.tb-move-name'),
+        moveCat: style('.tb-move-cat'),
+      },
+      moveRows: card.querySelectorAll('.tb-move').length,
+      separators: card.querySelectorAll('.tb-meta-sep').length,
+      idLine: card.querySelectorAll('.tb-card-idline').length,
+      head: rect(document.querySelector('.tb-team-viewer .tb-screen-head')),
+      grid: rect(document.querySelector('[data-testid="tb-slot-grid"]')),
+      cardBox: rect(card),
+      art: rect(card.querySelector('.tb-card-art')),
+      frame: rect(card.querySelector('.tb-card-frame')),
+      held: (() => {
+        const el = card.querySelector('.tb-held-item')
+        return el ? rect(el) : null
+      })(),
+      declaredWidth: parseFloat(
+        getComputedStyle(document.querySelector('.tb')).getPropertyValue('--tb-slot-card'),
+      ),
+      cardWidths: [
+        ...new Set(
+          [...document.querySelectorAll('.tb-card-full')].map((c) =>
+            r(c.getBoundingClientRect().width),
+          ),
+        ),
+      ],
+    }
+  })
+  log(`  facts order: ${display.order.map((o) => o.holds.join('+') || o.cls).join(' / ')}`)
+  log(`  card ${display.cardBox.w}x${display.cardBox.h}, art ${display.art.w}x${display.art.h}`)
+  log(`  styles: ${JSON.stringify(display.styles)}`)
+
+  check(
+    'line 1 is the nickname, the species in parentheses, the gender and the level -- in that order',
+    JSON.stringify(display.order[0]?.holds) ===
+      JSON.stringify(['tb-card-name', 'tb-card-species', 'tb-card-gender', 'tb-card-level']),
+    JSON.stringify(display.order[0]),
+  )
+  check(
+    'line 2 is the types, then the nature, then the ability, bar-separated on ONE line',
+    display.idLine === 1 &&
+      display.separators === 2 &&
+      /tb-card-idline/.test(display.order[1]?.cls ?? '') &&
+      display.order[1].holds.filter((c) => /tb-card-meta/.test(c)).length === 2,
+    `idline=${display.idLine} seps=${display.separators} holds=${display.order[1]?.holds.join('+')}`,
+  )
+  check(
+    'then the spread, then the four move rows -- seven lines, no more',
+    /tb-card-spread/.test(display.order[2]?.cls ?? '') &&
+      /tb-card-moves/.test(display.order[3]?.cls ?? '') &&
+      display.order.length === 4 &&
+      display.moveRows === 4,
+    `${display.order.map((o) => o.cls).join(' / ')} · ${display.moveRows} moves`,
+  )
+  check(
+    "every line is set at the nature and ability's own size -- one size for the whole card",
+    new Set(Object.values(display.styles).map((x) => x?.fs)).size === 1 &&
+      display.styles.meta.fs === display.styles.name.fs,
+    [...new Set(Object.values(display.styles).map((x) => x?.fs))].join('/'),
+  )
+  check(
+    'and the weights and families are UNTOUCHED -- only the size was levelled',
+    /* The name and the numbers stay numeric-face, the gender and the type run
+       stay bold, the rest stay regular sans. Levelling the size by setting one
+       rule on the facts block would have flattened all of this. */
+    display.styles.name.family === 'Martian Mono' &&
+      display.styles.spread.family === 'Martian Mono' &&
+      display.styles.moveName.family === 'Martian Mono' &&
+      display.styles.gender.fw === '700' &&
+      display.styles.type.fw === '700' &&
+      display.styles.meta.fw === '400' &&
+      display.styles.species.family === 'IBM Plex Sans',
+    JSON.stringify(display.styles),
+  )
+  check(
+    'the grid sits BESIDE the header, not below it',
+    display.head.right <= display.grid.x + 0.5 && Math.abs(display.head.y - display.grid.y) <= 0.5,
+    `head right ${display.head.right} vs grid x ${display.grid.x}, tops ${display.head.y}/${display.grid.y}`,
+  )
+  check(
+    'every card is the declared width, three to a row',
+    display.cardWidths.length === 1 && display.cardWidths[0] === display.declaredWidth,
+    `${display.cardWidths.join('/')} vs ${display.declaredWidth}`,
+  )
+  check(
+    'the sprite frame is SQUARE and inside its card -- an art box taller than the card is wide would clip it',
+    Math.abs(display.frame.w - display.frame.h) <= 0.5 &&
+      display.frame.w <= display.cardBox.w + 0.5,
+    `${display.frame.w}x${display.frame.h} in ${display.cardBox.w}`,
+  )
+  if (display.held) {
+    check(
+      'and the held item still hangs off the picture’s corner at this much larger size',
+      Math.abs(display.held.right - display.frame.right) <= 8,
+      `dx ${(display.held.right - display.frame.right).toFixed(1)}`,
+    )
+  }
+
+  /*
+    ---- THE MOVE ROW FITS COMFORTABLY, measured against the whole bundle
+
+    The width was asked to be driven by the move row. Rather than trusting that,
+    this measures every Gen 1-4 move name in the card's own face and checks the
+    widest one still has room beside the type and category columns.
+  */
+  const moveFit = await page.evaluate(async () => {
+    await document.fonts.ready
+    const d = await import('/pokeapp/src/data/index.ts')
+    const names = d
+      .listMoves()
+      .filter((m) => (m.generation_id ?? 1) <= 4)
+      .map((m) => m.display_name ?? m.name)
+    const cv = document.createElement('canvas').getContext('2d')
+    const nameEl = document.querySelector('.tb-card-full .tb-move-name')
+    const ncs = getComputedStyle(nameEl)
+    cv.font = `${ncs.fontSize} ${ncs.fontFamily}`
+    let widest = { name: '', w: 0 }
+    for (const n of names) {
+      /* The tilde prefix and the event asterisk are both part of the cell. */
+      const w = cv.measureText(`~ ${n}*`).width
+      if (w > widest.w) widest = { name: n, w: +w.toFixed(1) }
+    }
+    const cell = (sel) =>
+      +document.querySelector(`.tb-card-full ${sel}`).getBoundingClientRect().width.toFixed(1)
+    return { widest, nameCell: cell('.tb-move-name'), catCell: cell('.tb-move-cat') }
+  })
+  log(
+    `  widest move name "${moveFit.widest.name}" ${moveFit.widest.w}px in a ${moveFit.nameCell}px cell`,
+  )
+  check(
+    'the move-name column comfortably fits the widest move name in the bundle, asterisk included',
+    moveFit.nameCell >= moveFit.widest.w + 12,
+    `${moveFit.nameCell} >= ${moveFit.widest.w} + 12 ("${moveFit.widest.name}")`,
+  )
+
+  /*
+    ---- ALL SIX ON SCREEN, AT EVERY WINDOW HEIGHT WORTH HAVING
+
+    And the sprite grows with the window rather than being a number picked for
+    one screen, which is the point of sizing it from the remainder.
+  */
+  const before = page.viewportSize()
+  const perHeight = []
+  for (const h of [1080, 900, 820, 768, 720]) {
+    await page.setViewportSize({ width: 1600, height: h })
+    await page.waitForTimeout(300)
+    perHeight.push({
+      h,
+      ...(await page.evaluate(() => {
+        const sc = document.querySelector('.scroll-area')
+        const cards = [...document.querySelectorAll('.tb-card-full')]
+        const last = cards.at(-1).getBoundingClientRect()
+        return {
+          overflow: sc.scrollHeight - sc.clientHeight,
+          lastVisible: last.bottom <= sc.getBoundingClientRect().bottom + 0.5,
+          sprite: Math.round(cards[0].querySelector('.tb-card-art').getBoundingClientRect().height),
+        }
+      })),
+    })
+  }
+  await page.setViewportSize(before)
+  await page.waitForTimeout(300)
+  log(`  ${perHeight.map((p) => `${p.h}:${p.sprite}px`).join(' ')}`)
+  check(
+    'all six cards are on screen with nothing scrolling, from a 720px window up to 1080',
+    perHeight.every((p) => p.overflow === 0 && p.lastVisible),
+    perHeight.map((p) => `${p.h}:${p.overflow}/${p.lastVisible}`).join(' '),
+  )
+  check(
+    'and the sprite is sized from what is left over, so a taller window draws a bigger one',
+    perHeight[0].sprite > perHeight.at(-1).sprite &&
+      /* Three times the 84px it used to be, at the smallest window tested. */
+      perHeight.at(-1).sprite >= 150,
+    perHeight.map((p) => `${p.h}:${p.sprite}`).join(' '),
+  )
+
+  /*
+    ---- AND THE BUILD LIBRARY CARD WAS NOT TOUCHED
+
+    The reorder is scoped to the `full` variant on purpose: the library card was
+    reviewed and signed off with the species on its own line and the nature and
+    ability dot-separated. This is the guard that a change to one did not reach
+    the other.
+  */
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.waitForTimeout(500)
+  const libraryCard = await page.evaluate(() => {
+    const card = document.querySelector('.tb-card-library')
+    const facts = card.querySelector('.tb-card-facts')
+    return {
+      order: [...facts.children].map((e) => e.className),
+      idLines: card.querySelectorAll('.tb-card-idline').length,
+      separators: card.querySelectorAll('.tb-meta-sep').length,
+      speciesInHeadline: card.querySelectorAll('.tb-card-headline .tb-card-species').length,
+    }
+  })
+  log(`  library order: ${libraryCard.order.join(' / ')}`)
+  check(
+    'the Build Library card keeps its own order: species on its own line, no id line, no bars',
+    libraryCard.idLines === 0 &&
+      libraryCard.separators === 0 &&
+      libraryCard.speciesInHeadline === 0 &&
+      libraryCard.order.some((c) => /tb-card-species/.test(c)) &&
+      libraryCard.order.some((c) => /tb-card-meta/.test(c)),
+    JSON.stringify(libraryCard),
+  )
+
+  // =====================================================================
   hr('CONVENTIONS — across the whole module')
   const savey = await page.evaluate(() =>
     [...document.querySelectorAll('button')]

@@ -146,6 +146,28 @@ change here needs a request, not a justification. Read the deferred-debt
 section below before deciding something on this list is a bug: the known
 imperfections are already logged there deliberately.
 
+- **The Team Display sizes its sprite from what the text leaves over.**
+  `.tb-team-viewer` is `min-height: 100%` with `box-sizing: border-box` (the
+  screen's own 8/14px padding would otherwise push it 22px past the scroller),
+  the grid is `flex: 1` with `1fr 1fr` rows, and `.tb-card-art` is `flex: 1`
+  against `flex: 0 0 auto` facts — so the artwork absorbs the remainder of a
+  grid row and is as large as the window allows at any window size. Measured:
+  164px at a 720px window up to 264px at 1080, against the 84px it was fixed
+  at. All six cards stay on screen with no overflow across that whole range;
+  verify-team-builder §14 drives five heights.
+  **`max-height: var(--tb-slot-card)` on the art box is load-bearing**, not
+  taste: the frame is `aspect-ratio: 1` sized from its height, so an art box
+  taller than the card is wide makes a square frame WIDER than its card — and
+  the card sets `overflow: hidden`, so the held-item badge positioned against
+  that frame gets clipped off the picture.
+  `--tb-slot-card: 264px` is measured the same way as the Team Library card:
+  the widest Gen 1–4 move row (218px — "High Jump Kick" at 112px plus the type
+  and category columns) and the widest types|nature|ability line (259px), which
+  is the binding one.
+  **The seven-line order is scoped to `variant="full"`.** The Build Library card
+  keeps the layout it was signed off with — species on its own line, nature and
+  ability dot-separated — and §14 guards that the two have not merged.
+
 - **The Team Library card's width is a MEASURED CONSTANT.**
   `--tb-compact-card: 127px` is the rendered width of "ELECTRIC · FIGHTING" —
   the longest type pair in Gen 1–4 scope, 116.6px with the card's own uppercase

@@ -127,7 +127,16 @@ export function TeamViewer({ teamId }: { teamId: string }) {
       data-testid="tb-team-viewer"
       data-team-id={team.id}
     >
-      <header className="tb-screen-head">
+      {/*
+        THE HEADER IS A COLUMN BESIDE THE GRID, not a band above it.
+
+        As a full-width band it cost the grid 52px of height across the whole
+        screen for one button, an id and four icons -- and the grid's height is
+        exactly what the sprites are sized from, so that band was coming out of
+        the artwork. Beside it, it costs one narrow column of width, which the
+        cards have to spare.
+      */}
+      <header className="tb-screen-head" data-layout="viewer-head">
         <GhostButton onClick={() => goTo({ kind: 'my-teams' })} testId="tb-back-to-teams">
           <IconChevronLeft size={18} stroke={1.5} />
           Team Library
@@ -185,7 +194,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
         </div>
       </header>
 
-      <div className="tb-slot-grid" data-testid="tb-slot-grid">
+      <div className="tb-slot-grid" data-layout="slot-grid" data-testid="tb-slot-grid">
         {members.map((build, slot) =>
           build ? (
             <MemberSlot
