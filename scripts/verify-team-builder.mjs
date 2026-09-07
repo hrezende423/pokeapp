@@ -132,6 +132,45 @@ try {
     notes: '',
     ...over,
   })
+  /*
+    THE TIERED OFFENCE TABLE, read back off the screen.
+
+    Both offence panels -- a member's and the team's -- are the same component,
+    so they are read the same way: the column headings are the multipliers that
+    actually occur, and each cell is a count of ATTACKS. `sum` is the invariant
+    worth having: a row must account for every damaging attack and no others, so
+    a double count or a dropped move shows up as a row that does not add up.
+  */
+  const readOffence = (testId) =>
+    page.evaluate((id) => {
+      const scope = document.querySelector(`[data-testid="${id}"]`)
+      if (!scope) return null
+      const heads = [...scope.querySelectorAll('th')].map((e) => e.textContent.trim())
+      return {
+        title: scope.querySelector('.tb-matchup-title').textContent.trim(),
+        note: scope.querySelector('.tb-matchup-ignored')?.textContent?.trim() ?? '',
+        brought: [...scope.querySelectorAll('.tb-matchup-note [data-ds="type-label"]')].map(
+          (e) => e.dataset.type,
+        ),
+        heads,
+        rows: [...scope.querySelectorAll('tbody tr')].map((tr) => {
+          const cells = [...tr.children].slice(1).map((td) => td.textContent.trim())
+          return {
+            type: tr.dataset.type,
+            /* Keyed by the heading above it, so an assertion names a tier
+               rather than a column index that moves when a tier appears. */
+            tiers: Object.fromEntries(
+              cells.map((v, i) => [heads[i + 1], v === '' ? null : Number(v)]),
+            ),
+            sum: cells.reduce((n, v) => n + (v === '' ? 0 : Number(v)), 0),
+            hole: tr.dataset.hole === 'true',
+            wall: tr.dataset.wall === 'true',
+            marked: [...tr.children].some((td) => td.dataset.hole === 'true'),
+          }
+        }),
+      }
+    }, testId)
+
   const mkTeam = (id, seq, memberIds, over = {}) => ({
     id,
     seq,
@@ -1136,39 +1175,66 @@ try {
   await page.hover('[data-testid="tb-build-form"]')
   await page.click('[data-testid="tb-form-offence"]')
   await page.waitForSelector('[data-testid="tb-form-offence-popover"]')
-  const offence = await page.evaluate(() => {
-    const scope = document.querySelector('[data-testid="tb-matchup-offense"]')
-    return {
-      note: scope.querySelector('.tb-matchup-ignored')?.textContent?.trim() ?? '',
-      brought: [...scope.querySelectorAll('.tb-matchup-note [data-ds="type-label"]')].map(
-        (e) => e.dataset.type,
-      ),
-      cols: [...scope.querySelectorAll('.tb-matchup-col')].map((c) => ({
-        label: c.querySelector('.tb-matchup-label').textContent.trim(),
-        tiers: [...c.querySelectorAll('.tb-matchup-tier')].map((t) => ({
-          mult: t.querySelector('.tb-matchup-mult').textContent.trim(),
-          types: [...t.querySelectorAll('[data-ds="type-label"]')].map((x) => x.dataset.type),
-        })),
-      })),
-    }
-  })
+  const offence = await readOffence('tb-matchup-offense')
+  const offRow8 = (t) => offence.rows.find((r) => r.type === t)
   log(`  brought: ${offence.brought.join(',')} · ${offence.note}`)
+  log(`  columns: ${offence.heads.join(' ')}`)
+  log(
+    `  ${offence.rows
+      .map(
+        (r) =>
+          `${r.type}[${offence.heads
+            .slice(1)
+            .map((h) => r.tiers[h] ?? '-')
+            .join('/')}]`,
+      )
+      .join(' ')}`,
+  )
   check(
     'attacking coverage counts Razor Leaf and Sludge Bomb, and ignores Toxic (status) and Seismic Toss (fixed damage)',
     JSON.stringify([...offence.brought].sort()) === JSON.stringify(['grass', 'poison']) &&
       offence.note === '2 of 4 moves counted',
     `${offence.brought.join(',')} | ${offence.note}`,
   )
-  const hits = offence.cols.find((c) => c.label === 'Hits hard')
+  /*
+    ---- ONE ROW PER DEFENDING TYPE, ONE COLUMN PER TIER, COUNTING ATTACKS
+
+    The panel used to say only what the BEST multiplier was, which told a reader
+    that coverage existed without saying how deep it went. It now counts attacks
+    at every multiplier they land on, which is the defensive table's shape.
+
+    4x AND 0.25x ARE STRUCTURALLY ABSENT and that is not a gap in the panel: the
+    chart gives one of 0, 0.5, 1 or 2 for a single attacking type against a
+    single defending type, and the doubling that makes 4x on defence comes from
+    the DEFENDER having two types. The columns are discovered from the data
+    rather than hardcoded, so this check reads them rather than assuming them.
+  */
   check(
-    'and it reports the BEST multiplier per defending type, not a sum',
-    /* Grass hits Ground/Rock/Water for 2x and Poison hits Grass for 2x. Nothing
-       here reaches 4x, because one move cannot be two types. */
-    hits != null &&
-      hits.tiers.length === 1 &&
-      hits.tiers[0].mult === '2x' &&
-      ['grass', 'ground', 'rock', 'water'].every((t) => hits.tiers[0].types.includes(t)),
-    JSON.stringify(hits),
+    'the panel is a table of attack counts, a column per multiplier that occurs',
+    offence.rows.length === 17 &&
+      JSON.stringify(offence.heads) === JSON.stringify(['Type', '2x', '1x', '0.5x', '0x']),
+    `${offence.rows.length} rows: ${offence.heads.join(' | ')}`,
+  )
+  check(
+    'every row accounts for both damaging attacks and no others',
+    offence.rows.every((r) => r.sum === 2),
+    offence.rows
+      .filter((r) => r.sum !== 2)
+      .map((r) => `${r.type}=${r.sum}`)
+      .join(',') || 'all 17 rows sum to 2',
+  )
+  check(
+    'Razor Leaf is 2x on Water and 0.5x on Grass, and both are counted as ATTACKS',
+    offRow8('water')?.tiers['2x'] === 1 &&
+      offRow8('water')?.tiers['1x'] === 1 &&
+      offRow8('grass')?.tiers['2x'] === 1 &&
+      offRow8('grass')?.tiers['0.5x'] === 1,
+    `water ${JSON.stringify(offRow8('water')?.tiers)} grass ${JSON.stringify(offRow8('grass')?.tiers)}`,
+  )
+  check(
+    'and Sludge Bomb does NOTHING to Steel, which the 0x column says outright',
+    offRow8('steel')?.tiers['0x'] === 1 && offRow8('steel')?.tiers['0.5x'] === 1,
+    `steel ${JSON.stringify(offRow8('steel')?.tiers)}`,
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
@@ -3827,26 +3893,21 @@ try {
   await page.click('[data-testid="tb-viewer-offence"]')
   await page.waitForSelector('[data-testid="tb-viewer-offence-popover"]')
   await page.waitForTimeout(300)
-  const teamOff = await page.evaluate(() => {
-    const scope = document.querySelector('[data-testid="tb-matchup-team-offense"]')
-    return {
-      title: scope.querySelector('.tb-matchup-title').textContent.trim(),
-      brought: [...scope.querySelectorAll('.tb-matchup-note [data-ds="type-label"]')].map(
-        (e) => e.dataset.type,
-      ),
-      note: scope.querySelector('.tb-matchup-ignored')?.textContent?.trim() ?? '',
-      heads: [...scope.querySelectorAll('th')].map((e) => e.textContent.trim()),
-      rows: [...scope.querySelectorAll('tbody tr')].map((tr) => ({
-        type: tr.dataset.type,
-        hits: +tr.children[1].textContent.trim(),
-        best: tr.children[2].textContent.trim(),
-        marked: tr.children[1].dataset.hole === 'true',
-      })),
-    }
-  })
+  const teamOff = await readOffence('tb-matchup-team-offense')
   const offRow = (t) => teamOff.rows.find((r) => r.type === t)
   log(`  ${teamOff.title} · brought ${teamOff.brought.join(',')} · ${teamOff.note}`)
-  log(`  ${teamOff.rows.map((r) => `${r.type}:${r.hits}/${r.best}`).join(' ')}`)
+  log(`  columns: ${teamOff.heads.join(' ')}`)
+  log(
+    `  ${teamOff.rows
+      .map(
+        (r) =>
+          `${r.type}[${teamOff.heads
+            .slice(1)
+            .map((h) => r.tiers[h] ?? '-')
+            .join('/')}]`,
+      )
+      .join(' ')}`,
+  )
   check(
     'the team panel counts the whole team and says how many of its moves it could use',
     teamOff.title === 'Team offence · 3 members' && teamOff.note === '6 of 9 moves counted',
@@ -3859,36 +3920,63 @@ try {
     teamOff.brought.join(','),
   )
   check(
-    'one row per defending type in this generation, headed Type | Hits hard | Best',
+    "it is the MEMBER's table with a bigger denominator: same columns, one row per defending type",
     teamOff.rows.length === 17 &&
-      JSON.stringify(teamOff.heads) === JSON.stringify(['Type', 'Hits hard', 'Best']),
+      JSON.stringify(teamOff.heads) === JSON.stringify(['Type', '2x', '1x', '0.5x', '0x']),
     `${teamOff.rows.length} rows: ${teamOff.heads.join(' | ')}`,
   )
   check(
-    'the count is MEMBERS with a super-effective answer, not types: two members carry grass, so Water reads 2',
-    offRow('water')?.hits === 2 && offRow('water')?.best === '2x' && offRow('rock')?.hits === 3,
-    `water ${offRow('water')?.hits}/${offRow('water')?.best}, rock ${offRow('rock')?.hits}`,
+    'every row accounts for all six damaging attacks and no others',
+    teamOff.rows.every((r) => r.sum === 6),
+    teamOff.rows
+      .filter((r) => r.sum !== 6)
+      .map((r) => `${r.type}=${r.sum}`)
+      .join(',') || 'all 17 rows sum to 6',
   )
   check(
-    "and one member's Earthquake is the only answer to Steel",
-    offRow('steel')?.hits === 1 && offRow('steel')?.best === '2x',
-    `steel ${offRow('steel')?.hits}/${offRow('steel')?.best}`,
+    'ATTACKS, not members: two Razor Leafs are two attacks, so Water reads 2 at 2x',
+    offRow('water')?.tiers['2x'] === 2 && offRow('water')?.tiers['1x'] === 4,
+    `water ${JSON.stringify(offRow('water')?.tiers)}`,
   )
   check(
-    'a type nothing on the team hits hard reads 0, and carries the BEST the team can manage',
-    offRow('normal')?.hits === 0 &&
-      offRow('normal')?.best === '1x' &&
-      offRow('ghost')?.hits === 0 &&
-      offRow('ghost')?.best === '1x',
-    `normal ${offRow('normal')?.hits}/${offRow('normal')?.best},` +
-      ` ghost ${offRow('ghost')?.hits}/${offRow('ghost')?.best}`,
+    'Steel: one Earthquake gets through, four attacks are resisted and Sludge Bomb does nothing',
+    offRow('steel')?.tiers['2x'] === 1 &&
+      offRow('steel')?.tiers['0.5x'] === 4 &&
+      offRow('steel')?.tiers['0x'] === 1,
+    `steel ${JSON.stringify(offRow('steel')?.tiers)}`,
   )
   check(
-    'the holes sort to the TOP -- the opposite of the defensive table, where the high count leads',
-    teamOff.rows.slice(0, 6).every((r) => r.hits === 0 && r.marked) &&
-      teamOff.rows.slice(6).every((r) => r.hits > 0 && !r.marked) &&
-      teamOff.rows.at(-1).hits === 3,
-    teamOff.rows.map((r) => r.hits).join(''),
+    'Rock: Razor Leaf twice and Earthquake all land 2x, and Double-Edge is resisted',
+    offRow('rock')?.tiers['2x'] === 3 &&
+      offRow('rock')?.tiers['0.5x'] === 2 &&
+      offRow('rock')?.tiers['1x'] === 1,
+    `rock ${JSON.stringify(offRow('rock')?.tiers)}`,
+  )
+  check(
+    'a type nothing hits hard prints a 0 in the best column rather than an empty cell',
+    offRow('ghost')?.tiers['2x'] === 0 &&
+      offRow('ghost')?.hole === true &&
+      offRow('normal')?.tiers['2x'] === 0,
+    `ghost ${JSON.stringify(offRow('ghost')?.tiers)} normal ${JSON.stringify(offRow('normal')?.tiers)}`,
+  )
+  check(
+    'and the zero is MARKED only where the type also resists something -- a wall, not a shrug',
+    /* Ghost resists Sludge Bomb and ignores Double-Edge, so it is a wall.
+       Nothing here is resisted by Normal or Psychic, so those zeros are plain:
+       colouring every no-super-effective row would spend the page's one alarm
+       colour on a half-built member. */
+    offRow('ghost')?.marked === true &&
+      offRow('normal')?.marked === false &&
+      offRow('psychic')?.marked === false,
+    `ghost wall=${offRow('ghost')?.wall} marked=${offRow('ghost')?.marked},` +
+      ` normal marked=${offRow('normal')?.marked}`,
+  )
+  check(
+    'the worst matchups sort to the TOP -- the opposite of the defensive table, where the high count leads',
+    teamOff.rows.slice(0, 6).every((r) => r.hole) &&
+      teamOff.rows.slice(6).every((r) => !r.hole) &&
+      teamOff.rows.at(-1).tiers['2x'] === 3,
+    teamOff.rows.map((r) => r.tiers['2x']).join(''),
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
@@ -3898,37 +3986,38 @@ try {
   await page.click('[data-testid="tb-slot-0-offence"]')
   await page.waitForSelector('[data-testid="tb-slot-0-offence-popover"]')
   await page.waitForTimeout(300)
-  const memberOff = await page.evaluate(() => {
-    const scope = document.querySelector('[data-testid="tb-matchup-offense"]')
-    return {
-      title: scope.querySelector('.tb-matchup-title').textContent.trim(),
-      note: scope.querySelector('.tb-matchup-ignored')?.textContent?.trim() ?? '',
-      cols: [...scope.querySelectorAll('.tb-matchup-col')].map((col) => ({
-        label: col.querySelector('.tb-matchup-label').textContent.trim(),
-        tiers: [...col.querySelectorAll('.tb-matchup-tier')].map((t) => ({
-          mult: t.querySelector('.tb-matchup-mult').textContent.trim(),
-          types: [...t.querySelectorAll('[data-ds="type-label"]')].map((x) => x.dataset.type),
-        })),
-      })),
-    }
-  })
-  log(`  ${memberOff.title} · ${memberOff.note}`)
-  const memberHits = memberOff.cols.find((c) => c.label === 'Hits hard')
-  log(`  hits hard: ${JSON.stringify(memberHits)}`)
+  const memberOff = await readOffence('tb-matchup-offense')
+  const memRow = (t) => memberOff.rows.find((r) => r.type === t)
+  log(`  ${memberOff.title} · ${memberOff.note} · columns ${memberOff.heads.join(' ')}`)
+  log(
+    `  ${memberOff.rows
+      .map(
+        (r) =>
+          `${r.type}[${memberOff.heads
+            .slice(1)
+            .map((h) => r.tiers[h] ?? '-')
+            .join('/')}]`,
+      )
+      .join(' ')}`,
+  )
   check(
     "a member's panel is the one the Build Form shows, titled with its own species",
     memberOff.title === 'Venusaur · dealing damage' && memberOff.note === '2 of 4 moves counted',
     `${memberOff.title} | ${memberOff.note}`,
   )
   check(
-    'and it reports that build alone: Razor Leaf and Sludge Bomb, nothing a team-mate carries',
-    memberHits != null &&
-      memberHits.tiers.length === 1 &&
-      memberHits.tiers[0].mult === '2x' &&
-      ['grass', 'ground', 'rock', 'water'].every((t) => memberHits.tiers[0].types.includes(t)) &&
-      /* Steel is b2's Earthquake, and must not leak into b1's panel. */
-      !memberHits.tiers[0].types.includes('steel'),
-    JSON.stringify(memberHits),
+    'and it is the same table as the team panel, over this build alone',
+    JSON.stringify(memberOff.heads) === JSON.stringify(teamOff.heads) &&
+      memberOff.rows.length === teamOff.rows.length &&
+      memberOff.rows.every((r) => r.sum === 2),
+    `${memberOff.heads.join('|')} · ${memberOff.rows.length} rows`,
+  )
+  check(
+    "nothing a team-mate carries leaks in: Steel is b2's Earthquake, and this build has no answer to it",
+    memRow('steel')?.tiers['2x'] === 0 &&
+      memRow('water')?.tiers['2x'] === 1 &&
+      memRow('grass')?.tiers['2x'] === 1,
+    `steel ${JSON.stringify(memRow('steel')?.tiers)} water ${JSON.stringify(memRow('water')?.tiers)}`,
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)

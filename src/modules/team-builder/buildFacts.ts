@@ -272,6 +272,11 @@ export function abilityEffectFor(abilityId: number | null): string | null {
 /**
  * The ATTACKING types this build actually brings, from its four slots.
  *
+ * TWO SHAPES OF THE SAME ANSWER, and both are needed. `types` is the SET, for
+ * "what does this build bring"; `each` is one entry per counted move, in slot
+ * order, for "how many of my attacks hit this". Two Electric moves are one type
+ * and two attacks, and the coverage panels count attacks.
+ *
  * A MOVE COUNTS ONLY IF IT DEALS TYPE-SCALED DAMAGE, which rules out two groups.
  * Status moves are obvious. The subtler one is fixed-damage: Seismic Toss, Night
  * Shade, Dragon Rage and Sonic Boom are all physical or special and all deal a
@@ -288,8 +293,9 @@ export function abilityEffectFor(abilityId: number | null): string | null {
 export function attackingTypesFor(
   moveIds: (number | null)[],
   generation: number,
-): { types: string[]; counted: number; ignored: number } {
+): { types: string[]; each: string[]; counted: number; ignored: number } {
   const types = new Set<string>()
+  const each: string[] = []
   let counted = 0
   let ignored = 0
   for (const id of moveIds) {
@@ -303,35 +309,55 @@ export function attackingTypesFor(
     const name = resolveMoveTypeNameForGeneration(move, generation)
     if (!name) continue
     types.add(name)
+    each.push(name)
     counted += 1
   }
-  return { types: [...types], counted, ignored }
+  return { types: [...types], each, counted, ignored }
 }
 
 /**
- * What this moveset hits, and what walls it.
+ * What this moveset hits, and what walls it -- BY TIER, the way the defensive
+ * panel reads.
  *
- * One row per defending type that EXISTS in this generation, carrying the BEST
- * multiplier the moveset can manage against it. Best rather than an average or a
- * sum, because in a battle you pick the move: a set with Fire and Ground hits
- * Steel for 2x on either, and the number that matters is the one you would use.
+ * One row per defending type that EXISTS in this generation, and for each one a
+ * count of ATTACKS at every multiplier they land on. Attacks rather than types:
+ * "two of my six attacks are resisted here and one does nothing at all" is a
+ * different fact from "the best I can manage is 2x", and it is the one that says
+ * whether the coverage is real or is one move deep.
  *
- * Defending types are single, not the real dual-type combinations. A 17x17 grid
- * of pairs is the honest full answer and is unreadable; "which types do I have
+ * WHY 4x AND 0.25x DO NOT APPEAR HERE, which is not an omission: the type chart
+ * only ever gives one of 0, 0.5, 1 or 2 for a single attacking type against a
+ * single defending type. The doubling that produces 4x on defence comes from the
+ * DEFENDER having two types (Ice is 2x on Dragon and 2x on Flying, so 4x on
+ * Salamence), and an attack has only one type to bring. Those tiers therefore
+ * need a pair-aware pass over the type combinations that really exist, which is
+ * a different panel. Nothing here hardcodes their absence -- the tiers come out
+ * of the data, so a pair-aware caller would simply see more of them.
+ *
+ * Defending types are single for the same reason as before: a 17x17 grid of
+ * pairs is the honest full answer and is unreadable, and "which types do I have
  * an answer for" is the question a builder is actually asking.
  */
-export function offensiveCoverage(
-  attackingTypeNames: string[],
+export function offensiveTiers(
+  attackTypeNames: string[],
   generation: number,
-): { type: string; multiplier: number }[] {
-  if (attackingTypeNames.length === 0) return []
-  const attacking = new Set(attackingTypeNames)
+): { type: string; byMultiplier: Map<number, number>; attacks: number }[] {
+  if (attackTypeNames.length === 0) return []
   return typesInGeneration(generation).map((defender) => {
     /* Reading the DEFENDER's own chart gives every attacking type's multiplier
        against it in one pass, which is the same call the defensive panel makes. */
-    const rows = typeEffectivenessAgainst([defender.id], generation)
-    const mine = rows.filter((r) => attacking.has(r.type.name)).map((r) => r.multiplier)
-    return { type: defender.name, multiplier: mine.length ? Math.max(...mine) : 1 }
+    const chart = new Map(
+      typeEffectivenessAgainst([defender.id], generation).map((r) => [r.type.name, r.multiplier]),
+    )
+    const byMultiplier = new Map<number, number>()
+    for (const name of attackTypeNames) {
+      /* A type outside this generation's chart cannot happen -- the move's type
+         is resolved for the same generation -- but a missing row would silently
+         become a 2x if it defaulted the wrong way, so it defaults to neutral. */
+      const multiplier = chart.get(name) ?? 1
+      byMultiplier.set(multiplier, (byMultiplier.get(multiplier) ?? 0) + 1)
+    }
+    return { type: defender.name, byMultiplier, attacks: attackTypeNames.length }
   })
 }
 

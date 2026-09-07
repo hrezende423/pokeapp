@@ -238,19 +238,37 @@ imperfections are already logged there deliberately.
   the rendered table; the two checks it replaced asserted the conflated numbers,
   which is how the bug survived a suite that was already driving this panel.
 
-- **The team's attacking coverage counts MEMBERS, and its zeros lead.**
-  `TeamOffence` (`ui/TypeMatchup.tsx`) is the fourth coverage scope and the only
-  one whose interesting number is a zero: "Hits hard" is how many members have a
-  super-effective answer to that defending type, so a 0 is a Pokemon the team
-  cannot break, and the table sorts fewest-first with those rows marked in
-  `--accent` -- the same use as the defensive table's three-members-weak, not a
-  fifth one. It does NOT drop its quiet rows the way `TeamMatchup` drops types
-  nothing is weak to; here the quiet rows are the answer. "Best" is the best
-  multiplier the whole team can manage, from `offensiveCoverage` over the UNION
-  of everyone's attacking types -- only informative once the count is zero (1x
-  is chip damage, 0.5x a wall, 0x untouchable). Each member's moves resolve in
-  the MEMBER's own generation while the chart is the TEAM's, the same split the
-  defensive panel makes.
+- **Attacking coverage counts ATTACKS, per tier, in ONE table at both scopes.**
+  `OffencePanel` (`ui/TypeMatchup.tsx`) renders one moveset or six: a member's
+  panel and the team's are the same component, because "the same analysis for a
+  member and for the team" is a requirement and two implementations would drift.
+  One row per defending type, one column per multiplier, and the cell is how
+  many damaging attacks land there — so a row's columns SUM to the number of
+  damaging moves, which is the invariant §8 and §16 assert (a double count or a
+  dropped move shows up as a row that does not add up). Counting attacks rather
+  than "the best you can manage" is the point: 2x said coverage existed without
+  saying whether it was one move deep, and six members with one Earthquake
+  between them is not the team six members with one each is.
+
+  **4x AND 0.25x CANNOT OCCUR HERE and that is not a gap.** The chart gives one
+  of 0, 0.5, 1 or 2 for a single attacking type against a single defending type;
+  the doubling that produces 4x on defence comes from the DEFENDER having two
+  types, and an attack has only one type to bring. Those tiers need a pair-aware
+  pass over the type combinations that really exist, which is a different panel
+  and has not been asked for. **Nothing hardcodes their absence** — `TIER_ORDER`
+  is `[4, 2, 1, 0.5, 0.25, 0]` and the columns rendered are the ones the rows
+  actually use, so a pair-aware caller would simply see more of them.
+
+  **Worst matchups lead, and only a WALL is marked.** Rows with no
+  super-effective attack sort to the top (the opposite of the defensive table,
+  where the high count leads), and such a row prints an explicit `0` where every
+  other empty cell is blank. The `--accent` marker goes on that zero only when
+  the type also resists or ignores something: a half-built member has no
+  super-effective answer to almost anything, and colouring all thirteen of those
+  rows would spend the page's one alarm colour on "this build is unfinished".
+  Each member's moves resolve in the MEMBER's own generation while the chart is
+  the enclosing generation, the same split the defensive panel makes.
+
   **The panel's leading is its own** (`.tb-matchup { line-height: 15px }`, table
   cells at 2px): seventeen rows at the page's inherited 26.1px did not fit an
   800px window and the panel capped itself into a scroller. verify-team-builder

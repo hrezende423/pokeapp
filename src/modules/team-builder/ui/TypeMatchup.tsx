@@ -2,10 +2,17 @@
  * Type coverage, at four scopes, from one file.
  *
  * DEFENSIVE (per species) -- how hard each attacking type hits this Pokemon.
- * OFFENSIVE (per moveset) -- what this build's damaging moves can hit back.
- * TEAM, TAKING DAMAGE -- for each attacking type, how many members are weak to it.
- * TEAM, DEALING DAMAGE -- for each defending type, how many members have a
- * super-effective answer to it, and the best the team can manage if none do.
+ * OFFENSIVE (per moveset) -- for each defending type, how many of this build's
+ * attacks land on each multiplier.
+ * TEAM, TAKING DAMAGE -- for each attacking type, how many members are weak,
+ * resistant and immune to it.
+ * TEAM, DEALING DAMAGE -- the offensive panel with every member's attacks
+ * pooled: one table, the same columns, a bigger denominator.
+ *
+ * THE TWO OFFENSIVE SCOPES ARE ONE COMPONENT (`OffencePanel`) rendering one or
+ * many movesets, because "the same analysis for a member and for the team" is a
+ * requirement rather than a coincidence -- two implementations of it would
+ * drift, and the interesting comparison is between the two panels.
  *
  * THE PANELS ARE GROUPED BY MULTIPLIER, NOT JUST BY SIGN. "Weak to" that mixes
  * 4x and 2x buries the two types that will actually kill you among the six that
@@ -29,7 +36,7 @@
 
 import { defensiveChart } from '../typeDefence'
 import { TypeLabel } from '../../../components/ds/TypeLabel'
-import { attackingTypesFor, offensiveCoverage } from '../buildFacts'
+import { attackingTypesFor, offensiveTiers } from '../buildFacts'
 import type { Build } from '../model'
 
 interface Row {
@@ -119,45 +126,89 @@ export function SpeciesMatchup({
 }
 
 /**
- * What the four move slots can hit.
+ * DEALING DAMAGE, at either scope: one row per defending type, one column per
+ * multiplier, and the cell is how many ATTACKS land there.
  *
- * THE EMPTY CASE IS ITS OWN ANSWER. A build with no damaging moves is not
+ * ATTACKS, NOT TYPES, and not "the best you can manage" -- which is what this
+ * panel used to say. "2x" told a reader the coverage existed; it did not say
+ * whether it was three moves deep or one, and "one Earthquake" and "three ways
+ * to hit Steel" are different teams. Counting attacks also makes each row add
+ * up: the columns of a row sum to the number of damaging moves, so a reader can
+ * see at a glance that four of six attacks do nothing much here.
+ *
+ * THE COLUMNS ARE THE MULTIPLIERS THAT ACTUALLY OCCUR, discovered from the data
+ * and ordered best-for-the-attacker first. Against a single defending type the
+ * chart only ever gives 0, 0.5, 1 or 2 -- 4x and 0.25x need the DEFENDER to have
+ * two types, which is a pair-aware analysis and a different panel (see
+ * `offensiveTiers`). Nothing here hardcodes that: if the rows ever carry a 4x,
+ * the column appears.
+ *
+ * WORST MATCHUPS FIRST. A type nothing on the team hits hard is a Pokemon it
+ * cannot break, so those rows lead, and among them the ones resisting or
+ * ignoring the most attacks lead again. The row with no super-effective attack
+ * at all is marked, the same way the defensive table marks a shared weakness.
+ *
+ * THE EMPTY CASE IS ITS OWN ANSWER. A moveset with no damaging moves is not
  * "neutral coverage" -- it has none, and saying so is the useful thing. The
  * ignored count is shown because "3 moves, 1 counted" is a question the reader
  * would otherwise have to ask: status and fixed-damage moves do not scale with
  * the chart, so they buy no coverage. See `attackingTypesFor`.
  */
-export function MovesetCoverage({
-  moveIds,
-  generation,
+/** Best for the attacker first. Only the ones present are rendered. */
+const TIER_ORDER = [4, 2, 1, 0.5, 0.25, 0]
+
+function OffencePanel({
   title,
+  sets,
+  generation,
+  testId,
+  emptyNote,
 }: {
-  moveIds: (number | null)[]
-  generation: number
   title: string
+  /* One moveset per member. Each carries its OWN generation, because a move's
+     type is era-dependent and a team can hold builds from several eras; the
+     CHART is the enclosing generation's. */
+  sets: { moveIds: (number | null)[]; generation: number }[]
+  generation: number
+  testId: string
+  emptyNote: string
 }) {
-  const { types, counted, ignored } = attackingTypesFor(moveIds, generation)
-  const rows: Row[] = offensiveCoverage(types, generation).map((r) => ({
-    name: r.type,
-    multiplier: r.multiplier,
-  }))
-  const superEff = rows.filter((r) => r.multiplier > 1)
-  const resisted = rows.filter((r) => r.multiplier < 1 && r.multiplier > 0)
-  const immune = rows.filter((r) => r.multiplier === 0)
+  const per = sets.map((set) => attackingTypesFor(set.moveIds, set.generation))
+  const brought = [...new Set(per.flatMap((p) => p.types))]
+  const attacks = per.flatMap((p) => p.each)
+  const counted = per.reduce((n, p) => n + p.counted, 0)
+  const ignored = per.reduce((n, p) => n + p.ignored, 0)
+
+  const rows = offensiveTiers(attacks, generation)
+    .map((r) => ({
+      type: r.type,
+      counts: r.byMultiplier,
+      hard: [...r.byMultiplier].reduce((n, [m, c]) => (m > 1 ? n + c : n), 0),
+      blocked: [...r.byMultiplier].reduce((n, [m, c]) => (m < 1 ? n + c : n), 0),
+    }))
+    .sort((a, b) => a.hard - b.hard || b.blocked - a.blocked || a.type.localeCompare(b.type))
+  const tiers = TIER_ORDER.filter((m) => rows.some((r) => (r.counts.get(m) ?? 0) > 0))
+  /*
+    THE BEST TIER PRESENT, and the only cell that ever prints a zero. Every
+    other empty cell is left blank -- a table of zeroes reads as data and
+    absence is not data -- but a row where NOTHING is super effective is the
+    fact this panel exists to surface, so there the zero is written out. If no
+    super-effective tier is present at all, the missing column says it instead.
+  */
+  const hardTier = tiers.find((m) => m > 1) ?? null
 
   return (
-    <div className="tb-matchup" data-testid="tb-matchup-offense">
-      <p className="tb-matchup-title">{title} · dealing damage</p>
-      {types.length === 0 ? (
-        <span className="tb-matchup-empty" data-testid="tb-matchup-offense-empty">
-          No damaging moves selected, so there is no coverage to show. Status and fixed-damage moves
-          do not scale with the type chart.
+    <div className="tb-matchup" data-testid={testId}>
+      <p className="tb-matchup-title">{title}</p>
+      {brought.length === 0 ? (
+        <span className="tb-matchup-empty" data-testid={`${testId}-empty`}>
+          {emptyNote}
         </span>
       ) : (
         <>
           <p className="tb-matchup-note">
             <span className="tb-matchup-rows">
-              {types.map((t) => (
+              {brought.map((t) => (
                 <TypeLabel key={t} type={t} small />
               ))}
             </span>
@@ -167,14 +218,79 @@ export function MovesetCoverage({
               </span>
             )}
           </p>
-          <div className="tb-matchup-cols">
-            <Column label="Hits hard" rows={superEff} order="desc" testId="tb-matchup-super" />
-            <Column label="Resisted by" rows={resisted} order="asc" testId="tb-matchup-resisted" />
-            <Column label="No effect on" rows={immune} order="desc" testId="tb-matchup-noeffect" />
-          </div>
+          <table className="tb-matchup-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                {/* Not `num`: the heading sits beside "Type" at label size and
+                    the numeric face draws a size larger than the sans one, so a
+                    mono "0.5x" there would read as the biggest thing in the
+                    table. The cells below it are numbers and do carry it. */}
+                {tiers.map((m) => (
+                  <th key={m}>{formatMultiplier(m)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.type}
+                  data-type={row.type}
+                  data-hole={row.hard === 0 ? 'true' : undefined}
+                  data-wall={row.hard === 0 && row.blocked > 0 ? 'true' : undefined}
+                >
+                  <td>
+                    <TypeLabel type={row.type} small />
+                  </td>
+                  {tiers.map((m) => (
+                    <td
+                      key={m}
+                      className="num"
+                      /*
+                        MARKED ONLY WHEN THE ZERO COMES WITH RESISTANCE. Nothing
+                        super effective is worth reading in every row it happens
+                        in -- so the zero is always printed -- but a zero BESIDE
+                        resisted or ignored attacks is the wall: no answer, and
+                        it shrugs off part of what you do have. A half-built
+                        member has no super-effective answer to almost anything,
+                        and colouring all thirteen of those rows would spend the
+                        page's one alarm colour on "this build is unfinished".
+                      */
+                      data-hole={
+                        m === hardTier && row.hard === 0 && row.blocked > 0 ? 'true' : undefined
+                      }
+                    >
+                      {row.counts.get(m) ?? (m === hardTier && row.hard === 0 ? 0 : '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </>
       )}
     </div>
+  )
+}
+
+/** One build's four slots. */
+export function MovesetCoverage({
+  moveIds,
+  generation,
+  title,
+}: {
+  moveIds: (number | null)[]
+  generation: number
+  title: string
+}) {
+  return (
+    <OffencePanel
+      title={`${title} · dealing damage`}
+      sets={[{ moveIds, generation }]}
+      generation={generation}
+      testId="tb-matchup-offense"
+      emptyNote="No damaging moves selected, so there is no coverage to show. Status and fixed-damage moves do not scale with the type chart."
+    />
   )
 }
 
@@ -280,27 +396,16 @@ export function TeamMatchup({
 }
 
 /**
- * The team, dealing damage.
+ * The team, dealing damage: every member's attacks pooled into the panel above.
  *
- * THE TWO TEAM PANELS ASK OPPOSITE QUESTIONS AND SO COUNT OPPOSITE THINGS. On
- * defence the number worth acting on is a HIGH one -- three members weak to
- * Ground is a team that loses to one Earthquake. On offence it is a ZERO: a
- * defending type no member can hit super effectively is a Pokemon this team
- * cannot break, and that is the row a builder is looking for. So this table is
- * sorted fewest-first, holes at the top, and it does NOT drop its quiet rows
- * the way the defensive one drops types nothing is weak to -- here the quiet
- * rows are the answer.
+ * IT IS THE SAME TABLE ON PURPOSE. A member's panel and the team's answer the
+ * same question at two scopes, and the useful thing is comparing them -- "the
+ * team has four answers to Steel" against "this member has none" only reads if
+ * both are counted and laid out the same way.
  *
- * TWO COLUMNS, BECAUSE THEY SAY DIFFERENT THINGS. "Hits hard" counts MEMBERS,
- * so it reads as redundancy: one member covering Steel is a plan, four is
- * comfort. "Best" is the best multiplier the whole team can manage against that
- * type, which is only interesting once the count is zero -- 1x means chip
- * damage, 0.5x means a wall, 0x means the team literally cannot touch it.
- *
- * ERA CORRECTNESS RUNS BOTH WAYS HERE. Each member's moves are resolved in the
- * MEMBER's own generation (a Gen 3 build's Charm is Normal, not Fairy), while
- * the chart itself is the TEAM's generation -- the same split the defensive
- * panel makes, and the reason a Gen 1 team gets no Dark or Steel row.
+ * The pooled denominator is why counting ATTACKS rather than members matters
+ * here: six members with one Earthquake between them is not the same team as
+ * six members with one each, and a member count cannot tell them apart.
  */
 export function TeamOffence({
   members,
@@ -312,7 +417,6 @@ export function TeamOffence({
   members: Pick<Build, 'moveIds' | 'generation'>[]
   generation: number
 }) {
-  const title = `Team offence · ${members.length} member${members.length === 1 ? '' : 's'}`
   if (members.length === 0) {
     return (
       <div className="tb-matchup" data-testid="tb-matchup-team-offense">
@@ -321,79 +425,13 @@ export function TeamOffence({
       </div>
     )
   }
-
-  const perMember = members.map((m) => attackingTypesFor(m.moveIds, m.generation))
-  const brought = [...new Set(perMember.flatMap((p) => p.types))]
-  const counted = perMember.reduce((n, p) => n + p.counted, 0)
-  const ignored = perMember.reduce((n, p) => n + p.ignored, 0)
-
-  /* One member at a time, so the count is "how many members can do this" and
-     not "how many of the team's types happen to be super effective". */
-  const hits = new Map<string, number>()
-  for (const p of perMember) {
-    for (const row of offensiveCoverage(p.types, generation)) {
-      if (row.multiplier > 1) hits.set(row.type, (hits.get(row.type) ?? 0) + 1)
-    }
-  }
-  /* And the whole team's types at once, which gives the BEST it can manage --
-     the move you would actually pick. */
-  const rows = offensiveCoverage(brought, generation)
-    .map((r) => ({ type: r.type, best: r.multiplier, hits: hits.get(r.type) ?? 0 }))
-    .sort((a, b) => a.hits - b.hits || a.best - b.best || a.type.localeCompare(b.type))
-
   return (
-    <div className="tb-matchup" data-testid="tb-matchup-team-offense">
-      <p className="tb-matchup-title">{title}</p>
-      {brought.length === 0 ? (
-        <span className="tb-matchup-empty" data-testid="tb-matchup-team-offense-empty">
-          No damaging moves anywhere on this team, so there is no coverage to show. Status and
-          fixed-damage moves do not scale with the type chart.
-        </span>
-      ) : (
-        <>
-          <p className="tb-matchup-note">
-            <span className="tb-matchup-rows">
-              {brought.map((t) => (
-                <TypeLabel key={t} type={t} small />
-              ))}
-            </span>
-            {ignored > 0 && (
-              <span className="tb-matchup-ignored">
-                {counted} of {counted + ignored} moves counted
-              </span>
-            )}
-          </p>
-          <table className="tb-matchup-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Hits hard</th>
-                <th>Best</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.type}
-                  data-type={row.type}
-                  data-hole={row.hits === 0 ? 'true' : undefined}
-                >
-                  <td>
-                    <TypeLabel type={row.type} small />
-                  </td>
-                  {/* Zero is the fact this panel exists to surface, and it is
-                      marked the same way three-members-weak is on the other
-                      one: the row that changes a decision. */}
-                  <td className="num" data-hole={row.hits === 0 ? 'true' : undefined}>
-                    {row.hits}
-                  </td>
-                  <td className="num">{formatMultiplier(row.best)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-    </div>
+    <OffencePanel
+      title={`Team offence · ${members.length} member${members.length === 1 ? '' : 's'}`}
+      sets={members}
+      generation={generation}
+      testId="tb-matchup-team-offense"
+      emptyNote="No damaging moves anywhere on this team, so there is no coverage to show. Status and fixed-damage moves do not scale with the type chart."
+    />
   )
 }
