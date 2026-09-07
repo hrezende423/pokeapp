@@ -746,9 +746,15 @@ function BuildFormFields({
             ))}
           </div>
 
+          {/*
+            NO "Stats" HEADING. The table's own first column heading is the word
+            Stat, so the block announced itself twice -- a title over a header
+            row that already says the same thing. The three column headings are
+            the label this block needs, and the line the title occupied is what
+            lets the right rail's six cards end level with the Total row.
+          */}
           {facts && (
             <div className="tb-stats-block">
-              <span className="tb-field-label">Stats</span>
               <StatTable build={build} facts={facts} />
             </div>
           )}
@@ -1047,6 +1053,18 @@ function BuildFormFields({
           data-state={railTeam ? 'attached' : 'loose'}
         >
           {/*
+            THE TEAM'S ID HEADS THE RAIL, it does not trail it. Under the last
+            card it was the one thing hanging below the left column, so the two
+            columns ended 34px apart however tightly the cards were set. At the
+            top it is what Team Viewer already shows an ID as -- a heading -- and
+            the band of cards now ends level with the stat table's Total row.
+          */}
+          {railTeam && (
+            <span className="tb-rail-team num" data-testid="tb-rail-team">
+              {teamUiId(data, railTeam.id)}
+            </span>
+          )}
+          {/*
             THE WHOLE TEAM, INCLUDING THE ONE OPEN IN THE FORM. The rail used to
             filter the current build out, which meant the reader could not see
             where in the team they were -- six slots became five plus a gap. It
@@ -1132,11 +1150,6 @@ function BuildFormFields({
                 saveThen(() => createTeam(generation, [build.id]), { kind: 'attaches' })
               }
             />
-          )}
-          {railTeam && (
-            <span className="tb-rail-team num" data-testid="tb-rail-team">
-              {teamUiId(data, railTeam.id)}
-            </span>
           )}
         </aside>
       </div>

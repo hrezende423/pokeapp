@@ -317,6 +317,18 @@ the reason is usually that the cheap fix is the wrong one.
   Gen 3-4 both only REDIRECT the move and the holder still takes normal damage;
   the immunity arrives in Gen 5, which is outside this app's scope.
 
+- **The Build Form's rail ends 17px below the left column in Gen 1 only.** The
+  six rail cards are set so the band ends level with the stat table's Total row,
+  and it does in Gen 2-4. Gen 1's table has FIVE stat rows, not six, so the left
+  column is one 18px row shorter and the rail overhangs it by that much. The
+  cards are sized by leading and padding, both of which are era-independent and
+  should stay that way; the fix would be a rail height derived from the
+  identity column's measured height, which CSS cannot express here (the grid
+  row the rail spans is sized by the form column, not by that panel, and every
+  percentage-height trick either inflates the row or collapses the rail). Do
+  NOT hardcode a per-generation card height -- it would drift the moment the
+  leading changes. Nothing is clipped or unreachable either way.
+
 - **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
   one species whose HP does not follow the normal formula — it is always 1,
   at every level, with any DV/IV or EV spread — and `statMath.ts` computes it

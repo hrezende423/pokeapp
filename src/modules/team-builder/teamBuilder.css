@@ -949,7 +949,7 @@
   align-items: center;
   gap: var(--space-gap-sm);
   width: 100%;
-  padding: 6px 0;
+  padding: var(--tb-3) 0;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -972,10 +972,33 @@
 }
 .tb-rail-line {
   font-size: var(--font-size-label);
+  /*
+    A FIXED LEADING, IN PIXELS, AND IT HAS TO BE PIXELS. These lines inherit an
+    absolute 26.1px from the page, which on an 11px label is a leading of 2.37
+    -- three of them made a 91px card, and six of those overran the column by
+    more than 160px. 17px is the tight setting a three-line label block wants.
+
+    Not a unitless multiplier: the third line is set smaller than the other two
+    (see .num below), and a multiplier would give it a shorter line box, so the
+    three rows of a card would no longer be evenly spaced.
+  */
+  line-height: 17px;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/*
+  THE SPREAD IS SET SMALLER SO IT READS THE SAME SIZE. Martian Mono at a given
+  px is optically much larger than IBM Plex Sans at the same px, so the spread
+  line sat a size above the two label lines above it while nominally matching
+  them. Measured at 11px: sans has a 6px x-height, an 8px cap height and renders
+  "205HP/85SpA/132SpD" 115.1px wide; the mono needs 9px to land on 6 / 8 / 113.4
+  -- the same three numbers. 0.82 of the label token is that 9px, expressed
+  against the token so it still holds if the token moves.
+*/
+.tb-rail-line.num {
+  font-size: calc(var(--font-size-label) * 0.82);
 }
 
 /* ------------------------------------------------------------ build library */
@@ -1284,9 +1307,34 @@
   image-rendering: pixelated;
 }
 /* Scaled to the card it sits on, not to the identity panel's 34px. */
-.tb-card-rail .tb-held-item,
+/*
+  TWO SELECTORS, BECAUSE THEY WERE DOING TWO UNRELATED JOBS. This was one rule
+  listing `.tb-card-rail .tb-held-item` beside `.tb-card-compact .tb-card-art`
+  and setting `height: 64px` for both -- correct for the compact card's art box,
+  and a disaster for the rail's badge: it overrode the height alone, so the
+  badge computed 34x64 and stopped being square. Measured, it ran from 24px
+  ABOVE the 38px sprite frame to 2px below it -- taller than the Pokemon it
+  hangs off, which is the "item is too big and misaligned" in the rail.
+*/
 .tb-card-compact .tb-card-art {
   height: 64px;
+}
+/*
+  THE SAME STRUCTURE AS THE IDENTITY PANEL'S SPRITE, at the rail's scale: a
+  square frame carrying the artwork, and the badge pinned to that frame's
+  bottom-right corner. Only the numbers change, and BOTH of them change, so the
+  badge keeps the 1:1 ratio the artwork has and cannot stretch again.
+
+  16px against a 38px frame. The panel's ratio is 34/146, which here would be
+  9px -- a Dream World render at 9px is mush, and this badge has to be
+  recognisable as an item. It stays clearly subordinate to the sprite, which is
+  what it failed to do at 64.
+*/
+.tb-card-rail .tb-held-item {
+  right: -3px;
+  bottom: -1px;
+  width: 16px;
+  height: 16px;
 }
 .tb-card-compact .tb-held-item {
   width: 18px;
@@ -1813,17 +1861,31 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 2px;
+  /*
+    NO GAP. Every card carries a bottom hairline, so a gap between them left the
+    rules floating with 2px of nothing above each -- six separate cards rather
+    than one banded list, which is the hairline-band rule the data tables follow.
+    Butted together the hairlines read as the list's own rules. It also gives
+    the six cards back 10px, which is most of a text line.
+  */
+  gap: 0;
   padding-left: var(--space-gap-md);
   border-left: 1px solid var(--hairline);
 }
 .tb-rail[data-state='loose'] {
   align-items: center;
 }
+/*
+  A HEADING NOW, so the padding is below it rather than above. Its leading is
+  the cards' own 17px: at the page's inherited 26.1px this one line was 34px
+  tall, which is half a card, and the rail has exactly the height of the
+  identity column beside it to spend.
+*/
 .tb-rail-team {
-  padding-top: var(--space-gap-sm);
+  padding-bottom: var(--tb-5);
   font-family: var(--font-numeric);
   font-size: var(--font-size-label);
+  line-height: 17px;
   color: var(--text-secondary);
   text-align: center;
 }

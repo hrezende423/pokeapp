@@ -1308,6 +1308,202 @@ try {
 
   // =====================================================================
   /*
+    8b. THE RAIL HAS TO FIT THE COLUMN BESIDE IT.
+
+    A FULL TEAM IS THE ONLY CASE WORTH MEASURING. Five members always fitted;
+    six did not, and the rail then became the tallest column on the screen and
+    made the whole page scroll -- for a form that is otherwise 420px tall. The
+    checks here are the three separate causes that had to be fixed together:
+
+      the LEADING -- these lines inherited an absolute 26.1px from the page, so
+      an 11px label sat in a 26px line box and three of them made a 91px card;
+      the BADGE -- one rule set `height: 64px` on the rail's held item and its
+      width alone stayed 34px, so it was neither square nor small, and ran from
+      24px above the sprite to 2px below it;
+      the LABEL -- the team's id trailed the last card, which left it hanging
+      below the left column however tightly the cards were set.
+
+    ASSERTED AGAINST THE STAT TABLE'S TOTAL ROW, not against a pixel height. A
+    height would only be true on the machine that measured it; "the band of
+    cards ends where the column beside it ends" is the actual requirement and
+    survives a different window.
+  */
+  hr('8b. THE RAIL FITS THE COLUMN')
+  await seedStore({
+    nextBuildSeq: 8,
+    nextTeamSeq: 2,
+    builds: [
+      /* SIX, and the fourth is the worst case: an item, a nature, an ability
+         and a three-stat spread, so it is the tallest and widest card. */
+      mkBuild('r1', { speciesId: 7, pokemonId: 7, abilityId: 67, level: 52 }),
+      mkBuild('r2', { speciesId: 1, pokemonId: 1, abilityId: 65 }),
+      mkBuild('r3', { speciesId: 4, pokemonId: 4, abilityId: 66 }),
+      mkBuild('r4', {
+        speciesId: 3,
+        pokemonId: 3,
+        abilityId: 66,
+        natureId: 3,
+        itemId: moveIds2.leftovers,
+        effort: { hp: 252, 'special-attack': 84, 'special-defense': 132 },
+      }),
+      mkBuild('r5', { speciesId: 2, pokemonId: 2, abilityId: 65 }),
+      mkBuild('r6', { speciesId: 5, pokemonId: 5, abilityId: 66 }),
+    ],
+    teams: [mkTeam('t1', 1, ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'])],
+  })
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.click('[data-testid="tb-build-r1-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  await page.waitForSelector('[data-testid="tb-rail-r6"]')
+  await page.waitForTimeout(400)
+
+  const density = await page.evaluate(async () => {
+    await document.fonts.ready
+    const round = (n) => +n.toFixed(1)
+    const cards = [...document.querySelectorAll('.tb-card-rail')]
+    const rail = document.querySelector('[data-layout="rail"]')
+    const label = document.querySelector('.tb-rail-team')
+    const total = document.querySelector('.tb-stat-total-row')
+    const lines = [...cards[3].querySelectorAll('.tb-rail-line')]
+    /* Cap height, measured -- the only way to compare a mono against a sans.
+       Both are set at 11px nominally and the mono draws a size larger. */
+    const c = document.createElement('canvas').getContext('2d')
+    const capOf = (el) => {
+      const cs = getComputedStyle(el)
+      c.font = `${cs.fontSize} ${cs.fontFamily}`
+      return round(c.measureText('H').actualBoundingBoxAscent)
+    }
+    const frame = cards[3].querySelector('.tb-card-frame').getBoundingClientRect()
+    const held = cards[3].querySelector('.tb-held-item')
+    const hb = held.getBoundingClientRect()
+    return {
+      count: cards.length,
+      heights: cards.map((x) => round(x.getBoundingClientRect().height)),
+      lineBoxes: lines.map((l) => round(l.getBoundingClientRect().height)),
+      fontSizes: lines.map((l) => getComputedStyle(l).fontSize),
+      caps: lines.map(capOf),
+      labelFirst: rail.firstElementChild === label,
+      railBottom: round(rail.getBoundingClientRect().bottom),
+      lastCardBottom: round(cards.at(-1).getBoundingClientRect().bottom),
+      totalRowBottom: round(total.getBoundingClientRect().bottom),
+      badge: {
+        w: round(hb.width),
+        h: round(hb.height),
+        /* Distance from the badge's corner to the PICTURE's corner. */
+        dx: round(hb.right - frame.right),
+        dy: round(hb.bottom - frame.bottom),
+        frame: round(frame.width),
+      },
+      /* No "Stats" title, but the column headings are still there. */
+      statsBlockOwnLabel: document.querySelectorAll('.tb-stats-block .tb-field-label').length,
+      statHeads: [...document.querySelectorAll('.tb-stat-head')].map((e) => e.textContent.trim()),
+    }
+  })
+  log(`  cards: ${density.heights.join(', ')}`)
+  log(`  line boxes: ${density.lineBoxes.join(', ')} at ${density.fontSizes.join(', ')}`)
+  log(`  caps: ${density.caps.join(', ')}`)
+  log(
+    `  last card bottom ${density.lastCardBottom} vs Total row ${density.totalRowBottom}` +
+      ` (rail bottom ${density.railBottom})`,
+  )
+  log(`  badge: ${JSON.stringify(density.badge)}`)
+
+  check(
+    'a full team draws six rail cards, all the same height',
+    density.count === 6 && new Set(density.heights).size === 1,
+    `${density.count} cards: ${[...new Set(density.heights)].join('/')}`,
+  )
+  check(
+    "the three rows of a card share one line box, and it is the module's tight leading not the page's 26px",
+    new Set(density.lineBoxes).size === 1 && density.lineBoxes[0] <= 18,
+    density.lineBoxes.join(','),
+  )
+  check(
+    'the spread is set SMALLER than the two label lines above it, because the mono draws larger',
+    /* The point is the nominal sizes DIFFER while the drawn size does not. A
+       spread at the label's own 11px was visibly a size up from its own card. */
+    parseFloat(density.fontSizes[2]) < parseFloat(density.fontSizes[0]),
+    density.fontSizes.join(' / '),
+  )
+  check(
+    'and it therefore RENDERS at the same size: cap heights within a pixel',
+    Math.abs(density.caps[2] - density.caps[0]) <= 1,
+    `sans ${density.caps[0]} vs mono ${density.caps[2]}`,
+  )
+  check(
+    'the held-item badge is SQUARE and clearly subordinate to the sprite, not taller than it',
+    density.badge.w === density.badge.h && density.badge.h <= density.badge.frame / 2,
+    `${density.badge.w}x${density.badge.h} on a ${density.badge.frame}px frame`,
+  )
+  check(
+    "and it hangs off the PICTURE's bottom-right corner, the same structure the identity panel uses",
+    Math.abs(density.badge.dx) <= 6 && Math.abs(density.badge.dy) <= 6,
+    `dx=${density.badge.dx} dy=${density.badge.dy}`,
+  )
+  check(
+    "the team's id HEADS the rail rather than trailing the last card",
+    density.labelFirst && density.railBottom === density.lastCardBottom,
+    `label first: ${density.labelFirst}, rail bottom ${density.railBottom} vs last card ${density.lastCardBottom}`,
+  )
+  check(
+    "six cards end level with the stat table's Total row",
+    Math.abs(density.lastCardBottom - density.totalRowBottom) <= 4,
+    `${density.lastCardBottom} vs ${density.totalRowBottom}`,
+  )
+  check(
+    'the stat block carries no "Stats" title over the header row that already says Stat',
+    density.statsBlockOwnLabel === 0 &&
+      JSON.stringify(density.statHeads) === JSON.stringify(['Stat', 'Base', 'Total']),
+    `${density.statsBlockOwnLabel} title(s), heads ${density.statHeads.join('|')}`,
+  )
+
+  /*
+    ---- and the rail is no longer what makes the page scroll
+
+    THE CAUSE, NOT THE SYMPTOM. The form's main column is about 420px; the rail
+    at six 91px cards was 594, so it was the tallest thing in the grid and the
+    page's height was the rail's height. Asserting "no overflow" alone would
+    pass on a tall window, so this asserts the rail is not the tallest column
+    AND drives a short one.
+  */
+  const columns = await page.evaluate(() => {
+    const h = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().height)
+    return { rail: h('[data-layout="rail"]'), main: h('[data-layout="main"]') }
+  })
+  log(`  columns: rail ${columns.rail}, main ${columns.main}`)
+  check(
+    'the rail is no longer the tallest column, so the page height is the form and not the rail',
+    columns.rail <= columns.main,
+    `rail ${columns.rail} vs main ${columns.main}`,
+  )
+  const shortViewport = await (async () => {
+    const before = page.viewportSize()
+    await page.setViewportSize({ width: 1600, height: 720 })
+    await page.waitForTimeout(200)
+    const out = await page.evaluate(() => {
+      const sc = document.querySelector('.scroll-area')
+      const cards = [...document.querySelectorAll('.tb-card-rail')]
+      const last = cards.at(-1).getBoundingClientRect()
+      return {
+        overflow: sc.scrollHeight - sc.clientHeight,
+        /* Reachable WITHOUT scrolling is the claim, so compare against the
+           scroller's visible box rather than against the document. */
+        lastVisible: last.bottom <= sc.getBoundingClientRect().bottom + 0.5,
+      }
+    })
+    await page.setViewportSize(before)
+    await page.waitForTimeout(200)
+    return out
+  })()
+  check(
+    'and on a 720px window all six cards are on screen with nothing to scroll',
+    shortViewport.overflow === 0 && shortViewport.lastVisible,
+    `overflow ${shortViewport.overflow}, last card visible ${shortViewport.lastVisible}`,
+  )
+
+  // =====================================================================
+  /*
     9. BUILD FORM'S RAIL AND ITS SAVE TIMING.
 
     BUILD FORM DELIBERATELY DOES NOT BEHAVE LIKE THE REST OF THE MODULE, and
