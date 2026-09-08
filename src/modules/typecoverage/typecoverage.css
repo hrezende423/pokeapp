@@ -753,6 +753,25 @@ table.tc-against-table td.tc-against-enemy {
     overflow: auto;
   }
 
+  /*
+    THE SEGMENTS DROP BELOW THEIR LABEL rather than running off the screen.
+    Measured: at 360px the four generation segments ended 15px past the viewport
+    with neither the page nor .panel scrolling, so "Gen 4" was unreachable --
+    the clipping this app's scroll model makes silent. Wrapping the group is the
+    fix rather than shrinking the segments, which would have made every toggle
+    on the page smaller to serve the one row that has four options.
+  */
+  .tc-segmented {
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+
+  /* And the track itself wraps, so even a very narrow phone can reach the last
+     option instead of it sitting outside a box that does not scroll. */
+  .tc-segments {
+    flex-wrap: wrap;
+  }
+
   .tc-flow-head {
     display: none;
   }

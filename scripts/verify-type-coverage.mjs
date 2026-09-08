@@ -458,6 +458,31 @@ async function main() {
   const real = consoleErrors.filter((e) => !/favicon|raw\.githubusercontent|sprites/i.test(e))
   check(11, 'no console errors', real.length === 0, real.slice(0, 2).join(' | '))
 
+  /*
+    NOTHING MAY BE CLIPPED, at the widths this app is actually reviewed on.
+    #root is pinned to the viewport and .panel clips, so an element past the
+    right edge is UNREACHABLE rather than merely ugly -- neither the page nor
+    the panel scrolls sideways to reach it. The generation segments ran 15px off
+    a 360px viewport once, which put "Gen 4" outside the app with no way to
+    press it. The matrix's own scroller is excluded: it is meant to scroll.
+  */
+  for (const width of [320, 360, 390]) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.waitForTimeout(150)
+    const clipped = await page.evaluate(() => {
+      const out = []
+      for (const el of document.querySelector('.tc').querySelectorAll('*')) {
+        if (el.closest('.tc-matrix-scroll')) continue
+        if (el.getBoundingClientRect().right > window.innerWidth + 1) out.push(el.className)
+      }
+      const last = document.querySelector('[data-testid="tc-generation-4"]').getBoundingClientRect()
+      return { out: out.slice(0, 3), lastReachable: last.right <= window.innerWidth + 1 }
+    })
+    check(11, `nothing is clipped at ${width}px`, clipped.out.length === 0, clipped.out.join(', '))
+    check(11, `the last generation option is reachable at ${width}px`, clipped.lastReachable)
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+
   await browser.close()
 
   console.log(
