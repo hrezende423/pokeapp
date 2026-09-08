@@ -433,9 +433,18 @@ record and is NOT app code.
   `team-builder/pages.ts`, for the same reason. Consequence: `dex-switcher`
   wraps this entry too, so verify-dexes narrows to the registered dex ids
   rather than asserting nothing else shares the wrapper.
-- **TWO NAMED REGIONS, AND THE RAIL IS THE SHELL'S.**
+- **TWO NAMED REGIONS, AND ONLY THE LEFT ONE SCROLLS.**
   `data-layout="type-coverage-main"` is a grid of `content rail` — the view
-  left, the controls right, directly under the tab strip. The generation
+  left inside its own `ScrollArea`, the controls right **outside** it, directly
+  under the tab strip. The rail is a SIBLING of the scroller, not a child:
+  `position: sticky` inside one scroller would look identical until the rail
+  grew taller than the window, then scroll away too. `.tc-main` needs
+  `flex: 1; min-height: 0` or the grid grows to fit all 153 rows and nothing
+  scrolls — the bottom just becomes unreachable. `.tc-scroll-col` exists
+  because `ScrollArea` is `flex: 1; min-height: 0` and needs a bounded flex
+  parent to resolve against. Two scrollers side by side is an established
+  arrangement here (the Itemdex rail and its detail panel), which is why
+  `ScrollArea`'s back-to-top anchors to its own section, not the viewport. The generation
   dropdown has to land in the SAME place on all four tabs, so the rail belongs
   to the shell and Matrix's toggle state lives in `useMatrixControls` rather
   than inside the view. **`--tc-rail: 132px` is a FIXED track and that is

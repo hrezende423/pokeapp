@@ -117,17 +117,46 @@
   grid-template-areas: 'content rail';
   grid-template-columns: minmax(0, 1fr) var(--tc-rail);
   gap: var(--space-gap-lg);
-  align-items: start;
-  padding-bottom: var(--space-gap-xl);
+  /*
+    THE GRID TAKES THE REST OF THE MODULE'S HEIGHT, which is what lets the
+    content column be a bounded scroller and the rail be static beside it.
+    `min-height: 0` is not optional here: a flex item's automatic minimum is its
+    content, so without it the grid would grow to fit the whole 153-row matrix
+    and nothing would scroll -- the bottom would just be unreachable, which is
+    exactly the clipping this app's scroll model makes silent.
+  */
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+  The scrolling half. ScrollArea's own box is `flex: 1; min-height: 0`, so it
+  needs a flex parent with a bounded height to resolve against -- this is that
+  parent, and it is why the column exists as a wrapper rather than ScrollArea
+  sitting directly in the grid cell.
+*/
+.tc-scroll-col {
+  grid-area: content;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
 .tc-content {
-  grid-area: content;
   min-width: 0;
+  /* Inside the scroller now, so the bottom of a long view clears the edge. */
+  padding-bottom: var(--space-gap-xl);
 }
 
+/*
+  THE STATIC HALF. It is a sibling of the scroller, not a child of it, so it
+  does not move at all -- `align-self: start` keeps it the height of its own
+  controls rather than stretching down the grid row.
+*/
 .tc-rail {
   grid-area: rail;
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: var(--space-gap-md);
@@ -902,6 +931,9 @@ table.tc-against-table td.tc-against-enemy {
       'rail'
       'content';
     grid-template-columns: minmax(0, 1fr);
+    /* The rail takes what it needs and the scroller takes the rest, so the
+       controls stay put above a view that scrolls under them. */
+    grid-template-rows: auto minmax(0, 1fr);
     gap: var(--space-gap-sm);
   }
 

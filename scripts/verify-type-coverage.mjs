@@ -442,6 +442,63 @@ async function main() {
   check(7, 'Card is a four-column grid', cardShape.tracks === 4, `${cardShape.tracks} tracks`)
   check(7, 'four cards sit in the first row', cardShape.firstRow === 4, `${cardShape.firstRow}`)
 
+  /*
+    THE RAIL IS STATIC: it is a SIBLING of the scroller, not a child of it, so it
+    cannot move at all -- and that is asserted structurally as well as by
+    position. `position: sticky` inside the scroller would pass a
+    "does it move" check while still scrolling away the moment the rail itself
+    grew taller than the window, so the containment test is the one that pins
+    down the actual shape.
+
+    Every tab is driven, because each has a different content height and only
+    some of them make the column scroll at all.
+  */
+  for (const t of ['Flow', 'Against', 'Card', 'Matrix']) {
+    await page.locator('.tc-subnav .ds-tab', { hasText: t }).click()
+    await page.mouse.move(20, 860)
+    await page.waitForTimeout(200)
+    const railY = () =>
+      page.evaluate(() =>
+        Math.round(document.querySelector('[data-testid="tc-generation"]').getBoundingClientRect().top),
+      )
+    const yBefore = await railY()
+    const scrolled = await page.evaluate(() => {
+      const sa = document.querySelector('[data-testid="tc-scroll-area"]')
+      sa.scrollTo({ top: sa.scrollHeight })
+      return Math.round(sa.scrollTop)
+    })
+    await page.waitForTimeout(200)
+    const yAfter = await railY()
+    check(
+      7,
+      `${t}: the rail does not move when the content scrolls`,
+      yBefore === yAfter,
+      `scrolled ${scrolled}px, rail ${yBefore} -> ${yAfter}`,
+    )
+    /* Nothing may be clipped: the end of the view has to be reachable. */
+    const reachable = await page.evaluate(() => {
+      const sa = document.querySelector('[data-testid="tc-scroll-area"]')
+      const content = document.querySelector('.tc-content')
+      return content.getBoundingClientRect().bottom <= sa.getBoundingClientRect().bottom + 2
+    })
+    check(7, `${t}: the bottom of the view is reachable`, reachable)
+    await page.evaluate(() => document.querySelector('[data-testid="tc-scroll-area"]').scrollTo({ top: 0 }))
+  }
+  const railShape = await page.evaluate(() => {
+    const sa = document.querySelector('[data-testid="tc-scroll-area"]')
+    const rail = document.querySelector('.tc-rail')
+    return {
+      outside: !sa.contains(rail),
+      ownScroll: rail.scrollHeight - rail.clientHeight,
+    }
+  })
+  check(7, 'the rail lives OUTSIDE the scrolling element', railShape.outside)
+  check(7, 'and the rail is not a scroller itself', railShape.ownScroll === 0, `${railShape.ownScroll}px`)
+
+  await page.locator('.tc-subnav .ds-tab', { hasText: 'Matrix' }).click()
+  await page.mouse.move(20, 860)
+  await page.waitForTimeout(180)
+
   /* The removed labels stay removed. */
   await page.locator('.tc-subnav .ds-tab', { hasText: 'Matrix' }).click()
   await page.mouse.move(20, 860)

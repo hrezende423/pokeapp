@@ -18,9 +18,10 @@ import './typecoverage.css'
  * the reading that answers a lookup ("what does Ice do to Ground/Flying") in one
  * glance; the other three re-frame the same chart for a different question.
  *
- * TWO REGIONS, NAMED, AND THE RAIL IS THE SHELL'S. `data-layout="type-coverage-main"`
- * is a grid of `content rail`: the view on the left, the controls on the right,
- * directly under the tab strip. The rail belongs to the shell rather than to each
+ * TWO REGIONS, NAMED, AND ONLY ONE OF THEM SCROLLS. `data-layout="type-coverage-main"`
+ * is a grid of `content rail`: the view on the left inside its own ScrollArea,
+ * the controls on the right OUTSIDE it, directly under the tab strip and static
+ * however far the view scrolls. The rail belongs to the shell rather than to each
  * view because the generation dropdown has to land in the SAME place on all four
  * tabs -- four views each placing it would be four coordinates that do not refer
  * to one another, which is the failure the layout rules were adopted to stop.
@@ -70,35 +71,48 @@ export function TypeCoverage() {
       </div>
 
       {/*
-        ONE SCROLLER PER SCREEN, and it is this one: #root is pinned to the
-        viewport and .panel clips, so a module without a ScrollArea simply ends
-        mid-page with the bottom unreachable.
+        THE RAIL IS OUTSIDE THE SCROLLER, and that is the point of this shape:
+        only the CONTENT column scrolls, so the controls stay where they are
+        however far down the matrix you go. Making the rail `position: sticky`
+        inside one scroller would have looked the same until the rail itself grew
+        taller than the window, at which point it would start scrolling too.
 
-        The Matrix tab's TABLE scrolls itself as well, and that is not a second
+        Two scrollable sections side by side is an established arrangement in
+        this app rather than a new one -- the Itemdex rail and its detail panel
+        do the same, which is why ScrollArea's back-to-top control is anchored
+        to its own section and not to the viewport.
+
+        The content column still needs a ScrollArea: #root is pinned to the
+        viewport and .panel clips, so a module without one simply ends mid-page
+        with the bottom unreachable.
+
+        The Matrix tab's TABLE scrolls itself as well, and that is not a third
         answer to the same problem -- it is what gives the frozen headers
         something to stick to. See the note in TypeMatrixView.
       */}
-      <ScrollArea testId="tc-scroll-area">
-        <div className="tc-main" data-layout="type-coverage-main" data-tab={tab}>
-          <div className="tc-content" role="tabpanel" data-testid={`tc-panel-${tab.toLowerCase()}`}>
-            {/* NOT keyed by generation: switching era must not throw away the
-                orientation and toggles the reader just set. TypeMatrixView
-                clamps its own type filter to the types the generation has. */}
-            {tab === 'Matrix' && (
-              <TypeMatrixView generation={scope.generation} controls={controls} />
-            )}
-            {tab === 'Flow' && <TypeFlowView generation={scope.generation} />}
-            {tab === 'Against' && <TypeAgainstView generation={scope.generation} />}
-            {tab === 'Card' && <TypeCardView generation={scope.generation} />}
-          </div>
-
-          <ControlRail
-            scope={scope}
-            controls={controls}
-            showMatrixControls={tab === 'Matrix'}
-          />
+      <div className="tc-main" data-layout="type-coverage-main" data-tab={tab}>
+        <div className="tc-scroll-col">
+          <ScrollArea testId="tc-scroll-area">
+            <div
+              className="tc-content"
+              role="tabpanel"
+              data-testid={`tc-panel-${tab.toLowerCase()}`}
+            >
+              {/* NOT keyed by generation: switching era must not throw away the
+                  orientation and toggles the reader just set. TypeMatrixView
+                  clamps its own type filter to the types the generation has. */}
+              {tab === 'Matrix' && (
+                <TypeMatrixView generation={scope.generation} controls={controls} />
+              )}
+              {tab === 'Flow' && <TypeFlowView generation={scope.generation} />}
+              {tab === 'Against' && <TypeAgainstView generation={scope.generation} />}
+              {tab === 'Card' && <TypeCardView generation={scope.generation} />}
+            </div>
+          </ScrollArea>
         </div>
-      </ScrollArea>
+
+        <ControlRail scope={scope} controls={controls} showMatrixControls={tab === 'Matrix'} />
+      </div>
     </div>
   )
 }
