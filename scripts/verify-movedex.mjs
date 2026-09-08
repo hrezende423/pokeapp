@@ -241,13 +241,23 @@ try {
   log(`  tabs: ${tabs.join(', ')}`)
   // Derived from the registry rather than hardcoded: registering another module
   // must not break this assertion, which is the whole point of the array.
-  const registryCount = [
-    ...readFileSync('src/modules/nav/registry.ts', 'utf8').matchAll(/\{\s*id:\s*'([a-z]+)'/g),
-  ].length
+  // [a-z-] so a hyphenated id is picked up rather than silently dropped.
+  const registryIds = [
+    ...readFileSync('src/modules/nav/registry.ts', 'utf8').matchAll(/\{\s*id:\s*'([a-z-]+)'/g),
+  ].map((m) => `nav-${m[1]}`)
+  /*
+    EVERY REGISTERED DEX IS PRESENT, rather than "nothing else shares the
+    wrapper". The Pokepedia tab now also carries Type Coverage, which is NOT a
+    dex -- no entry list, no per-entry selection -- so it registers in
+    typecoverage/pages.ts rather than in DEX_MODULES and navConfig appends it
+    after the dexes. Counting buttons in `dex-switcher` therefore counts one
+    more than the registry has, which was never the claim being tested.
+  */
+  const missing = registryIds.filter((id) => !tabs.includes(id))
   check(
-    `all ${registryCount} registered modules render as tabs`,
-    tabs.length === registryCount,
-    `(${tabs.length} tabs vs ${registryCount} registered)`,
+    `all ${registryIds.length} registered dexes render as tabs`,
+    missing.length === 0,
+    missing.length ? `missing ${missing.join(', ')}` : `(${tabs.length} entries on the tab)`,
   )
   check('Movedex has a tab', tabs.includes('nav-movedex'))
   await goTo('movedex')

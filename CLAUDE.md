@@ -409,7 +409,8 @@ record and is NOT app code.
   is pure Flying, and in Gen 1 nothing is pure Rock, Ghost or Ice either — so
   pruning made the Gen 1 chart 11 columns against 15 rows. Existing keeps its
   stated meaning where it is a CONTROL (Custom); Standard shows the full
-  system. **Flagged to the owner, not silently decided.**
+  system. **CONFIRMED by the owner — keep the columns. Settled; do not
+  re-litigate.**
 - **The matrix table is its own scroller and that is load-bearing.**
   `position: sticky` resolves against the nearest *scrolling* ancestor, so a
   table that merely grows the page has nothing to stick to — the mockup's

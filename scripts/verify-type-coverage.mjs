@@ -6,12 +6,26 @@
  * "the dark row highlight differs from the page ground" survives a token change,
  * "#1c1c1e" does not.
  *
- * Run: node scripts/verify-type-coverage.mjs [baseUrl]
+ * Run: npm run build && npm run verify:type-coverage
  */
 
 import { chromium } from 'playwright'
+import { startPreviewServer } from './lib/devServer.mjs'
 
-const BASE = process.argv[2] ?? 'http://localhost:5199/pokeapp/'
+/*
+  IT HOSTS ITS OWN SERVER, like every other browser suite here, and that was a
+  real defect rather than a convenience: this suite used to point at whatever was
+  answering on the dev port, so it could not run in a clean pass or in CI at all
+  -- it simply failed with ERR_CONNECTION_REFUSED -- and when something WAS
+  listening it would happily test a stale dev server, or another project's.
+
+  startPreviewServer is what the other suites use and it earns its place: it
+  refuses to start if the port already answers (turning an orphaned server from a
+  silent wrong answer into a loud failure) and it byte-matches the served
+  index.html against the local dist/index.html before returning, so the browser
+  is provably looking at THIS build. Run `npm run build` first.
+*/
+const PORT = 4195
 const results = []
 let failures = 0
 
@@ -28,8 +42,8 @@ function section(n, title) {
 }
 
 /** Opens Pokepedia's dropdown and clicks the Type Coverage entry. */
-async function openModule(page) {
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' })
+async function openModule(page, base) {
+  await page.goto(base, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-testid="dex-switcher"], .nav-trigger, .panel', {
     timeout: 20000,
   })
@@ -59,6 +73,7 @@ const tabNames = (page) =>
 const rowCount = (page) => page.locator('[data-testid="tc-row"]').count()
 
 async function main() {
+  const preview = await startPreviewServer({ port: PORT })
   const browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const consoleErrors = []
@@ -66,7 +81,7 @@ async function main() {
     if (m.type() === 'error') consoleErrors.push(m.text())
   })
 
-  await openModule(page)
+  await openModule(page, preview.url)
 
   // ---------------------------------------------------------------- 1. By Type
   section(1, '"By type" is gone')
@@ -707,6 +722,7 @@ async function main() {
   await page.setViewportSize({ width: 1440, height: 900 })
 
   await browser.close()
+  preview.stop()
 
   console.log(
     `\n${results.length - failures}/${results.length} checks passed${

@@ -90,6 +90,9 @@ export function useMatrixControls(): MatrixControls {
       So Existing keeps the meaning the brief gives it exactly where it is a
       CONTROL, which is Custom. In Standard, where it is not a control at all,
       the axes stay the full type system.
+
+      CONFIRMED BY THE OWNER: keep the columns. This is settled rather than an
+      open judgement call -- do not "fix" it back to a literal reading.
     */
     effectiveExistence: layout === 'standard' ? 'all' : existence,
     customControls: layout === 'custom',
