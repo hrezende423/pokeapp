@@ -1,0 +1,797 @@
+/*
+  Type Coverage.
+
+  TOKEN-SCALED, not frame-scaled (MODULE-PATTERNS §1): this screen is a data
+  table, not a reproduction of one fixed Figma frame, so its sizes come from
+  --font-size-* and its own gap scale rather than from a --dp-u unit.
+
+  ITS OWN GAP SCALE, declared once. The design system's --space-gap-* starts at
+  8px, which is too coarse for a 17-column table where a cell's padding is 2px --
+  the same reason Team Building declares --tb-1..6. Declaring a scale is the
+  sanctioned move; picking raw px per rule is not.
+
+  ONE LEADING FOR THE WHOLE MODULE. The page body is 26.1px, which is right for
+  prose and wrong for a table of one fact per line: seventeen rows at that
+  leading did not fit an 800px window in the team matchup panel either, and this
+  table has up to 153 of them.
+*/
+
+.tc {
+  --tc-1: 2px;
+  --tc-2: 4px;
+  --tc-3: 6px;
+  --tc-4: 8px;
+  --tc-5: 12px;
+  /* One fact per line, so the page's 26.1px is far too much. */
+  --tc-line: 17px;
+
+  /*
+    THE ROW HIGHLIGHT, HOSTED AS A TOKEN so the two themes differ in one place
+    rather than in a duplicated rule.
+
+    DARK MODE CANNOT USE --surface-hover, and this is the actual bug that was
+    reported: in dark that token is #141414, byte-identical to --surface, so the
+    hover rule painted a colour indistinguishable from the page and the
+    highlight was invisible while the CSS looked correct.
+
+    --surface-raised (#1c1c1e) is the fix, and it is a REUSED token rather than a
+    new one on purpose: "elevation is a tone-step, --surface vs --surface-raised"
+    is the design system's own rule for exactly this, so a hovered row reading as
+    one step above the page is the system's existing vocabulary. It is a dark grey
+    -- no light-theme value bleeds through -- and it is the only grey already
+    defined a step above the dark surface.
+  */
+  --tc-row-hover: var(--surface-hover);
+
+  /*
+    HOW TALL THE MATRIX BOX IS ALLOWED TO GET. A max rather than a height, so a
+    short table is still only as tall as its rows. See .tc-matrix-scroll for why
+    the box scrolls at all.
+  */
+  --tc-matrix-max: 68vh;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding: var(--space-gap-md) var(--space-gap-lg) 0;
+  line-height: var(--tc-line);
+}
+
+[data-theme='dark'] .tc {
+  --tc-row-hover: var(--surface-raised);
+}
+
+.num {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ------------------------------------------------------------- page chrome */
+
+.tc-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-gap-lg);
+  margin-bottom: var(--space-gap-sm);
+  flex: none;
+}
+
+.tc-title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-medium);
+  line-height: 24px;
+}
+
+.tc-note {
+  margin: var(--tc-2) 0 0;
+  max-width: 68ch;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+/* The species page's right-aligned sub-nav. */
+.tc-subnav {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.tc-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-gap-md);
+  margin-bottom: var(--space-gap-sm);
+  flex: none;
+}
+
+.tc-scope-note,
+.tc-axis-note {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+.tc-body {
+  padding-bottom: var(--space-gap-xl);
+}
+
+.tc-section-label,
+.tc-control-label {
+  display: block;
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+/* ------------------------------------------------------- segmented control */
+/* The theme switcher's pill, and the species scope segments: a --hairline track
+   with the selected segment lifted one tone step. No accent, no shadow. */
+
+.tc-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tc-4);
+}
+
+.tc-control-label {
+  display: inline;
+}
+
+.tc-segments {
+  display: inline-flex;
+  gap: 0;
+  padding: 3px;
+  background: var(--hairline);
+  border-radius: 10px;
+}
+
+.tc-segment {
+  padding: var(--tc-2) var(--tc-5);
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--font-weight-regular);
+  line-height: 1;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  /* Both segments reserve the bold metrics, so selecting one does not shift the
+     other sideways -- without this the pill jiggles on every switch. */
+  min-width: 3.9rem;
+}
+
+.tc-segment[data-active='true'] {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+  background: var(--surface-raised);
+  cursor: default;
+}
+
+.tc-segment:focus-visible,
+.tc-filter:focus-visible,
+.tc-row-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------------------ matrix controls */
+
+.tc-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-4);
+  margin-bottom: var(--space-gap-sm);
+}
+
+.tc-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-gap-md);
+}
+
+.tc-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tc-3) var(--space-gap-md);
+}
+
+.tc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tc-3) var(--space-gap-md);
+  align-items: baseline;
+}
+
+/*
+  THE FILTER IS UNDERLINED, NOT FILLED, and that is a design-system requirement
+  rather than a style choice: "nothing gets a badge -- no fill, no pill, no chip,
+  anywhere". A selected filter is its type's own colour with a 2px rule under it;
+  an unselected one is the same label at 45%.
+
+  NOTE this is deliberately NOT components/TypeFilter.tsx. That component fills
+  its selected buttons with the type colour and sets a white foreground, which is
+  the chip this rule forbids; it predates the redesign and is kept for the two
+  pre-redesign dexes that use it. Reusing it here would import a forbidden
+  pattern into a new module.
+
+  The underline is already this page's language for "active" -- it is what the
+  tab strip does.
+*/
+.tc-filter {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0 0 3px;
+  font: inherit;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: var(--tc-line);
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.tc-filter[data-on='true'] {
+  opacity: 1;
+  border-bottom-color: currentColor;
+}
+
+.tc-filter-clear {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tc-count {
+  margin: 0;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+.tc-count .num {
+  font-size: var(--font-size-caption);
+}
+
+/* ------------------------------------------------------------------- matrix */
+
+/*
+  THE TABLE SCROLLS INSIDE ITS OWN BOX, and that is what makes the headers
+  freeze. `position: sticky` resolves against the nearest SCROLLING ancestor, so
+  a table that merely grows the page has nothing to stick to -- the column
+  headers already declared `top: 0` in the mockup and still scrolled away for
+  exactly that reason.
+
+  BOTH AXES, not one. Vertical freezing was the request; the horizontal freeze on
+  the row headers was already here and is kept deliberately -- the row label IS
+  what a row means, and seventeen columns do not fit a phone.
+*/
+.tc-matrix-scroll {
+  overflow: auto;
+  max-height: var(--tc-matrix-max);
+  max-width: 100%;
+  /* The sticky headers paint over the rows sliding under them, so the box needs
+     its own ground -- a transparent one would show the rows through the gaps. */
+  background: var(--surface);
+}
+
+table.tc-table {
+  border-collapse: collapse;
+}
+
+table.tc-table th,
+table.tc-table td {
+  border: 1px solid var(--hairline);
+  padding: 0;
+  height: 24px;
+  min-width: 30px;
+  line-height: 22px;
+  text-align: center;
+}
+
+/* Top-left: sticky on BOTH axes, so it stays over the corner both headers
+   otherwise scroll into. Above both, hence the highest z-index of the three. */
+table.tc-table th.tc-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  border: none;
+  padding: 0 var(--tc-4) 0 0;
+  text-align: left;
+  background: var(--surface);
+  font-weight: var(--font-weight-regular);
+  white-space: nowrap;
+}
+
+/* The column headers -- the freeze this pass was asked for. */
+table.tc-table th.tc-col-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0 5px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  background: var(--surface);
+}
+
+table.tc-table th.tc-row-head {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 0 var(--tc-4) 0 0;
+  border-left: none;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-align: right;
+  white-space: nowrap;
+  background: var(--surface);
+}
+
+table.tc-table th.tc-row-head-combo {
+  padding-left: var(--tc-3);
+  min-width: 152px;
+  font-size: var(--font-size-caption);
+  cursor: help;
+}
+
+/*
+  A COMBINATION NOTHING HAS is still a legal defensive typing with real
+  arithmetic, so it is dimmed rather than hidden -- 60% is this page's way of
+  saying "this row is true about nothing that exists".
+*/
+table.tc-table th.tc-row-head-combo[data-exists='false'] {
+  opacity: 0.6;
+}
+
+.tc-combo-sep {
+  color: var(--text-secondary);
+  padding: 0 3px;
+}
+
+/*
+  A READING AID, NOT DECORATION: at 153 rows by 17 columns the eye loses the row.
+  ONE ROW, never a row-and-column crosshair -- the question a reader is holding
+  is "what happens to this typing", which is a row.
+
+  The row header is included so the highlight starts at the label; it is sticky
+  and would otherwise keep the page ground while its own row changed tone.
+*/
+table.tc-table tbody tr:hover th.tc-row-head,
+table.tc-table tbody tr:hover td {
+  background: var(--tc-row-hover);
+}
+
+table.tc-table td {
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  THE FACTS, AS COLOURED TEXT -- no cell fills, no badges.
+
+  GREEN FOR MORE DAMAGE, RED FOR LESS, both measured rather than picked:
+  --effect-super is 6.23:1 on the light ground and 6.36:1 on the dark one against
+  the resist red's 6.26:1 and 6.38:1, matched pairwise so neither out-shouts the
+  other. The green is an EMERALD rather than a leaf green because the Grass and
+  Bug labels are already green and sit in the same table.
+
+  1x IS TRANSPARENT, NOT ABSENT: two hundred of these cells are neutral and
+  drawing them would bury the eighty-nine that are not, but the glyph stays in
+  the box so the column widths do not depend on which cells happen to be neutral.
+
+  0x IS THE PAGE'S OWN INK -- black on light, white on dark -- because "nothing
+  happens" is not a warmer or cooler fact than the others, it is the absence of
+  one.
+*/
+table.tc-table td[data-m='4'],
+table.tc-table td[data-m='2'] {
+  color: var(--effect-super);
+  font-weight: var(--font-weight-bold);
+}
+
+table.tc-table td[data-m='0.5'],
+table.tc-table td[data-m='0.25'] {
+  color: var(--effect-resist);
+}
+
+table.tc-table td[data-m='0'] {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+table.tc-table td[data-m='1'] {
+  color: transparent;
+}
+
+.tc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tc-4) var(--space-gap-lg);
+  margin-top: var(--space-gap-sm);
+}
+
+.tc-legend-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--tc-3);
+  white-space: nowrap;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+.tc-legend-item .num {
+  font-size: var(--font-size-caption);
+}
+
+.tc-more {
+  color: var(--effect-super);
+  font-weight: var(--font-weight-bold);
+}
+
+.tc-less {
+  color: var(--effect-resist);
+}
+
+.tc-none {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+/*
+  The species list behind a row header. Fixed-positioned so it escapes the
+  table's own scroller instead of being clipped by it -- the same reason the
+  Team Building coverage panels are portalled out of their card.
+
+  --surface-raised plus a hairline is the whole recipe for a floating panel;
+  there is no shadow in this app, in either theme.
+*/
+.tc-holders {
+  position: fixed;
+  z-index: 60;
+  max-width: 320px;
+  max-height: 240px;
+  overflow: auto;
+  padding: var(--space-gap-sm) var(--space-gap-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  font-size: var(--font-size-caption);
+  line-height: var(--tc-line);
+}
+
+.tc-holders-head {
+  display: block;
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-bottom: var(--tc-2);
+}
+
+/* ------------------------------------------------------------- type labels */
+
+.tc-ty {
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.tc-ty-sm {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  line-height: var(--tc-line);
+}
+
+.tc-run {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--tc-4);
+}
+
+.tc-empty-note {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+/* --------------------------------------------------------------------- flow */
+/*
+  THE SPINE. One hairline running the height of the block through the middle,
+  each type name breaking it, and the multipliers pinned to the INNER edge of
+  each wing so the numbers sit against the spine and the runs flow outward.
+
+  CAPPED AND CENTRED, because this view is one OBJECT rather than a band of page.
+  Full-bleed, the wings were mostly white space with the runs pressed against the
+  spine, which read as two columns that happened to be near each other.
+*/
+
+.tc-flow {
+  position: relative;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.tc-flow-head,
+.tc-flow-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 124px minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-gap-md);
+}
+
+.tc-flow-head {
+  padding-bottom: var(--tc-3);
+}
+
+.tc-flow-head .tc-section-label:first-child {
+  text-align: right;
+}
+
+.tc-flow-row {
+  padding: var(--space-gap-md) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.tc-flow-row:hover {
+  background: var(--tc-row-hover);
+}
+
+/*
+  `align-self: stretch` is what makes the spine one continuous line: as a centred
+  grid item it is only as tall as its own 17px label, so the rule could not reach
+  the row's edges and came out as a dash per row instead of a line down the page.
+*/
+.tc-spine {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tc-spine::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--space-gap-md) - 1px);
+  bottom: calc(-1 * var(--space-gap-md));
+  border-left: 1px solid var(--hairline);
+}
+
+.tc-spine-type {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  padding: 0 var(--tc-4);
+  background: var(--surface);
+  /* Body size, not label size: it is the thing the two wings hang off. */
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* So the break in the hairline follows the row highlight rather than staying
+   the page's tone inside a highlighted row. */
+.tc-flow-row:hover .tc-spine-type {
+  background: var(--tc-row-hover);
+}
+
+.tc-wing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-1);
+  min-width: 0;
+}
+
+.tc-wing-tier {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tc-4);
+  min-width: 0;
+}
+
+/* Left wing reads inward to the spine, right wing outward from it. */
+.tc-wing-left .tc-wing-tier {
+  flex-direction: row-reverse;
+}
+
+.tc-wing-left .tc-run {
+  justify-content: flex-end;
+}
+
+.tc-wing-mult {
+  flex: 0 0 auto;
+  font-size: var(--font-size-caption);
+  line-height: var(--tc-line);
+}
+
+.tc-wing-mult[data-m='4'],
+.tc-wing-mult[data-m='2'] {
+  color: var(--effect-super);
+  font-weight: var(--font-weight-bold);
+}
+
+.tc-wing-mult[data-m='0.5'],
+.tc-wing-mult[data-m='0.25'] {
+  color: var(--effect-resist);
+}
+
+.tc-wing-mult[data-m='0'] {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ------------------------------------------------------------------ against */
+
+/* Its own scroller, so five columns of type runs never push the page sideways. */
+.tc-against-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+table.tc-against-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+table.tc-against-table th {
+  text-align: left;
+  padding: 0 var(--space-gap-md) var(--tc-3) 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+/*
+  NO ROW GAP ON A BORDERED-ROW TABLE. The hairline-band rule: where rows draw
+  their own border-bottom, the band a reader sees runs from one hairline to the
+  next, so a row gap lands INSIDE that band and centred content reads a half-gap
+  low. The padding is the only thing setting the rhythm here.
+*/
+table.tc-against-table td {
+  padding: var(--tc-5) var(--space-gap-md) var(--tc-5) 0;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: top;
+  line-height: var(--tc-line);
+}
+
+table.tc-against-table tbody tr:hover td {
+  background: var(--tc-row-hover);
+}
+
+table.tc-against-table td.tc-against-enemy {
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------- cards */
+
+.tc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: var(--space-gap-lg);
+  margin-top: var(--tc-4);
+}
+
+.tc-card {
+  position: relative;
+  padding: var(--space-gap-md) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.tc-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tc-4);
+  margin-bottom: var(--tc-3);
+}
+
+.tc-card-line {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: var(--tc-3);
+  align-items: baseline;
+}
+
+.tc-card-line-label {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+  /* The label is one token ("2x from") and must never break across lines --
+     a wrapped label pushes every tile's rows out of alignment. */
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------- phone */
+
+@media (max-width: 720px) {
+  .tc {
+    padding: var(--space-gap-md) var(--space-gap-md) 0;
+  }
+
+  .tc-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tc-subnav {
+    justify-content: flex-start;
+    overflow: auto;
+  }
+
+  .tc-flow-head {
+    display: none;
+  }
+
+  .tc-flow-row {
+    grid-template-columns: 1fr;
+    row-gap: var(--tc-4);
+  }
+
+  /* The type LEADS its block on a phone: stacked, a centred name between two
+     wings reads as the end of the block above it. */
+  .tc-spine {
+    order: -1;
+    justify-content: flex-start;
+  }
+
+  .tc-spine::before {
+    display: none;
+  }
+
+  .tc-spine-type {
+    padding: 0;
+  }
+
+  .tc-wing-left .tc-wing-tier {
+    flex-direction: row;
+  }
+
+  .tc-wing-left .tc-run {
+    justify-content: flex-start;
+  }
+
+  /* Each wing names itself once the head row is gone. */
+  .tc-wing::before {
+    content: attr(data-side);
+    font-size: var(--font-size-label);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    line-height: var(--tc-line);
+  }
+}

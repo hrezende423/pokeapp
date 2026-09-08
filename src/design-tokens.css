@@ -189,6 +189,19 @@
   --stat-increase: #b3261e;
   --stat-decrease: #1f5fa8;
 
+  /* Type-effectiveness direction, for the type chart's multiplier cells. Green
+     for more damage, red for less, measured the way the arrows above were:
+     --effect-super is 6.23:1 on #fafafa against the resist red's 6.26:1, matched
+     pairwise so neither out-shouts the other.
+     THE GREEN IS AN EMERALD, NOT A LEAF GREEN, because the Grass and Bug type
+     labels are already green and sit in the same table -- 68 units of RGB
+     distance in light, 76 in dark, so a green digit never reads as a type name.
+     The red is the verified --stat-increase hex reused, so no new red enters the
+     palette. 0x takes --text-primary: "nothing happens" is not a warmer or
+     cooler fact than the others, it is the absence of one. */
+  --effect-super: #186b45;
+  --effect-resist: #b3261e;
+
   /* buttons */
   --button-primary-fill: #3a3a3a; /* ink.800 — deliberately not full ink.900 black */
   --button-primary-text: #ffffff;
@@ -255,6 +268,11 @@
      the dark --accent (#ff3b4e). */
   --stat-increase: #e8776a;
   --stat-decrease: #6ba3d6;
+
+  /* 6.36:1 super against the resist red's 6.38:1 on #141414, matched the same
+     way as the light pair. See the light block for why the green is an emerald. */
+  --effect-super: #35ac68;
+  --effect-resist: #e8776a;
 
   --button-primary-fill: #f5f5f5;
   --button-primary-text: #141414;

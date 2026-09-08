@@ -215,22 +215,39 @@ try {
 
   // ------------------------------------------------------------ item 0: nav
   hr('ITEM 0 — navigation switcher, driven by the module registry')
-  const tabs = await page.$$eval('[data-testid="dex-switcher"] button', (els) =>
+  // Derived from the registry source, not hardcoded: registering another dex must
+  // not require editing this assertion, which is the whole point of the array.
+  const registrySrc = readFileSync('src/modules/nav/registry.ts', 'utf8')
+  // [a-z-] rather than [a-z] so a hyphenated dex id would be picked up rather
+  // than silently dropped, which would read as a missing tab.
+  const registryIds = [...registrySrc.matchAll(/\{\s*id:\s*'([a-z-]+)'/g)].map((m) => m[1])
+  log(`  registry declares: ${registryIds.join(', ')}`)
+  check('registry is non-empty', registryIds.length > 0)
+
+  const allEntries = await page.$$eval('[data-testid="dex-switcher"] button', (els) =>
     els.map((e) => ({
       id: e.getAttribute('data-testid'),
       label: e.textContent.trim(),
       current: e.getAttribute('aria-current'),
     })),
   )
-  log(`  tabs: ${tabs.map((t) => t.label).join(' | ')}`)
-  // Derived from the registry source, not hardcoded: registering another dex must
-  // not require editing this assertion, which is the whole point of the array.
-  const registrySrc = readFileSync('src/modules/nav/registry.ts', 'utf8')
-  const registryIds = [...registrySrc.matchAll(/\{\s*id:\s*'([a-z]+)'/g)].map((m) => m[1])
-  log(`  registry declares: ${registryIds.join(', ')}`)
-  check('registry is non-empty', registryIds.length > 0)
+  log(`  entries: ${allEntries.map((t) => t.label).join(' | ')}`)
+  /*
+    NARROWED TO THE REGISTERED DEXES, because the Pokepedia tab now also carries
+    a screen that is NOT one: Type Coverage has no entry list and no per-entry
+    selection, so it registers in typecoverage/pages.ts rather than in
+    DEX_MODULES and navConfig appends it after the dexes.
+
+    So this suite asserts "every registered dex is here, in registry order" --
+    which is what it was always for -- rather than "nothing else shares the
+    wrapper", which was never the claim being tested and is no longer true. The
+    walk below expects a dex-shaped module, and a non-dex cannot satisfy it.
+  */
+  const dexIdSet = new Set(registryIds.map((id) => `nav-${id}`))
+  const tabs = allEntries.filter((t) => dexIdSet.has(t.id))
+  log(`  dex tabs: ${tabs.map((t) => t.label).join(' | ')}`)
   check(
-    'every registered module renders as a tab',
+    'every registered dex renders as a tab',
     tabs.length === registryIds.length,
     `(${tabs.length} tabs vs ${registryIds.length} registered)`,
   )

@@ -1,6 +1,7 @@
 import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
+import { TYPE_COVERAGE_PAGES, findTypeCoveragePage, type TypeCoveragePageId } from '../typecoverage/pages'
 import { DEX_MODULES, findModule, type DexModuleId } from './registry'
 import type { ComponentType } from 'react'
 
@@ -26,7 +27,7 @@ import type { ComponentType } from 'react'
  * stubs (they have a real component). Keeping them separate is what lets findPage
  * resolve them without a stub fallback swallowing a real screen.
  */
-export type PageId = DexModuleId | TbPageId | StubPageId
+export type PageId = DexModuleId | TbPageId | TypeCoveragePageId | StubPageId
 
 export interface NavEntry {
   /** The page this entry opens. */
@@ -68,7 +69,18 @@ export const NAV_TABS: readonly NavTab[] = [
     id: 'pokepedia',
     label: 'Poképedia',
     itemsTestId: 'dex-switcher',
-    entries: DEX_MODULES.map((m) => ({ id: m.id, label: m.label })),
+    /*
+      THE DEXES, THEN THE SCREENS THAT ARE NOT DEXES. Type Coverage belongs on
+      this tab but is not a dex -- no entry list, no per-entry selection -- so it
+      registers in its own pages.ts rather than in DEX_MODULES, and joins here.
+      That keeps `dex-switcher` resolving to exactly the registered dexes, in
+      registry order, which is what verify-dexes asserts against the registry
+      source.
+    */
+    entries: [
+      ...DEX_MODULES.map((m) => ({ id: m.id, label: m.label })),
+      ...TYPE_COVERAGE_PAGES.map((p) => ({ id: p.id, label: p.label })),
+    ],
   },
   {
     id: 'team-building',
@@ -121,6 +133,8 @@ export function findPage(id: PageId): ResolvedPage {
   // shadow a real screen with a placeholder.
   const tb = findTeamBuildingPage(id)
   if (tb) return { id: tb.id, label: tb.label, Component: tb.Component }
+  const tc = findTypeCoveragePage(id)
+  if (tc) return { id: tc.id, label: tc.label, Component: tc.Component }
   const stub = findStub(id)
   if (stub) return { id: stub.id, label: stub.label, Component: StubPage }
   // Not reachable through PageId; findPage is also the shell's fallback.

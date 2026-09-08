@@ -71,6 +71,16 @@ disagrees with §1–§11, which were written before implementation.
   It reports partitions that FAILED rather than dropping them — a table
   missing three games must never read as "not in those games" — and throws
   only when every one of them failed.
+- **Type Coverage has its OWN generation selector — the SECOND sanctioned
+  exception**, also by explicit request (`useTypeCoverageScope`). The
+  question that page asks is "which type chart, and which combinations
+  really exist" — asked *about* a generation rather than inside one — so
+  answering it must not re-filter the app behind it. It seeds from the app
+  selection once on mount (the `useSpeciesGameScope` pattern) and then
+  diverges; the dependency runs one way only, so neither selector can move
+  the other. Generation only, no version-group axis: every game in a
+  generation shares one chart, so a second row would offer a choice that
+  changes nothing. Do not add a third exception without asking.
 - Sprites: GitHub Release assets in `hrezende423/pokeapp-sprites`,
   runtime-cached, NOT precached (648MB total, too large to bundle).
   `species-background-colors.json` lives in the same repo, fetched at
@@ -373,6 +383,62 @@ that isn't explicitly about design.)
 - Old (pre-redesign) modules — Itemdex, Abilitydex, Naturedex, Berrydex,
   Movedex — keep their own layout/components/colors untouched, but now
   inherit the app-wide Plex Sans default like everything else.
+
+## Type Coverage (Poképedia)
+
+Four tabs — **Matrix | Flow | Against | Card**, Matrix leading and default.
+Built from `design-system/typechart-mockup.html`, which stays as the design
+record and is NOT app code.
+
+- **Matrix is ONE computation read two ways.** `defendingRows` is built per
+  defending typing in attacking-type order; Custom renders it as it stands,
+  Standard reads the same array with the loops exchanged. The transpose is an
+  index swap, never a second table — that is what makes the two orientations
+  incapable of disagreeing about a cell. Do not add a separate Standard path.
+- **Custom is the default orientation**, and it is the only one that can show
+  4x / ¼x: those tiers need a defender holding two types, and only the row
+  axis carries a pair. 31 cells reach 4x in Gen 4, 48 fall to ¼x.
+- **Toggles B (Full/Single) and C (Existing/All) are Custom-only**, hidden
+  rather than disabled, and **switching orientation RESETS both to their
+  defaults plus clears the type filter** — by explicit request, so nobody
+  reads a matrix shaped by a control they cannot see.
+- **STANDARD DOES NOT PRUNE ITS AXES BY WHAT EXISTS**, and this is where the
+  brief contradicted itself. Standard is specified as "the traditional
+  layout" *and* as forcing Existing; those cannot both hold, because the
+  printed chart is a chart of the type system. Measured: nothing in Gen 1–4
+  is pure Flying, and in Gen 1 nothing is pure Rock, Ghost or Ice either — so
+  pruning made the Gen 1 chart 11 columns against 15 rows. Existing keeps its
+  stated meaning where it is a CONTROL (Custom); Standard shows the full
+  system. **Flagged to the owner, not silently decided.**
+- **The matrix table is its own scroller and that is load-bearing.**
+  `position: sticky` resolves against the nearest *scrolling* ancestor, so a
+  table that merely grows the page has nothing to stick to — the mockup's
+  column headers already declared `top: 0` and still scrolled away for
+  exactly that reason. **Both axes freeze**: vertical was the request, and the
+  horizontal row-header freeze was kept deliberately on request.
+- **The dark row highlight could not use `--surface-hover`.** In dark that
+  token is `#141414`, byte-identical to `--surface`, so the rule painted a
+  colour indistinguishable from the page while the CSS looked correct.
+  `--surface-raised` is the reuse, per "elevation is a tone-step".
+- **The type filter is underlined, not filled**, and is deliberately NOT
+  `components/TypeFilter.tsx` — that one fills selected buttons with the type
+  colour, which is the chip the design system forbids. It is kept for the
+  pre-redesign dexes; reusing it here would import a forbidden pattern.
+- **"By type" was dropped on request** and never built in `src/`. "Defending"
+  is not missing either — it IS Matrix's Custom orientation.
+- **Registered in `typecoverage/pages.ts`, NOT in `DEX_MODULES`.** It is not a
+  dex (no entry list, no per-entry selection) and `registry.ts` is the single
+  source of truth for what a dex is — `verify-dexes` walks that array and
+  requires each entry to mount a `dex-<id>` rows table. Same arrangement as
+  `team-builder/pages.ts`, for the same reason. Consequence: `dex-switcher`
+  wraps this entry too, so verify-dexes narrows to the registered dex ids
+  rather than asserting nothing else shares the wrapper.
+- **`typeCombos.ts` is combo-shaped everywhere**, and that is deliberate
+  future-proofing: Flow, Against and Card are expected to grow dual-type
+  support, so nothing takes a bare `typeId` on the defending side and the
+  three single-type views call `singleCombos()`. It computes no chart of its
+  own — `typeEffectivenessAgainst` in `data/era.ts` already composes across a
+  dual typing, and a wrong matrix still renders as a matrix.
 
 ## Known gotchas (already hit once)
 

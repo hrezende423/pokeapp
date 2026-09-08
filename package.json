@@ -23,6 +23,7 @@
     "verify:ds": "node scripts/verify-design-system.mjs",
     "verify:evo-icons": "node scripts/verify-evo-icons.mjs",
     "verify:species-page": "node scripts/verify-species-page.mjs",
+    "verify:type-coverage": "node scripts/verify-type-coverage.mjs",
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
     "audit:white-sprites": "node scripts/audit-white-sprites.mjs",
     "report:type-scale": "node scripts/report-type-scale.mjs"
