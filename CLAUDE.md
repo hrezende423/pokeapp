@@ -539,6 +539,28 @@ Use it to REVIEW: screenshot with it on and name the region, rather than
 describing a direction and a distance. It reads `grid-template-areas` from
 the computed style, so a name it prints is a name in the stylesheet.
 
+## Verification plumbing
+
+- **Every script that starts a server owns its port**, and
+  `verify-design-system` asserts it statically from the tracked file list.
+  Three scripts once shared 4183 (`verify-species-page`, `verify-eggmoves`,
+  `report-type-scale`) and two more pairs collided on 4193 and 4195 — so those
+  could never run concurrently, and before `startPreviewServer`'s port guard
+  existed the second one silently measured the first one's build. A collision
+  does not fail; it just quietly shares a server. That is why the check is
+  static and scanned rather than a hardcoded roster.
+- **Anything that needs a server goes through `scripts/lib/devServer.mjs`.**
+  `spawn('npx', …, { shell: true })` starts cmd.exe on Windows, so `kill()`
+  reaps the shell and orphans the vite behind it — the failure that once left
+  78 servers holding the 4173–4199 range and made a suite test a stale build.
+  `report-type-scale` had exactly that shape and was fixed; the three
+  `calibrate-*` tools are allow-listed **by name** in that suite, same
+  convention as `SHADOW_EXCEPTIONS`, so the allowance cannot grow silently.
+- **A new browser suite must self-host.** `verify-type-coverage` shipped
+  pointing at a hardcoded dev-server URL: it scored 0 checks and exited 1 on
+  any machine without a dev server, and tested whatever was listening when
+  there was one.
+
 ## Known deferred debt (logged, not fixed)
 
 Real, reproducible, and deliberately left alone. Each entry says why it is

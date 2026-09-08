@@ -370,6 +370,75 @@ check(
   liveShadows.join(' | ') || `(${SHADOW_EXCEPTIONS.join(', ')} allow-listed as dead code)`,
 )
 
+/*
+  EVERY SCRIPT THAT STARTS A SERVER OWNS ITS PORT, asserted statically because
+  the symptom of a collision is not a failure -- it is two scripts silently
+  sharing one server. verify-species-page, verify-eggmoves and report-type-scale
+  all sat on 4183, which meant they could never run concurrently, and before
+  startPreviewServer's port guard existed it meant the second one measured the
+  first one's build.
+
+  Scanned from the tracked file list rather than a hardcoded roster, so a new
+  suite is covered the moment it is added -- which is the point, since a
+  duplicated port is the kind of thing that arrives by copy-paste.
+*/
+const portScripts = execFileSync('git', ['ls-files', 'scripts'], { encoding: 'utf8' })
+  .split('\n')
+  .filter((f) => f.endsWith('.mjs'))
+const portOwners = new Map()
+for (const file of portScripts) {
+  const m = /^const PORT = (\d+)/m.exec(readFileSync(file, 'utf8'))
+  if (!m) continue
+  const port = m[1]
+  if (!portOwners.has(port)) portOwners.set(port, [])
+  portOwners.get(port).push(file.split('/').pop())
+}
+const portClashes = [...portOwners.entries()]
+  .filter(([, owners]) => owners.length > 1)
+  .map(([port, owners]) => `${port}: ${owners.join(' + ')}`)
+log(`  scripts declaring a PORT: ${portOwners.size} distinct ports`)
+portClashes.forEach((c) => log(`    COLLISION ${c}`))
+check(
+  'no two scripts declare the same server port',
+  portClashes.length === 0,
+  portClashes.join(' | ') || `(${[...portOwners.keys()].sort().join(', ')})`,
+)
+
+/*
+  AND NOTHING THAT RUNS IN A PASS SPAWNS ITS SERVER THROUGH A SHELL.
+  `spawn('npx', ..., { shell: true })` starts cmd.exe on Windows, so kill()
+  reaps the shell and ORPHANS the vite behind it -- the failure that once left
+  78 live servers holding this whole port range and made a suite measure a stale
+  build. Everything that needs a server goes through scripts/lib/devServer.mjs,
+  which runs vite directly, refuses an already-answering port, and proves the
+  served page is this build.
+
+  THE THREE CALIBRATE TOOLS ARE ALLOW-LISTED BY NAME, not covered silently --
+  the same arrangement, and the same reasoning, as SHADOW_EXCEPTIONS above. They
+  are one-off tools that established the frame-scale constants, are never run
+  inside a pass, and two of the three already kill their process tree with
+  `taskkill /T`. Listing them means the allowance cannot quietly grow to a
+  fourth script, and converting them stays a real option rather than a
+  forgotten one.
+*/
+const SPAWN_EXCEPTIONS = [
+  'scripts/calibrate-detail.mjs',
+  'scripts/calibrate-ghost.mjs',
+  'scripts/calibrate-scale.mjs',
+]
+const rawSpawners = portScripts
+  .filter((f) => !SPAWN_EXCEPTIONS.includes(f))
+  .filter((f) => {
+    // Comments discuss this rule by name, so strip them before matching.
+    const text = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    return /spawn\(\s*['"]npx['"]/.test(text)
+  })
+check(
+  'every script that runs in a pass starts its server through devServer.mjs',
+  rawSpawners.length === 0,
+  rawSpawners.join(', ') || `(${SPAWN_EXCEPTIONS.length} calibrate tools allow-listed by name)`,
+)
+
 // No shadow, in source as well as in the browser.
 const dsSources = [
   'src/components/ds/ds.css',

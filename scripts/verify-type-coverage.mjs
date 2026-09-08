@@ -25,7 +25,9 @@ import { startPreviewServer } from './lib/devServer.mjs'
   index.html against the local dist/index.html before returning, so the browser
   is provably looking at THIS build. Run `npm run build` first.
 */
-const PORT = 4195
+/* 4196, not 4195: calibrate-detail.mjs was already on 4195. Every script that
+   starts a server owns its port -- verify-design-system asserts that now. */
+const PORT = 4196
 const results = []
 let failures = 0
 

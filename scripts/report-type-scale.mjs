@@ -16,17 +16,37 @@
  * anything. The RAW column is the number to edit; the px column is what it
  * currently draws at.
  *
- * Run against the dev or preview server:
- *   node scripts/report-type-scale.mjs [url]
- * Default: http://localhost:4183/pokeapp/ (the port the verify suites use).
+ * Run against a server of its own, or point it at one you already have:
+ *   npm run build && npm run report:type-scale
+ *   node scripts/report-type-scale.mjs http://localhost:5173/pokeapp/
+ * With no argument it starts its own preview server on a port nothing else uses.
  */
 
-import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { startPreviewServer } from './lib/devServer.mjs'
 
-const PORT = 4183
-const APP_URL = process.argv[2] ?? `http://localhost:${PORT}/pokeapp/`
+/*
+  ITS OWN PORT, AND THE SHARED SERVER HELPER.
+
+  This script used to sit on 4183 alongside verify-species-page and
+  verify-eggmoves, and it started its own server with
+  `spawn('npx', ..., { shell: true })` -- which is both failure modes
+  scripts/lib/devServer.mjs was written to close, on a port two suites shared:
+
+    1. On Windows that shell starts cmd.exe, which starts npx, which starts
+       vite. `preview.kill()` kills cmd.exe and ORPHANS the vite behind it.
+    2. Readiness was "the URL answered", so an orphan left by an earlier run
+       answered instead -- and an orphaned `vite preview` serves whatever dist/
+       it was started with, so this report would measure a STALE build and print
+       numbers for a page that is no longer on disk. For a tool whose entire
+       output is measurements, that is the worst possible failure.
+
+  startPreviewServer runs vite directly with no shell (so the handle really is
+  the server), refuses to start if the port already answers, and byte-matches
+  the served index.html against the local dist/index.html before returning.
+*/
+const PORT = 4199
 const OWN_SERVER = process.argv[2] == null
 
 /* ------------------------------------------------------------------ tokens */
@@ -45,21 +65,11 @@ console.log('  Used at these sizes by every module except the species detail pag
 
 let preview = null
 if (OWN_SERVER) {
-  preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
-    stdio: 'ignore',
-    shell: process.platform === 'win32',
-  })
-  const deadline = Date.now() + 60000
-  for (;;) {
-    try {
-      if ((await fetch(APP_URL)).ok) break
-    } catch {
-      /* not up yet */
-    }
-    if (Date.now() > deadline) throw new Error('preview server never became ready')
-    await new Promise((r) => setTimeout(r, 250))
-  }
+  preview = await startPreviewServer({ port: PORT })
 }
+/* One source of truth for where the browser goes: the server's own url when we
+   started it, the caller's argument when they brought their own. */
+const APP_URL = preview?.url ?? process.argv[2]
 
 const browser = await chromium.launch({ channel: 'chrome' })
 try {
@@ -202,5 +212,5 @@ try {
   console.log('')
 } finally {
   await browser.close()
-  preview?.kill()
+  preview?.stop()
 }

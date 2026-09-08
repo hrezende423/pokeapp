@@ -27,7 +27,13 @@ import { chromium } from 'playwright'
 import { withControlsOn } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
-const PORT = 4183
+/*
+  ITS OWN PORT. This suite and verify-species-page both sat on 4183, so they
+  could never run concurrently: the second to start would either trip
+  startPreviewServer's "port already answering" guard or, without it, quietly
+  measure the other one's server. report-type-scale was on 4183 too.
+*/
+const PORT = 4197
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
 
 const failures = []

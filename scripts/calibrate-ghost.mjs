@@ -14,7 +14,10 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { chromium } from 'playwright'
 
-const PORT = 4193
+/* 4188, not 4193: verify-team-builder.mjs is on 4193, and two scripts sharing a
+   port cannot run at the same time -- the second silently uses the first's
+   server. verify-design-system asserts every port here is unique. */
+const PORT = 4188
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
 
 // Figma raw geometry, MainPage-Light frame 9:143, card 9:173.
