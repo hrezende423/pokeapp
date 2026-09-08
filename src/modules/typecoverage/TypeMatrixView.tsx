@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { typesInGeneration } from '../../data'
 import type { Effectiveness } from '../../data'
-import { Segmented } from './Segmented'
 import {
   abbreviate,
   comboExists,
@@ -13,6 +12,7 @@ import {
   singleCombos,
   type TypeCombo,
 } from './typeCombos'
+import type { MatrixControls } from './useMatrixControls'
 
 /**
  * The matrix, in two orientations, from ONE computation.
@@ -31,29 +31,11 @@ import {
  * disagree about a cell -- there is no second derivation to drift from the first,
  * which is the failure mode this codebase has been bitten by before.
  *
- * WHY B AND C ARE CUSTOM-ONLY. Standard's rows are attacking types, and an
- * attack has exactly one type to bring -- so "include dual-type combinations"
- * and "only combinations something really has" are questions with no meaning on
- * that axis. They are hidden rather than disabled: a disabled control that could
- * never apply reads as a feature that is temporarily broken.
+ * THE TOGGLES ARE NOT HERE. They live in the shell's right-hand rail, so the
+ * generation dropdown can sit in the same place on all four tabs -- see
+ * ControlRail and useMatrixControls. This view renders the type filter, which
+ * belongs above the table it filters, and the table itself.
  */
-
-type Layout = 'custom' | 'standard'
-type Depth = 'full' | 'single'
-type Existence = 'existing' | 'all'
-
-const LAYOUTS: { value: Layout; label: string }[] = [
-  { value: 'custom', label: 'Custom' },
-  { value: 'standard', label: 'Standard' },
-]
-const DEPTHS: { value: Depth; label: string }[] = [
-  { value: 'full', label: 'Full' },
-  { value: 'single', label: 'Single' },
-]
-const EXISTENCES: { value: Existence; label: string }[] = [
-  { value: 'existing', label: 'Existing' },
-  { value: 'all', label: 'All' },
-]
 
 /** One defending typing and its multipliers, in attacking-type order. */
 interface DefendingRow {
@@ -71,57 +53,15 @@ interface HoldersPanel {
   top: number
 }
 
-export function TypeMatrixView({ generation }: { generation: number }) {
-  const [layout, setLayout] = useState<Layout>('custom')
-  const [depth, setDepth] = useState<Depth>('full')
-  const [existence, setExistence] = useState<Existence>('existing')
-  const [picked, setPicked] = useState<number[]>([])
+export function TypeMatrixView({
+  generation,
+  controls,
+}: {
+  generation: number
+  controls: MatrixControls
+}) {
   const [panel, setPanel] = useState<HoldersPanel | null>(null)
-
-  /*
-    SWITCHING ORIENTATION RESETS THE CUSTOM-ONLY CONTROLS, by explicit request:
-    coming back from Standard lands on Full / Existing rather than resuming
-    whatever was set before, so the reader is never looking at a matrix shaped by
-    a control they cannot see and did not just touch.
-
-    THE TYPE FILTER RESETS WITH THEM. It is hidden under Standard for exactly the
-    same reason B and C are, so leaving it applied on the way back would be the
-    same surprise the reset exists to prevent -- a matrix silently missing most
-    of its rows because of a choice made before a round trip.
-  */
-  const changeLayout = useCallback((next: Layout) => {
-    setLayout(next)
-    setDepth('full')
-    setExistence('existing')
-    setPicked([])
-  }, [])
-
-  /*
-    Standard never shows a dual typing: its rows are attacking types, and an
-    attack brings one type.
-  */
-  const effectiveDepth: Depth = layout === 'standard' ? 'single' : depth
-
-  /*
-    AND STANDARD DOES NOT PRUNE ITS AXES BY WHAT EXISTS. This is the one place
-    the brief contradicted itself and the resolution is written down rather than
-    left in the code: Standard is specified as "the traditional layout", and it
-    is also specified to force Existing -- but those cannot both hold, because
-    the printed chart is a chart of the TYPE SYSTEM, not of extant species.
-
-    Measured, not assumed: no species in Gen 1-4 scope is pure Flying, and in
-    Gen 1 nothing is pure Rock, pure Ghost or pure Ice either (every Rock is
-    Rock/Ground, every Ghost is Ghost/Poison). Pruning by existence turns the
-    Gen 1 chart into 11 defending columns against 15 attacking rows, and an
-    11x15 "traditional type chart" is simply wrong -- the real one is 15x15.
-
-    So Existing keeps the meaning the brief gives it exactly where it is a
-    CONTROL, which is Custom: there it prunes the combinations, singles included.
-    In Standard, where it is not a control at all, the axes stay the full type
-    system. That makes both halves of the brief true at once instead of trading
-    one for the other.
-  */
-  const effectiveExistence: Existence = layout === 'standard' ? 'all' : existence
+  const { layout, picked, effectiveDepth, effectiveExistence, customControls } = controls
 
   const attacking = useMemo(() => typesInGeneration(generation), [generation])
   const holders = useMemo(() => holdersByCombo(generation), [generation])
@@ -137,8 +77,7 @@ export function TypeMatrixView({ generation }: { generation: number }) {
       dropping columns would silently change what every remaining row says.
       A row survives if EITHER half matches, so picking Water keeps Water,
       Water/Flying and Grass/Water alike.
-    */
-    /*
+
       CLAMPED TO THE GENERATION'S OWN TYPES. Picking Steel in Gen 4 and then
       switching to Gen 1 would otherwise filter to a typing that cannot exist
       there and render an empty matrix, which reads as a broken page rather than
@@ -152,12 +91,17 @@ export function TypeMatrixView({ generation }: { generation: number }) {
 
     return filtered.map((combo) => {
       const key = comboKey(combo)
-      return { combo, key, row: multipliersAgainst(combo, generation), holders: holders.get(key) ?? [] }
+      return {
+        combo,
+        key,
+        row: multipliersAgainst(combo, generation),
+        holders: holders.get(key) ?? [],
+      }
     })
   }, [attacking, effectiveDepth, effectiveExistence, generation, holders, layout, picked])
 
   /* A scroll moves the header the panel was measured against, so it is dismissed
-     rather than re-placed -- the same call the mockup makes. */
+     rather than re-placed. */
   useEffect(() => {
     if (!panel) return
     const drop = () => setPanel(null)
@@ -170,116 +114,77 @@ export function TypeMatrixView({ generation }: { generation: number }) {
     setPanel({ key, names, left: Math.max(8, box.left), top: box.bottom + 6 })
   }
 
-  const togglePicked = (id: number) =>
-    setPicked((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
-
-  const customControls = layout === 'custom'
   const existingCount = defendingRows.filter((r) => r.holders.length > 0).length
+
+  /*
+    THE ROW COUNT IS THE CORNER'S TOOLTIP, not a line of its own. It is a fact
+    about the table's axes, so it belongs on the cell that names them -- and as a
+    standing line it spent a row of vertical space repeating something the reader
+    wants once.
+  */
+  const cornerTitle =
+    layout === 'custom'
+      ? [
+          `${defendingRows.length} defending ${defendingRows.length === 1 ? 'typing' : 'typings'}`,
+          effectiveExistence === 'all' ? `${existingCount} of them exist` : null,
+          picked.length > 0 ? 'filtered' : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : `${attacking.length} attacking types against ${defendingRows.length} defending types`
 
   return (
     <div className="tc-matrix" data-layout="type-matrix" data-matrix-layout={layout}>
-      <div className="tc-controls" data-layout="matrix-controls">
-        <div className="tc-control-row">
-          <Segmented
-            label="Layout"
-            testId="tc-toggle-layout"
-            options={LAYOUTS}
-            value={layout}
-            onChange={changeLayout}
-          />
-          {/* Hidden, not disabled, under Standard -- see the header note. */}
-          {customControls && (
-            <Segmented
-              label="Combinations"
-              testId="tc-toggle-depth"
-              options={DEPTHS}
-              value={depth}
-              onChange={setDepth}
-            />
-          )}
-          {customControls && (
-            <Segmented
-              label="Species"
-              testId="tc-toggle-existence"
-              options={EXISTENCES}
-              value={existence}
-              onChange={setExistence}
-            />
-          )}
-        </div>
-
-        {customControls && (
-          <div className="tc-filter-row" data-layout="matrix-type-filter">
-            <span className="tc-control-label" id="tc-filter-label">
-              Show only
-            </span>
-            {/*
-              UNDERLINED, NOT FILLED. A chip or a pill is what this control
-              usually is and is exactly what the design system forbids; the
-              underline is already this page's language for "this one is active",
-              which is what the tab strip above it does.
-            */}
-            <div
-              className="tc-filters"
-              role="group"
-              aria-labelledby="tc-filter-label"
-              data-testid="tc-type-filter"
-            >
-              {attacking.map((type) => {
-                const on = picked.includes(type.id)
-                return (
-                  <button
-                    key={type.id}
-                    type="button"
-                    className="tc-filter"
-                    data-testid={`tc-type-filter-${type.name}`}
-                    data-type={type.name}
-                    data-on={on}
-                    aria-pressed={on}
-                    style={{ color: `var(--type-${type.name})` }}
-                    onClick={() => togglePicked(type.id)}
-                  >
-                    {type.display_name}
-                  </button>
-                )
-              })}
-              {picked.length > 0 && (
+      {/* ABOVE THE TABLE IT FILTERS, in the content column rather than the rail:
+          a control that narrows rows reads as a caption for them. */}
+      {customControls && (
+        <div className="tc-filter-row" data-layout="matrix-type-filter">
+          <span className="tc-control-label" id="tc-filter-label">
+            Show only
+          </span>
+          {/*
+            UNDERLINED, NOT FILLED. A chip or a pill is what this control usually
+            is and is exactly what the design system forbids; the underline is
+            already this page's language for "this one is active", which is what
+            the tab strip above it does.
+          */}
+          <div
+            className="tc-filters"
+            role="group"
+            aria-labelledby="tc-filter-label"
+            data-testid="tc-type-filter"
+          >
+            {attacking.map((type) => {
+              const on = picked.includes(type.id)
+              return (
                 <button
+                  key={type.id}
                   type="button"
-                  className="tc-filter-clear"
-                  data-testid="tc-type-filter-clear"
-                  onClick={() => setPicked([])}
+                  className="tc-filter"
+                  data-testid={`tc-type-filter-${type.name}`}
+                  data-type={type.name}
+                  data-on={on}
+                  aria-pressed={on}
+                  style={{ color: `var(--type-${type.name})` }}
+                  onClick={() => controls.togglePicked(type.id)}
                 >
-                  clear the filter
+                  {type.display_name}
                 </button>
-              )}
-            </div>
+              )
+            })}
+            {picked.length > 0 && (
+              <button
+                type="button"
+                className="tc-filter-clear"
+                data-testid="tc-type-filter-clear"
+                onClick={controls.clearPicked}
+              >
+                clear the filter
+              </button>
+            )}
           </div>
-        )}
-
-        <p className="tc-count" data-testid="tc-matrix-count">
-          {layout === 'custom' ? (
-            <>
-              <span className="num">{defendingRows.length}</span>{' '}
-              {defendingRows.length === 1 ? 'defending typing' : 'defending typings'}
-              {/* Only under All: under Existing every row exists by definition,
-                  so "88 typings, 88 of them exist" says the same thing twice. */}
-              {effectiveExistence === 'all' && (
-                <>
-                  {' · '}
-                  <span className="num">{existingCount}</span> of them exist
-                </>
-              )}
-              {picked.length > 0 && ' · filtered'}
-            </>
-          ) : (
-            <>
-              <span className="num">{attacking.length}</span> attacking types against{' '}
-              <span className="num">{defendingRows.length}</span> defending types
-            </>
-          )}
-        </p>
-      </div>
+        </div>
+      )}
 
       {/*
         THE TABLE IS ITS OWN SCROLLER, and that is what makes the column headers
@@ -296,7 +201,7 @@ export function TypeMatrixView({ generation }: { generation: number }) {
         <table className="tc-table">
           <thead>
             <tr>
-              <th className="tc-corner">
+              <th className="tc-corner" title={cornerTitle} data-testid="tc-corner">
                 <span className="tc-axis-note">
                   {layout === 'custom' ? 'defending ↓ / attacking →' : 'attacking ↓ / defending →'}
                 </span>
@@ -395,7 +300,6 @@ export function TypeMatrixView({ generation }: { generation: number }) {
         </div>
       )}
 
-      {/* The dimmed-row line only where a dimmed row can actually appear. */}
       <MatrixLegend explainDimmed={effectiveExistence === 'all'} />
     </div>
   )

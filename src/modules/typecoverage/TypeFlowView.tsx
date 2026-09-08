@@ -19,6 +19,10 @@ import {
  * charts draw that direction with arrows; alignment carries it here and needs no
  * glyph.
  *
+ * The "damage taken on the left, damage dealt on the right" caption was removed
+ * on request. The head row still names the two wings, and on a phone -- where
+ * that row is hidden -- each wing names itself from `data-side`.
+ *
  * SINGLE TYPES ONLY, TODAY, AND NOT BY ASSUMPTION. It asks its question through
  * `singleCombos()` and the same combo-shaped primitives the Matrix uses, so the
  * dual-type expansion this view is expected to grow is a change to the row
@@ -38,7 +42,6 @@ export function TypeFlowView({ generation }: { generation: number }) {
 
   return (
     <div className="tc-flow" data-layout="type-flow">
-      <span className="tc-section-label">Damage taken on the left, damage dealt on the right</span>
       <div className="tc-flow-head">
         <span className="tc-section-label">Attacking it</span>
         <span />

@@ -43,9 +43,6 @@ export function TypeAgainstView({ generation }: { generation: number }) {
 
   return (
     <div className="tc-against" data-layout="type-against">
-      <span className="tc-section-label">
-        Read a row as: the thing in front of you is this type
-      </span>
       <div className="tc-against-wrap">
         <table className="tc-against-table">
           <thead>

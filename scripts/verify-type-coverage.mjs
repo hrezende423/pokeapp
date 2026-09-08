@@ -47,7 +47,7 @@ async function openModule(page) {
      mouseleave) and covers the controls every later section clicks. */
   await page.mouse.move(1200, 700)
   await page.waitForSelector('.tc', { timeout: 20000 })
-  await page.waitForSelector('[data-testid="tc-matrix-count"]')
+  await page.waitForSelector('[data-testid="tc-corner"]')
 }
 
 const setTheme = (page, theme) =>
@@ -319,12 +319,12 @@ async function main() {
 
   /* The count line and the legend must not state tautologies. */
   await page.locator('[data-testid="tc-toggle-existence-existing"]').click()
-  const countExisting = await page.locator('[data-testid="tc-matrix-count"]').innerText()
+  const countExisting = await page.getAttribute('[data-testid="tc-corner"]', 'title')
   check(
     7,
-    'under Existing the count does not say "of them exist"',
+    'under Existing the corner tooltip does not say "of them exist"',
     !/of them exist/.test(countExisting),
-    countExisting.trim(),
+    countExisting,
   )
   check(
     7,
@@ -334,13 +334,179 @@ async function main() {
   await page.locator('[data-testid="tc-toggle-existence-all"]').click()
   check(
     7,
-    'under All it does say how many exist',
-    /of them exist/.test(await page.locator('[data-testid="tc-matrix-count"]').innerText()),
+    'under All the corner tooltip does say how many exist',
+    /of them exist/.test(await page.getAttribute('[data-testid="tc-corner"]', 'title')),
   )
   check(
     7,
     'under All the dimmed-row legend is present',
     /dimmed row/.test(await page.locator('.tc-legend').innerText()),
+  )
+
+  /*
+    THE ROUND-2 LAYOUT, asserted as RELATIONS rather than coordinates.
+
+    The one control that appears on every tab is the generation dropdown, and
+    "the same position on each tab" is only true if the rail is the same WIDTH
+    on each tab -- sized to its content it sat 47px further right on the three
+    tabs that have no toggles, so the dropdown moved as you switched. That is
+    why the rail is a fixed track and why this checks the dropdown's own box.
+  */
+  const railPositions = []
+  for (const t of ['Matrix', 'Flow', 'Against', 'Card']) {
+    await page.locator('.tc-subnav .ds-tab', { hasText: t }).click()
+    await page.mouse.move(20, 860)
+    await page.waitForTimeout(150)
+    railPositions.push(
+      await page.evaluate(() => {
+        const sel = document.querySelector('[data-testid="tc-generation"]').getBoundingClientRect()
+        const content = document.querySelector('.tc-content').getBoundingClientRect()
+        const rail = document.querySelector('.tc-rail').getBoundingClientRect()
+        return {
+          x: Math.round(sel.left),
+          y: Math.round(sel.top),
+          railRightOfContent: rail.left >= content.right - 1,
+        }
+      }),
+    )
+  }
+  check(
+    7,
+    'the generation dropdown is in the SAME place on all four tabs',
+    new Set(railPositions.map((r) => `${r.x}:${r.y}`)).size === 1,
+    railPositions.map((r) => `${r.x},${r.y}`).join(' | '),
+  )
+  check(
+    7,
+    'the rail sits to the right of the content on every tab',
+    railPositions.every((r) => r.railRightOfContent),
+  )
+
+  /* Each view is flush with the content column's left edge -- "moved left to
+     open space". Flow was centred in its column and had to be un-centred. */
+  for (const [t, sel] of [
+    ['Matrix', '.tc-matrix-scroll'],
+    ['Flow', '.tc-flow'],
+    ['Against', '.tc-against-table'],
+    ['Card', '.tc-cards'],
+  ]) {
+    await page.locator('.tc-subnav .ds-tab', { hasText: t }).click()
+    await page.mouse.move(20, 860)
+    await page.waitForTimeout(150)
+    const flush = await page.evaluate((s) => {
+      const a = document.querySelector(s).getBoundingClientRect()
+      const c = document.querySelector('.tc-content').getBoundingClientRect()
+      return Math.round(a.left - c.left)
+    }, sel)
+    check(7, `${t} is flush with the content column's left edge`, flush <= 1, `${flush}px in`)
+  }
+
+  /* Against wraps its runs at four names, in a grid so they line up in columns
+     rather than ragging wherever the wrap fell. */
+  await page.locator('.tc-subnav .ds-tab', { hasText: 'Against' }).click()
+  await page.mouse.move(20, 860)
+  await page.waitForSelector('.tc-against .tc-run')
+  const runShape = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('.tc-against .tc-run')]
+    const tracks = getComputedStyle(cells[0]).gridTemplateColumns.split(' ').length
+    let worst = 0
+    for (const c of cells) {
+      const byRow = {}
+      for (const k of c.children) {
+        const top = Math.round(k.getBoundingClientRect().top)
+        byRow[top] = (byRow[top] ?? 0) + 1
+      }
+      worst = Math.max(worst, ...Object.values(byRow))
+    }
+    return { tracks, worst }
+  })
+  check(7, 'Against lays its runs out in four columns', runShape.tracks === 4, `${runShape.tracks} tracks`)
+  check(
+    7,
+    'no Against cell puts more than four types on one line',
+    runShape.worst === 4,
+    `worst line holds ${runShape.worst}`,
+  )
+
+  /* Card is four tiles across, on request. */
+  await page.locator('.tc-subnav .ds-tab', { hasText: 'Card' }).click()
+  await page.mouse.move(20, 860)
+  await page.waitForSelector('.tc-cards')
+  const cardShape = await page.evaluate(() => {
+    const tracks = getComputedStyle(document.querySelector('.tc-cards')).gridTemplateColumns.split(' ').length
+    const tops = [...document.querySelectorAll('.tc-card')].map((c) =>
+      Math.round(c.getBoundingClientRect().top),
+    )
+    return { tracks, firstRow: tops.filter((t) => t === tops[0]).length }
+  })
+  check(7, 'Card is a four-column grid', cardShape.tracks === 4, `${cardShape.tracks} tracks`)
+  check(7, 'four cards sit in the first row', cardShape.firstRow === 4, `${cardShape.firstRow}`)
+
+  /* The removed labels stay removed. */
+  await page.locator('.tc-subnav .ds-tab', { hasText: 'Matrix' }).click()
+  await page.mouse.move(20, 860)
+  const pageText = await page.locator('.tc').innerText()
+  for (const [what, re] of [
+    ['the page subtitle', /17 types|No Fairy/],
+    ['the scope caption', /this page only/],
+    ['the Flow caption', /Damage taken on the left/],
+    ['the Against caption', /Read a row as/],
+    ['the standing row-count line', /defending typings/],
+  ]) {
+    check(7, `${what} is gone`, !re.test(pageText))
+  }
+
+  /*
+    THE COLUMN HEADERS HAVE A BOTTOM HAIRLINE, and it has to be measured off the
+    pseudo-element: under `border-collapse: collapse` the collapsed borders are
+    painted by the TABLE, so a sticky header travels without its own bottom
+    border and `borderBottomWidth` on the cell reads as set while nothing is
+    drawn. The ::after is what actually appears.
+  */
+  const headRule = await page.evaluate(() => {
+    const th = document.querySelector('.tc-table thead th.tc-col-head')
+    const cs = getComputedStyle(th, '::after')
+    return { w: cs.borderBottomWidth, colour: cs.borderBottomColor, drawn: cs.content !== 'none' }
+  })
+  check(
+    7,
+    'the column header row draws a bottom hairline',
+    headRule.drawn && headRule.w === '1px',
+    `${headRule.w} ${headRule.colour}`,
+  )
+
+  /*
+    THE CONTROLS ARE A STEP SMALLER THAN THE PAGE'S LABEL TOKEN, which is the
+    reduction that was asked for -- the toggles were at 12px and the labels and
+    filter at the 11px label token, and all three now sit on the 10px caption
+    token. Measured against --font-size-label read off the page rather than
+    against a hardcoded 10, so retuning the token moves the assertion with it.
+  */
+  const sizes = await page.evaluate(() => {
+    const px = (s) => parseFloat(getComputedStyle(document.querySelector(s)).fontSize)
+    const token = parseFloat(
+      getComputedStyle(document.querySelector('.tc')).getPropertyValue('--font-size-label'),
+    )
+    return {
+      labelToken: token,
+      controlLabel: px('.tc-control-label'),
+      segment: px('.tc-segment'),
+      filter: px('.tc-filter'),
+    }
+  })
+  check(
+    7,
+    'every control is set below the page label token',
+    sizes.controlLabel < sizes.labelToken &&
+      sizes.segment < sizes.labelToken &&
+      sizes.filter < sizes.labelToken,
+    JSON.stringify(sizes),
+  )
+  check(
+    7,
+    'and the three controls share one size, so they read as one surface',
+    sizes.controlLabel === sizes.segment && sizes.segment === sizes.filter,
+    `${sizes.controlLabel}/${sizes.segment}/${sizes.filter}`,
   )
 
   // ---------------------------------------------------------- 8. Type filter
@@ -374,7 +540,7 @@ async function main() {
 
   /* Existing combos really change with THIS page's selector. */
   const gen4Rows = await rowCount(page)
-  await page.locator('[data-testid="tc-generation-1"]').click()
+  await page.selectOption('[data-testid="tc-generation-select"]', '1')
   const gen1Rows = await rowCount(page)
   const gen1Cols = await page.locator('.tc-table thead th.tc-col-head').count()
   check(9, 'Gen 1 has 15 attacking types, not 17', gen1Cols === 15, `${gen1Cols} cols`)
@@ -391,8 +557,8 @@ async function main() {
   if (other) {
     await appSelect.selectOption(other)
     await page.waitForTimeout(200)
-    const stillGen1 = await page.getAttribute('[data-testid="tc-generation-1"]', 'data-active')
-    check(9, 'the page stayed on Gen 1 when the app selector moved', stillGen1 === 'true', `app now ${other}`)
+    const stillGen1 = await page.inputValue('[data-testid="tc-generation-select"]')
+    check(9, 'the page stayed on Gen 1 when the app selector moved', stillGen1 === '1', `app now ${other}, page gen ${stillGen1}`)
     /* Gen 1's chart is genuinely its own -- the page must still be showing it. */
     const cols = await page.locator('.tc-table thead th.tc-col-head').count()
     check(9, 'the page is still rendering the Gen 1 chart', cols === 15, `${cols} cols`)
@@ -475,11 +641,11 @@ async function main() {
         if (el.closest('.tc-matrix-scroll')) continue
         if (el.getBoundingClientRect().right > window.innerWidth + 1) out.push(el.className)
       }
-      const last = document.querySelector('[data-testid="tc-generation-4"]').getBoundingClientRect()
-      return { out: out.slice(0, 3), lastReachable: last.right <= window.innerWidth + 1 }
+      const sel = document.querySelector('[data-testid="tc-generation-select"]').getBoundingClientRect()
+      return { out: out.slice(0, 3), lastReachable: sel.right <= window.innerWidth + 1 && sel.width > 0 }
     })
     check(11, `nothing is clipped at ${width}px`, clipped.out.length === 0, clipped.out.join(', '))
-    check(11, `the last generation option is reachable at ${width}px`, clipped.lastReachable)
+    check(11, `the generation dropdown is reachable at ${width}px`, clipped.lastReachable)
   }
   await page.setViewportSize({ width: 1440, height: 900 })
 

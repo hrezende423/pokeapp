@@ -433,6 +433,37 @@ record and is NOT app code.
   `team-builder/pages.ts`, for the same reason. Consequence: `dex-switcher`
   wraps this entry too, so verify-dexes narrows to the registered dex ids
   rather than asserting nothing else shares the wrapper.
+- **TWO NAMED REGIONS, AND THE RAIL IS THE SHELL'S.**
+  `data-layout="type-coverage-main"` is a grid of `content rail` — the view
+  left, the controls right, directly under the tab strip. The generation
+  dropdown has to land in the SAME place on all four tabs, so the rail belongs
+  to the shell and Matrix's toggle state lives in `useMatrixControls` rather
+  than inside the view. **`--tc-rail: 132px` is a FIXED track and that is
+  load-bearing**: sized to its content the rail sat 47px further right on the
+  three tabs with no toggles, so the one control common to all four moved as
+  you switched. 132px is measured against the Combinations segmented control.
+  Moving a control is editing that grid, not editing a view.
+- **The column headers' bottom hairline is a pseudo-element, not a border.**
+  Under `border-collapse: collapse` the collapsed borders are painted by the
+  TABLE, so a `position: sticky` header travels without its own bottom border —
+  the cell's `borderBottomWidth` reads as set while nothing is drawn. Verify it
+  off the `::after`, never off the cell. `border-collapse: separate` would also
+  fix it, at the cost of hand-managing every shared edge in a 17-column table.
+- **`--tc-control-size` (caption) is declared once** so the rail, the toggles
+  and the type filter cannot drift apart; the table stays the loudest thing on
+  the page. Assert it against `--font-size-label` read off the page, not
+  against a hardcoded 10.
+- **Flow is capped but NOT centred.** The 1040px cap stays (full-bleed, the
+  wings were mostly whitespace and read as two columns). `margin: 0 auto` was
+  removed on request — centred, it floated 80px in from the left with empty
+  page either side, and the room it frees is the room the rail sits in.
+- **Against wraps its type runs at four, in a GRID not a wrapping flex line.**
+  Grid gives every line in a cell the same four column widths, so names align
+  into columns instead of ragging wherever the wrap fell. That is what let the
+  table drop its 620px `min-width`.
+- **No page subtitle, no scope caption, and the row count is the corner cell's
+  tooltip** — all removed/moved on request. The per-generation chart notes went
+  with the subtitle; Gen 1 is still genuinely its own chart, just not narrated.
 - **`typeCombos.ts` is combo-shaped everywhere**, and that is deliberate
   future-proofing: Flow, Against and Card are expected to grow dual-type
   support, so nothing takes a bare `typeId` on the defending side and the

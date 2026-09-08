@@ -37,7 +37,6 @@ export function TypeCardView({ generation }: { generation: number }) {
 
   return (
     <div className="tc-cards-view" data-layout="type-cards">
-      <span className="tc-section-label">One tile per type, sized for a phone</span>
       <div className="tc-cards">
         {cards.map(({ type, dealt, taken }) => (
           <div className="tc-card" key={type.id} data-testid={`tc-card-${type.name}`}>

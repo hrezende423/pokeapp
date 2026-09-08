@@ -26,6 +26,27 @@
   --tc-line: 17px;
 
   /*
+    THE CONTROLS ARE SET SMALLER THAN THE DATA, on request. One step down from
+    the label token to the caption token, declared once so the rail, the toggles
+    and the type filter cannot drift apart -- they read as one control surface
+    and the table stays the loudest thing on the page.
+  */
+  --tc-control-size: var(--font-size-caption);
+
+  /*
+    THE RAIL IS A FIXED WIDTH, and that is the whole point of it. "Same position
+    on each tab" is only true if the column is the same width on each tab -- with
+    the rail sized to its content the dropdown sat at x=1280 on Matrix, where the
+    toggles widen it, and at x=1327 on the other three, so the one control that
+    appears on all four tabs moved by 47px as you switched between them.
+
+    132px is measured against the widest thing in it: the Combinations segmented
+    control, two segments at `calc(var(--tc-control-size) * 5.4)` plus the track's
+    own 3px padding either side.
+  */
+  --tc-rail: 132px;
+
+  /*
     THE ROW HIGHLIGHT, HOSTED AS A TOKEN so the two themes differ in one place
     rather than in a duplicated rule.
 
@@ -75,8 +96,48 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-gap-lg);
-  margin-bottom: var(--space-gap-sm);
+  /* The subtitle used to sit between the title and the content and is gone, so
+     the gap it was providing is declared here instead of being missed. */
+  margin-bottom: var(--space-gap-md);
   flex: none;
+}
+
+/*
+  TWO NAMED REGIONS: the view on the left, the controls on the right, the rail
+  starting level with the top of the content so it sits directly under the tab
+  strip. Moving a control between them is swapping two words in this template,
+  which is the whole reason the areas are named.
+
+  `minmax(0, 1fr)` on the content column, not `1fr`: a grid item's automatic
+  minimum size is its content, so the matrix's own horizontal scroller would
+  otherwise refuse to shrink and push the rail off the page.
+*/
+.tc-main {
+  display: grid;
+  grid-template-areas: 'content rail';
+  grid-template-columns: minmax(0, 1fr) var(--tc-rail);
+  gap: var(--space-gap-lg);
+  align-items: start;
+  padding-bottom: var(--space-gap-xl);
+}
+
+.tc-content {
+  grid-area: content;
+  min-width: 0;
+}
+
+.tc-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-md);
+  /* Fixed, not max-content -- see --tc-rail for why that is load-bearing. */
+  width: var(--tc-rail);
+}
+
+.tc-rail-row {
+  display: flex;
+  flex-direction: column;
 }
 
 .tc-title {
@@ -86,14 +147,6 @@
   line-height: 24px;
 }
 
-.tc-note {
-  margin: var(--tc-2) 0 0;
-  max-width: 68ch;
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-  line-height: var(--tc-line);
-}
-
 /* The species page's right-aligned sub-nav. */
 .tc-subnav {
   display: flex;
@@ -101,30 +154,24 @@
   min-width: 0;
 }
 
-.tc-scope {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-gap-md);
-  margin-bottom: var(--space-gap-sm);
-  flex: none;
-}
-
-.tc-scope-note,
 .tc-axis-note {
-  font-size: var(--font-size-label);
+  font-size: var(--tc-control-size);
   color: var(--text-secondary);
   line-height: var(--tc-line);
 }
 
-.tc-body {
-  padding-bottom: var(--space-gap-xl);
-}
-
-.tc-section-label,
-.tc-control-label {
+.tc-section-label {
   display: block;
   font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  line-height: var(--tc-line);
+}
+
+.tc-control-label {
+  display: block;
+  font-size: var(--tc-control-size);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-secondary);
@@ -135,14 +182,12 @@
 /* The theme switcher's pill, and the species scope segments: a --hairline track
    with the selected segment lifted one tone step. No accent, no shadow. */
 
+/* In the rail the label sits ABOVE its control, so a stack of four of them
+   reads as four rows rather than four ragged inline pairs. */
 .tc-segmented {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tc-4);
-}
-
-.tc-control-label {
-  display: inline;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-2);
 }
 
 .tc-segments {
@@ -154,9 +199,9 @@
 }
 
 .tc-segment {
-  padding: var(--tc-2) var(--tc-5);
+  padding: var(--tc-2) var(--tc-4);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tc-control-size);
   font-weight: var(--font-weight-regular);
   line-height: 1;
   color: var(--text-secondary);
@@ -165,8 +210,9 @@
   border-radius: var(--radius-control);
   cursor: pointer;
   /* Both segments reserve the bold metrics, so selecting one does not shift the
-     other sideways -- without this the pill jiggles on every switch. */
-  min-width: 3.9rem;
+     other sideways -- without this the pill jiggles on every switch. Sized off
+     the control token so it follows if that changes. */
+  min-width: calc(var(--tc-control-size) * 5.4);
 }
 
 .tc-segment[data-active='true'] {
@@ -184,27 +230,68 @@
   border-radius: 2px;
 }
 
-/* ------------------------------------------------------------ matrix controls */
-
-.tc-controls {
+/* ------------------------------------------------------------ the dropdown */
+/*
+  A STYLED NATIVE SELECT, which is what the design system's select IS -- the
+  custom overlay menu is a separate, undesigned component, so a hand-rolled
+  dropdown here would be inventing a pattern rather than using one. Same
+  hairline-underline shell as the text field, and the unicode chevron the spec
+  names rather than a Tabler icon.
+*/
+.tc-select-field {
   display: flex;
   flex-direction: column;
-  gap: var(--tc-4);
-  margin-bottom: var(--space-gap-sm);
+  gap: var(--tc-2);
 }
 
-.tc-control-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-gap-md);
+.tc-select-shell {
+  position: relative;
+  display: block;
 }
 
+.tc-select {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: var(--font-size-label);
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  padding: var(--tc-2) 16px var(--tc-2) 2px;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Focus reuses the active-tab language: a 2px accent underline, with the
+   padding dropping by the pixel the border gained so the field keeps its height. */
+.tc-select:focus {
+  outline: none;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: calc(var(--tc-2) - 1px);
+}
+
+.tc-select-chevron {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--tc-control-size);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ matrix controls */
+
+/* The filter keeps its place ABOVE the table it narrows, in the content column
+   rather than the rail: a control that drops rows reads as a caption for them. */
 .tc-filter-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--tc-3) var(--space-gap-md);
+  margin-bottom: var(--tc-4);
 }
 
 .tc-filters {
@@ -235,7 +322,7 @@
   border-bottom: 2px solid transparent;
   padding: 0 0 3px;
   font: inherit;
-  font-size: var(--font-size-label);
+  font-size: var(--tc-control-size);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -254,21 +341,10 @@
   border: none;
   padding: 0;
   font: inherit;
-  font-size: var(--font-size-label);
+  font-size: var(--tc-control-size);
   color: var(--text-secondary);
   text-decoration: underline;
   cursor: pointer;
-}
-
-.tc-count {
-  margin: 0;
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-  line-height: var(--tc-line);
-}
-
-.tc-count .num {
-  font-size: var(--font-size-caption);
 }
 
 /* ------------------------------------------------------------------- matrix */
@@ -315,6 +391,8 @@ table.tc-table th.tc-corner {
   left: 0;
   z-index: 3;
   border: none;
+  /* It carries the row count as its tooltip -- see TypeMatrixView. */
+  cursor: help;
   padding: 0 var(--tc-4) 0 0;
   text-align: left;
   background: var(--surface);
@@ -332,6 +410,29 @@ table.tc-table th.tc-col-head {
   font-weight: var(--font-weight-bold);
   letter-spacing: 0.05em;
   background: var(--surface);
+}
+
+/*
+  THE HEADER ROW'S BOTTOM HAIRLINE, DRAWN AS A PSEUDO-ELEMENT, and this is a
+  workaround rather than a preference. Under `border-collapse: collapse` the
+  collapsed borders are painted by the TABLE, not by the cell -- so a `position:
+  sticky` header travels without its own bottom border and the row that should
+  close the header off simply is not drawn. The left and right edges survive
+  because a neighbouring cell paints them.
+
+  Hence an absolutely-positioned 1px line inside the cell, which the cell owns
+  and therefore carries with it while it is pinned. `border-collapse: separate`
+  would fix it too, and at the cost of hand-managing every shared edge in a
+  17-column table.
+*/
+table.tc-table th.tc-col-head::after,
+table.tc-table th.tc-corner::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-bottom: 1px solid var(--hairline);
 }
 
 table.tc-table th.tc-row-head {
@@ -528,15 +629,20 @@ table.tc-table td[data-m='1'] {
   each type name breaking it, and the multipliers pinned to the INNER edge of
   each wing so the numbers sit against the spine and the runs flow outward.
 
-  CAPPED AND CENTRED, because this view is one OBJECT rather than a band of page.
-  Full-bleed, the wings were mostly white space with the runs pressed against the
-  spine, which read as two columns that happened to be near each other.
+  CAPPED BUT NOT CENTRED. The cap stays, for the original reason: full-bleed, the
+  wings were mostly white space with the runs pressed against the spine, which
+  read as two columns that happened to be near each other rather than one object.
+
+  THE CENTRING WENT, on request. With the control rail taking the right-hand
+  column, `margin: 0 auto` left the diagram floating 80px in from the left with
+  empty page either side -- so it is flush left now, and the room it frees is the
+  room the rail sits in.
 */
 
 .tc-flow {
   position: relative;
   max-width: 1040px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .tc-flow-head,
@@ -659,10 +765,20 @@ table.tc-table td[data-m='1'] {
   max-width: 100%;
 }
 
+/*
+  NARROWER THAN IT WAS, because the runs now wrap at four. The old table needed
+  620px because "Not with" could be thirteen types on one line; four-per-row
+  makes the widest cell four type names, so the whole table fits the content
+  column beside the rail without a sideways scroll.
+
+  `width: max-content` with a cap rather than `width: 100%`: at 100% the five
+  columns stretched to fill whatever was left and the runs sat in columns far
+  wider than four names need.
+*/
 table.tc-against-table {
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   border-collapse: collapse;
-  min-width: 620px;
 }
 
 table.tc-against-table th {
@@ -698,12 +814,40 @@ table.tc-against-table td.tc-against-enemy {
   white-space: nowrap;
 }
 
+/*
+  FOUR TYPES PER ROW, THEN A BREAK -- the requested shape:
+
+    Not with
+    Normal  Flying  Poison  Rock
+    Bug     Ghost   Steel   Grass
+    Psychic Ice     Dragon  Dark
+
+  A four-track grid rather than a wrapping flex line, and the difference
+  matters: grid gives every row of a cell the SAME four column widths, so the
+  names line up into columns down the cell instead of ragging wherever the wrap
+  happened to fall. `max-content` tracks keep each column only as wide as its
+  longest name, and `justify-content: start` stops the four tracks spreading
+  across a cell wider than they need.
+*/
+.tc-against .tc-run {
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  justify-content: start;
+  gap: var(--tc-1) var(--space-gap-sm);
+}
+
 /* -------------------------------------------------------------------- cards */
 
+/*
+  FOUR COLUMNS, on request, rather than as many 196px tiles as fit. `minmax(0,
+  1fr)` and not `1fr`: a track's automatic minimum is its content, so a tile
+  holding a long run of type names would otherwise push the grid wider than the
+  content column and out from under the rail.
+*/
 .tc-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-  gap: var(--space-gap-lg);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-gap-md) var(--space-gap-lg);
   margin-top: var(--tc-4);
 }
 
@@ -746,6 +890,42 @@ table.tc-against-table td.tc-against-enemy {
   .tc-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  /*
+    ON A PHONE THE RAIL IS A ROW, NOT A COLUMN. Two side-by-side columns at
+    390px would leave the matrix about 240px wide; stacking puts the controls
+    above the view and gives the table the whole width back.
+  */
+  .tc-main {
+    grid-template-areas:
+      'rail'
+      'content';
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-gap-sm);
+  }
+
+  .tc-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--tc-4) var(--space-gap-md);
+    /* Not --tc-rail: stacked above the content it is a full-width row. */
+    width: auto;
+  }
+
+  .tc-select-field {
+    width: 84px;
+  }
+
+  /* Four card columns do not fit a phone. */
+  .tc-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Nor do four type columns in an Against cell. */
+  .tc-against .tc-run {
+    grid-template-columns: repeat(2, max-content);
   }
 
   .tc-subnav {
