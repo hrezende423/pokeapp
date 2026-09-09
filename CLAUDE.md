@@ -549,13 +549,39 @@ the computed style, so a name it prints is a name in the stylesheet.
   existed the second one silently measured the first one's build. A collision
   does not fail; it just quietly shares a server. That is why the check is
   static and scanned rather than a hardcoded roster.
-- **Anything that needs a server goes through `scripts/lib/devServer.mjs`.**
-  `spawn('npx', …, { shell: true })` starts cmd.exe on Windows, so `kill()`
-  reaps the shell and orphans the vite behind it — the failure that once left
-  78 servers holding the 4173–4199 range and made a suite test a stale build.
-  `report-type-scale` had exactly that shape and was fixed; the three
-  `calibrate-*` tools are allow-listed **by name** in that suite, same
-  convention as `SHADOW_EXCEPTIONS`, so the allowance cannot grow silently.
+- **Everything that needs a server goes through `scripts/lib/devServer.mjs`,
+  with no exceptions** — and the empty allow-list *is* the assertion. There is
+  no sanctioned second way to start a server here. `spawn('npx', …,
+  { shell: true })` puts cmd.exe between the script and its vite on Windows, so
+  `kill()` reaps the shell and orphans the server — the failure that once left
+  78 servers holding the 4173–4199 range.
+  **The deeper half is readiness, and it is the half that actually bit.**
+  Polling "did the URL answer" cannot tell your server from someone else's: with
+  the port already held, `--strictPort` makes the new vite exit and the poll
+  succeeds against the *other* one. Demonstrated on the pre-conversion
+  `calibrate-scale` — with a foreign server on its port it printed a full report
+  of measurements taken from a build it never started, and **exited 0**. For a
+  tool whose entire output is the measured constants this file cites, silently
+  stale numbers are the worst failure available. Converted, the same experiment
+  exits 1 with zero measurements.
+  `report-type-scale` and all three `calibrate-*` tools were converted; the
+  `SPAWN_EXCEPTIONS` allow-list is deleted, not shortened.
+- **`startPreviewServer` does NOT handle SIGINT** — no `process.on('SIGINT')`
+  anywhere in `devServer.mjs`; its only `.on('exit')` is on the child vite, used
+  to catch the `--strictPort` bail. So Ctrl+C mid-run still skips the `finally`
+  and can leave a bound port. The conversion **moved** that gap rather than
+  closing it, though it narrowed the blast radius: with no shell in between, a
+  terminal SIGINT reaches the vite directly, where previously it had to pass
+  through cmd.exe. The port guard also turns any resulting orphan into a loud
+  refusal on the next run instead of a stale measurement. Genuinely open; a
+  `process.once('SIGINT')` in `devServer.mjs` would close it for every caller at
+  once, which is the right place if it is ever wanted.
+- **A calibration tool's coarse sweep is not a correction to a committed
+  value.** `calibrate-ghost` sweeps letter-spacing at 0.01em steps and nominates
+  `0.22em`; the committed value is `0.222em`, refined past that granularity, and
+  the tool's own render line confirms it lands dead on target (157.83px against
+  157.83px) where the swept candidate is 0.37px off. The committed constant is
+  the better one. Do not "fix" source to match a sweep's resolution.
 - **A new browser suite must self-host.** `verify-type-coverage` shipped
   pointing at a hardcoded dev-server URL: it scored 0 checks and exited 1 on
   any machine without a dev server, and tested whatever was listening when

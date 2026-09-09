@@ -405,38 +405,31 @@ check(
 )
 
 /*
-  AND NOTHING THAT RUNS IN A PASS SPAWNS ITS SERVER THROUGH A SHELL.
-  `spawn('npx', ..., { shell: true })` starts cmd.exe on Windows, so kill()
-  reaps the shell and ORPHANS the vite behind it -- the failure that once left
-  78 live servers holding this whole port range and made a suite measure a stale
-  build. Everything that needs a server goes through scripts/lib/devServer.mjs,
-  which runs vite directly, refuses an already-answering port, and proves the
-  served page is this build.
+  AND NOTHING STARTS ITS SERVER THROUGH A SHELL. `spawn('npx', ..., { shell: true })`
+  puts cmd.exe between the script and its vite on Windows, so a plain kill()
+  reaps the shell and orphans the server -- the failure that once left 78 live
+  servers holding this whole port range. The deeper half is readiness: polling
+  "did the URL answer" cannot tell its own server from someone else's, so with
+  the port already held, --strictPort makes the new vite exit and the poll
+  succeeds against the OTHER one. A tool then measures a build it never started.
 
-  THE THREE CALIBRATE TOOLS ARE ALLOW-LISTED BY NAME, not covered silently --
-  the same arrangement, and the same reasoning, as SHADOW_EXCEPTIONS above. They
-  are one-off tools that established the frame-scale constants, are never run
-  inside a pass, and two of the three already kill their process tree with
-  `taskkill /T`. Listing them means the allowance cannot quietly grow to a
-  fourth script, and converting them stays a real option rather than a
-  forgotten one.
+  THE ALLOW-LIST IS GONE, not shortened. The three calibrate-* tools were the
+  last holders and are converted; report-type-scale went before them. Everything
+  that needs a server now goes through scripts/lib/devServer.mjs, which runs
+  vite directly, refuses an already-answering port, watches the child's exit so
+  a --strictPort bail is loud, and byte-matches the served index.html against
+  the local dist/index.html. An empty exception list is the assertion: there is
+  no sanctioned second way to start a server here.
 */
-const SPAWN_EXCEPTIONS = [
-  'scripts/calibrate-detail.mjs',
-  'scripts/calibrate-ghost.mjs',
-  'scripts/calibrate-scale.mjs',
-]
-const rawSpawners = portScripts
-  .filter((f) => !SPAWN_EXCEPTIONS.includes(f))
-  .filter((f) => {
-    // Comments discuss this rule by name, so strip them before matching.
-    const text = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-    return /spawn\(\s*['"]npx['"]/.test(text)
-  })
+const rawSpawners = portScripts.filter((f) => {
+  // Comments discuss this rule by name, so strip them before matching.
+  const text = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+  return /spawn\(\s*['"]npx['"]/.test(text)
+})
 check(
-  'every script that runs in a pass starts its server through devServer.mjs',
+  'every script starts its server through devServer.mjs, no exceptions',
   rawSpawners.length === 0,
-  rawSpawners.join(', ') || `(${SPAWN_EXCEPTIONS.length} calibrate tools allow-listed by name)`,
+  rawSpawners.join(', ') || '(no allow-list; nothing spawns a shell)',
 )
 
 // No shadow, in source as well as in the browser.

@@ -11,14 +11,13 @@
  * Usage: node scripts/calibrate-ghost.mjs
  */
 
-import { spawn, spawnSync } from 'node:child_process'
 import { chromium } from 'playwright'
+import { startPreviewServer } from './lib/devServer.mjs'
 
 /* 4188, not 4193: verify-team-builder.mjs is on 4193, and two scripts sharing a
    port cannot run at the same time -- the second silently uses the first's
    server. verify-design-system asserts every port here is unique. */
 const PORT = 4188
-const APP_URL = `http://localhost:${PORT}/pokeapp/`
 
 // Figma raw geometry, MainPage-Light frame 9:143, card 9:173.
 const CARD_W = 497
@@ -28,36 +27,35 @@ const GHOST_H = 198
 const WANT_W_RATIO = GHOST_W / CARD_W
 const WANT_H_RATIO = GHOST_H / CARD_H
 
-async function waitForServer(url, timeoutMs = 120000) {
-  const deadline = Date.now() + timeoutMs
-  let last = 'never attempted'
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(url)
-      if (res.ok) return
-      last = `HTTP ${res.status}`
-    } catch (err) {
-      last = (err.cause && (err.cause.code || err.cause.message)) || err.message
-    }
-    await new Promise((r) => setTimeout(r, 250))
-  }
-  throw new Error(`preview server never became ready at ${url} (last: ${last})`)
-}
+/*
+  ITS SERVER COMES FROM scripts/lib/devServer.mjs, like every other script here
+  that needs one. It used to start its own server through a shell and treat "the
+  URL answered" as ready, which left two holes a calibration tool can least
+  afford:
 
-const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
-  stdio: ['ignore', 'pipe', 'pipe'],
-  shell: true,
-})
-let serverLog = ''
-preview.stdout.on('data', (d) => (serverLog += d))
-preview.stderr.on('data', (d) => (serverLog += d))
+    THE SHELL SAT BETWEEN THIS SCRIPT AND ITS SERVER. On Windows it started
+    cmd.exe, which started npx, which started vite. A tree-kill was in place so
+    a normal run did reap it -- but the shell was never necessary.
 
-const killTree = () => {
-  if (preview.pid) spawnSync('taskkill', ['/pid', String(preview.pid), '/T', '/F'], { shell: true })
-}
+    READINESS WAS "SOMETHING ANSWERED", which is the one that actually bit. With
+    the port already held, --strictPort makes the new vite exit at once and
+    nothing here watched for that, so the poll succeeded against the OTHER
+    server and this tool measured it. Demonstrated rather than theorised: run
+    with a foreign server on this port it printed a full report of measurements
+    taken from a build it never started, and exited 0. For a tool whose whole
+    output is measured constants, silently-stale numbers are the worst failure
+    available.
+
+  startPreviewServer runs vite directly with no shell, REFUSES to start when the
+  port already answers, watches the child's exit so a --strictPort bail is a loud
+  error instead of a wrong answer, and byte-matches the served index.html
+  against the local dist/index.html before returning. Run `npm run build` first.
+*/
+const preview = await startPreviewServer({ port: PORT })
+/* The server's own url, not a string rebuilt from the port. */
+const APP_URL = preview.url
 
 try {
-  await waitForServer(APP_URL)
   const browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } })
   await page.goto(APP_URL, { waitUntil: 'networkidle' })
@@ -147,5 +145,5 @@ try {
 
   await browser.close()
 } finally {
-  killTree()
+  preview.stop()
 }
