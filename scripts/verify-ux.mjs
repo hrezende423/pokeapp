@@ -440,9 +440,16 @@ try {
     els.map((e) => e.getAttribute('data-testid')),
   )
   log(`  sections: ${sections.join(', ')}`)
+  /*
+    SCOPED TO THE TAB, which is what the label says and what the claim is. The
+    app bar grew two real switches with the dex filter/sort pass -- the Pokedex's
+    grid/list view and its sort direction, both inside a closed disclosure -- and
+    a document-wide `[data-testid^="toggle-"]` count would have read those as the
+    four-axis artwork control returning to this tab.
+  */
   check(
     'no artwork control and no toggles anywhere on the tab',
-    (await page.$$('[data-testid^="toggle-"]')).length === 0 &&
+    (await page.$$('[data-testid="species-sprites"] [data-testid^="toggle-"]')).length === 0 &&
       (await page.$('[data-testid="artwork-img"]')) === null,
   )
   check(

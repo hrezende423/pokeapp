@@ -19,6 +19,7 @@
     "verify:legal-moveset": "node scripts/verify-legal-moveset.mjs",
     "verify:team-builder": "node scripts/verify-team-builder.mjs",
     "verify:dexes": "node scripts/verify-dexes.mjs",
+    "verify:dex-filters": "node scripts/verify-dex-filters.mjs",
     "verify:movedex": "node scripts/verify-movedex.mjs",
     "verify:search": "node scripts/verify-search.mjs",
     "verify:ds": "node scripts/verify-design-system.mjs",

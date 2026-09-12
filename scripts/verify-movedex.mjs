@@ -129,21 +129,35 @@ log(
 )
 
 hr('STATIC — the type filter is the shared component, not a copy')
-// The Pokedex's type filter moved out of SpeciesList and into the app bar's
-// controls panel during the simplification pass, so that is where the import has
-// to be. The point of the check is unchanged: one shared component, no copies.
+/*
+  WHERE THE IMPORT LIVES HAS MOVED TWICE, and the check has followed it both
+  times; the claim has never changed. It was SpeciesList's, then the app bar's
+  controls panel during the simplification pass, and it is now the shared dex
+  FILTER PANEL -- three dexes (Pokedex, Movedex, Berrydex) declare a `types`
+  filter and FilterPanel is the single place that turns one into markup. That
+  makes the "one shared component, no copies" claim stronger than it was, not
+  weaker: there is now exactly ONE call site for the whole app rather than one
+  per dex, so the check also asserts that the panel and not the Pokedex's own
+  chrome is what renders it.
+*/
 const speciesListSrc = readFileSync('src/modules/pokedex/SpeciesList.tsx', 'utf8')
 const controlsSrc = readFileSync('src/modules/nav/ControlsPanel.tsx', 'utf8')
+const filterPanelSrc = readFileSync('src/modules/dex/query/FilterPanel.tsx', 'utf8')
 const movedexSrc = readFileSync('src/modules/dex/Movedex.tsx', 'utf8')
 const filterSrc = readFileSync('src/components/TypeFilter.tsx', 'utf8')
 const importsFilter = (src) => /from '(\.\.\/)+components\/TypeFilter'/.test(src)
-check("the Pokedex's controls panel imports the shared TypeFilter", importsFilter(controlsSrc))
+check('the shared dex filter panel imports the shared TypeFilter', importsFilter(filterPanelSrc))
+check(
+  "and the Pokedex's controls panel no longer renders one of its own",
+  !importsFilter(controlsSrc),
+)
 check('Movedex imports the shared TypeFilter', importsFilter(movedexSrc))
 check('and SpeciesList no longer renders a filter of its own', !importsFilter(speciesListSrc))
 check(
   'no module re-implements the filter buttons',
   !/className=\{[^}]*'tf/.test(speciesListSrc) &&
     !/className=\{[^}]*'tf/.test(controlsSrc) &&
+    !/className=\{[^}]*'tf/.test(filterPanelSrc) &&
     !/className=\{[^}]*'tf/.test(movedexSrc),
 )
 check(

@@ -1860,7 +1860,14 @@ try {
   await page.waitForSelector('[data-testid="species-sprites"]', { timeout: 30000 })
   const spritesTab = await page.evaluate(() => ({
     /* The four-axis control and its filter switch must both be gone. */
-    toggles: document.querySelectorAll('[data-testid^="toggle-"]').length,
+    /*
+      Scoped to the tab, which is what this check claims. The app bar grew two
+      real switches with the dex filter/sort pass -- the Pokedex's grid/list view
+      and its sort direction, both inside a closed disclosure -- and a
+      document-wide count would have read those as the artwork control returning.
+    */
+    toggles: document.querySelectorAll('[data-testid="species-sprites"] [data-testid^="toggle-"]')
+      .length,
     artworkPanel: document.querySelector('[data-testid="artwork-img"]') != null,
     featured: document.querySelector('[data-testid="sprites-featured"]') != null,
     filterCount: document.querySelector('[data-testid="sprites-filter-count"]') != null,

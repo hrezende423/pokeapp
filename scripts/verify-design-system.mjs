@@ -330,15 +330,17 @@ check(
   well as dynamically: it is the system's hardest, it is a single property, and
   the failure mode is a rule violation on a screen no suite happens to visit.
 
-  ONE NAMED EXCEPTION, and naming it is the point. `.toggle-knob` belongs to
-  src/components/ToggleSwitch.tsx, which NOTHING IMPORTS -- the sanctioned toggle
-  is components/ds/Toggle.tsx. It is dead code carrying a dead violation, so it
-  renders nowhere; it is allow-listed rather than fixed so that this check can
-  ship without deleting a component as a side effect, and it is listed here by
-  name so the allowance cannot quietly cover anything else. Delete both when the
-  file goes.
+  THE ALLOW-LIST IS EMPTY, AND THAT IS THE NEWS. It held exactly one entry,
+  `.toggle-knob` from src/components/ToggleSwitch.tsx -- tolerated only because
+  nothing imported that component, so it was a dead violation in dead code. The
+  dex filter/sort pass gave the Sort panels a direction switch and the Pokedex a
+  grid/list switch, both of them that component, so it renders on six screens
+  now; the shadow was removed rather than re-allowed, and the knob reads against
+  its track on a tone-step like everything else. An empty list is the strongest
+  form of this check, so it stays empty: a new entry here needs a reason as good
+  as "the component does not exist on screen", which nothing currently has.
 */
-const SHADOW_EXCEPTIONS = ['.toggle-knob']
+const SHADOW_EXCEPTIONS = []
 /* Every tracked file under src/, filtered here rather than globbed by git: a
    pathspec glob that misses a directory would make this check silently pass. */
 const cssFiles = execFileSync('git', ['ls-files', 'src'], { encoding: 'utf8' })

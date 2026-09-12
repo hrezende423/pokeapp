@@ -182,7 +182,10 @@ Reuse, in preference order:
 | label/value metadata row    | `StatRow` + `StatList` (`components/ds/DataRows.tsx`) |
 | sortable multi-column table | `DataTable` (`components/DataTable.tsx`)      |
 | dense browse list           | `LedgerList`                                  |
-| binary state toggle         | `components/ds/Toggle.tsx` — **not** `ToggleSwitch.tsx`, which is unimported dead code and the last `box-shadow` in the repo |
+| search / filter / sort      | a config: `FilterSection[]` + `SortField[]` (`modules/dex/query/dexQuery.ts`), rendered by `FilterPanel` / `SortPanel` |
+| any list ordering           | `compareSortValues` / `sortRows` (`components/sortValues.ts`) — the one comparator, shared with `DataTable` |
+| binary state INDICATOR      | `components/ds/Toggle.tsx` — caught/not-caught and its like |
+| two-position CHOICE         | `components/ToggleSwitch.tsx` — both positions are real values (Ascending/Descending, Grid/List). No longer dead code, and no longer carrying a `box-shadow` |
 | titled section on a tab     | `.species-info-block` + `.species-info-heading` |
 
 `DataTable` is driven by a column config — a column declares how to render a
@@ -272,7 +275,8 @@ from "back to top".
 ## 9. Verification
 
 Every module gets a suite in `scripts/`, driving the real app in a real browser —
-ten of them, 1,317 checks. `"Reported done" ≠ "actually verified"`, and
+eleven of them — the dex filter/sort suite alone is 128 checks.
+`"Reported done" ≠ "actually verified"`, and
 type-checking is not verification. What the existing suites do that a new one
 should:
 
