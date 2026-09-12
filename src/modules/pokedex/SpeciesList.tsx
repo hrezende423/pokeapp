@@ -1,21 +1,33 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
+import { DataTable, type Column } from '../../components/DataTable'
 import { SpeciesCardGrid } from '../../components/SpeciesCardGrid'
 import { TypeBadge } from '../../components/TypeBadge'
-import { resolveTypesForGeneration } from '../../data'
-import type { Species } from '../../data'
 import { useFilters } from '../filters/filtersContext'
-import { speciesEntries } from '../dex/entrySources'
 import { useVersionGroup } from '../version-group/context'
+import { statFieldsFor, type SpeciesRow } from './speciesQuery'
 
 /**
  * How the same list draws itself.
  *
- * `grid` is the browse view from Figma MainPage-Light/Dark; `rail` is the 240px
- * sidebar that sits beside an open species. One component rather than two so the
- * filtering below -- and with it the generation scope -- cannot drift between
- * them, and so both expose the same test ids.
+ * `grid` is the browse view from Figma MainPage-Light/Dark; `list` is the dense
+ * sortable table added with the filter pass; `rail` is the 240px sidebar that
+ * sits beside an open species. One component rather than three so the query --
+ * and with it the generation scope -- cannot drift between them, and so all
+ * three expose the same test ids.
+ *
+ * IT NO LONGER FILTERS. The rows arrive already filtered and sorted from the
+ * filters context, which is where the controls write. Doing it here as well was
+ * fine while "the query" was a name and a type list; with eleven filter sections
+ * and a sort it would be a second implementation of the same question.
+ *
+ * THE TABLE AND THE SORT PANEL SHARE ONE SORT STATE. `DataTable` is driven in
+ * controlled mode -- the header row and the panel are two views of the same
+ * `query.sortKey`/`query.direction`, so clicking a column header moves the panel
+ * and vice versa. Two independent copies would have disagreed the first time
+ * either was used, and the reader would have had no way to tell which was in
+ * force.
  */
-export type SpeciesListLayout = 'rail' | 'grid'
+export type SpeciesListLayout = 'rail' | 'grid' | 'list'
 
 interface Props {
   selectedId: number | null
@@ -23,47 +35,70 @@ interface Props {
   layout?: SpeciesListLayout
 }
 
-/** The default form is what the list shows; alternate forms live in the detail view. */
-function defaultVariety(species: Species) {
-  return species.varieties.find((v) => v.is_default) ?? species.varieties[0]
-}
-
 export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
-  const { generation, isAll } = useVersionGroup()
-  // The controls themselves live in the app bar's controls panel; this reads the
-  // same state they write. The generation clamp is applied by the provider.
-  const { search, typeFilter: activeTypeFilter } = useFilters()
-
-  const rows = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    // The one source for "which species does this dex list" -- the global search
-    // calls the same function, so the two cannot disagree about scope.
-    return speciesEntries({ generation, isAll })
-      .map((s) => {
-        const variety = defaultVariety(s)
-        return {
-          species: s,
-          variety,
-          typeIds: resolveTypesForGeneration(variety, generation).map((t) => t.type_id),
-        }
-      })
-      .filter((row) => {
-        if (term && !row.species.display_name.toLowerCase().includes(term)) return false
-        // OR across selected types: a species matches if it has ANY of them.
-        if (activeTypeFilter.length > 0) {
-          if (!row.typeIds.some((id) => activeTypeFilter.includes(id))) return false
-        }
-        return true
-      })
-  }, [generation, isAll, search, activeTypeFilter])
+  const { generation } = useVersionGroup()
+  const { query, sorts } = useFilters()
+  const rows = query.visible
 
   /*
-    No count readout either. It was the last thing left in this block, so the
-    block itself is gone rather than left as an empty wrapper contributing
-    spacing. Row count is still observable -- it is the number of children of
-    [data-testid="species-rows"], which is the truth rather than a rendered
-    string about it.
+    The table's columns ARE the sort fields, mapped one to one, so a column that
+    can be clicked to sort and a field the panel offers cannot come apart. The
+    accessors are the same functions -- `sorts` is the single declaration -- and
+    only the cell rendering is added here.
   */
+  const columns: Column<SpeciesRow>[] = useMemo(() => {
+    const statKeys = new Set(statFieldsFor(generation).map((s) => `stat-${s.key}`))
+    return sorts.map((field) => {
+      const numeric = field.key !== 'name'
+      let render: (row: SpeciesRow) => ReactNode
+      if (field.key === 'dex') {
+        render = (row) => <span className="num">#{String(row.species.id).padStart(4, '0')}</span>
+      } else if (field.key === 'name') {
+        render = (row) => row.species.display_name
+      } else if (field.key === 'height') {
+        render = (row) => (
+          <span className="num">
+            {row.height != null ? (row.height / 10).toFixed(1) : '—'}
+            <span className="move-unit">m</span>
+          </span>
+        )
+      } else if (field.key === 'weight') {
+        render = (row) => (
+          <span className="num">
+            {row.weight != null ? (row.weight / 10).toFixed(1) : '—'}
+            <span className="move-unit">kg</span>
+          </span>
+        )
+      } else if (statKeys.has(field.key) || field.key === 'bst' || field.key === 'friendship') {
+        render = (row) => {
+          const value = field.value(row)
+          return <span className="num">{value ?? '—'}</span>
+        }
+      } else {
+        render = (row) => <span className="num">{field.value(row) ?? '—'}</span>
+      }
+      return { key: field.key, label: field.label, sortValue: field.value, render, numeric }
+    })
+  }, [sorts, generation])
+
+  if (layout === 'list') {
+    return (
+      <div className="species-list species-list-table">
+        <DataTable
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.species.id}
+          onRowClick={(row) => onSelect(row.species.id)}
+          selectedKey={selectedId}
+          sortKey={query.sortKey}
+          direction={query.direction}
+          onSort={query.setSort}
+          testId="species-rows"
+          emptyNote="No species match those filters."
+        />
+      </div>
+    )
+  }
 
   if (layout === 'grid') {
     return (

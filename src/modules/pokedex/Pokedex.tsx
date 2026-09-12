@@ -57,14 +57,12 @@ export function Pokedex() {
     calls the same two.
   */
   const { generation, isAll } = useVersionGroup()
-  const { search, typeFilter } = useFilters()
-  const gridKey = scrollKey(
-    'pokedex-grid',
-    generation,
-    isAll,
-    search.trim().toLowerCase(),
-    [...typeFilter].sort((a, b) => a - b).join('.'),
-  )
+  const { query, view } = useFilters()
+  // The signature covers every filter AND the sort, which is more than the
+  // search term and type list it used to carry -- the invalidation story is
+  // unchanged, it just describes the whole query now. The view is part of it
+  // too: a grid offset means nothing in a table.
+  const gridKey = scrollKey('pokedex-grid', generation, isAll, view, query.signature)
 
   return (
     <div className="pokedex">
@@ -86,8 +84,11 @@ export function Pokedex() {
             ScrollArea, which was built for exactly this.
           */}
           <ScrollArea testId="pokedex-grid-scroll-area" memoryKey={gridKey}>
-            <div className="pokedex-grid-wrap">
-              <SpeciesList selectedId={selectedId} onSelect={setSelectedId} layout="grid" />
+            {/* .pokedex-grid-wrap centres three 212px columns in a wider shell,
+                which is the grid's whole geometry and means nothing to a table:
+                the list view takes the full width and its own padding. */}
+            <div className={view === 'list' ? 'pokedex-table-wrap' : 'pokedex-grid-wrap'}>
+              <SpeciesList selectedId={selectedId} onSelect={setSelectedId} layout={view} />
             </div>
           </ScrollArea>
         </div>
