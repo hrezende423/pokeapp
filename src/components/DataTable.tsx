@@ -1,6 +1,7 @@
 import { IconChevronRight } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { compareSortValues, type SortValue } from './sortValues'
 
 /**
  * A sortable data table, driven by a column config.
@@ -12,6 +13,15 @@ import type { ReactNode } from 'react'
  * Sorting is stable and null-last in both directions. A move with no power is
  * not "0 power" -- status moves have no power at all -- so nulls sink whichever
  * way the arrow points rather than clustering at the strong end when descending.
+ * The comparator itself lives in components/sortValues.ts, because the dex sort
+ * PANELS sort lists that are not tables and had to mean the same thing by it.
+ *
+ * SORT STATE IS OPTIONALLY CONTROLLED. Left alone the table owns it, which is
+ * what the Movedex wants: its header row is the only sort control on the page.
+ * Pass `sortKey`/`direction`/`onSort` and the caller owns it instead -- the
+ * Pokedex list view does, because the same sort is also offered in its Sort
+ * disclosure, and a panel and a header row that each held their own copy would
+ * disagree the moment either was used.
  *
  * A CLICKABLE ROW ENDS IN A CHEVRON, added by the table rather than declared as a
  * column: it is not data, it is the affordance saying the row opens something,
@@ -26,7 +36,7 @@ export interface Column<T> {
   /** Cell contents. Defaults to the sort value when omitted. */
   render?: (row: T) => ReactNode
   /** Sort key. Omit for a column that cannot be sorted. */
-  sortValue?: (row: T) => string | number | null
+  sortValue?: (row: T) => SortValue
   /** Right-aligned, --font-numeric. For counts and measurements. */
   numeric?: boolean
 }
@@ -40,6 +50,9 @@ export function DataTable<T>({
   onRowClick,
   selectedKey = null,
   initialSort,
+  sortKey: controlledSortKey,
+  direction: controlledDirection,
+  onSort,
   testId,
   emptyNote,
 }: {
@@ -48,16 +61,26 @@ export function DataTable<T>({
   rowKey: (row: T) => number
   onRowClick?: (row: T) => void
   selectedKey?: number | null
-  /** Column key to sort by on first render. */
+  /** Column key to sort by on first render. Ignored when `sortKey` is passed. */
   initialSort?: string
+  /** Controlled sort column. Pass with `direction` and `onSort`, or none of them. */
+  sortKey?: string | null
+  /** Controlled sort direction. */
+  direction?: SortDirection
+  /** Called with the next (key, direction) pair when a header is clicked. */
+  onSort?: (key: string, direction: SortDirection) => void
   testId: string
   emptyNote?: string
 }) {
-  const [sortKey, setSortKey] = useState<string | null>(initialSort ?? null)
+  const [ownSortKey, setOwnSortKey] = useState<string | null>(initialSort ?? null)
   // "movedex-rows" names the table; a row inside it is "movedex-row-29", not
   // "movedex-rows-row-29". Same convention LedgerList uses.
   const base = testId.replace(/-rows$/, '')
-  const [direction, setDirection] = useState<SortDirection>('asc')
+  const [ownDirection, setOwnDirection] = useState<SortDirection>('asc')
+
+  const controlled = onSort != null
+  const sortKey = controlled ? (controlledSortKey ?? null) : ownSortKey
+  const direction = controlled ? (controlledDirection ?? 'asc') : ownDirection
 
   const sorted = useMemo(() => {
     const column = columns.find((c) => c.key === sortKey)
@@ -65,24 +88,23 @@ export function DataTable<T>({
     const get = column.sortValue
     const sign = direction === 'asc' ? 1 : -1
     // Slice first: sort mutates, and `rows` is the caller's array.
-    return rows.slice().sort((a, b) => {
-      const av = get(a)
-      const bv = get(b)
-      // Null-last regardless of direction -- see the note above.
-      if (av == null && bv == null) return 0
-      if (av == null) return 1
-      if (bv == null) return -1
-      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sign
-      return String(av).localeCompare(String(bv)) * sign
-    })
+    return rows.slice().sort((a, b) => compareSortValues(get(a), get(b), sign))
   }, [rows, sortKey, direction, columns])
 
   const toggle = (key: string) => {
+    // Same column -> flip; a different one -> start ascending. Identical in both
+    // modes, so a controlled caller inherits the header's behaviour rather than
+    // reimplementing it.
+    const next: SortDirection = key === sortKey && direction === 'asc' ? 'desc' : 'asc'
+    if (controlled) {
+      onSort(key, next)
+      return
+    }
     if (key === sortKey) {
-      setDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
+      setOwnDirection(next)
     } else {
-      setSortKey(key)
-      setDirection('asc')
+      setOwnSortKey(key)
+      setOwnDirection('asc')
     }
   }
 

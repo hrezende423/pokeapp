@@ -25,12 +25,22 @@ export type FieldState = 'default' | 'focus' | 'disabled' | 'error' | 'success'
  */
 export function TextField({
   label,
+  hideLabel = false,
   helper,
   error,
   state = 'default',
   ...rest
 }: {
   label: string
+  /**
+   * Keep the label for assistive tech but take it off the screen.
+   *
+   * For the one case where the visible name is already directly above the field
+   * and printing it twice would be noise: a dex filter section whose header IS
+   * this field's name. The label stays in the DOM -- a field with no accessible
+   * name would be the wrong fix -- so this is a visual suppression, not a removal.
+   */
+  hideLabel?: boolean
   /** Secondary line under the field. Replaced by `error` when state is error. */
   helper?: string
   error?: string
@@ -39,7 +49,9 @@ export function TextField({
   const isError = state === 'error'
   return (
     <label className="ds-field" data-ds="text-field" data-state={state}>
-      <span className="ds-field-label">{label}</span>
+      <span className={hideLabel ? 'ds-field-label visually-hidden' : 'ds-field-label'}>
+        {label}
+      </span>
       <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-gap-sm)' }}>
         <input className="ds-field-control" disabled={state === 'disabled'} {...rest} />
         {state === 'success' && (

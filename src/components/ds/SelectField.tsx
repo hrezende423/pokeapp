@@ -12,26 +12,39 @@ import type { FieldState } from './TextField'
  */
 export function SelectField({
   label,
+  hideLabel = false,
   helper,
   options,
   state = 'default',
   ...rest
 }: {
   label: string
+  /** Visually suppressed, still in the DOM -- see TextField's note. */
+  hideLabel?: boolean
   helper?: string
-  options: string[]
+  /**
+   * Either plain strings (value === label) or explicit pairs. The pairs form is
+   * what the dex filter panels need: "Any" has to submit an empty value, and a
+   * growth rate's value is `medium-slow` where its label is "Medium Slow".
+   */
+  options: (string | { value: string; label: string })[]
   state?: FieldState
 } & SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <label className="ds-field ds-select-wrap" data-ds="select-field" data-state={state}>
-      <span className="ds-field-label">{label}</span>
+      <span className={hideLabel ? 'ds-field-label visually-hidden' : 'ds-field-label'}>
+        {label}
+      </span>
       <span style={{ position: 'relative', display: 'block' }}>
         <select className="ds-field-control" disabled={state === 'disabled'} {...rest}>
-          {options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
+          {options.map((o) => {
+            const option = typeof o === 'string' ? { value: o, label: o } : o
+            return (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            )
+          })}
         </select>
         <span className="ds-select-chevron" aria-hidden>
           ▾
