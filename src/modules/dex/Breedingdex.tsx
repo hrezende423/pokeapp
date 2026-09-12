@@ -19,6 +19,14 @@ import { BREEDING_INTRODUCED_IN_GENERATION, eggGroupEntries, speciesEntries } fr
  * Generation 2 and no egg group has been added or removed inside Gen 1-4, so
  * there is no per-entry signal to consult.
  *
+ * NO FILTERS AND NO SORT, and that is a decision rather than an omission. The
+ * dex-wide filter/sort pass gave every other dex a declared config; an egg group
+ * record is `{ id, name, display_name }` and nothing else, so there is no field
+ * to filter on and nothing but the name and the id to order by -- both of which
+ * a fifteen-row list already shows at a glance. The name search it has is the
+ * whole useful query. If a member COUNT filter or a sort by member count is ever
+ * wanted, the count is already computed below and would be two lines here.
+ *
  * THE CARDS SHOW EGG GROUPS, NOT ABILITIES. On every other page the shared card's
  * bottom line is the species' abilities; here it is the species' egg groups,
  * because on a page about one egg group the useful thing to know about Bulbasaur

@@ -6,6 +6,7 @@ import { useVersionGroup } from '../version-group/context'
 import { DexPageShell, LedgerList } from './DexPageShell'
 import { EntityDetailPage } from './EntityDetailPage'
 import { abilitiesHiddenFromList, abilityEntries } from './entrySources'
+import type { FilterSection, SortField } from './query/dexQuery'
 
 /**
  * REGULAR / HIDDEN GROUPING: measured, and deliberately not applied.
@@ -56,12 +57,79 @@ export function Abilitydex() {
   const hiddenCount = useMemo(() => abilitiesHiddenFromList().length, [])
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 
+  /*
+    THE GENERATION OPTIONS ARE READ OFF THE LIST, not written down. Abilities
+    arrived in Generation 3, so inside this app's scope the honest answer is "3
+    or 4" -- but the list is already clamped twice over (by the Gen 1-4 presence
+    rule and by the selected game), and a hardcoded pair would offer Generation 4
+    to someone playing Ruby. Deriving it means the control can only ever offer
+    what the list in front of it actually contains.
+
+    The four ability fields the bundle carries are generation_id, is_main_series,
+    and the two effect texts. is_main_series is `true` for all 161 -- a filter
+    with one value is a control that cannot narrow anything -- so generation is
+    the only filter here, and the dex stays lean rather than padded.
+  */
+  const sections: FilterSection<Ability>[] = useMemo(() => {
+    const generations = [...new Set(entries.map((a) => a.generation_id))]
+      .filter((g): g is number => g != null)
+      .sort((a, b) => a - b)
+    return [
+      {
+        id: 'name',
+        label: 'Name',
+        filters: [
+          {
+            kind: 'text',
+            key: 'name',
+            label: 'Search abilities by name',
+            testId: 'abilitydex-search',
+            match: (ability, term) => ability.display_name.toLowerCase().includes(term),
+          },
+        ],
+      },
+      {
+        id: 'generation',
+        label: 'Generation introduced',
+        filters: [
+          {
+            kind: 'select',
+            key: 'generation',
+            label: 'Generation introduced',
+            options: generations.map((g) => ({ value: String(g), label: `Generation ${g}` })),
+            match: (ability, value) => String(ability.generation_id) === value,
+          },
+        ],
+      },
+    ]
+  }, [entries])
+
+  /*
+    ABILITY # LEADS AND IS THE DEFAULT, which is a small departure from the brief
+    (it asked for Name, Ability ID, Generation, with Name as "the existing
+    default"). The shipped list is NOT alphabetical -- it is in ability-id order,
+    which is what the #001 in every row says -- so making Name the default would
+    have silently re-ordered a screen nobody asked to re-order, and leaving the
+    order off the field list would have left no way back to it. Declaring the
+    real default order as a field is both fixes at once.
+  */
+  const sorts: SortField<Ability>[] = useMemo(
+    () => [
+      { key: 'id', label: 'Ability #', value: (a) => a.id },
+      { key: 'name', label: 'Name', value: (a) => a.display_name },
+      { key: 'generation', label: 'Generation', value: (a) => a.generation_id },
+    ],
+    [],
+  )
+
   return (
     <DexPageShell
       dexId="abilitydex"
       entries={entries}
       entryId={(ability) => ability.id}
-      searchText={(ability) => ability.display_name}
+      sections={sections}
+      sorts={sorts}
+      defaultSort="id"
       searchLabel="Search/filter abilities"
       gatedMessage={
         preAbilityEra
@@ -78,7 +146,7 @@ export function Abilitydex() {
               meta: a.short_effect ?? undefined,
             }))}
             onSelect={onSelect}
-            emptyNote="No ability matches that search."
+            emptyNote="No ability matches those filters."
           />
           {hiddenCount > 0 && (
             <p className="list-caption" data-testid="abilitydex-clamp-caption">

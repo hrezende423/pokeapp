@@ -309,6 +309,24 @@
   padding-top: var(--space-gap-xl);
 }
 
+/*
+  THE LIST VIEW IS NOT THE GRID WITH DIFFERENT CHILDREN, so it does not reuse the
+  grid's wrapper. .pokedex-grid-wrap centres three 212px columns inside a much
+  wider shell -- that centring IS the grid's Figma geometry -- and a twelve-column
+  table wants the width the grid is deliberately refusing. Full bleed with the
+  page's own gutter, and the table scrolls itself sideways on a narrow window
+  rather than pushing the page wider.
+*/
+.pokedex-table-wrap {
+  padding: var(--space-gap-md) var(--space-gap-md) var(--space-gap-xl);
+  min-width: 0;
+}
+
+.species-list-table {
+  width: auto;
+  min-width: 0;
+}
+
 .pokedex-grid {
   display: grid;
   grid-template-columns: repeat(3, 212px);
@@ -696,7 +714,16 @@
   border-radius: 50%;
   transform: translateY(-50%);
   transition: left 120ms ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  /*
+    THE SHADOW THAT USED TO BE HERE IS GONE, and its allow-list entry in
+    verify-design-system went with it. It was the app's last box-shadow, tolerated
+    only because ToggleSwitch had no callers -- a dead violation in dead code. The
+    dex Sort panels use this switch for their direction control, so it renders
+    now, and a rendered shadow is a rule break whatever its history. The knob
+    reads against the track on a tone-step, which is what elevation is here.
+  */
+  border: 1px solid var(--hairline);
+  box-sizing: border-box;
 }
 
 .toggle-track[aria-checked='true'] .toggle-knob {
@@ -1482,6 +1509,12 @@
   right: 0;
   width: 320px;
   max-width: calc(100vw - 2rem);
+  /* The Pokedex's filter panel is eight sections deep once "More filters" is
+     open, which is taller than a laptop window. It scrolls itself rather than
+     running off the bottom of the page -- "nothing may be clipped" applies to a
+     floating panel exactly as it does to a module root. */
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-control);
@@ -2418,31 +2451,64 @@
   letter-spacing: -0.02em;
 }
 
+/*
+  EACH TRIGGER OWNS ITS OWN ANCHOR. .dex-controls was the positioning context
+  while there was one panel; with two panels hanging off two triggers side by
+  side, anchoring both to the row would have opened the Sort panel under the
+  Search/filter words. One group per trigger, each its own containing block, so
+  a panel opens directly under the words that opened it.
+*/
+.dex-control-group {
+  position: relative;
+}
+
 /* Open, or narrowing the list: either way --accent marks a binary state, which
    is one of the four uses it is reserved for. */
 .dex-controls[data-open='true'] .dex-controls-toggle,
-.dex-controls-toggle[data-filters-active='true'] {
+.dex-controls[data-sort-open='true'] .dex-sort-toggle,
+.dex-controls-toggle[data-filters-active='true'],
+.dex-sort-toggle[data-filters-active='true'] {
   color: var(--accent);
 }
 
-.dex-controls-panel {
+.dex-controls-panel,
+.dex-sort-panel {
   display: none;
   position: absolute;
   z-index: 20;
   top: 100%;
   left: 0;
   min-width: 18rem;
+  /* Wide enough for a range pair and a wrapped type filter, never wider than
+     the window. The Pokedex's eight sections can outgrow a short viewport, so
+     the panel scrolls itself rather than running off the bottom of the page --
+     the same "nothing may be clipped" rule every module root follows. */
+  max-width: min(24rem, calc(100vw - 2rem));
+  max-height: min(34rem, calc(100vh - 9rem));
+  overflow-y: auto;
   margin-top: 4px;
   padding: var(--space-gap-md);
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-control);
+  box-sizing: border-box;
 }
 
-.dex-controls[data-open='true'] .dex-controls-panel {
+.dex-control-group[data-open='true'] > .dex-controls-panel,
+.dex-control-group[data-open='true'] > .dex-sort-panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-gap-sm);
+}
+
+/* The sort panel hangs off the right-hand trigger, so on a narrow window it is
+   pinned to that trigger's LEFT edge and would overflow; right-aligning it
+   keeps it inside the page without moving it away from what opened it. */
+@media (max-width: 560px) {
+  .dex-sort-panel {
+    left: auto;
+    right: 0;
+  }
 }
 
 /*
@@ -2492,6 +2558,160 @@
 .dex-controls-inline .dex-controls-count {
   margin-left: auto;
   white-space: nowrap;
+}
+
+/* ============================================ filter and sort panel bodies */
+
+/*
+  These rules are the panels' INTERNAL rhythm, and they are shared by the per-dex
+  disclosures and by the app bar's species panel, because both render the same
+  FilterPanel/SortPanel components. Scoping them to `.dex-controls-panel` alone
+  would have left the Pokedex's copy unstyled -- the Pokedex has no controls row
+  of its own (its browse grid sits directly under the app bar's hairline, which
+  is signed off), so its panel lives in the bar.
+*/
+.dex-filter-panel-body,
+.dex-sort-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-md);
+  min-width: 0;
+}
+
+.dex-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+  min-width: 0;
+}
+
+.dex-filter-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-gap-sm);
+}
+
+.dex-filter-section-head .ds-section-label {
+  margin: 0;
+}
+
+/*
+  DISABLED, NOT HIDDEN, while its section is untouched: a control that only
+  appears once you have used the thing above it is a control nobody finds.
+*/
+.dex-filter-reset {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.dex-filter-reset:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.dex-filter-reset:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dex-filter-reset:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.dex-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* The design-system field is a fixed 220px, which is its reference-page width.
+   In a panel it fills the panel. */
+.dex-controls-panel .ds-field,
+.dex-sort-panel .ds-field,
+.app-controls-panel .ds-field {
+  width: 100%;
+}
+
+/* The type filter's own top margin is for the rail it came from. */
+.dex-filter-field .type-filter {
+  margin: 0;
+}
+
+.dex-filter-range-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.dex-filter-range-row .ds-field-control {
+  width: 100%;
+  min-width: 0;
+  /* --font-numeric, because these are values you read and compare, which is
+     exactly the rule the stat tables and dex numbers follow. */
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.dex-filter-range-sep {
+  color: var(--text-secondary);
+}
+
+.dex-filter-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+}
+
+.dex-filter-more-panel {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-gap-md);
+  /* Indented behind its own hairline so the fold reads as contained by the
+     toggle above it rather than as a continuation of the panel. */
+  padding-left: var(--space-gap-sm);
+  border-left: 1px solid var(--hairline);
+}
+
+.dex-filter-more[data-open='true'] .dex-filter-more-panel {
+  display: flex;
+}
+
+.dex-filter-more-toggle[data-filters-active='true'] {
+  color: var(--accent);
+}
+
+.dex-filter-clear {
+  align-self: flex-start;
+}
+
+.dex-filter-clear:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dex-filter-count {
+  margin: 0;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  letter-spacing: -0.02em;
+}
+
+/* The stubbed filter's note, and any other explanation a control has to carry. */
+.dex-filter-note {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
 }
 
 /* ================================================== ledger row additions */

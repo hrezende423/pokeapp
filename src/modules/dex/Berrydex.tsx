@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
 import { ItemArtwork } from '../../components/ItemArtwork'
 import { TypeLabel } from '../../components/ds/TypeLabel'
-import { getItem, getType } from '../../data'
+import { getItem, getType, typesInGeneration } from '../../data'
 import type { Berry } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell } from './DexPageShell'
 import { berryEntries } from './entrySources'
+import type { FilterSection, SortField } from './query/dexQuery'
 
 /**
  * The Berrydex: one card per berry, and no detail page at all.
@@ -123,6 +124,42 @@ function BerryCard({ berry }: { berry: Berry }) {
   )
 }
 
+/**
+ * The berry's dominant flavour: the highest-potency entry of the five.
+ *
+ * `flavors` always carries all five with a potency each, and 0 is by far the
+ * commonest value -- so "the flavour it tastes of" is the maximum, and a berry
+ * whose maximum is 0 has no flavour at all rather than an arbitrary first one.
+ * TIES ARE REAL and are not resolved here: a berry can be equally spicy and dry,
+ * and this returns every flavour at the maximum so the filter matches on any of
+ * them. Picking one would be inventing a precedence the games do not have.
+ */
+function dominantFlavors(berry: Berry): string[] {
+  const potency = Math.max(0, ...berry.flavors.map((f) => f.potency))
+  if (potency === 0) return []
+  return berry.flavors.filter((f) => f.potency === potency && f.flavor).map((f) => f.flavor!)
+}
+
+/* Soft to hard, not alphabetical: firmness is an ordered scale and the reader is
+   picking a point on it, so the buttons read in the order the scale runs. */
+const FIRMNESS_OPTIONS = [
+  { value: 'very-soft', label: 'Very Soft' },
+  { value: 'soft', label: 'Soft' },
+  { value: 'hard', label: 'Hard' },
+  { value: 'very-hard', label: 'Very Hard' },
+  { value: 'super-hard', label: 'Super Hard' },
+]
+
+/* The games' own flavour order (spicy, dry, sweet, bitter, sour), which is the
+   order the five appear in on every berry record. */
+const FLAVOR_OPTIONS = [
+  { value: 'spicy', label: 'Spicy' },
+  { value: 'dry', label: 'Dry' },
+  { value: 'sweet', label: 'Sweet' },
+  { value: 'bitter', label: 'Bitter' },
+  { value: 'sour', label: 'Sour' },
+]
+
 export function Berrydex() {
   const { generation, isAll } = useVersionGroup()
 
@@ -130,12 +167,140 @@ export function Berrydex() {
   // have no generation field of their own. See data/availability.ts.
   const entries = useMemo(() => berryEntries({ generation, isAll }), [generation, isAll])
 
+  // Same clamp every type control in the app uses: a type that does not exist in
+  // this generation must not be offerable, even as a Natural Gift.
+  const availableTypes = useMemo(() => typesInGeneration(generation), [generation])
+
+  const sections: FilterSection<Berry>[] = useMemo(
+    () => [
+      {
+        id: 'name',
+        label: 'Name',
+        filters: [
+          {
+            kind: 'text',
+            key: 'name',
+            label: 'Search berries by name',
+            testId: 'berrydex-search',
+            match: (berry, term) => berryName(berry).toLowerCase().includes(term),
+          },
+        ],
+      },
+      {
+        /* The type filter stays a primary control here for the same reason it is
+           one on the Pokedex and the Movedex: it is the axis people come to a
+           list of 64 berries with. */
+        id: 'gift-type',
+        label: 'Natural Gift type',
+        filters: [
+          {
+            kind: 'types',
+            key: 'giftType',
+            label: 'Natural Gift type',
+            available: availableTypes,
+            testIdPrefix: 'berrydex-ng-type',
+            match: (berry, selected) =>
+              berry.natural_gift_type_id != null && selected.includes(berry.natural_gift_type_id),
+          },
+        ],
+      },
+      {
+        id: 'taste',
+        label: 'Taste',
+        more: true,
+        filters: [
+          {
+            kind: 'multi',
+            key: 'firmness',
+            label: 'Firmness',
+            options: FIRMNESS_OPTIONS,
+            match: (berry, selected) => berry.firmness != null && selected.includes(berry.firmness),
+          },
+          {
+            kind: 'multi',
+            key: 'flavor',
+            label: 'Dominant flavour',
+            options: FLAVOR_OPTIONS,
+            match: (berry, selected) =>
+              dominantFlavors(berry).some((flavor) => selected.includes(flavor)),
+          },
+        ],
+      },
+      {
+        id: 'values',
+        label: 'Values',
+        more: true,
+        filters: [
+          {
+            kind: 'range',
+            key: 'ngPower',
+            label: 'Natural Gift power',
+            value: (berry) => berry.natural_gift_power,
+            bounds: { min: 60, max: 80 },
+          },
+          {
+            kind: 'range',
+            key: 'size',
+            label: 'Size',
+            value: (berry) => berry.size,
+            bounds: { min: 20, max: 300 },
+            unit: 'mm',
+          },
+          {
+            kind: 'range',
+            key: 'smoothness',
+            label: 'Smoothness',
+            value: (berry) => berry.smoothness,
+            bounds: { min: 20, max: 60 },
+          },
+        ],
+      },
+      {
+        id: 'growing',
+        label: 'Growing',
+        more: true,
+        filters: [
+          {
+            kind: 'range',
+            key: 'growthTime',
+            label: 'Growth time',
+            value: (berry) => berry.growth_time,
+            bounds: { min: 2, max: 24 },
+            unit: 'h/stage',
+          },
+          {
+            kind: 'range',
+            key: 'maxHarvest',
+            label: 'Max harvest',
+            value: (berry) => berry.max_harvest,
+            bounds: { min: 5, max: 15 },
+          },
+        ],
+      },
+    ],
+    [availableTypes],
+  )
+
+  const sorts: SortField<Berry>[] = useMemo(
+    () => [
+      { key: 'id', label: 'Berry #', value: (b) => b.id },
+      { key: 'name', label: 'Name', value: (b) => berryName(b) },
+      { key: 'ngPower', label: 'Gift power', value: (b) => b.natural_gift_power },
+      { key: 'size', label: 'Size', value: (b) => b.size },
+      { key: 'growthTime', label: 'Growth time', value: (b) => b.growth_time },
+      { key: 'maxHarvest', label: 'Max harvest', value: (b) => b.max_harvest },
+    ],
+    [],
+  )
+
   return (
     <DexPageShell
       dexId="berrydex"
       entries={entries}
       entryId={(berry) => berry.id}
-      searchText={(berry) => berryName(berry)}
+      sections={sections}
+      sorts={sorts}
+      defaultSort="id"
       searchLabel="Search/filter berries"
       gatedMessage={`No berry in the bundle exists in Generation ${generation}. Berries arrived with Generation 2 and the modern berry system with Generation 3 — pick a later game to browse them.`}
       list={({ entries: visible }) => (
@@ -148,7 +313,7 @@ export function Berrydex() {
             ))}
             {visible.length === 0 && (
               <li className="empty" data-testid="berrydex-rows-empty">
-                No berry matches that search.
+                No berry matches those filters.
               </li>
             )}
           </ul>

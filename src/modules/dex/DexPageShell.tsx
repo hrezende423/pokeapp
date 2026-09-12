@@ -1,11 +1,15 @@
 import { IconChevronRight } from '@tabler/icons-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
 import { useDexSelection } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import type { DexModuleId } from '../nav/registry'
 import { DexControls } from './DexControls'
+import { FilterPanel } from './query/FilterPanel'
+import { SortPanel } from './query/SortPanel'
+import { asText, type FilterSection, type SortField } from './query/dexQuery'
+import { useDexQuery } from './query/useDexQuery'
 
 /**
  * List page, or detail page -- never both at once.
@@ -13,11 +17,15 @@ import { DexControls } from './DexControls'
  * The same split the Pokedex uses since its retrofit: nothing selected shows the
  * full-width list, something selected shows that entry's page with a way back.
  *
- * The name search and the entry count come with it. They were DexShell's, in the
- * rail; losing the rail should not lose the search, and putting them here rather
- * than in each caller keeps it one implementation. The search now lives behind
- * DexControls' ghost-button disclosure, so what is permanently on screen is the
- * list itself plus a count.
+ * THE SHELL OWNS THE WHOLE QUERY, not just the name search. It used to own one
+ * `search` string and hand the filtered array to `list`; five dexes then wanted
+ * filters and four of them wanted sorting, and the alternative to putting it
+ * here was five copies of the same disclosure, reset and clear-all machinery. A
+ * dex now declares `sections` and `sorts` as DATA (see query/dexQuery.ts) and
+ * this component renders the controls, applies them, and keys the scroll memory
+ * by the result. A dex that declares neither gets exactly what it had before,
+ * through the same code path -- the name search is expressed as one `text`
+ * filter rather than as a second way to narrow a list.
  *
  * NO DESCRIPTIVE HEADER. There was a `note` prop for a line like "All 25 natures
  * (Generation 4)" and callers passed explanatory paragraphs through it. Both are
@@ -38,6 +46,9 @@ export function DexPageShell<T>({
   searchLabel,
   controlsVariant,
   controls,
+  sections,
+  sorts,
+  defaultSort,
   list,
   detail,
   gatedMessage,
@@ -46,15 +57,28 @@ export function DexPageShell<T>({
   /** Entries after generation gating, in display order. */
   entries: T[]
   entryId: (entry: T) => number
-  /** What the search box matches against. Omit for a list with no search. */
+  /**
+   * What the built-in name filter matches against. Omit for a list with no
+   * search, or when `sections` declares a name filter of its own.
+   */
   searchText?: (entry: T) => string
-  /** Trigger text for the controls disclosure. */
+  /** Trigger text for the filter disclosure. */
   searchLabel?: string
   /** "inline" gives an always-visible control row instead. Movedex only. */
   controlsVariant?: 'disclosure' | 'inline'
-  /** Extra controls inside the disclosure panel. */
+  /** Extra controls inside the panel (or the inline row), e.g. a type filter. */
   controls?: ReactNode
-  /** Rendered when nothing is selected, over the search-filtered entries. */
+  /**
+   * This dex's filters, as data. When given it REPLACES the built-in name
+   * filter, so a dex with filters declares its own name section -- which is what
+   * puts the name search first inside every page's panel.
+   */
+  sections?: FilterSection<T>[]
+  /** Sortable fields. Omit for a dex with nothing to sort by but its own order. */
+  sorts?: SortField<T>[]
+  /** Sort field applied before the reader picks one. */
+  defaultSort?: string
+  /** Rendered when nothing is selected, over the filtered, sorted entries. */
   list: (args: { entries: T[]; onSelect: (id: number) => void }) => ReactNode
   /**
    * Rendered when something is. OMIT for a dex with no detail page: the Berrydex
@@ -65,7 +89,6 @@ export function DexPageShell<T>({
   /** Shown instead of the list when `entries` is empty for era reasons. */
   gatedMessage?: string
 }) {
-  const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useDexSelection(dexId)
   /*
     Read for the scroll keys below and nothing else. `entries` arrives already
@@ -76,18 +99,47 @@ export function DexPageShell<T>({
   */
   const { generation, isAll } = useVersionGroup()
 
-  const visible = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term || !searchText) return entries
-    return entries.filter((entry) => searchText(entry).toLowerCase().includes(term))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, search])
+  /*
+    A dex with no `sections` still gets one: its name search, expressed as the
+    same `text` filter kind the declared ones use. That is what keeps ONE code
+    path through the filtering -- the alternative was a legacy branch that
+    searched by name beside a new branch that ran a config, which is two ways to
+    narrow a list and therefore two ways for them to disagree.
+  */
+  const resolvedSections: FilterSection<T>[] = useMemo(() => {
+    if (sections) return sections
+    if (!searchText) return []
+    return [
+      {
+        id: 'name',
+        label: 'Name',
+        filters: [
+          {
+            kind: 'text',
+            key: 'name',
+            label: `Search ${dexId} by name`,
+            testId: `${dexId}-search`,
+            match: (entry: T, term: string) => searchText(entry).toLowerCase().includes(term),
+          },
+        ],
+      },
+    ]
+  }, [sections, searchText, dexId])
 
-  // Resolved against the full gated list, NOT the search-filtered one: typing
-  // narrows the list without closing an open entry, and the global search can
-  // open something the local box happens to be hiding. A selection that is no
-  // longer in scope -- the generation changed under an open entry -- falls back
-  // to the list rather than rendering a detail page the era does not have.
+  const query = useDexQuery({
+    entries,
+    sections: resolvedSections,
+    sorts,
+    defaultSort: defaultSort ?? null,
+  })
+  const visible = query.visible
+  const hasControls = resolvedSections.length > 0
+
+  // Resolved against the full gated list, NOT the filtered one: typing narrows
+  // the list without closing an open entry, and the global search can open
+  // something the local box happens to be hiding. A selection that is no longer
+  // in scope -- the generation changed under an open entry -- falls back to the
+  // list rather than rendering a detail page the era does not have.
   // Hoisted rather than inlined into the dep list: react-hooks/use-memo requires
   // dependencies to be simple expressions, and `detail == null` is not one.
   const hasDetail = detail != null
@@ -117,32 +169,45 @@ export function DexPageShell<T>({
     <div className="pokedex" data-testid={`dex-${dexId}`}>
       {selected == null ? (
         <>
-          {searchText && (
+          {hasControls && (
             <DexControls
               dexId={dexId}
               count={visible.length}
-              search={search}
-              onSearch={setSearch}
+              searchValue={asText(query.values.name)}
+              onSearchChange={(value) => query.setValue('name', value)}
               label={searchLabel ?? 'Search/filter entries'}
               variant={controlsVariant}
+              filtersActive={query.activeCount > 0}
+              sortActive={query.sortKey != null && query.sortKey !== (defaultSort ?? null)}
+              filterPanel={
+                controlsVariant === 'inline' ? undefined : (
+                  <FilterPanel dexId={dexId} sections={resolvedSections} query={query} />
+                )
+              }
+              sortPanel={
+                sorts != null && sorts.length > 0 && controlsVariant !== 'inline' ? (
+                  <SortPanel dexId={dexId} sorts={sorts} query={query} />
+                ) : undefined
+              }
             >
               {controls}
             </DexControls>
           )}
           {/* A dex with no search still needs its count on screen. */}
-          {!searchText && (
+          {!hasControls && (
             <div className="dex-controls">
               <p className="subtitle dex-controls-count" data-testid={`${dexId}-count`}>
                 {visible.length} {visible.length === 1 ? 'entry' : 'entries'}
               </p>
             </div>
           )}
-          {/* The local search box is part of the key for the same reason the
-              Pokedex grid's filters are: a narrowed list is a different list,
-              and an offset taken against the full one means nothing in it. */}
+          {/* The query signature is part of the key for the reason the Pokedex
+              grid's filters already were: a narrowed or re-ordered list is a
+              different list, and an offset taken against another one means
+              nothing in it. */}
           <ScrollArea
             testId={`${dexId}-list-scroll`}
-            memoryKey={scrollKey(dexId, 'list', generation, isAll, search.trim().toLowerCase())}
+            memoryKey={scrollKey(dexId, 'list', generation, isAll, query.signature)}
           >
             {list({ entries: visible, onSelect: setSelectedId })}
           </ScrollArea>
