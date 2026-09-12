@@ -125,6 +125,7 @@ import {
   updateBuild,
   useTeamBuilderData,
 } from './store'
+import { registerNavBlocker } from '../nav/navGuard'
 import { goTo, type BuildOrigin, type TbScreen } from './tbNav'
 import { useLegalMoveset } from './useLegalMoveset'
 
@@ -439,6 +440,114 @@ function BuildFormFields({
   })
 
   /*
+    HOISTED ABOVE THE EMPTY-FORM RETURN BELOW, and that is why it sits here
+    rather than beside the rail questions it reads like. The nav guard further
+    down delegates to it, so both it and the hooks that register it have to run
+    on every render -- a hook after a conditional return is a hooks-order error,
+    and this function is the thing they depend on. Every value it closes over
+    was already defined above this point; nothing else changed in it.
+  */
+  /**
+   * SAVE, THEN DO THE THING. Every save point in this screen calls this, so the
+   * shared-build question is asked in one place and cannot be bypassed by taking
+   * a different route out.
+   *
+   * `after` receives the id the build settled on -- which for a member being
+   * saved for the first time is an id that did not exist a moment ago, and is
+   * the only way the caller can then act on it.
+   *
+   * NO PROMPT EXCEPT THE SHARED ONE. Every transition here commits SILENTLY --
+   * going back, duplicating, adding to a team, leaving by the app bar. The rail
+   * has its own questions and they are further down; the one here is for a build
+   * two or more teams reference, where saving is not a private act.
+   */
+  const saveThen = (after: (savedId: string | null) => void) => {
+    if (!pending.current || !stored || !isShared) {
+      after(persist())
+      return
+    }
+    const edited = pending.current
+    prompt.ask({
+      title: 'This build is used by more than one team',
+      body: `Saving changes it for all ${attachedTeams.length} teams that use it (${attachedTeams
+        .map((t) => teamUiId(data, t.id))
+        .join(', ')}).`,
+      testId: 'tb-shared-prompt',
+      actions: [
+        {
+          label: 'Save to all teams',
+          testId: 'tb-shared-save',
+          onPick: () => after(persist()),
+        },
+        {
+          label: 'Save as a new build',
+          testId: 'tb-shared-fork',
+          onPick: () => {
+            /* The copy takes the edit; the original keeps what it had. Clearing
+               `pending` first is what stops the unmount flush writing the edit
+               back onto the original a moment later. */
+            pending.current = null
+            setDirty(false)
+            const copy =
+              origin.kind === 'team'
+                ? forkBuildInTeam(stored.id, edited, origin.teamId)
+                : createBuild(withoutId(edited))
+            after(copy.id)
+          },
+        },
+        {
+          label: 'Discard changes',
+          danger: true,
+          testId: 'tb-shared-discard',
+          onPick: () => {
+            revert()
+            after(stored.id)
+          },
+        },
+      ],
+    })
+  }
+
+  /*
+    ---------------------------------------------- LEAVING BY THE APP NAV BAR
+
+    THE SHARED-BUILD QUESTION NOW GETS ASKED THERE TOO, which closes the debt
+    item logged against this screen: an edit to a build two or more teams use
+    was silently dropped when the reader left through the global nav, because
+    the only thing standing at that door was the unmount flush -- and a cleanup
+    runs with the component already gone, so there was nobody left to ask which
+    of save-back / save-as-new / discard was meant.
+
+    The guard it registers with lives in the NAV LAYER, not here, which is the
+    whole point of the note that logged this: the app bar was one door and the
+    back control is now another, and a Team-Building-local answer would have
+    covered whichever one it was written for. Every page change in the app goes
+    through NavProvider, so the question is asked at all of them at once.
+
+    IT ASKS BY DELEGATING TO `saveThen`, not by growing a second prompt. That
+    function already is "the one place that can ask", and its three answers all
+    end in a state where leaving is safe -- so the transition is simply its
+    continuation. Dismissing the question calls nothing, which is how "actually,
+    I'll stay" is expressed.
+
+    REGISTERED ONCE, CALLED THROUGH A REF. `saveThen` closes over the draft and
+    is rebuilt every render; a blocker registered with one of those would still
+    be holding the first render's copy by the time it ran, and would ask about
+    an empty form. Same reason and same shape as `onLeave` above.
+  */
+  const guardRef = useRef<(proceed: () => void) => 'go' | 'handled'>(() => 'go')
+  useEffect(() => {
+    guardRef.current = (proceed) => {
+      /* Nothing typed, nothing stored, or a build only one team uses: leaving
+         is already safe. The unmount flush writes it, exactly as before. */
+      if (!pending.current || !stored || !isShared) return 'go'
+      saveThen(() => proceed())
+      return 'handled'
+    }
+  })
+  useEffect(() => registerNavBlocker((proceed) => guardRef.current(proceed)), [])
+
+  /*
     THE FORM IS ONLY EMPTY FOR TWO REASONS, and neither of them is "this member
     has not been saved yet" -- which is what made this branch fire mid-build and
     tell the reader their build no longer existed. It fires when the reader has
@@ -505,67 +614,6 @@ function BuildFormFields({
   const railAddSlot = railTeam
     ? railTeam.memberIds.findIndex((m, i) => i !== slot && slotIsFree(data.builds, m))
     : -1
-
-  /**
-   * SAVE, THEN DO THE THING. Every save point in this screen calls this, so the
-   * shared-build question is asked in one place and cannot be bypassed by taking
-   * a different route out.
-   *
-   * `after` receives the id the build settled on -- which for a member being
-   * saved for the first time is an id that did not exist a moment ago, and is
-   * the only way the caller can then act on it.
-   *
-   * NO PROMPT EXCEPT THE SHARED ONE. Every transition here commits SILENTLY --
-   * going back, duplicating, adding to a team, leaving by the app bar. The rail
-   * has its own questions and they are further down; the one here is for a build
-   * two or more teams reference, where saving is not a private act.
-   */
-  const saveThen = (after: (savedId: string | null) => void) => {
-    if (!pending.current || !stored || !isShared) {
-      after(persist())
-      return
-    }
-    const edited = pending.current
-    prompt.ask({
-      title: 'This build is used by more than one team',
-      body: `Saving changes it for all ${attachedTeams.length} teams that use it (${attachedTeams
-        .map((t) => teamUiId(data, t.id))
-        .join(', ')}).`,
-      testId: 'tb-shared-prompt',
-      actions: [
-        {
-          label: 'Save to all teams',
-          testId: 'tb-shared-save',
-          onPick: () => after(persist()),
-        },
-        {
-          label: 'Save as a new build',
-          testId: 'tb-shared-fork',
-          onPick: () => {
-            /* The copy takes the edit; the original keeps what it had. Clearing
-               `pending` first is what stops the unmount flush writing the edit
-               back onto the original a moment later. */
-            pending.current = null
-            setDirty(false)
-            const copy =
-              origin.kind === 'team'
-                ? forkBuildInTeam(stored.id, edited, origin.teamId)
-                : createBuild(withoutId(edited))
-            after(copy.id)
-          },
-        },
-        {
-          label: 'Discard changes',
-          danger: true,
-          testId: 'tb-shared-discard',
-          onPick: () => {
-            revert()
-            after(stored.id)
-          },
-        },
-      ],
-    })
-  }
 
   /*
     ------------------------------------------------- THE RAIL'S OWN QUESTIONS

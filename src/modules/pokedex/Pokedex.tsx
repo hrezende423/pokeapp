@@ -1,5 +1,8 @@
 import { useDexSelection, useNav } from '../nav/navContext'
 import { ScrollArea } from '../../components/ScrollArea'
+import { scrollKey } from '../../components/scrollMemory'
+import { useFilters } from '../filters/filtersContext'
+import { useVersionGroup } from '../version-group/context'
 import { SpeciesDetailPage } from './SpeciesDetailPage'
 import { SpeciesList } from './SpeciesList'
 // The grid card's type row is the validated TypeLabel/TypeRow pair, whose styles
@@ -37,6 +40,32 @@ export function Pokedex() {
   const nav = useNav()
   const browsing = selectedId == null
 
+  /*
+    WHERE THE GRID WAS LEFT, keyed by what the grid was SHOWING.
+
+    Opening a species unmounts the grid -- `browsing` flips and the whole
+    scroller goes -- so returning to it is a fresh mount every time and there is
+    nothing local left to remember the offset. scrollMemory.ts holds it outside
+    React for that reason.
+
+    THE FILTER STATE IS PART OF THE KEY, and that is the whole invalidation
+    story: a different generation, search term or type filter is a different key,
+    so it opens at the top rather than at an offset measured against a list that
+    no longer exists. Restoring a clamped offset into a filtered list would put
+    the reader somewhere they had never been. Two contexts are read here purely
+    to compose this -- the grid itself is filtered inside SpeciesList, which
+    calls the same two.
+  */
+  const { generation, isAll } = useVersionGroup()
+  const { search, typeFilter } = useFilters()
+  const gridKey = scrollKey(
+    'pokedex-grid',
+    generation,
+    isAll,
+    search.trim().toLowerCase(),
+    [...typeFilter].sort((a, b) => a - b).join('.'),
+  )
+
   return (
     <div className="pokedex">
       {/*
@@ -56,7 +85,7 @@ export function Pokedex() {
             scroll-down indicator and the back-to-top control come from
             ScrollArea, which was built for exactly this.
           */}
-          <ScrollArea testId="pokedex-grid-scroll-area">
+          <ScrollArea testId="pokedex-grid-scroll-area" memoryKey={gridKey}>
             <div className="pokedex-grid-wrap">
               <SpeciesList selectedId={selectedId} onSelect={setSelectedId} layout="grid" />
             </div>
@@ -76,6 +105,11 @@ export function Pokedex() {
           onBack={() => setSelectedId(null)}
           onSelectSpecies={setSelectedId}
           onSelectEggGroup={(id) => nav.navigate('breedingdex', id)}
+          /* Pokedex > species > move page, which is the flow the back stack was
+             built for. `navigate` is the same one-update cross-module jump the
+             egg groups and the global search use -- and it records the step, so
+             one back press returns to the species and the next to the grid. */
+          onSelectMove={(id) => nav.navigate('movedex', id)}
         />
       )}
     </div>

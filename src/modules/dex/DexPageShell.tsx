@@ -1,7 +1,9 @@
 import { IconChevronRight } from '@tabler/icons-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
+import { scrollKey } from '../../components/scrollMemory'
 import { useDexSelection } from '../nav/navContext'
+import { useVersionGroup } from '../version-group/context'
 import type { DexModuleId } from '../nav/registry'
 import { DexControls } from './DexControls'
 
@@ -65,6 +67,14 @@ export function DexPageShell<T>({
 }) {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useDexSelection(dexId)
+  /*
+    Read for the scroll keys below and nothing else. `entries` arrives already
+    generation-scoped from the caller, so this component never filters by
+    generation -- but its scroll offsets still have to be keyed by it, and
+    `entries.length` is a proxy rather than an answer: two generations can
+    scope to the same count.
+  */
+  const { generation, isAll } = useVersionGroup()
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -127,12 +137,21 @@ export function DexPageShell<T>({
               </p>
             </div>
           )}
-          <ScrollArea testId={`${dexId}-list-scroll`}>
+          {/* The local search box is part of the key for the same reason the
+              Pokedex grid's filters are: a narrowed list is a different list,
+              and an offset taken against the full one means nothing in it. */}
+          <ScrollArea
+            testId={`${dexId}-list-scroll`}
+            memoryKey={scrollKey(dexId, 'list', generation, isAll, search.trim().toLowerCase())}
+          >
             {list({ entries: visible, onSelect: setSelectedId })}
           </ScrollArea>
         </>
       ) : (
-        <ScrollArea testId={`${dexId}-detail-scroll`}>
+        <ScrollArea
+          testId={`${dexId}-detail-scroll`}
+          memoryKey={scrollKey(dexId, 'detail', generation, isAll, entryId(selected))}
+        >
           {detail?.({ entry: selected, onBack: () => setSelectedId(null) })}
         </ScrollArea>
       )}

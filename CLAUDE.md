@@ -481,6 +481,108 @@ record and is NOT app code.
   own — `typeEffectivenessAgainst` in `data/era.ts` already composes across a
   dual typing, and a wrong matrix still renders as a matrix.
 
+## The scroll model and the back stack
+
+`components/ScrollArea.tsx` owns the scroll half, and all six mounts get every
+part of it by construction. `npm run verify:scroll-nav` (port 4198) drives the
+lot, including a real touch context.
+
+- **THE SCROLLBAR IS DRAWN, NOT NATIVE, and the fade is why.** A native bar's
+  gutter is layout rather than paint, so hiding its thumb when idle leaves the
+  gutter behind — the full width paid permanently for a mark visible a second at
+  a time, and every row in the app narrower for good. CSS cannot fade one
+  either, only switch it on and off, and the three engines disagree on how a
+  native bar is styled and how wide `thin` is. Drawing it also lets it stop
+  short of the corner where the back-to-top control sits.
+  **The universal no-scrollbar rule in `index.css` therefore STAYS** — the drawn
+  thumb is additive, and the small internal scrollers (learnset tables, search
+  dropdown, evolution tree) keep no bar at all, by request.
+  It reproduces exactly what an 8px native track with a 2px inset paints: 4px of
+  rounded bar, 2px off the edge. Tone is `color-mix` down from
+  `--text-secondary`, **not `--border`** — that token disappears against
+  `--surface-raised`, which is what three of the six scrollers sit on — and it is
+  translucent on purpose, since the thumb sits over content.
+- **The thumb's geometry is written straight to the node**, never through state:
+  it moves on every scroll frame, and a `setState` there re-rendered the whole
+  section to shift one element 3px. The three booleans that DO need a render are
+  compared before setting, which the original hook did not do.
+- **On touch it is an indicator at rest and a handle once awake.** The invisible
+  state takes no pointer events, because a 12px strip that eats them is 12px of
+  every list a right-handed thumb cannot swipe; press-to-jump on the empty track
+  is mouse-only for the same reason. The finger-sized hit area is a `::before`
+  that grows **leftward only** — symmetric insets reach outside the section, and
+  `.scroll-area-outer` does not clip, so in the two side-by-side arrangements
+  (Itemdex rail + detail, Type Coverage view + rail) it would swallow events in
+  the neighbour.
+- **Scroll memory is keyed by what a scroller is SHOWING, not by which scroller
+  it is.** Three mounts host several screens each — `tb-scroll` is every Team
+  Building screen, `tc-scroll-area` all four Type Coverage tabs, the species
+  page's scroller a different species and tab every time — so the call site
+  composes the key and a missing part is visible there.
+  **The Pokédex grid's key includes the filter state, and that IS the whole
+  invalidation story**: a different generation, search term or type filter is a
+  different key, so it opens at the top, and returning to a filter you had
+  before restores your place in it for free. There is no invalidation step to
+  forget to call.
+- **NOTHING IS WRITTEN IN THE RESTORE EFFECT'S CLEANUP, and that is
+  load-bearing.** A "last word" write there — the obvious belt to the scroll
+  handler's braces — silently destroyed the feature: React runs an effect
+  cleanup after the element is detached, and a detached element reports
+  `scrollTop === 0`, so the last thing to reach the store on every exit was a
+  zero over the real offset. The log read `WRITE 900` then `WRITE 0`, in that
+  order, every single time. The scroll handler is sufficient alone — the only
+  way to change `scrollTop` without a scroll event is not to change it.
+- **Not persisted**, by request: a reload starts at the top of everything.
+  sessionStorage would need a clamp and a staleness rule for a restored offset
+  pointing past the end of a list whose data changed since.
+
+### The back stack
+
+`nav/navHistory.ts`, and it is **STILL NOT A ROUTER** — nothing writes a URL, so
+no deep links and no `?ds=1` / `?layout=1` to preserve. It uses the History API
+only for the browser's *stack*, one entry per screen carrying a depth number, so
+**the Android back gesture, the browser button and the app-bar control are one
+mechanism**. That was the whole reason to involve the platform: this app is
+reviewed on a phone, where the gesture is how people go back.
+
+- **One path for every back.** The app-bar control calls `history.back()` and
+  lets the `popstate` handler do the work, so the guard, the depth bookkeeping
+  and the application of a location exist once. A second implementation for the
+  button is how the two would drift.
+- **A location is a page plus the entry open in it** — what the nav context
+  already owns. **Module-internal screens are NOT steps**: Team Building's four
+  live in `tbNav` and the species page's tabs in local state, so leaving Team
+  Building returns to whatever preceded Team Building rather than walking out
+  through My Teams. Those screens have their own back controls. Adding them
+  later means pushing a location from `goTo`, not changing the shape here.
+- **Two ways a guard can say yes, and they need opposite handling.** With
+  nothing to ask, `proceed` runs synchronously and the location is applied on
+  the spot. With something to ask it runs frames later — and by then the browser
+  has ALREADY moved, because `popstate` fires after the fact and cannot be
+  prevented. So a blocked back re-pushes the depth we never left, and the
+  blocker's `proceed` re-enters through the platform with `bypassGuard` set. An
+  `asking` flag tells the two apart. Applying directly in the late case leaves
+  our depth and the browser's disagreeing, which is the bug that shape exists to
+  avoid.
+- **`applying` guards reentrancy**: restoring a location calls the nav setters,
+  and those setters are what push history.
+- **Every page change goes through `NavProvider`**, which is what lets one
+  guard cover the app bar, the global search's cross-module jump and the back
+  control at once. That is the point of `navGuard.ts` living in the nav layer —
+  see the closed debt entry below.
+- **Deliberate: the species page's own "All species" control pushes a step.**
+  It is a destination ("show me the grid"), not an undo — it has to reach the
+  grid even when the reader arrived at that species from the global search in
+  another module, which an undo cannot promise. So grid → detail → All species
+  leaves three entries and a back press re-opens the detail, exactly as a
+  browser does with links. Do not "fix" that by collapsing it; the two controls
+  are independent on purpose.
+- **Learnset move names link into the Movedex** (`onSelectMove`, threaded
+  Pokédex → SpeciesDetailPage → SpeciesLearnsetTab), which is what makes
+  Pokédex > species > move page walkable back. The treatment is
+  `.species-egg-group`'s, **shared rather than copied** — same act, and two
+  rules would be two treatments in one session.
+
 ## Known gotchas (already hit once)
 
 - Bare element selectors in old CSS (`.panel h2`, `.panel section`) can
@@ -539,6 +641,53 @@ Use it to REVIEW: screenshot with it on and name the region, rather than
 describing a direction and a distance. It reads `grid-template-areas` from
 the computed style, so a name it prints is a name in the stylesheet.
 
+## The Bulbapedia supplement layer
+
+Two generated modules carrying facts the PokeAPI snapshot does not:
+`src/data/moveFlags.ts` and `src/data/abilityIgnorability.ts`, both written by
+`npm run build:supplement` and committed. **Generated, not hand-typed and not
+fetched at runtime** — the app is offline-first with no backend, so a screen
+needing a wiki would break on a plane; and 114 names copied from a console dump
+is transcription nobody re-checks. The generator throws rather than emitting a
+short list if a category vanishes or an in-scope member stops matching, because
+nothing downstream can tell "Bite has no flag" from "the category moved".
+`npm run audit:supplement` re-joins every name and then asserts hand-derived
+facts (Tackle is not a biting move, Mega Kick is not a punch, Intimidate is not
+ignorable) — a join can be internally consistent and still wrong.
+
+- **SEVEN FLAGS, NOT EIGHT — contact has no source and that is settled.**
+  Bulbapedia documents it neither as an inclusion list nor as an exception list:
+  `Category:Contact moves`, `Category:Moves that make contact`,
+  `Category:Non-contact moves` and both "do/don't make contact" phrasings all
+  return DOES NOT EXIST, and none of the 91 real `Moves that …` categories
+  concerns it. The `PokeAPI/api-data` snapshot has no `move-flag` resource and
+  no `flags` field on a move — checked in the extracted snapshot, not assumed.
+  Sourcing it would mean a new dependency, so it was dropped rather than allowed
+  to block the other seven. Do not re-derive this; the search is recorded here
+  precisely so nobody repeats it.
+- **THE ABILITY EXCEPTION LIST IS EMPTY ON PURPOSE.** Comatose, Shields Down,
+  Full Metal Body, Shadow Shield and Prism Armor are the five usually named as
+  ignorable-by-pattern but immune in practice. All five are Generation 7+ and
+  **not in this bundle at all** (the recon prints `(not in bundle)` for each), so
+  a rule about them could never fire in a Gen 1–4 app — it would be a branch
+  nothing reaches that a reader must verify to dismiss. The audit asserts the
+  absence, since an unguarded absence is indistinguishable from an omission.
+  First thing to add back if this app ever grows past Gen 6.
+- **`recon-bulbapedia.mjs`'s "Gen 5+" bucket is structurally dead for moves.**
+  The bundle carries 485 moves and *all* of them are Gen ≤4, so `allMoveNames`
+  and the in-scope set are the same — that column reads 0 in all seven rows and
+  every post-Gen-4 member falls into "unmatched" by construction. Its
+  `unmatched needing a decision: 91` therefore overstates the real figure, which
+  is **0**; only the ability row's 12 are genuine Gen 5+ classifications. Read a
+  future run's output with that in mind rather than re-deriving the confusion.
+- **Item locations are explicitly NOT part of this layer** — a separate future
+  pass, never started here.
+- **`f9cb816`'s authorship is unresolved and accepted as-is.** It appeared
+  between sessions; git records the repo's configured name on every commit, so
+  authorship cannot distinguish authors. Its content was verified clean — the
+  recon fetches and prints, writes nothing into `src/data`, and matches project
+  conventions. Not worth further investigation unless something else surfaces.
+
 ## Verification plumbing
 
 - **Every script that starts a server owns its port**, and
@@ -594,17 +743,16 @@ not worth fixing yet — read that before "fixing" one as a drive-by, because
 the reason is usually that the cheap fix is the wrong one.
 
 - ~~**Leaving Build Form via the global app nav bar does not prompt for a
-  shared build's unsaved edits.**~~ **Half fixed**, by the move to explicit save
-  points. Build Form now flushes its draft from its own unmount cleanup, so an
-  UNSHARED build survives leaving through the app bar — that path is covered by
-  a check in verify-team-builder section 5. A SHARED build (2+ teams) still
-  drops the edit there, and deliberately: the cleanup runs with the component
-  already gone, so there is nobody left to ask which of save-back /
-  save-as-new / discard was meant, and writing without asking would change every
-  team that uses the build. The failure direction stays safe — the shared
-  original is untouched. A real fix is still a cross-module navigation guard the
-  nav layer consults BEFORE switching modules; **do not build a
-  Team-Building-local version of that.**
+  shared build's unsaved edits.**~~ **FIXED** — the cross-module navigation
+  guard this entry asked for now exists, in the nav layer, as
+  `src/modules/nav/navGuard.ts`. See "The scroll model and the back stack"
+  above. Build Form registers a blocker that delegates to its own `saveThen`,
+  so the three-way question gets asked at every door rather than at the ones
+  Team Building happens to know about — which now includes the back control, a
+  second door that did not exist when this was logged. The unmount flush stays
+  as the fallback for the paths no guard can cover (`pagehide`, a closing tab).
+  verify-scroll-nav §5 drives both the nav bar and the back control, and
+  asserts nothing is written while the question is open.
 - **Build Form does not autosave; every other screen does.** This is deliberate
   and is not an inconsistency to "fix". Build Form holds field edits in local
   state and writes them only at a transition — going back, duplicating, adding

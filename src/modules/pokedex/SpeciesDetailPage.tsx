@@ -58,6 +58,7 @@
 import { IconArrowLeft } from '@tabler/icons-react'
 import { useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
+import { scrollKey } from '../../components/scrollMemory'
 import { Tabs } from '../../components/ds/Navigation'
 import { getSpecies } from '../../data'
 import type { Species } from '../../data'
@@ -85,6 +86,7 @@ export function SpeciesDetailPage({
   onBack,
   onSelectSpecies,
   onSelectEggGroup,
+  onSelectMove,
 }: {
   speciesId: number
   onBack: () => void
@@ -92,6 +94,8 @@ export function SpeciesDetailPage({
   onSelectSpecies?: (id: number) => void
   /** Cross-navigation into the Breedingdex, from the Info tab's egg groups. */
   onSelectEggGroup?: (id: number) => void
+  /** Cross-navigation into the Movedex, from a move name on the Learnset tab. */
+  onSelectMove?: (moveId: number) => void
 }) {
   const [tab, setTab] = useState<SpeciesTab>('Info')
   const { generation, versionGroup } = useVersionGroup()
@@ -152,8 +156,23 @@ export function SpeciesDetailPage({
               <Tabs tabs={[...TABS]} active={tab} onSelect={(t) => setTab(t as SpeciesTab)} />
             </div>
 
-            {/* THE ONLY SCROLLABLE AREA ON THE PAGE. */}
-            <ScrollArea className="species-page-scroll" testId="species-page-scroll">
+            {/*
+              THE ONLY SCROLLABLE AREA ON THE PAGE.
+
+              KEYED BY SPECIES AND BY TAB, both of which are load-bearing. One
+              scroller serves four tabs and every species, so a key of its own
+              identity alone would drop the reader half-way down Sprites because
+              that is where they were on Info -- and drop them half-way down
+              Mew's page because that is where they were on Gengar's. The tab is
+              also the honest boundary: only one is mounted at a time, so leaving
+              and returning to a tab is the same act as leaving and returning to
+              the page.
+            */}
+            <ScrollArea
+              className="species-page-scroll"
+              testId="species-page-scroll"
+              memoryKey={scrollKey('species-page', species.id, tab)}
+            >
               <div
                 className="species-page-panel"
                 data-testid={`species-page-panel-${tab.toLowerCase()}`}
@@ -178,7 +197,12 @@ export function SpeciesDetailPage({
                   />
                 )}
                 {variety && tab === 'Learnset' && (
-                  <SpeciesLearnsetTab species={species} variety={variety} scope={gameScope} />
+                  <SpeciesLearnsetTab
+                    species={species}
+                    variety={variety}
+                    scope={gameScope}
+                    onSelectMove={onSelectMove}
+                  />
                 )}
                 {variety && tab === 'Description' && <SpeciesDescriptionTab species={species} />}
                 {variety && tab === 'Sprites' && (

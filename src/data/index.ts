@@ -142,4 +142,19 @@ export type { SpriteSlot, SpriteTile } from './spriteSlots'
 export { DATA_DIR, EAGER_DATA_FILES, PARTITION_DIRS } from './manifest'
 export type { EagerDataFile } from './manifest'
 
+export {
+  FLAGGED_MOVE_COUNT,
+  MOVES_BY_FLAG,
+  MOVE_FLAGS,
+  moveFlags,
+  moveHasFlag,
+} from './moveFlags'
+export type { MoveFlag } from './moveFlags'
+
+export {
+  IGNORABLE_ABILITIES,
+  IGNORABLE_ABILITY_COUNT,
+  abilityIsIgnorable,
+} from './abilityIgnorability'
+
 export type * from './types'

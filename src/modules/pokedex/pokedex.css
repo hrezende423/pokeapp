@@ -1190,6 +1190,45 @@
   gap: 8.5px;
 }
 
+/*
+  The back control, leading the bar.
+
+  NO BOX, NO FILL, NO PILL -- an icon and nothing else, in --text-secondary
+  until it is hovered. The design system forbids the chip either way, and an
+  outlined button here would be the loudest thing in a bar whose own tabs are
+  bare text.
+
+  align-self: center because .app-bar-nav aligns its children on the BASELINE,
+  which is right for the brand and the five text tabs and wrong for a glyph:
+  baseline-aligned, an 18px icon hangs below the row it sits in. It is the one
+  child of that row which is not text, so it is the one that opts out.
+
+  Rendered only where there is a step to undo, so it is never a dead control;
+  see the note at the call site in App.tsx for what that costs.
+*/
+.app-bar-back {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  /* The icon's own 18px box is the whole target -- no padding, so the 8.5px
+     rhythm to the brand is the same gap the brand keeps to the first tab. */
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.app-bar-back:hover {
+  color: var(--text-primary);
+}
+
+.app-bar-back:focus-visible {
+  outline: var(--field-focus-border-width) solid var(--field-focus-border);
+  outline-offset: 2px;
+}
+
 /* 14px/700, first in the row -- straight from the navbar spec. */
 /*
   Figma's five nav labels all imply the same font size: dividing each text node's
@@ -3544,7 +3583,15 @@
 
 /* A link into the Breedingdex, styled as text with a hairline underline -- the
    app's existing cross-navigation affordance, not a button shape. */
-.species-egg-group {
+/*
+  THE CROSS-DEX LINK, shared by the Info tab's egg groups and the Learnset tab's
+  move names. One rule for both: they are the same act -- a data value that
+  opens another dex -- and two rules would be two treatments within a session.
+  The hairline underline is what makes it read as interactive without becoming
+  the chip the design system forbids.
+*/
+.species-egg-group,
+.species-learn-move-link {
   padding: 0;
   border: 0;
   background: none;
@@ -3554,12 +3601,14 @@
   cursor: pointer;
 }
 
-.species-egg-group:hover:enabled {
+.species-egg-group:hover:enabled,
+.species-learn-move-link:hover:enabled {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
 
-.species-egg-group:disabled {
+.species-egg-group:disabled,
+.species-learn-move-link:disabled {
   cursor: default;
   border-bottom-color: transparent;
 }

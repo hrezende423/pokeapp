@@ -42,6 +42,19 @@ export interface NavState {
   select: (moduleId: DexModuleId, entryId: number | null) => void
   /** Switch to a module and open one of its entries, in one update. */
   navigate: (moduleId: DexModuleId, entryId: number) => void
+  /**
+   * False where this is the screen the reader came in on, so the back control
+   * is ABSENT rather than disabled -- a dead button is worse than none.
+   */
+  canGoBack: boolean
+  /**
+   * Undo one step: page-and-entry, one at a time, back to the page reached
+   * through the nav bar and then to whatever preceded it.
+   *
+   * The same steps the phone's back gesture and the browser's back button walk
+   * -- they are one mechanism, not a button with a lookalike. See navHistory.ts.
+   */
+  back: () => void
 }
 
 export const NavContext = createContext<NavState | null>(null)

@@ -1,3 +1,4 @@
+import { IconArrowLeft } from '@tabler/icons-react'
 import { LayoutOverlay } from './components/LayoutOverlay'
 import { useEffect, useState } from 'react'
 import './App.css'
@@ -48,6 +49,35 @@ function Shell() {
       <div className="app-bar">
         {/* Brand then the three nav groups, per the full-95 navbar spec. */}
         <div className="app-bar-nav">
+          {/*
+            BACK, BEFORE THE BRAND. It leads the bar because it is the one
+            control whose meaning is "where I just was" -- reading it after the
+            nav groups would put an undo to the right of the things it undoes.
+
+            ABSENT, NOT DISABLED, on the screen the reader came in on: the same
+            call ScrollArea's back-to-top makes, for the same reason. That does
+            move the brand 8.5px + 18px to the right the first time it appears,
+            and the alternative was worse -- holding the slot open permanently
+            puts an empty gutter at the left of the bar on the app's main screen
+            for the whole session. The shift lands DURING a page transition, when
+            the entire body is changing anyway. Nothing measures the brand's
+            absolute x (verify-design-system checks the gap AFTER it).
+
+            It is the app-bar half of ONE mechanism, not a lookalike for the
+            phone's gesture: both go through `popstate`. See navHistory.ts.
+          */}
+          {nav.canGoBack && (
+            <button
+              type="button"
+              className="app-bar-back"
+              data-testid="app-bar-back"
+              aria-label="Back"
+              title="Back"
+              onClick={nav.back}
+            >
+              <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
+            </button>
+          )}
           <span className="app-brand" data-testid="app-brand">
             Pokeapp
           </span>

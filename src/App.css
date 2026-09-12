@@ -245,6 +245,151 @@
 }
 
 /*
+  ------------------------------------------------------------- the thumb
+
+  THE NATIVE BAR STAYS HIDDEN. This is a drawn one -- see the note at the top
+  of components/ScrollArea.tsx for why, in short: a native bar's gutter is
+  layout rather than paint, so it cannot fade without leaving the gutter
+  behind, and it cannot be told to stop short of the back-to-top control in
+  the corner. The universal no-scrollbar rule in index.css is untouched.
+
+  DERIVED, NOT A NEW PAIR OF HEX VALUES. --border is the obvious tone and is
+  wrong here: it disappears against --surface-raised, which is what three of
+  the six scrollers sit on. Mixing down from --text-secondary follows both
+  themes from one declaration, and being TRANSLUCENT is the point rather than
+  a shortcut -- the thumb sits over content, so it should tint what is behind
+  it instead of painting a stripe on top of it.
+*/
+:root {
+  --scroll-thumb: color-mix(in srgb, var(--text-secondary) 38%, transparent);
+  --scroll-thumb-live: color-mix(in srgb, var(--text-secondary) 78%, transparent);
+}
+
+/*
+  The track is the 12px strip the thumb travels in, and it is a POINTER TARGET
+  rather than a painted element -- nothing about it is visible. `top`/`bottom`
+  keep the travel 3px clear of the section's own edges; the thumb's 4px of
+  paint sits 2px off the right edge, where the back-to-top control is 12px off
+  it, so the two are side by side and neither is ever under the other.
+*/
+.scroll-track {
+  position: absolute;
+  top: 3px;
+  right: 0;
+  bottom: 3px;
+  width: 12px;
+  /*
+    OFF BY DEFAULT, AND ON ONLY FOR A MOUSE (below). A 12px strip that eats
+    pointer events is 12px of the list a finger cannot swipe -- and it is the
+    right-hand edge, which is exactly where a right-handed thumb lands. On
+    touch this whole thing is an indicator, the same as every native overlay
+    scrollbar on a phone; press-to-jump and drag are mouse affordances.
+  */
+  pointer-events: none;
+}
+
+.scroll-track[hidden] {
+  display: none;
+}
+
+.scroll-thumb {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--scroll-thumb);
+  /* Enabled by `.is-awake` below, and by the fine-pointer query further down. */
+  pointer-events: none;
+  touch-action: none;
+  /* Idle IS invisible. `is-awake` is added by the hook on scroll and on the
+     pointer entering the strip, and removed a second after the last of
+     either -- never while a drag is live or a pointer is resting on it. */
+  opacity: 0;
+  transition:
+    opacity 260ms linear,
+    background-color 120ms linear,
+    width 120ms linear,
+    right 120ms linear;
+  /* The transform is written straight to the node on every scroll frame. */
+  will-change: transform;
+}
+
+.scroll-track.is-awake .scroll-thumb {
+  opacity: 1;
+}
+
+/* Declared AFTER the wake rule and scoped to the two live states, so neither
+   can be outranked by the other at equal specificity -- the hover-beats-active
+   trap noted in CLAUDE.md's gotchas. */
+.scroll-track:hover .scroll-thumb,
+.scroll-track.is-dragging .scroll-thumb {
+  background: var(--scroll-thumb-live);
+  width: 6px;
+  right: 1px;
+}
+
+/*
+  DRAGGABLE ON A TOUCH SCREEN, BUT ONLY ONCE IT IS AWAKE -- which is to say only
+  in the second after a scroll, because that is the only time it is visible.
+
+  This is the reason the whole feature was asked for: 493 species is a long way
+  to travel a flick at a time, and this app is reviewed on a phone. But a thumb
+  that is always grabbable would eat the right-hand edge of every list, which is
+  exactly where a right-handed thumb lands -- so the invisible state takes no
+  pointer events at all and a swipe there scrolls normally. Flick once, then
+  drag: Android's own fast-scroll handle behaves this way.
+
+  ::before is the touch target, not the paint. A 4px-wide control is not
+  reachable with a finger, so the hit area is widened to ~24px while the mark
+  stays 4px. It is inside the thumb rather than on the track so it travels with
+  it and covers only the thumb's own stretch of the edge.
+
+  IT GROWS LEFTWARD ONLY. Symmetric insets put 12px of invisible hit area
+  OUTSIDE the section's right edge, and .scroll-area-outer does not clip -- so
+  in the two places this app puts scrollers side by side (the Itemdex rail and
+  its detail panel, Type Coverage's view and rail) it would reach into the
+  neighbour and swallow pointer events there.
+*/
+.scroll-track.is-awake .scroll-thumb {
+  pointer-events: auto;
+}
+
+.scroll-thumb::before {
+  content: '';
+  position: absolute;
+  inset: -6px 0 -6px -20px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* A mouse gets the whole strip, so pressing the empty part of the track jumps
+     there. That is the one native behaviour whose absence would be noticed, and
+     it is safe here because a pointer cannot ask a list to scroll by pressing
+     it. */
+  .scroll-track {
+    pointer-events: auto;
+  }
+
+  .scroll-thumb {
+    pointer-events: auto;
+  }
+
+  /* A pointer needs less room than a finger, but 4px of paint is still a
+     fiddly grab -- so it gets the strip's own 12px and no vertical overhang,
+     which leaves a track press directly above or below the thumb landing on
+     the track and jumping, rather than being caught by the thumb. */
+  .scroll-thumb::before {
+    inset: 0 0 0 -8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-thumb {
+    transition: none;
+  }
+}
+
+/*
   Back to top. Fixed to the bottom-right corner of its own section, not the
   viewport -- several sections can be scrollable at once (the Itemdex rail and its
   detail panel, side by side), and a single viewport-anchored button could only

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
+import { scrollKey } from '../../components/scrollMemory'
 import { Tabs } from '../../components/ds/Navigation'
 import { ControlRail } from './ControlRail'
 import { TypeAgainstView } from './TypeAgainstView'
@@ -92,7 +93,15 @@ export function TypeCoverage() {
       */}
       <div className="tc-main" data-layout="type-coverage-main" data-tab={tab}>
         <div className="tc-scroll-col">
-          <ScrollArea testId="tc-scroll-area">
+          {/*
+            KEYED BY TAB AND GENERATION, though the VIEW is deliberately not
+            keyed by generation (see the note below). Those are different
+            questions: the controls must survive an era switch, while an offset
+            measured down a 153-row Gen 4 matrix means nothing in Gen 1's
+            shorter one. Four tabs through one scroller makes the tab
+            load-bearing here for the same reason it is on the species page.
+          */}
+          <ScrollArea testId="tc-scroll-area" memoryKey={scrollKey('tc', tab, scope.generation)}>
             <div
               className="tc-content"
               role="tabpanel"

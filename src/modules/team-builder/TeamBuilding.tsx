@@ -19,6 +19,7 @@
 
 import { useEffect, useRef } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
+import { scrollKey } from '../../components/scrollMemory'
 import { useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { BuildForm } from './BuildForm'
@@ -144,7 +145,24 @@ export function TeamBuilding() {
   */
   return (
     <div className="tb" data-tb-screen={screen.kind} data-generation={generation}>
-      <ScrollArea testId="tb-scroll" hint={false}>
+      {/*
+        ONE SCROLLER, FOUR SCREENS -- so the screen is part of the memory key,
+        and so is whichever record it is showing. Keyed on `tb-scroll` alone,
+        the offset from half-way down My Teams would be applied to the Build
+        Library the moment you opened it, and to every team viewer in turn.
+        `screen.kind` plus the id in that screen is the finest identity tbNav
+        carries, which makes it the honest one.
+      */}
+      <ScrollArea
+        testId="tb-scroll"
+        hint={false}
+        memoryKey={scrollKey(
+          'tb',
+          screen.kind,
+          screen.kind === 'team-viewer' ? screen.teamId : null,
+          screen.kind === 'build-form' ? screen.buildId : null,
+        )}
+      >
         {screen.kind === 'my-teams' && <MyTeams generation={generation} />}
         {screen.kind === 'team-viewer' && <TeamViewer teamId={screen.teamId} />}
         {screen.kind === 'build-library' && (

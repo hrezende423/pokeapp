@@ -62,7 +62,18 @@ interface MoveRow {
   lead: string
 }
 
-function columnsFor(method: string): Column<MoveRow>[] {
+/**
+ * THE MOVE NAME IS A LINK INTO THE MOVEDEX when a handler is supplied, and
+ * plain text when one is not -- the tab renders in one place today, but a
+ * column set that silently required a callback would be a trap for the next
+ * caller.
+ *
+ * The treatment is `.species-egg-group`'s, SHARED rather than copied: that
+ * button is the app's existing answer to "a data value that opens another dex",
+ * and giving this one its own rule is how the two drift apart. Only the NAME is
+ * inside the button -- the egg-move marker beside it is a marker, not a link.
+ */
+function columnsFor(method: string, onSelectMove?: (moveId: number) => void): Column<MoveRow>[] {
   const leadLabel = method === 'level-up' ? 'Lv' : method === 'machine' ? 'TM/HM' : ''
   const columns: Column<MoveRow>[] = [
     {
@@ -80,7 +91,20 @@ function columnsFor(method: string): Column<MoveRow>[] {
               moveName={r.move?.display_name ?? `#${r.row.move_id}`}
             />
           )}
-          {r.move?.display_name ?? `#${r.row.move_id}`}
+          {/* A move the bundle cannot resolve is not a link: there is no entry
+              for the Movedex to open, so it stays the bare "#123" it was. */}
+          {onSelectMove && r.move ? (
+            <button
+              type="button"
+              className="species-egg-group species-learn-move-link"
+              data-testid={`species-learn-move-link-${r.row.move_id}`}
+              onClick={() => onSelectMove(r.row.move_id)}
+            >
+              {r.move.display_name}
+            </button>
+          ) : (
+            (r.move?.display_name ?? `#${r.row.move_id}`)
+          )}
         </span>
       ),
       sortValue: (r) => r.move?.display_name ?? '',
@@ -123,12 +147,15 @@ export function SpeciesLearnsetTab({
   species,
   variety,
   scope,
+  onSelectMove,
 }: {
   species: Species
   variety: Variety
   /* Owned by the page, not by this tab -- see the note in SpeciesDetailPage on
      why the scope is lifted. */
   scope: SpeciesGameScope | null
+  /** Cross-navigation into the Movedex, from a move name in any of the tables. */
+  onSelectMove?: (moveId: number) => void
 }) {
   const vgName = scope?.versionGroup.name ?? null
   const learnsets = usePartitionRows<LearnRow>(getLearnsetsForSpecies, species.id, vgName)
@@ -220,7 +247,7 @@ export function SpeciesLearnsetTab({
             </h3>
             <DataTable
               rows={group.rows}
-              columns={columnsFor(group.method)}
+              columns={columnsFor(group.method, onSelectMove)}
               rowKey={(r) => r.key}
               initialSort={group.method === 'level-up' ? 'lead' : 'move'}
               testId={`species-learn-${group.method}-rows`}

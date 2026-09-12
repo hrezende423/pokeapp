@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:data": "tsx scripts/build-data.ts",
+    "build:supplement": "node scripts/build-supplement.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -24,7 +25,9 @@
     "verify:evo-icons": "node scripts/verify-evo-icons.mjs",
     "verify:species-page": "node scripts/verify-species-page.mjs",
     "verify:type-coverage": "node scripts/verify-type-coverage.mjs",
+    "verify:scroll-nav": "node scripts/verify-scroll-nav.mjs",
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
+    "audit:supplement": "node scripts/audit-supplement.mjs",
     "audit:white-sprites": "node scripts/audit-white-sprites.mjs",
     "report:type-scale": "node scripts/report-type-scale.mjs"
   },
