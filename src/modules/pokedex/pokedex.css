@@ -336,7 +336,12 @@
 */
 .pokedex-table-wrap {
   padding: var(--space-gap-md) var(--space-gap-md) var(--space-gap-xl);
-  min-width: 0;
+  /* As wide as the TABLE, never narrower than the window. A plain block would be
+     100% of the scroller and the table would simply hang out of its right edge,
+     which loses the right-hand padding the moment you scroll -- overflow does
+     not carry a parent's padding with it. */
+  width: max-content;
+  min-width: 100%;
 }
 
 .species-list-table {
@@ -348,16 +353,17 @@
   THE WIDE TABLE, and why it does not inherit the six-column widths above.
 
   `.data-table th:nth-child(n)` was written for the Movedex's six columns and
-  applies to every data table in the app. This one has thirty-four, so it resets
-  those rules and takes its widths from a <colgroup> instead -- one width per
-  column, declared beside the column in speciesColumns.tsx, which is the only
-  way thirty-four widths stay readable and the only way the "first twelve fit the
-  window" promise is a sum you can check.
+  applies to every data table in the app. This one has forty-four, so it takes
+  its widths from a <colgroup> instead -- one width per column, declared beside
+  the column in speciesColumns.tsx, which is the only way forty-four widths stay
+  readable and the only way the "the identity block fits the window" promise is a
+  sum you can check. The rules that make a colgroup authoritative live with the
+  fallbacks themselves (see .data-table-sized below); the reset here is kept
+  because this table's own widths are the point of it.
 
   SMALLER TYPE AND REGULAR WEIGHT. The table is the densest thing in the app and
-  was drawing at --font-size-body; at label size thirty-four columns are legible
-  without the page needing a zoom, and the first twelve fit a 1280px window with
-  room to spare. Regular weight throughout, including the name cell, which was
+  was drawing at --font-size-body; at label size forty-four columns are legible
+  without the page needing a zoom, and the identity block fits a 1280px window. Regular weight throughout, including the name cell, which was
   medium: at this density a bolded column reads as a heading rather than as data.
 */
 .species-list-table .data-table {
@@ -2213,31 +2219,75 @@
   min-width: 0;
 }
 
-.data-table th:first-child,
-.data-table td:first-child {
+/*
+  :where() IS LOAD-BEARING HERE, and it is what makes a <colgroup> mean anything.
+
+  These five rules are POSITIONAL and they reach every data table in the app --
+  the documented gotcha. A table that declares its own widths column by column
+  (Column.width -> <colgroup>) was supposed to escape them, and it did not:
+  `.data-table th:nth-child(2)` and `.species-list-table .data-table th` are both
+  (0,2,1), the tie went to whichever came later in the file, and this block is
+  later. Worse, Chrome's fixed layout takes the LARGER of the column's own width
+  and the first row's cell width, so the escape had to win the cascade outright
+  or it did nothing at all.
+
+  Measured, before: the Pokedex list's first column was 282px against the 70px
+  its colgroup asked for -- 15rem inherited from a rule written for the Movedex's
+  name column -- and four more columns were wrong the same way, which is why only
+  eleven columns fitted a window the widths were calculated to fit fifteen of.
+
+  Wrapping the selectors in :where() drops these to (0,1,0): still the default for
+  every table that declares nothing, still beaten by ANY table that declares its
+  own. No other rule changes, and no table loses a width it had.
+*/
+.data-table :where(th:first-child, td:first-child) {
   width: 15rem;
 }
 
-.data-table th:nth-child(2),
-.data-table td:nth-child(2) {
+.data-table :where(th:nth-child(2), td:nth-child(2)) {
   width: 6.5rem;
 }
 
-.data-table th:nth-child(3),
-.data-table td:nth-child(3) {
+.data-table :where(th:nth-child(3), td:nth-child(3)) {
   width: 6rem;
 }
 
-.data-table th:nth-child(4),
-.data-table td:nth-child(4),
-.data-table th:nth-child(5),
-.data-table td:nth-child(5) {
+.data-table :where(th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5)) {
   width: 5.5rem;
 }
 
-.data-table th:nth-child(6),
-.data-table td:nth-child(6) {
+.data-table :where(th:nth-child(6), td:nth-child(6)) {
   width: 4rem;
+}
+
+/*
+  A table that brought its own widths stands the five fallbacks above down --
+  all of them, by position, whichever ones happen to line up with its columns.
+  Set on the table by DataTable whenever any column declares a width; see the
+  note there for why a colgroup alone was not enough.
+*/
+.data-table-sized th,
+.data-table-sized td {
+  width: auto;
+}
+
+/*
+  AND `min-content` IS WHAT MAKES `table-layout: fixed` ACTUALLY FIXED.
+
+  With `width: auto` Chrome sizes the table by the automatic (content) algorithm
+  first and only then distributes columns, so ONE overlong cell still set its
+  column's width -- measured: the Pokedex list's "Evolves to" column came out
+  1359px against the 360px its colgroup asked for, because Eevee's row names
+  seven evolutions with their conditions. Every other column obeyed, which is
+  what made it look like a content problem rather than a layout one.
+
+  `min-content` on a table whose columns are all declared resolves to the sum of
+  those columns, so the declared widths are the whole answer and no row can widen
+  anything. The table went 5502px -> 4479px with no column losing a pixel it had
+  asked for.
+*/
+.data-table-sized {
+  width: min-content;
 }
 
 /* The chevron column: just wide enough for a 16px glyph plus its breathing room. */
@@ -2743,27 +2793,54 @@
 /* =========================================== the two app-bar menus, compact */
 
 /*
-  ONE TYPE SIZE FOR BOTH MENUS, and it is smaller than the data they narrow.
+  ONE TYPE SIZE FOR BOTH MENUS, AND IT IS THE SMALLEST IN THE APP.
+
   A control that shouts louder than the table it filters reads as the subject of
-  the page rather than as the thing acting on it -- so the menus sit at
-  --font-size-label where the tables are at --font-size-body, and the section
-  headings drop to caption. The spacing comes down with the type, for the reason
-  MODULE-PATTERNS gives about the Build Form: type that shrinks while padding
-  does not leaves every row keeping the rhythm of a larger face.
+  the page rather than as the thing acting on it. The menus were at
+  --font-size-label with the headings and the middot rows at caption, which is
+  two sizes in one 320px panel and made the plain inputs look like the important
+  part. Everything in here is caption now -- the size the egg-group names in the
+  filter rows were already drawn at -- so the panel has ONE type size and the
+  tables it narrows stay the loudest thing on screen.
+
+  THE NUMERIC INPUTS GO SMALLER STILL, and that is not an inconsistency: the
+  range fields are --font-numeric, and Martian Mono draws about a fifth larger
+  than Plex Sans at the same px (measured on the Team Builder's card rail, where
+  9px mono levelled with 11px sans). At a shared 10px they were visibly the
+  biggest text in the menu. --dex-menu-mono is that 0.82 correction, so the
+  numbers LOOK the same size as the words beside them rather than measuring the
+  same.
+
+  --dex-menu-row IS THE TYPE FILTER'S OWN ROW GAP, lifted to the whole panel.
+  The type names wrap into rows 0.1rem apart and that run reads perfectly well,
+  so it is the density the rest of the menu is held to: every stacked
+  label/control/section gap in here is that one value, rather than five hand-
+  picked numbers that drift apart. The hairline-separated BLOCKS keep a little
+  more (--dex-menu-band), because that padding is half of a band a reader sees
+  between two hairlines, not a gap between two rows.
 */
 .dex-menu {
-  font-size: var(--font-size-label);
-}
-
-.dex-menu .app-controls-field {
-  padding: var(--space-gap-sm) var(--space-gap-md);
-}
-
-.dex-menu .app-controls-label {
-  margin-bottom: 3px;
+  --dex-menu-row: 0.1rem;
+  --dex-menu-band: 6px;
+  --dex-menu-mono: calc(var(--font-size-caption) * 0.82);
   font-size: var(--font-size-caption);
 }
 
+.dex-menu .app-controls-field {
+  padding: var(--dex-menu-band) var(--space-gap-md);
+}
+
+.dex-menu .app-controls-label {
+  margin-bottom: var(--dex-menu-row);
+  font-size: var(--font-size-caption);
+}
+
+/*
+  EVERY TEXT ROLE IN THE PANEL AT ONE SIZE. The inputs are listed with the
+  labels rather than a step above them: a 14px select in a 10px panel was the
+  loudest thing in it, and the game scope is a choice you make once, not the
+  subject of the menu.
+*/
 .dex-menu .ds-field-label,
 .dex-menu .ds-section-label,
 .dex-menu .ds-filter,
@@ -2771,21 +2848,56 @@
 .dex-menu .ds-filter-sep,
 .dex-menu .dex-filter-note,
 .dex-menu .dex-filter-count,
+.dex-menu .dex-filter-clear,
+.dex-menu .dex-filter-more-toggle,
 .dex-menu .toggle-label,
-.dex-menu .toggle-side {
+.dex-menu .toggle-side,
+.dex-menu .tf,
+.dex-menu .ds-field-control,
+.dex-menu .ds-search,
+.dex-menu .vg-selector,
+.dex-menu .vg-selector select,
+.dex-menu .global-search-input,
+.dex-menu input[type='search'] {
   font-size: var(--font-size-caption);
 }
 
 .dex-menu .ds-field-control,
 .dex-menu .ds-search,
 .dex-menu input[type='search'] {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  font-size: var(--font-size-label);
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
-.dex-menu .ds-field {
-  gap: 3px;
+/* The numbers, corrected for the mono face's larger drawn size -- see above. */
+.dex-menu .dex-filter-range-row .ds-field-control {
+  font-size: var(--dex-menu-mono);
+}
+
+/* ---- the row rhythm: one value, the type filter's own, everywhere it stacks */
+
+.dex-menu .ds-field,
+.dex-menu .dex-filter-panel-body,
+.dex-menu .dex-sort-panel-body,
+.dex-menu .dex-filter-section,
+.dex-menu .dex-filter-slot,
+.dex-menu .dex-filter-field,
+.dex-menu .dex-filter-more,
+.dex-menu .dex-filter-more-panel {
+  gap: var(--dex-menu-row);
+}
+
+/* The middot rows keep their own horizontal rhythm and take the row gap for the
+   vertical one, so a filter that wraps to three lines is as tight as the type
+   names it sits under. */
+.dex-menu .ds-filters,
+.dex-menu .type-filter {
+  row-gap: var(--dex-menu-row);
+}
+
+.dex-menu .app-controls-label,
+.dex-menu .ds-section-label {
+  margin-bottom: 0;
 }
 
 /* The reset row at the head of the filter menu: one action, no heading. */

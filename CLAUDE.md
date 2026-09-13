@@ -527,6 +527,17 @@ the COUNT and nothing else above the list: a readout, not a control.
   `useDisclosureGroup` holds one open id. Destructure its result at the call
   site: it returns a ref, and the react-hooks lint refuses to let an object
   carrying a ref be passed to a function during render.
+- **The menus are the smallest type in the app, at one size.** Everything in a
+  `.dex-menu` is `--font-size-caption` — the size the egg-group names in the
+  filter rows already used — so a 320px panel has one type size rather than
+  three, and the tables it narrows stay the loudest thing on screen. The numeric
+  range inputs go smaller still (`--dex-menu-mono`, 0.82 of it): Martian Mono
+  draws about a fifth larger than Plex Sans at the same px, so at a shared size
+  the numbers were visibly the biggest text in the menu.
+  **`--dex-menu-row` is the type filter's own row gap**, lifted to every stacked
+  gap in the panel, rather than five hand-picked numbers that drift apart. The
+  hairline-separated blocks keep a little more (`--dex-menu-band`), because that
+  padding is half of a band between two hairlines, not a gap between two rows.
 - **The bar's order is Grid/List · Sort · Search/Filter · theme**, and the theme
   switcher being LAST is the point: the cluster is right-aligned, so the one
   control that belongs to no page never moves as the page-specific triggers come
@@ -548,14 +559,38 @@ the COUNT and nothing else above the list: a readout, not a control.
   The Breeding dex's cards gained a gender row the same way — and
   `.species-card-egg-group` needs `line-height: inherit`, because a `<button>`
   does not inherit it and its UA box was 3px taller than its line.
-- **List** — 35 columns (`pokedex/speciesColumns.tsx`), widths declared per
-  column and emitted as a `<colgroup>`, because `.data-table th:nth-child(n)` was
-  written for the Movedex's six and reaches every table in the app. **The first
-  twelve fit the window** (national # → Speed); the rest are over a horizontal
-  scroll. **This table sorts itself from its own headers** — it is NOT wired to
-  the bar's sort state, because the menu holds four keys and the table has 35, so
-  a header click would set a key the menu could not hold and the fallback would
-  silently do nothing.
+- **List** — 44 columns (`pokedex/speciesColumns.tsx`), **one fact per column,
+  never a joined list**: two type columns, two ability columns plus the hidden
+  slot, two egg-group columns and one EV-yield column per stat. A cell reading
+  "Grass/Poison" sorts under G, which is not a column. The EV block follows the
+  same era rule as the base stats beside it and is absent before Gen 3.
+  **The identity block — national # → Speed, fifteen columns — fits the
+  window**; the rest are over a horizontal scroll. **This table sorts itself from
+  its own headers** — it is NOT wired to the bar's sort state, because the menu
+  holds four keys and the table has 44, so a header click would set a key the
+  menu could not hold and the fallback would silently do nothing.
+- **A table's own widths only win because it says so.** `Column.width` emits a
+  `<colgroup>`, and DataTable also marks the table `data-table-sized`. Both are
+  needed. The positional `.data-table th:nth-child(n)` rules were written for the
+  Movedex's original six columns and reach every table in the app; they are
+  wrapped in `:where()` so anything declaring its own widths outranks them, and
+  the marker class resets the cell widths outright — because Chrome's fixed
+  layout takes the LARGER of the column's width and the first row's cell width,
+  so a colgroup alone left the first column at 282px against the 70px it asked
+  for. **And `.data-table-sized` is `width: min-content`**: under `width: auto`
+  Chrome sizes the table by the CONTENT algorithm first, so one overlong cell
+  still set its column (Eevee's seven evolutions made "Evolves to" 1359px against
+  a declared 360px) while every other column obeyed.
+- **The list view is the app's one horizontally scrolling section**, via
+  `ScrollArea`'s `horizontal` prop. It shipped without one: `.scroll-area` sets
+  `overflow-x: hidden` for every other scroller, so the columns past the twelfth
+  were not merely off-screen but unreachable. The bar is drawn, not native, and
+  it lives in the OUTER frame rather than at the foot of the content — a bar
+  below 493 rows is a control you have to scroll to the bottom to reach.
+  `useScrollThumb` takes an axis rather than being copied. **Its idle state is
+  the one that is visible rather than invisible**, and that is deliberate: the
+  vertical thumb can fade to nothing because the scroll-down chevron still says
+  "more below", and there is no sideways equivalent of that cue.
 - **Regional dex numbers are a written-out table**, not derived: a generation
   does not determine the dex (FRLG are Gen 3 and use KANTO, Platinum extends
   Sinnoh, HGSS use updated-johto). Colosseum, XD and "All games" have none and

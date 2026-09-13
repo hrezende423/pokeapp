@@ -528,57 +528,76 @@ try {
   await page.screenshot({ path: `${SHOTS}/dexf-pokedex-grid.png` })
 
   // ==================================================================
-  hr('4 — POKEDEX LIST VIEW: 35 columns, the first twelve on screen')
+  hr('4 — POKEDEX LIST VIEW: one fact per column, and a bar for the rest')
   await page.click('[data-testid="toggle-species-view"]')
   await page.waitForTimeout(400)
   await closeMenus()
 
-  const table = await page.evaluate(() => {
+  /*
+    THE JOINED CELLS ARE SPLIT TO THE GAMES' OWN SLOTS. Types, abilities, egg
+    groups and the EV yield were each one cell holding a middot-separated run,
+    which cannot be sorted or scanned; there are two type columns, two ability
+    columns plus the hidden slot, two egg-group columns and one EV column per
+    stat now. That makes the identity block fifteen columns rather than twelve,
+    and it still has to land inside the window -- which is measured below
+    against the SCROLLER, not against the table's own wrapper.
+  */
+  const IDENTITY = [
+    'Nat #',
+    'Reg #',
+    'Name',
+    'Type 1',
+    'Type 2',
+    'Ability 1',
+    'Ability 2',
+    'Hidden ability',
+    'BST',
+    'HP',
+    'Attack',
+    'Defense',
+    'Sp. Atk',
+    'Sp. Def',
+    'Speed',
+  ]
+
+  const table = await page.evaluate((identityCount) => {
     const ths = [...document.querySelectorAll('[data-testid="species-rows"] thead th')]
     const labelled = ths.filter((t) => t.textContent.trim())
-    const twelfth = labelled[11].getBoundingClientRect()
-    const wrap = document.querySelector('.species-list-table .data-table-wrap')
+    const last = labelled[identityCount - 1].getBoundingClientRect()
+    const scroller = document.querySelector('[data-testid="pokedex-grid-scroll-area"]')
     return {
       columns: labelled.length,
       labels: labelled.map((t) => t.textContent.replace(/[▲▼]/g, '').trim()),
-      twelfthRight: Math.round(twelfth.right),
-      viewport: window.innerWidth,
-      wrapWidth: Math.round(wrap.clientWidth),
-      scrolls: wrap.scrollWidth > wrap.clientWidth,
-      overflowX: getComputedStyle(wrap).overflowX,
+      identityRight: Math.round(last.right),
+      scrollerLeft: Math.round(scroller.getBoundingClientRect().left),
+      scrollerWidth: scroller.clientWidth,
+      scrolls: scroller.scrollWidth > scroller.clientWidth,
+      overflowX: getComputedStyle(scroller).overflowX,
       fontSize: parseFloat(
         getComputedStyle(document.querySelector('[data-testid="species-rows"]')).fontSize,
       ),
       nameWeight: getComputedStyle(document.querySelector('[data-testid="species-open-1"]'))
         .fontWeight,
     }
-  })
-  log(`  table: ${table.columns} columns, first twelve end at ${table.twelfthRight}px`)
+  }, IDENTITY.length)
+  log(`  table: ${table.columns} columns, the identity block ends at ${table.identityRight}px`)
   log(`  labels: ${table.labels.join(' | ')}`)
-  check('thirty-five columns', table.columns === 35, String(table.columns))
+  check('forty-four columns', table.columns === 44, String(table.columns))
   check(
-    'in the order asked for, national and regional dex first',
-    JSON.stringify(table.labels.slice(0, 12)) ===
-      JSON.stringify([
-        'Nat #',
-        'Reg #',
-        'Name',
-        'Types',
-        'Abilities',
-        'BST',
-        'HP',
-        'Attack',
-        'Defense',
-        'Sp. Atk',
-        'Sp. Def',
-        'Speed',
-      ]),
-    table.labels.slice(0, 12).join(','),
+    'the joined cells are split to the slots the games have',
+    JSON.stringify(table.labels.slice(0, IDENTITY.length)) === JSON.stringify(IDENTITY),
+    table.labels.slice(0, IDENTITY.length).join(','),
   )
   check(
-    'the first twelve fit the window with no horizontal scrolling',
-    table.twelfthRight <= table.wrapWidth,
-    `${table.twelfthRight} <= ${table.wrapWidth}`,
+    'one EV yield column per stat, named for it',
+    JSON.stringify(table.labels.slice(17, 23)) ===
+      JSON.stringify(['HP EVY', 'Atk EVY', 'Def EVY', 'SpA EVY', 'SpD EVY', 'Spe EVY']),
+    table.labels.slice(17, 23).join(','),
+  )
+  check(
+    'the identity block still fits the window',
+    table.identityRight - table.scrollerLeft <= table.scrollerWidth,
+    `${table.identityRight - table.scrollerLeft} <= ${table.scrollerWidth}`,
   )
   check(
     'and the rest are reachable by scrolling sideways, not clipped away',
@@ -591,6 +610,105 @@ try {
     `${table.fontSize}px / ${table.nameWeight}`,
   )
 
+  /*
+    THE SIDEWAYS BAR IS A CONTROL, NOT A HINT, and the previous pass shipped
+    without it: .scroll-area sets overflow-x: hidden for every other scroller in
+    the app, so the columns past the twelfth were not merely off-screen, they
+    could not be reached at all. Drawn rather than native, like its vertical
+    twin -- so it is checked the same way: it exists, it is sized in proportion
+    to how much is off-screen, and dragging it really moves the table.
+  */
+  /*
+    THE SCROLL AND THE READING HAPPEN IN ONE EVALUATE, with the wait inside the
+    page. The wake lasts a second; a `waitForTimeout` plus two round trips is
+    most of that on a loaded machine, so reading the opacity from the driver
+    made this a race that reported a faded thumb as a broken one. It also has to
+    be a real scroll of THIS element -- a wheel event lands wherever the mouse
+    happens to be, and the wake is bound to the scroller's own scroll event.
+  */
+  const hbar = await page.evaluate(async () => {
+    const track = document.querySelector('[data-testid="scroll-track-x"]')
+    const thumb = document.querySelector('[data-testid="scroll-thumb-x"]')
+    if (!track || !thumb) return null
+    const el = document.querySelector('[data-testid="pokedex-grid-scroll-area"]')
+    el.scrollTop += 40
+    // Past the 260ms opacity transition, well inside the 1000ms idle timeout.
+    await new Promise((r) => setTimeout(r, 350))
+    return {
+      hidden: track.hidden,
+      trackWidth: Math.round(track.getBoundingClientRect().width),
+      thumbWidth: Math.round(thumb.getBoundingClientRect().width),
+      ratio: el.clientWidth / el.scrollWidth,
+      opacity: Number(getComputedStyle(thumb).opacity),
+      awake: track.classList.contains('is-awake'),
+      native: el.offsetWidth - el.clientWidth,
+    }
+  })
+  check('the list view draws a horizontal bar of its own', hbar !== null && !hbar.hidden)
+  check(
+    'sized to how much of the table is off-screen',
+    Math.abs(hbar.thumbWidth / hbar.trackWidth - hbar.ratio) < 0.05,
+    `thumb ${hbar.thumbWidth}/${hbar.trackWidth} vs visible share ${hbar.ratio.toFixed(2)}`,
+  )
+  check(
+    'and awake after a scroll, like the vertical one',
+    hbar.awake && hbar.opacity === 1,
+    `awake ${hbar.awake}, opacity ${hbar.opacity}`,
+  )
+  /* Unlike the vertical thumb it does not fade to nothing: there is no sideways
+     equivalent of the scroll-down chevron, so this bar is the only thing saying
+     the table continues past the right edge. See .scroll-thumb-x in App.css. */
+  await page.waitForTimeout(1400)
+  const resting = await page.$eval('[data-testid="scroll-thumb-x"]', (el) =>
+    Number(getComputedStyle(el).opacity),
+  )
+  check(
+    'and it stays visible at rest, where the vertical one fades away',
+    resting > 0.2 && resting < 1,
+    String(resting),
+  )
+  check(
+    'it costs no gutter -- nothing native is drawn underneath it',
+    hbar.native === 0,
+    `${hbar.native}px`,
+  )
+
+  const dragged = await page.evaluate(async () => {
+    const el = document.querySelector('[data-testid="pokedex-grid-scroll-area"]')
+    const thumb = document.querySelector('[data-testid="scroll-thumb-x"]')
+    const r = thumb.getBoundingClientRect()
+    const opts = { bubbles: true, pointerId: 1, clientY: r.top + 2 }
+    thumb.setPointerCapture = () => {}
+    thumb.dispatchEvent(new PointerEvent('pointerdown', { ...opts, clientX: r.left + 5 }))
+    thumb.dispatchEvent(new PointerEvent('pointermove', { ...opts, clientX: r.left + 205 }))
+    thumb.dispatchEvent(new PointerEvent('pointerup', { ...opts, clientX: r.left + 205 }))
+    await new Promise((res) => requestAnimationFrame(res))
+    return el.scrollLeft
+  })
+  check('dragging it scrolls the table sideways', dragged > 100, `scrollLeft ${dragged}`)
+
+  /* The far end is reachable, which is the whole point of the bar. */
+  const farEnd = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="pokedex-grid-scroll-area"]')
+    el.scrollLeft = el.scrollWidth
+    const ths = [...document.querySelectorAll('[data-testid="species-rows"] thead th')]
+    const last = ths.filter((t) => t.textContent.trim()).slice(-1)[0]
+    const r = last.getBoundingClientRect()
+    return { label: last.textContent.replace(/[▲▼]/g, '').trim(), onScreen: r.right <= innerWidth }
+  })
+  check(
+    'and scrolling to the end really brings the last column on screen',
+    farEnd.label === 'Further evo' && farEnd.onScreen,
+    `${farEnd.label}, on screen ${farEnd.onScreen}`,
+  )
+  await page.evaluate(() => {
+    document.querySelector('[data-testid="pokedex-grid-scroll-area"]').scrollLeft = 0
+  })
+
+  const charmander = await page.$eval('[data-testid="species-row-4"] td:nth-child(5)', (td) =>
+    td.textContent.trim(),
+  )
+
   /* Every new column is checked against the bundle on one row rather than by
      eye: a column that renders a dash everywhere looks fine in a screenshot. */
   const bulbaRow = await page.evaluate(() => {
@@ -598,30 +716,56 @@ try {
     return cells.map((c) => c.textContent.trim())
   })
   const bulba = speciesById[1]
-  log(`  Bulbasaur row: ${bulbaRow.slice(0, 20).join(' | ')}`)
+  log(`  Bulbasaur row: ${bulbaRow.slice(0, 23).join(' | ')}`)
   check(
     "the regional dex number is the SELECTED game's, not the national one",
     bulbaRow[1] === String(bulba.pokedex_numbers['updated-johto']).padStart(3, '0'),
     `${bulbaRow[1]} vs ${bulba.pokedex_numbers['updated-johto']}`,
   )
-  check('egg groups come from the bundle', bulbaRow[12] === 'Monster · Grass', bulbaRow[12])
-  check('EV yield is the effort values', bulbaRow[13] === '1 Sp. Atk', bulbaRow[13])
-  check('catch rate', bulbaRow[16] === String(bulba.capture_rate), bulbaRow[16])
+  /* Lower-cased: the type labels are capitalised by CSS, the same as everywhere
+     else in the app, so the DOM text is the bundle's own slug. */
+  check(
+    'the two types are two columns',
+    bulbaRow[3].toLowerCase() === 'grass' && bulbaRow[4].toLowerCase() === 'poison',
+    `${bulbaRow[3]} / ${bulbaRow[4]}`,
+  )
+  check(
+    'a species with one type prints a dash in the second, never an empty cell',
+    charmander === '—',
+    charmander,
+  )
+  check('the first ability slot', bulbaRow[5] === 'Overgrow', bulbaRow[5])
+  check(
+    'and the hidden slot is a dash in Gen 1-4, where hidden abilities do not exist',
+    bulbaRow[7] === '—',
+    bulbaRow[7],
+  )
+  check(
+    'egg groups come from the bundle, one per column',
+    bulbaRow[15] === 'Monster' && bulbaRow[16] === 'Grass',
+    `${bulbaRow[15]} / ${bulbaRow[16]}`,
+  )
+  check(
+    'the EV yield is one number per stat, zero where it yields none',
+    bulbaRow.slice(17, 23).join(',') === '0,0,0,1,0,0',
+    bulbaRow.slice(17, 23).join(','),
+  )
+  check('catch rate', bulbaRow[25] === String(bulba.capture_rate), bulbaRow[25])
   check(
     'base experience',
-    bulbaRow[18] === String(defaultVariety(bulba).base_experience),
-    bulbaRow[18],
+    bulbaRow[27] === String(defaultVariety(bulba).base_experience),
+    bulbaRow[27],
   )
-  check('gender ratio', bulbaRow[19] === '87.5% ♂ / 12.5% ♀', bulbaRow[19])
-  check('egg cycles', bulbaRow[21] === String(bulba.hatch_counter), bulbaRow[21])
-  check('genus', bulbaRow[25] === bulba.genus, bulbaRow[25])
-  check('evolution stage', bulbaRow[31] === '1', bulbaRow[31])
+  check('gender ratio', bulbaRow[28] === '87.5% ♂ / 12.5% ♀', bulbaRow[28])
+  check('egg cycles', bulbaRow[30] === String(bulba.hatch_counter), bulbaRow[30])
+  check('genus', bulbaRow[34] === bulba.genus, bulbaRow[34])
+  check('evolution stage', bulbaRow[40] === '1', bulbaRow[40])
   check(
     'evolves to, with the trigger condition spelled out',
-    bulbaRow[33]?.startsWith('Ivysaur (Level 16'),
-    bulbaRow[33],
+    bulbaRow[42]?.startsWith('Ivysaur (Level 16'),
+    bulbaRow[42],
   )
-  check('and "further evolutions" is answered', bulbaRow[34] === 'Yes', bulbaRow[34])
+  check('and "further evolutions" is answered', bulbaRow[43] === 'Yes', bulbaRow[43])
   await page.screenshot({ path: `${SHOTS}/dexf-pokedex-list.png` })
 
   check(

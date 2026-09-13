@@ -383,6 +383,73 @@
   }
 }
 
+/*
+  THE SIDEWAYS AXIS, opted into per scroller (ScrollArea's `horizontal`).
+
+  Everything above applies unchanged -- these rules only turn the strip on its
+  side. The track stops 14px short of the right edge so it does not run under
+  the vertical one, and the thumb's finger target grows UPWARD only, for the
+  same reason its vertical twin grows leftward: .scroll-area-outer does not clip,
+  so a symmetric inset would put hit area below the section, over whatever the
+  page has there.
+*/
+.scroll-area-x {
+  overflow-x: auto;
+}
+
+.scroll-track-x {
+  top: auto;
+  right: 14px;
+  bottom: 0;
+  left: 3px;
+  width: auto;
+  height: 12px;
+}
+
+/*
+  THE ONE PLACE THE IDLE STATE IS NOT INVISIBLE, and it is not an inconsistency.
+
+  The vertical axis fades to nothing because it is not the only cue: a scrollable
+  section also draws the scroll-down chevron, so "there is more below" is said
+  whether or not the thumb is up. There is no sideways equivalent -- a table whose
+  columns continue past the right edge looks exactly like a table that ends
+  there -- so this thumb rests at a low opacity instead of at zero, and wakes to
+  full like its twin. It is drawn rather than native, so resting visible still
+  costs no gutter and takes no width from the table.
+*/
+.scroll-thumb-x {
+  top: auto;
+  right: auto;
+  bottom: 2px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  opacity: 0.4;
+  transition:
+    opacity 260ms linear,
+    background-color 120ms linear,
+    height 120ms linear,
+    bottom 120ms linear;
+}
+
+.scroll-track-x:hover .scroll-thumb-x,
+.scroll-track-x.is-dragging .scroll-thumb-x {
+  width: 4px;
+  right: auto;
+  height: 6px;
+  bottom: 1px;
+}
+
+.scroll-thumb-x::before {
+  inset: -20px 0 -6px 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .scroll-thumb-x::before {
+    inset: -8px 0 0 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scroll-thumb {
     transition: none;

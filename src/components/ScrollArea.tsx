@@ -207,9 +207,31 @@ function useScrollThumb(
   el: HTMLElement | null,
   track: HTMLElement | null,
   thumb: HTMLElement | null,
+  axis: 'y' | 'x' = 'y',
 ) {
   useEffect(() => {
     if (!el || !track || !thumb) return
+
+    /*
+      THE TWO AXES ARE THE SAME HOOK, PARAMETERISED -- not a copy with `Top`
+      swapped for `Left`. The drag, the track press, the idle fade, the minimum
+      thumb and the "hide when there is nothing to scroll" rule are identical
+      questions on both axes, and the one thing that differs is which four
+      measurements you ask the element for. A second copy is how the horizontal
+      bar would end up with a subtly different fade or a drift the vertical one
+      does not have.
+    */
+    const horizontal = axis === 'x'
+    const maxScroll = () =>
+      horizontal ? el.scrollWidth - el.clientWidth : el.scrollHeight - el.clientHeight
+    const offset = () => (horizontal ? el.scrollLeft : el.scrollTop)
+    const setOffset = (next: number) => {
+      if (horizontal) el.scrollLeft = next
+      else el.scrollTop = next
+    }
+    /** The track's length, and the thumb's, along the axis being drawn. */
+    const trackRoom = () => (horizontal ? track.clientWidth : track.clientHeight)
+    const thumbSize = () => (horizontal ? thumb.offsetWidth : thumb.offsetHeight)
 
     let idle = 0
     let dragging = false
@@ -226,17 +248,25 @@ function useScrollThumb(
     }
 
     const layout = () => {
-      const max = el.scrollHeight - el.clientHeight
+      const max = maxScroll()
       if (max <= EDGE) {
         track.hidden = true
         return
       }
       track.hidden = false
-      const room = track.clientHeight
-      const height = Math.max(MIN_THUMB, Math.round((room * el.clientHeight) / el.scrollHeight))
-      const travel = room - height
-      thumb.style.height = `${height}px`
-      thumb.style.transform = `translateY(${Math.round((el.scrollTop / max) * travel)}px)`
+      const room = trackRoom()
+      const visible = horizontal ? el.clientWidth : el.clientHeight
+      const total = horizontal ? el.scrollWidth : el.scrollHeight
+      const size = Math.max(MIN_THUMB, Math.round((room * visible) / total))
+      const travel = room - size
+      const at = Math.round((offset() / max) * travel)
+      if (horizontal) {
+        thumb.style.width = `${size}px`
+        thumb.style.transform = `translateX(${at}px)`
+      } else {
+        thumb.style.height = `${size}px`
+        thumb.style.transform = `translateY(${at}px)`
+      }
     }
 
     const onScroll = () => {
@@ -258,14 +288,15 @@ function useScrollThumb(
       track.classList.add('is-dragging')
       wake()
 
-      const startY = ev.clientY
-      const startTop = el.scrollTop
-      const travel = track.clientHeight - thumb.offsetHeight
-      const max = el.scrollHeight - el.clientHeight
+      const start = horizontal ? ev.clientX : ev.clientY
+      const startOffset = offset()
+      const travel = trackRoom() - thumbSize()
+      const max = maxScroll()
 
       const move = (e: PointerEvent) => {
         if (travel <= 0) return
-        el.scrollTop = startTop + ((e.clientY - startY) / travel) * max
+        const moved = (horizontal ? e.clientX : e.clientY) - start
+        setOffset(startOffset + (moved / travel) * max)
       }
       const up = () => {
         dragging = false
@@ -285,10 +316,11 @@ function useScrollThumb(
     const onTrackDown = (ev: PointerEvent) => {
       if (ev.target !== track) return
       const rect = track.getBoundingClientRect()
-      const span = rect.height - thumb.offsetHeight
+      const span = (horizontal ? rect.width : rect.height) - thumbSize()
       if (span <= 0) return
-      const p = (ev.clientY - rect.top - thumb.offsetHeight / 2) / span
-      el.scrollTop = Math.min(Math.max(p, 0), 1) * (el.scrollHeight - el.clientHeight)
+      const from = horizontal ? ev.clientX - rect.left : ev.clientY - rect.top
+      const p = (from - thumbSize() / 2) / span
+      setOffset(Math.min(Math.max(p, 0), 1) * maxScroll())
       wake()
     }
 
@@ -310,7 +342,7 @@ function useScrollThumb(
       thumb.removeEventListener('pointerdown', onThumbDown)
       observer.disconnect()
     }
-  }, [el, track, thumb])
+  }, [el, track, thumb, axis])
 }
 
 export function ScrollArea({
@@ -319,6 +351,22 @@ export function ScrollArea({
   testId,
   /** Set false for a region whose bottom edge is not a "keep reading" cue. */
   hint = true,
+  /**
+   * Let this section scroll SIDEWAYS as well, with a drawn bar of its own.
+   *
+   * Off everywhere else on purpose: `overflow-x: hidden` is what stops a stray
+   * wide child from giving a list a sideways wobble, and only one screen in the
+   * app genuinely wants the axis -- the Pokedex's thirty-odd-column table. It
+   * had `overflow-x: hidden` above it and no bar, so every column past the
+   * twelfth was not merely unlabelled but UNREACHABLE.
+   *
+   * The bar is drawn in the OUTER frame, not at the foot of the content, which
+   * is the whole reason this is a ScrollArea prop rather than `overflow-x: auto`
+   * on the table's own wrapper: a bar that belongs to the content sits below 493
+   * rows, so reaching the control that moves you sideways would mean scrolling
+   * to the bottom first.
+   */
+  horizontal = false,
   /**
    * Identity for the remembered offset. Omit and this scroller has no memory.
    *
@@ -334,6 +382,7 @@ export function ScrollArea({
   className?: string
   testId?: string
   hint?: boolean
+  horizontal?: boolean
   memoryKey?: string
 }) {
   /*
@@ -345,16 +394,26 @@ export function ScrollArea({
   const [el, setEl] = useState<HTMLDivElement | null>(null)
   const [track, setTrack] = useState<HTMLDivElement | null>(null)
   const [thumb, setThumb] = useState<HTMLDivElement | null>(null)
+  const [trackX, setTrackX] = useState<HTMLDivElement | null>(null)
+  const [thumbX, setThumbX] = useState<HTMLDivElement | null>(null)
   const { atTop, atEnd, scrollable } = useScrollState(el)
 
   useScrollRestore(el, memoryKey)
   useScrollThumb(el, track, thumb)
+  // Passing nulls while the axis is off is what keeps the hook inert there --
+  // it bails on a missing node, so there is no conditional hook and no second
+  // set of listeners on the five scrollers that do not want the axis.
+  useScrollThumb(el, trackX, thumbX, 'x')
+
+  const classes = ['scroll-area']
+  if (horizontal) classes.push('scroll-area-x')
+  if (className) classes.push(className)
 
   return (
     <div className="scroll-area-outer" data-scrollable={scrollable}>
       <div
         ref={setEl}
-        className={className ? `scroll-area ${className}` : 'scroll-area'}
+        className={classes.join(' ')}
         data-testid={testId}
         /* Readable by the suites, so "a different filter is a different key" is
            assertable rather than inferred from where a scroller ended up. */
@@ -383,6 +442,25 @@ export function ScrollArea({
       <div className="scroll-track" data-testid="scroll-track" ref={setTrack} aria-hidden hidden>
         <div className="scroll-thumb" data-testid="scroll-thumb" ref={setThumb} />
       </div>
+
+      {/* The sideways one, same contract: drawn rather than native, faded when
+          idle, and hidden outright when the content fits. It stops short of the
+          vertical track's strip so the two never cross in the corner. */}
+      {horizontal && (
+        <div
+          className="scroll-track scroll-track-x"
+          data-testid="scroll-track-x"
+          ref={setTrackX}
+          aria-hidden
+          hidden
+        >
+          <div
+            className="scroll-thumb scroll-thumb-x"
+            data-testid="scroll-thumb-x"
+            ref={setThumbX}
+          />
+        </div>
+      )}
 
       {/* Only once there is somewhere to go back to: on an unscrolled section
           this control would do nothing, and a dead button is worse than none. */}

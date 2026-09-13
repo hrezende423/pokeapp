@@ -123,7 +123,17 @@ export function DataTable<T>({
 
   return (
     <div className="data-table-wrap">
-      <table className="data-table" data-testid={testId}>
+      {/*
+        `data-table-sized` SAYS THIS TABLE DECLARES ITS OWN COLUMN WIDTHS, and
+        the stylesheet uses it to stand its positional fallbacks down. Those
+        fallbacks (`.data-table th:nth-child(n)`) were written for the Movedex's
+        original six columns and reach every table in the app, so without a way
+        to opt out a colgroup was not authoritative: Chrome's fixed layout takes
+        the LARGER of the column's width and the first row's cell width, so a
+        declared 3.9rem column still came out at the 15rem the fallback asked
+        for. Marking the table is what makes Column.width mean what it says.
+      */}
+      <table className={widths ? 'data-table data-table-sized' : 'data-table'} data-testid={testId}>
         {widths && (
           <colgroup>
             {columns.map((c) => (

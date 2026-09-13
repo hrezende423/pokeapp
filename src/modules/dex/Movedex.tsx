@@ -373,15 +373,32 @@ export function Movedex() {
 
   const columns: Column<Move>[] = useMemo(
     () => [
+      /*
+        THE BATTLE NUMBERS COME BEFORE THE CATALOGUE ONES. Name, type and
+        category say what the move IS; power, accuracy and PP are what you
+        actually compare moves on and they now sit together, uninterrupted.
+        Range and Gen are classification -- read once, not scanned -- so they
+        close the row rather than splitting the three numbers apart, which is
+        where they landed when they were added.
+
+        EVERY COLUMN CARRIES ITS OWN WIDTH, emitted as a <colgroup>. The
+        `.data-table th:nth-child(n)` rules in pokedex.css were written when this
+        table had six columns and are positional, so the reorder above would
+        otherwise have handed Power the width sized for Range -- and the two
+        columns past the sixth had no rule at all, leaving them to be sized by
+        whatever happened to be in the first row.
+      */
       {
         key: 'name',
         label: 'Name',
+        width: '15rem',
         sortValue: (m) => m.display_name,
         render: (m) => m.display_name,
       },
       {
         key: 'type',
         label: 'Type',
+        width: '6.5rem',
         sortValue: (m) => (m.type_id != null ? (getType(m.type_id)?.name ?? '') : null),
         render: (m) =>
           m.type_id != null ? <TypeLabel type={getType(m.type_id)?.name ?? ''} small /> : '—',
@@ -389,28 +406,14 @@ export function Movedex() {
       {
         key: 'category',
         label: 'Category',
+        width: '6rem',
         sortValue: (m) => m.damage_class,
         render: (m) => titleCase(m.damage_class),
       },
       {
-        // What the move can be aimed at. PokeAPI calls it `target`; "range" is
-        // what a player calls it, and the fourteen slugs are mapped to words
-        // rather than title-cased -- "Users Field" is not English.
-        key: 'range',
-        label: 'Range',
-        sortValue: moveRangeSort,
-        render: (m) => moveRange(m),
-      },
-      {
-        key: 'generation',
-        label: 'Gen',
-        sortValue: (m) => m.generation_id,
-        render: (m) => <span className="num">{m.generation_id ?? '—'}</span>,
-        numeric: true,
-      },
-      {
         key: 'power',
         label: 'Power',
+        width: '5.5rem',
         // Sorts on the real power only. A fixed-damage move is deliberately NOT
         // sorted as though 40 hp were 40 power -- different quantities -- and
         // null-last keeps those rows together at the end either way.
@@ -421,6 +424,7 @@ export function Movedex() {
       {
         key: 'accuracy',
         label: 'Accuracy',
+        width: '5.5rem',
         sortValue: (m) => m.accuracy,
         render: accuracyCell,
         numeric: true,
@@ -428,8 +432,28 @@ export function Movedex() {
       {
         key: 'pp',
         label: 'PP',
+        width: '4rem',
         sortValue: (m) => m.pp,
         render: (m) => <span className="num">{m.pp ?? '—'}</span>,
+        numeric: true,
+      },
+      {
+        // What the move can be aimed at. PokeAPI calls it `target`; "range" is
+        // what a player calls it, and the fourteen slugs are mapped to words
+        // rather than title-cased -- "Users Field" is not English. Wide enough
+        // for "All opponents", the longest of those words.
+        key: 'range',
+        label: 'Range',
+        width: '8rem',
+        sortValue: moveRangeSort,
+        render: (m) => moveRange(m),
+      },
+      {
+        key: 'generation',
+        label: 'Gen',
+        width: '3.4rem',
+        sortValue: (m) => m.generation_id,
+        render: (m) => <span className="num">{m.generation_id ?? '—'}</span>,
         numeric: true,
       },
     ],

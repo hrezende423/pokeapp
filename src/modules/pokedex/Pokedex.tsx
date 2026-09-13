@@ -83,7 +83,15 @@ export function Pokedex() {
             scroll-down indicator and the back-to-top control come from
             ScrollArea, which was built for exactly this.
           */}
-          <ScrollArea testId="pokedex-grid-scroll-area" memoryKey={gridKey}>
+          <ScrollArea
+            testId="pokedex-grid-scroll-area"
+            memoryKey={gridKey}
+            /* The list view is the one place in the app with a table wider than
+               the window. Without this the columns past the twelfth were not
+               merely off-screen, they were unreachable: .scroll-area sets
+               overflow-x: hidden for every other scroller. */
+            horizontal={view === 'list'}
+          >
             {/* .pokedex-grid-wrap centres three 212px columns in a wider shell,
                 which is the grid's whole geometry and means nothing to a table:
                 the list view takes the full width and its own padding. */}

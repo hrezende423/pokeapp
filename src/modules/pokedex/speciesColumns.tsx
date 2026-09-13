@@ -1,6 +1,7 @@
-import { TypeRow } from '../../components/ds/TypeLabel'
+import { TypeLabel } from '../../components/ds/TypeLabel'
 import type { Column } from '../../components/DataTable'
 import {
+  EFFORT_VALUES_INTRODUCED_IN_GENERATION,
   genderRatio,
   getEggGroup,
   getItem,
@@ -21,12 +22,21 @@ import { statFieldsFor, type SpeciesRow } from './speciesQuery'
  * print. The grid's Sort menu offers what a card shows; this table offers
  * everything, sorted from its own headers. See speciesQuery.ts.
  *
- * THE FIRST TWELVE COLUMNS FIT THE WINDOW, deliberately and by measurement:
- * national number through Speed, which is the block that answers "what is this
- * and how good is it". Everything after Speed is over the horizontal scroll,
- * which is the trade this table makes rather than shrinking type past legibility
- * -- the widths below are what makes that promise, and verify-dex-filters
- * measures it rather than trusting it.
+ * ONE FACT PER COLUMN, NEVER A JOINED LIST. Types, abilities, egg groups and the
+ * EV yield were each one cell holding a middot-separated run, and that is not a
+ * column: it cannot be sorted on ("Grass/Poison" sorts under G, away from every
+ * other Poison), it cannot be scanned down, and a species with one type and one
+ * with two are different shapes in the same cell. They are split to the slots the
+ * games themselves have -- two types, two abilities and a hidden one, two egg
+ * groups, one EV yield per stat -- so every cell holds a single value or a dash.
+ *
+ * THE IDENTITY BLOCK FITS THE WINDOW, deliberately and by measurement: national
+ * number through Speed, which is the block that answers "what is this and how
+ * good is it". Splitting the joined cells made that block fifteen columns rather
+ * than twelve, and the widths below are sized so it still lands inside a normal
+ * window; verify-dex-filters measures it rather than trusting it. Everything
+ * after Speed is over the horizontal scroll, which the list view now actually
+ * draws a bar for.
  *
  * ERA CORRECTNESS runs through the same resolvers as everywhere else: abilities
  * do not exist before Generation 3 and neither does the EV yield, egg groups
@@ -123,7 +133,9 @@ export function speciesColumns({
   const regional = (row: SpeciesRow) =>
     dexKey ? (row.species.pokedex_numbers[dexKey] ?? null) : null
 
-  const statColumns: Column<SpeciesRow>[] = statFieldsFor(generation).map((stat) => ({
+  const statFields = statFieldsFor(generation)
+
+  const statColumns: Column<SpeciesRow>[] = statFields.map((stat) => ({
     key: `stat-${stat.key}`,
     label: stat.label,
     width: '3.4rem',
@@ -131,6 +143,18 @@ export function speciesColumns({
     sortValue: (row) => row.stats[stat.key] ?? null,
     render: (row) => <span className="num">{row.stats[stat.key] ?? DASH}</span>,
   }))
+
+  const evColumns: Column<SpeciesRow>[] =
+    generation < EFFORT_VALUES_INTRODUCED_IN_GENERATION
+      ? []
+      : statFields.map((stat) => ({
+          key: `ev-${stat.key}`,
+          label: `${EV_LABELS[stat.key] ?? stat.label} EVY`,
+          width: '4.2rem',
+          numeric: true,
+          sortValue: (row) => row.evs[stat.key] ?? 0,
+          render: (row) => <span className="num">{row.evs[stat.key] ?? 0}</span>,
+        }))
 
   return [
     {
@@ -159,26 +183,57 @@ export function speciesColumns({
       sortValue: (row) => row.species.display_name,
       render: (row) => row.species.display_name,
     },
+    /*
+      TWO TYPE COLUMNS, NOT ONE. A single cell reading "Grass/Poison" sorts under
+      G, so every dual-type Poison lands nowhere near the pure ones -- and the
+      second slot is a real, separate fact the games track (it is what an
+      attacker's second multiplier comes from). Type 2 is a dash where there is
+      none rather than an empty cell, so "no second type" and "nothing loaded"
+      cannot look the same.
+    */
     {
-      key: 'types',
-      label: 'Types',
-      width: '7.5rem',
-      // Sorted by the typing as written, so the two halves of a dual type stay
-      // together rather than interleaving with every other Grass.
-      sortValue: (row) => row.typeIds.map((id) => getType(id)?.name ?? '').join('/'),
-      render: (row) => (
-        <TypeRow types={row.typeIds.map((id) => getType(id)?.name ?? '').filter(Boolean)} small />
-      ),
+      key: 'type1',
+      label: 'Type 1',
+      width: '4.8rem',
+      sortValue: (row) => typeName(row, 0),
+      render: (row) => typeCell(row, 0),
     },
     {
-      key: 'abilities',
-      label: 'Abilities',
-      width: '10.5rem',
-      sortValue: (row) => abilityNames(row, generation).join(', '),
-      render: (row) => {
-        const names = abilityNames(row, generation)
-        return names.length > 0 ? names.join(' · ') : DASH
-      },
+      key: 'type2',
+      label: 'Type 2',
+      width: '4.8rem',
+      sortValue: (row) => typeName(row, 1),
+      render: (row) => typeCell(row, 1),
+    },
+    /*
+      THE TWO ORDINARY SLOTS AND THE HIDDEN ONE, separately -- the hidden slot is
+      not a third ability, it is a different mechanic, and joining it into one run
+      with an "(H)" suffix made that a matter of spotting a marker. In Gen 1-4
+      scope every hidden cell is a dash by construction (hidden abilities arrive
+      in Gen 5, and `resolveAbilitiesForGeneration` returns nothing at all before
+      Gen 3); the column is present so the table's shape does not change under a
+      later generation, and it prints a dash rather than an empty cell.
+    */
+    {
+      key: 'ability1',
+      label: 'Ability 1',
+      width: '7.6rem',
+      sortValue: (row) => abilitySlot(row, generation, 1),
+      render: (row) => abilitySlot(row, generation, 1) ?? DASH,
+    },
+    {
+      key: 'ability2',
+      label: 'Ability 2',
+      width: '7.6rem',
+      sortValue: (row) => abilitySlot(row, generation, 2),
+      render: (row) => abilitySlot(row, generation, 2) ?? DASH,
+    },
+    {
+      key: 'abilityHidden',
+      label: 'Hidden ability',
+      width: '7.6rem',
+      sortValue: (row) => hiddenAbility(row, generation),
+      render: (row) => hiddenAbility(row, generation) ?? DASH,
     },
     {
       key: 'bst',
@@ -190,27 +245,29 @@ export function speciesColumns({
     },
     ...statColumns,
     {
-      key: 'eggGroups',
-      label: 'Egg groups',
-      width: '9rem',
-      sortValue: (row) => eggGroupNames(row).join(', '),
-      render: (row) => {
-        const names = eggGroupNames(row)
-        return names.length > 0 ? names.join(' · ') : DASH
-      },
+      key: 'eggGroup1',
+      label: 'Egg group 1',
+      width: '6.8rem',
+      sortValue: (row) => eggGroupNames(row)[0] ?? null,
+      render: (row) => eggGroupNames(row)[0] ?? DASH,
     },
     {
-      key: 'ev',
-      label: 'EV yield',
-      width: '8rem',
-      sortValue: (row) => Object.values(row.evs).reduce((a, b) => a + b, 0) || null,
-      render: (row) => {
-        const parts = statFieldsFor(generation)
-          .filter((stat) => row.evs[stat.key] != null)
-          .map((stat) => `${row.evs[stat.key]} ${stat.label}`)
-        return parts.length > 0 ? parts.join(' · ') : DASH
-      },
+      key: 'eggGroup2',
+      label: 'Egg group 2',
+      width: '6.8rem',
+      sortValue: (row) => eggGroupNames(row)[1] ?? null,
+      render: (row) => eggGroupNames(row)[1] ?? DASH,
     },
+    /*
+      ONE EV YIELD COLUMN PER STAT, and they follow the SAME era rule as the base
+      stats beside them -- so Gen 1 would get a single "Spc EVY" and Gen 2-4 the
+      split pair, and the two blocks can never disagree about how many stats an
+      era has. The whole block is absent before Generation 3, where effort values
+      do not exist: `row.evs` is empty there and six columns of dashes is noise
+      rather than a fact. A stat that yields nothing prints 0, not a dash --
+      zero IS the yield, and it is what you sort against.
+    */
+    ...evColumns,
     {
       key: 'height',
       label: 'Height',
@@ -390,11 +447,47 @@ export function speciesColumns({
   ]
 }
 
-/** Abilities INCLUDING the hidden slot, which is marked rather than dropped. */
-function abilityNames(row: SpeciesRow, generation: number): string[] {
-  return resolveAbilitiesForGeneration(row.variety, generation).map((a) =>
-    a.is_hidden ? `${a.ability.display_name} (H)` : a.ability.display_name,
+/**
+ * Short stat names for the EV columns.
+ *
+ * "Attack EVY" and "Sp. Atk EVY" are wider than any number they will ever hold,
+ * and six of them in a row is most of a window -- so the EV block uses the
+ * abbreviations while the base-stat block keeps the full labels. Keyed by stat
+ * key rather than derived by truncating the label, because no rule that turns
+ * "Defense" into "Def" also turns "Sp. Atk" into "SpA".
+ */
+const EV_LABELS: Record<string, string> = {
+  hp: 'HP',
+  attack: 'Atk',
+  defense: 'Def',
+  special: 'Spc',
+  'special-attack': 'SpA',
+  'special-defense': 'SpD',
+  speed: 'Spe',
+}
+
+const typeName = (row: SpeciesRow, slot: number): string | null => {
+  const id = row.typeIds[slot]
+  return id == null ? null : (getType(id)?.name ?? null)
+}
+
+/** The type as a LABEL -- the app-wide treatment: coloured text, never a badge. */
+function typeCell(row: SpeciesRow, slot: number) {
+  const name = typeName(row, slot)
+  return name ? <TypeLabel type={name} small /> : DASH
+}
+
+/** The ability in one of the two ordinary slots, or null where the slot is empty. */
+function abilitySlot(row: SpeciesRow, generation: number, slot: number): string | null {
+  const found = resolveAbilitiesForGeneration(row.variety, generation).find(
+    (a) => !a.is_hidden && a.slot === slot,
   )
+  return found?.ability.display_name ?? null
+}
+
+function hiddenAbility(row: SpeciesRow, generation: number): string | null {
+  const found = resolveAbilitiesForGeneration(row.variety, generation).find((a) => a.is_hidden)
+  return found?.ability.display_name ?? null
 }
 
 function eggGroupNames(row: SpeciesRow): string[] {
