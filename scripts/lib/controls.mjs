@@ -66,68 +66,44 @@ export function controls(page) {
 /* ------------------------------------------------------- per-dex controls */
 
 /*
-  A dex's own search moved behind a ghost-button disclosure, the same pattern the
-  app bar uses. Movedex is the exception: its controls are an always-visible row,
-  so its search needs none of this and `fillDexSearch` short-circuits for it.
+  EVERY DEX'S SEARCH IS IN THE APP BAR NOW. Each one used to carry its own
+  ghost-button disclosure above its own list, and the Movedex an always-visible
+  row; Pokepedia has ONE Search/Filter menu, so the per-dex openDexControls and
+  closeDexControls helpers are deleted rather than shortened -- there is no
+  second disclosure left for them to drive.
 
-  OPEN, FILL, CLOSE -- in that order, and the close matters twice over. The panel
-  floats above the list, so leaving it open would let it intercept clicks meant
-  for the rows underneath; and the input stays MOUNTED while hidden (the panel is
-  display: none, not unmounted), so the term it holds stays applied to the list
-  after closing. That is what makes "filter, then click a row" work at all.
+  WHAT HAS NOT CHANGED IS THE TEST ID: each dex's name filter is still
+  `<dex>-search`, so every call site below reads exactly as it did. That was the
+  point of letting a filter definition override its own id.
+
+  OPEN, FILL, CLOSE -- in that order, and the close still matters twice over. The
+  panel floats over the page, so leaving it open lets it intercept clicks meant
+  for the list underneath; and the input stays MOUNTED while hidden (the panel is
+  display: none, not unmounted), so the term it holds stays applied after
+  closing. That is what makes "filter, then click a row" work at all.
 */
-const dexPanelOpen = (page, dexId) =>
-  page.$eval(`[data-testid="${dexId}-controls"]`, (el) => el.dataset.open === 'true')
-
-export async function openDexControls(page, dexId) {
-  const toggle = `[data-testid="${dexId}-controls-toggle"]`
-  if ((await page.$(toggle)) == null) return false
-  if (await dexPanelOpen(page, dexId)) return true
-  /*
-    The nav opens its dropdown on HOVER and keeps it open while the pointer is on
-    the tab. Navigating to a dex therefore leaves that panel hanging directly over
-    the top-left of the page -- which is exactly where this toggle sits -- so the
-    pointer has to leave the bar before the toggle is clickable. Playwright
-    reports this as "nav-pokedex ... intercepts pointer events".
-  */
-  await page.mouse.move(900, 600)
-  await page.waitForTimeout(80)
-  await page.click(toggle)
-  await page.waitForSelector(`[data-testid="${dexId}-search"]`, {
-    state: 'visible',
-    timeout: 15000,
-  })
-  return true
-}
-
-export async function closeDexControls(page, dexId) {
-  const toggle = `[data-testid="${dexId}-controls-toggle"]`
-  if ((await page.$(toggle)) == null) return
-  if (!(await dexPanelOpen(page, dexId))) return
-  await page.click(toggle)
-  await page.waitForTimeout(60)
-}
 
 /**
- * Type into a dex's own name search, whichever layout that dex uses.
+ * Type into a dex's name filter, from wherever the page currently is.
  *
- * Returns to the LIST first if a detail page is open. These dexes are a list page
- * XOR a detail page, so the search box does not exist while an entry is open --
- * asking to type in it from a detail page is a request to go back and then type,
- * and doing that here rather than at every call site is the point of this module.
+ * Returns to the LIST first if a detail page is open: these dexes are a list
+ * page XOR a detail page, and a filter is only built while its dex is the active
+ * module -- so asking to type from a detail page is a request to go back and
+ * then type, and doing that here rather than at every call site is the point of
+ * this module.
  */
 export async function fillDexSearch(page, dexId, value) {
   const input = `[data-testid="${dexId}-search"]`
-  if ((await page.$(input)) == null && (await page.$('[data-testid="entity-back"]')) != null) {
+  if ((await page.$('[data-testid="entity-back"]')) != null) {
     await page.click('[data-testid="entity-back"]')
     await page.waitForSelector(`[data-testid="${dexId}-count"]`, { timeout: 15000 })
   }
-  // 'attached', not the default 'visible': while the panel is closed the input is
-  // mounted but display: none, and waiting for it to be visible before opening
-  // the panel is a deadlock.
+  /*
+    'attached', not the default 'visible': while the panel is closed the input is
+    mounted but display: none, and waiting for it to be visible before opening
+    the panel is a deadlock.
+  */
   await page.waitForSelector(input, { state: 'attached', timeout: 30000 })
-  // Movedex has no toggle: its row is always on screen, so fill it directly.
-  const opened = await openDexControls(page, dexId)
-  await page.fill(input, value)
-  if (opened) await closeDexControls(page, dexId)
+  await withControlsOn(page, () => page.fill(input, value))
+  await page.waitForTimeout(80)
 }

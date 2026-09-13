@@ -39,7 +39,12 @@
  * time and looks right.
  */
 
-import { getEggGroup, resolveStatsForGeneration, resolveTypesForGeneration } from '../../data'
+import {
+  EFFORT_VALUES_INTRODUCED_IN_GENERATION,
+  getEggGroup,
+  resolveStatsForGeneration,
+  resolveTypesForGeneration,
+} from '../../data'
 import type { PokemonType, Species, Variety } from '../../data'
 import type { FilterSection, SortField } from '../dex/query/dexQuery'
 
@@ -60,6 +65,15 @@ export interface SpeciesRow {
   typeIds: number[]
   /** Resolved base stats, keyed by stat name. Gen 1 carries `special`. */
   stats: Record<string, number>
+  /**
+   * Effort values yielded, keyed by the same stat names.
+   *
+   * EVs arrived in Generation 3 -- Gens 1-2 had Stat Experience, a different
+   * mechanic with no per-species yield -- so this is EMPTY before then rather
+   * than zeroed. An empty map and a map of zeroes are different claims, and the
+   * column prints an em dash for the first.
+   */
+  evs: Record<string, number>
   bst: number
   /** Decimetres and hectograms, as the bundle stores them. */
   height: number | null
@@ -70,10 +84,13 @@ export function buildSpeciesRows(entries: Species[], generation: number): Specie
   return entries.map((species) => {
     const variety = defaultVariety(species)
     const stats: Record<string, number> = {}
+    const evs: Record<string, number> = {}
+    const hasEvs = generation >= EFFORT_VALUES_INTRODUCED_IN_GENERATION
     let bst = 0
     for (const entry of resolveStatsForGeneration(variety, generation)) {
       if (entry.stat == null) continue
       stats[entry.stat] = entry.base_stat
+      if (hasEvs && entry.effort > 0) evs[entry.stat] = entry.effort
       bst += entry.base_stat
     }
     return {
@@ -81,6 +98,7 @@ export function buildSpeciesRows(entries: Species[], generation: number): Specie
       variety,
       typeIds: resolveTypesForGeneration(variety, generation).map((t) => t.type_id),
       stats,
+      evs,
       bst,
       height: variety.height,
       weight: variety.weight,
@@ -361,38 +379,24 @@ export function speciesFilterSections({
 }
 
 /**
- * The grid sorts by three fields, the list by all of them.
+ * What the Sort menu offers, and it is the GRID's question.
  *
- * Not because the grid could not sort by Sp. Def, but because a card shows a
- * number, a name and a picture -- ordering by a value the cards do not print
- * produces a sequence the reader cannot check. The table prints every one of
- * these in a column, so all of them are answerable on screen.
+ * A card shows a number, a name, a picture, its abilities and -- since the row
+ * below them was added -- its base-stat total and its Speed. Those are exactly
+ * the orderings offered, because ordering cards by a value the cards do not
+ * print produces a sequence the reader cannot check.
+ *
+ * THE LIST VIEW IS NOT HERE. Its table declares its own columns
+ * (speciesColumns.tsx) and sorts from its own headers, which is why the bar's
+ * Sort trigger is disabled there: two controls for one ordering, one of them
+ * off screen, is the disagreement this whole pass removes.
  */
-export function speciesSortFields({
-  view,
-  generation,
-}: {
-  view: SpeciesView
-  generation: number
-}): SortField<SpeciesRow>[] {
-  const base: SortField<SpeciesRow>[] = [
+export function speciesSortFields(): SortField<SpeciesRow>[] {
+  return [
     { key: 'dex', label: 'Dex #', value: (row) => row.species.id },
     { key: 'name', label: 'Name', value: (row) => row.species.display_name },
-  ]
-  if (view === 'grid') {
-    return [...base, { key: 'bst', label: 'Base stat total', value: (row) => row.bst }]
-  }
-  return [
-    ...base,
-    ...statFieldsFor(generation).map((stat) => ({
-      key: `stat-${stat.key}`,
-      label: stat.label,
-      value: (row: SpeciesRow) => row.stats[stat.key] ?? null,
-    })),
-    { key: 'bst', label: 'Total', value: (row) => row.bst },
-    { key: 'height', label: 'Height', value: (row) => row.height },
-    { key: 'weight', label: 'Weight', value: (row) => row.weight },
-    { key: 'friendship', label: 'Friendship', value: (row) => row.species.base_happiness },
+    { key: 'bst', label: 'Base stat total', value: (row) => row.bst },
+    { key: 'speed', label: 'Speed', value: (row) => row.stats.speed ?? null },
   ]
 }
 

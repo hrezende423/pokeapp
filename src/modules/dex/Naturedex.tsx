@@ -5,7 +5,6 @@ import type { Nature } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell } from './DexPageShell'
 import { natureEntries } from './entrySources'
-import type { FilterSection } from './query/dexQuery'
 
 /**
  * The 25 natures as a 5x5 matrix: rows are the raised stat, columns the lowered
@@ -243,100 +242,11 @@ export function Naturedex() {
   const available = isAll || naturesExistInGeneration(generation)
   const entries = useMemo(() => natureEntries({ generation, isAll }), [generation, isAll])
 
-  /*
-    FILTERS, BUT NO SORT, and both halves of that are deliberate.
-
-    The page is a 5x5 matrix whose axes ARE the two stats, so "sort by name"
-    would have nothing to re-order -- a cell's position is its meaning. Filtering
-    still works perfectly well against it: a filtered-out nature simply leaves an
-    empty cell, which is the same em dash the matrix already draws where a pair
-    has no nature, so narrowing reads as "these are the ones that match" rather
-    than as a re-flowed list.
-
-    HP IS ABSENT FROM BOTH STAT LISTS because no nature has ever affected it --
-    that is why the matrix is 5x5 and not 6x6. The five neutral natures carry
-    increased_stat AND decreased_stat as null rather than as the same stat, so
-    they can only be reached through the Neutral toggle, never through either
-    stat select, and the flavour selects skip them for the same reason.
-  */
-  const sections: FilterSection<Nature>[] = useMemo(() => {
-    const statOptions = STATS.map((stat) => ({ value: stat, label: STAT_LABELS[stat] }))
-    const flavorOptions = ['spicy', 'dry', 'sweet', 'bitter', 'sour'].map((flavor) => ({
-      value: flavor,
-      label: titleCase(flavor) ?? flavor,
-    }))
-    return [
-      {
-        id: 'name',
-        label: 'Name',
-        filters: [
-          {
-            kind: 'text',
-            key: 'name',
-            label: 'Search natures by name',
-            testId: 'naturedex-search',
-            match: (nature, term) => nature.display_name.toLowerCase().includes(term),
-          },
-        ],
-      },
-      {
-        id: 'stats',
-        label: 'Stats',
-        more: true,
-        filters: [
-          {
-            kind: 'select',
-            key: 'increased',
-            label: 'Raised stat',
-            options: statOptions,
-            match: (nature, value) => nature.increased_stat === value,
-          },
-          {
-            kind: 'select',
-            key: 'decreased',
-            label: 'Lowered stat',
-            options: statOptions,
-            match: (nature, value) => nature.decreased_stat === value,
-          },
-          {
-            kind: 'toggle',
-            key: 'neutral',
-            label: 'Neutral natures only',
-            match: (nature) => isNeutral(nature),
-          },
-        ],
-      },
-      {
-        id: 'flavour',
-        label: 'Flavour',
-        more: true,
-        filters: [
-          {
-            kind: 'select',
-            key: 'likes',
-            label: 'Liked flavour',
-            options: flavorOptions,
-            match: (nature, value) => nature.likes_flavor === value,
-          },
-          {
-            kind: 'select',
-            key: 'hates',
-            label: 'Disliked flavour',
-            options: flavorOptions,
-            match: (nature, value) => nature.hates_flavor === value,
-          },
-        ],
-      },
-    ]
-  }, [])
-
   return (
     <DexPageShell
       dexId="naturedex"
       entries={entries}
       entryId={(nature) => nature.id}
-      sections={sections}
-      searchLabel="Search/filter natures"
       gatedMessage={
         available
           ? undefined

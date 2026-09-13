@@ -1,31 +1,31 @@
-import { useMemo, type ReactNode } from 'react'
-import { DataTable, type Column } from '../../components/DataTable'
+import { useMemo } from 'react'
+import { DataTable } from '../../components/DataTable'
 import { SpeciesCardGrid } from '../../components/SpeciesCardGrid'
 import { TypeBadge } from '../../components/TypeBadge'
-import { useFilters } from '../filters/filtersContext'
+import { pokedexFooter } from '../../components/speciesCardFooters'
+import { useDexRows } from '../dex/query/dexQueryContext'
 import { useVersionGroup } from '../version-group/context'
-import { statFieldsFor, type SpeciesRow } from './speciesQuery'
+import { speciesColumns } from './speciesColumns'
+import type { SpeciesRow } from './speciesQuery'
 
 /**
  * How the same list draws itself.
  *
- * `grid` is the browse view from Figma MainPage-Light/Dark; `list` is the dense
- * sortable table added with the filter pass; `rail` is the 240px sidebar that
- * sits beside an open species. One component rather than three so the query --
- * and with it the generation scope -- cannot drift between them, and so all
- * three expose the same test ids.
+ * `grid` is the browse view from Figma MainPage-Light/Dark; `list` is the wide
+ * sortable table; `rail` is the 240px sidebar that sits beside an open species.
+ * One component rather than three so the query -- and with it the generation
+ * scope -- cannot drift between them, and so all three expose the same test ids.
  *
  * IT NO LONGER FILTERS. The rows arrive already filtered and sorted from the
- * filters context, which is where the controls write. Doing it here as well was
- * fine while "the query" was a name and a type list; with eleven filter sections
- * and a sort it would be a second implementation of the same question.
+ * shared dex query, which is where the app bar's controls write. Doing it here
+ * as well was fine while "the query" was a name and a type list; with eleven
+ * filter sections and a sort it would be a second implementation of the same
+ * question.
  *
- * THE TABLE AND THE SORT PANEL SHARE ONE SORT STATE. `DataTable` is driven in
- * controlled mode -- the header row and the panel are two views of the same
- * `query.sortKey`/`query.direction`, so clicking a column header moves the panel
- * and vice versa. Two independent copies would have disagreed the first time
- * either was used, and the reader would have had no way to tell which was in
- * force.
+ * THE TABLE SORTS ITSELF, from its own column headers, in controlled mode
+ * against the same query state. The bar's Sort trigger is disabled while this
+ * view is open for exactly that reason: one ordering, one control, and the one
+ * that is on screen beside the data wins.
  */
 export type SpeciesListLayout = 'rail' | 'grid' | 'list'
 
@@ -36,63 +36,33 @@ interface Props {
 }
 
 export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
-  const { generation } = useVersionGroup()
-  const { query, sorts } = useFilters()
-  const rows = query.visible
+  const { generation, versionGroup } = useVersionGroup()
+  const { rows } = useDexRows<SpeciesRow>('pokedex')
 
-  /*
-    The table's columns ARE the sort fields, mapped one to one, so a column that
-    can be clicked to sort and a field the panel offers cannot come apart. The
-    accessors are the same functions -- `sorts` is the single declaration -- and
-    only the cell rendering is added here.
-  */
-  const columns: Column<SpeciesRow>[] = useMemo(() => {
-    const statKeys = new Set(statFieldsFor(generation).map((s) => `stat-${s.key}`))
-    return sorts.map((field) => {
-      const numeric = field.key !== 'name'
-      let render: (row: SpeciesRow) => ReactNode
-      if (field.key === 'dex') {
-        render = (row) => <span className="num">#{String(row.species.id).padStart(4, '0')}</span>
-      } else if (field.key === 'name') {
-        render = (row) => row.species.display_name
-      } else if (field.key === 'height') {
-        render = (row) => (
-          <span className="num">
-            {row.height != null ? (row.height / 10).toFixed(1) : '—'}
-            <span className="move-unit">m</span>
-          </span>
-        )
-      } else if (field.key === 'weight') {
-        render = (row) => (
-          <span className="num">
-            {row.weight != null ? (row.weight / 10).toFixed(1) : '—'}
-            <span className="move-unit">kg</span>
-          </span>
-        )
-      } else if (statKeys.has(field.key) || field.key === 'bst' || field.key === 'friendship') {
-        render = (row) => {
-          const value = field.value(row)
-          return <span className="num">{value ?? '—'}</span>
-        }
-      } else {
-        render = (row) => <span className="num">{field.value(row) ?? '—'}</span>
-      }
-      return { key: field.key, label: field.label, sortValue: field.value, render, numeric }
-    })
-  }, [sorts, generation])
+  const columns = useMemo(
+    () => speciesColumns({ generation, versionGroup }),
+    [generation, versionGroup],
+  )
 
   if (layout === 'list') {
     return (
       <div className="species-list species-list-table">
+        {/*
+          THE TABLE OWNS ITS OWN SORT HERE, and that is why the bar's Sort
+          trigger is disabled while this view is open. The two cannot be one
+          state: the menu offers the four orderings a CARD can be read by, and
+          this table has thirty-five columns -- wiring the headers to the menu's
+          state meant a header click set a key the menu could not hold, the
+          fallback fired, and the click did nothing at all. One control per
+          question, and on this view the control is the header row.
+        */}
         <DataTable
           rows={rows}
           columns={columns}
           rowKey={(row) => row.species.id}
           onRowClick={(row) => onSelect(row.species.id)}
           selectedKey={selectedId}
-          sortKey={query.sortKey}
-          direction={query.direction}
-          onSort={query.setSort}
+          initialSort="natdex"
           testId="species-rows"
           emptyNote="No species match those filters."
         />
@@ -108,6 +78,10 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
           Movedex, Abilitydex and Breeding dex detail pages. This call site keeps
           the "species-rows" test id, so the grid is still the same thing every
           suite already inspects.
+
+          The FOOTER is this grid's own: abilities, and under them the base-stat
+          total and Speed. The other grids that render this card keep the
+          abilities line alone -- see speciesCardFooters.tsx.
         */}
         <SpeciesCardGrid
           entries={rows.map(({ species }) => ({ species }))}
@@ -115,6 +89,7 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
           selectedId={selectedId}
           onSelect={onSelect}
           testId="species-rows"
+          footer={pokedexFooter}
           emptyNote="No species match those filters."
         />
       </div>

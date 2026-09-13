@@ -844,8 +844,15 @@
   border-radius: 10px;
 }
 
+/*
+  SIZED TO THE WORD, not to the spec's 12px inset. The full-95 library gives the
+  segment `padding: 6px 12px`, which drew a pill wide enough to push the bar's
+  whole right-hand cluster around; the control says "Light" and "Dark" and needs
+  to be as wide as those words and 2px either side of them. The vertical padding
+  comes down with it so the pill stays square-ish rather than becoming a slab.
+*/
 .ds-theme-segment {
-  padding: 6px 12px;
+  padding: 4px 2px;
   font: inherit;
   font-size: 12px;
   font-weight: var(--font-weight-regular);
@@ -856,8 +863,12 @@
   border-radius: var(--radius-control);
   cursor: pointer;
   /* Both segments reserve the bold metrics, so selecting one does not shift the
-     other sideways. Without this the pill jiggles on every switch. */
-  min-width: 3.4rem;
+     other sideways. Without this the pill jiggles on every switch. Measured
+     against bold "Light" at 12px -- 29.1px measured in the browser -- plus the
+     2px inset either side. In px rather than rem because it is a measurement of
+     a string at a fixed 12px, and :root is 18px here, so a rem value would be a
+     different number pretending to be the same one. */
+  min-width: 33px;
 }
 
 .ds-theme-segment[data-active='true'] {

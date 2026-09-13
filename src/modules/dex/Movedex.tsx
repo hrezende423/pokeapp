@@ -1,15 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { DataTable, type Column } from '../../components/DataTable'
 import { TypeLabel } from '../../components/ds/TypeLabel'
-import { getType, typesInGeneration } from '../../data'
+import { getType, listVersionGroups } from '../../data'
 import { fixedDamage } from '../../data/moveDamage'
 import type { Move } from '../../data'
 import { useVersionGroup } from '../version-group/context'
-import { TypeFilter } from '../../components/TypeFilter'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { DexPageShell } from './DexPageShell'
 import { EntityDetailPage, type SpeciesSection } from './EntityDetailPage'
 import { moveEntries } from './entrySources'
+import {
+  machineNames,
+  moveFlagLabels,
+  moveMetaRows,
+  moveRange,
+  moveRangeSort,
+  pastValueRows,
+  statChangeLabels,
+} from './moveFacts'
 import { LEARN_SECTIONS, useMoveLearners } from './useMoveLearners'
 
 function titleCase(value: string | null): string {
@@ -164,6 +172,24 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
         nav.setModule('pokedex')
       }}
     >
+      {/*
+        THE WHOLE MOVE, not the six fields the table shows.
+
+        Everything below was already in moves.json and none of it was on screen:
+        priority, range, effect chance, the meta block (ailment, drain, healing,
+        crit rate, multi-hit and multi-turn spans), the stat changes a move
+        applies, the seven Bulbapedia flags, the machines that teach it, its
+        contest and super-contest entries, and the values it had in earlier
+        games. A page that printed a move's power and then said nothing about
+        Fury Swipes hitting two to five times was leaving the interesting half
+        of the record in the file.
+
+        ROWS WITH NOTHING TO SAY ARE NOT RENDERED, rather than rendered as a
+        dash. Almost every `meta` field is zero for almost every move, so a fixed
+        table would be twelve dashes and one fact on most of them -- the same
+        decision the shared detail page makes about empty species sections.
+      */}
+      <MoveFactBlocks move={move} />
       {loading && (
         <p className="subtitle" data-testid="movedex-learners-loading">
           {isAll ? 'Loading every version group…' : 'Loading learnset…'}
@@ -206,27 +232,144 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
   )
 }
 
+/** Label/value rows on hairlines, the Itemdex's treatment. Nothing in a box. */
+function FactRows({
+  testId,
+  rows,
+}: {
+  testId: string
+  rows: { label: string; value: ReactNode }[]
+}) {
+  if (rows.length === 0) return null
+  return (
+    <ul className="fact-rows" data-testid={testId}>
+      {rows.map((row) => (
+        <li key={row.label}>
+          <span className="fact-label">{row.label}</span>
+          <span className="fact-value">{row.value}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function MoveFactBlocks({ move }: { move: Move }) {
+  const { isAll, versionGroup } = useVersionGroup()
+  /* Machines are per version group; under a single game only that game's TM
+     counts, under "All" every Gen 1-4 group does. */
+  const inScope = useMemo(() => {
+    if (isAll || !versionGroup) return new Set(listVersionGroups().map((vg) => vg.name))
+    return new Set([versionGroup.name])
+  }, [isAll, versionGroup])
+  /* Past values are scoped to the whole bundle rather than to one game: they
+     describe a change BETWEEN games, so narrowing them to the selected one would
+     leave nothing to compare. */
+  const allGroups = useMemo(() => new Set(listVersionGroups().map((vg) => vg.name)), [])
+
+  const machines = machineNames(move, inScope)
+  const flags = moveFlagLabels(move)
+  const statChanges = statChangeLabels(move)
+  const metaRows = moveMetaRows(move)
+  const pastRows = pastValueRows(move, allGroups)
+
+  const basics: { label: string; value: ReactNode }[] = [
+    { label: 'Range', value: moveRange(move) },
+    { label: 'Priority', value: <span className="num">{move.priority}</span> },
+    {
+      label: 'Introduced',
+      value:
+        move.generation_id != null ? (
+          <>
+            Generation <span className="num">{move.generation_id}</span>
+          </>
+        ) : (
+          '—'
+        ),
+    },
+  ]
+  if (move.effect_chance != null) {
+    basics.push({
+      label: 'Effect chance',
+      value: (
+        <>
+          <span className="num">{move.effect_chance}</span>
+          <span className="move-unit">%</span>
+        </>
+      ),
+    })
+  }
+  if (statChanges.length > 0) {
+    basics.push({ label: 'Stat changes', value: statChanges.join(' · ') })
+  }
+  if (flags.length > 0) basics.push({ label: 'Flags', value: flags.join(' · ') })
+  if (machines.length > 0) basics.push({ label: 'Machines', value: machines.join(' · ') })
+
+  const contest: { label: string; value: ReactNode }[] = []
+  if (move.contest_type)
+    contest.push({ label: 'Contest type', value: titleCase(move.contest_type) })
+  if (move.contest_effect) {
+    contest.push({
+      label: 'Contest appeal',
+      value: (
+        <>
+          <span className="num">{move.contest_effect.appeal ?? 0}</span> appeal ·{' '}
+          <span className="num">{move.contest_effect.jam ?? 0}</span> jam
+        </>
+      ),
+    })
+    if (move.contest_effect.flavor_text) {
+      contest.push({ label: 'Contest note', value: move.contest_effect.flavor_text })
+    }
+  }
+  if (move.super_contest_effect) {
+    contest.push({
+      label: 'Super Contest',
+      value: (
+        <>
+          <span className="num">{move.super_contest_effect.appeal ?? 0}</span> appeal
+          {move.super_contest_effect.flavor_text
+            ? ` · ${move.super_contest_effect.flavor_text}`
+            : ''}
+        </>
+      ),
+    })
+  }
+
+  return (
+    <>
+      <FactRows testId="movedex-facts" rows={basics} />
+      <FactRows
+        testId="movedex-meta"
+        rows={metaRows.map((r) => ({ label: r.label, value: r.value }))}
+      />
+      <FactRows testId="movedex-contest" rows={contest} />
+      {pastRows.length > 0 && (
+        <>
+          <p className="list-caption" data-testid="movedex-past-caption">
+            Values in earlier games. These are recorded, not applied: the figures above are the
+            bundle&apos;s current ones.
+          </p>
+          <FactRows
+            testId="movedex-past"
+            rows={pastRows.map((r) => ({ label: r.label, value: r.value }))}
+          />
+        </>
+      )}
+    </>
+  )
+}
+
 export function Movedex() {
   const { generation, isAll } = useVersionGroup()
-  const [typeFilter, setTypeFilter] = useState<number[]>([])
 
-  const availableTypes = useMemo(() => typesInGeneration(generation), [generation])
-
-  // A type that stops existing when the generation changes must not keep filtering.
-  const activeTypeFilter = useMemo(
-    () => typeFilter.filter((id) => availableTypes.some((t) => t.id === id)),
-    [typeFilter, availableTypes],
-  )
-
-  const gated = useMemo(() => moveEntries({ generation, isAll }), [generation, isAll])
-
-  const entries = useMemo(
-    () =>
-      activeTypeFilter.length === 0
-        ? gated
-        : gated.filter((m) => m.type_id != null && activeTypeFilter.includes(m.type_id)),
-    [gated, activeTypeFilter],
-  )
+  /*
+    THE NAME SEARCH AND THE TYPE FILTER LEFT THIS FILE, not the dex. Both used to
+    be an always-visible row above the table with their own local state; they are
+    declared in modules/dex/query/registries.ts now and applied by the shared
+    query, because Pokepedia has one Search/Filter menu and it is in the app bar.
+    What stays here is the list this dex is allowed to show at all.
+  */
+  const entries = useMemo(() => moveEntries({ generation, isAll }), [generation, isAll])
 
   const columns: Column<Move>[] = useMemo(
     () => [
@@ -248,6 +391,22 @@ export function Movedex() {
         label: 'Category',
         sortValue: (m) => m.damage_class,
         render: (m) => titleCase(m.damage_class),
+      },
+      {
+        // What the move can be aimed at. PokeAPI calls it `target`; "range" is
+        // what a player calls it, and the fourteen slugs are mapped to words
+        // rather than title-cased -- "Users Field" is not English.
+        key: 'range',
+        label: 'Range',
+        sortValue: moveRangeSort,
+        render: (m) => moveRange(m),
+      },
+      {
+        key: 'generation',
+        label: 'Gen',
+        sortValue: (m) => m.generation_id,
+        render: (m) => <span className="num">{m.generation_id ?? '—'}</span>,
+        numeric: true,
       },
       {
         key: 'power',
@@ -282,22 +441,6 @@ export function Movedex() {
       dexId="movedex"
       entries={entries}
       entryId={(move) => move.id}
-      searchText={(move) => move.display_name}
-      searchLabel="Search/filter moves"
-      // The one dex with an always-visible control row rather than the
-      // ghost-button disclosure every other dex uses. Deliberate: this table is
-      // dense enough that filtering is the primary way through it, so the filter
-      // is not something to put behind a click. See DexControls.
-      controlsVariant="inline"
-      controls={
-        <TypeFilter
-          available={availableTypes}
-          selected={activeTypeFilter}
-          onChange={setTypeFilter}
-          testIdPrefix="movedex-type"
-          label="Filter moves by type"
-        />
-      }
       gatedMessage={
         entries.length === 0
           ? `No move in the bundle exists in Generation ${generation}.`

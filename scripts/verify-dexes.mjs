@@ -810,7 +810,61 @@ try {
     oranCard.width === 212,
     `${oranCard.width}x${oranCard.height}`,
   )
-  check('and the card is not clickable, because there is nothing to open', !oranCard.clickable)
+  /*
+    THE CARD OPENS A PAGE NOW. This dex shipped with no detail page, on the
+    reasoning that the six facts on the card were everything worth showing; the
+    berry has twelve, and soil dryness, max harvest, the five-flavour profile and
+    the linked item's effect text had nowhere to go. So the claim flips: the card
+    IS clickable, and what it opens is the Itemdex's page structure with a
+    berry's fields in it.
+  */
+  check('the card opens the berry page', oranCard.clickable)
+  await page.click(`[data-testid="berrydex-open-${oran.id}"]`)
+  await page.waitForSelector('[data-testid="berrydex-detail"]', { timeout: 15000 })
+  const oranPage = await page.evaluate(() => ({
+    name: document.querySelector('[data-testid="berrydex-name"]')?.textContent?.trim(),
+    firmness: document
+      .querySelector('[data-testid="berrydex-detail-firmness"]')
+      ?.textContent?.trim(),
+    power: document.querySelector('[data-testid="berrydex-detail-ng-power"]')?.textContent?.trim(),
+    harvest: document.querySelector('[data-testid="berrydex-detail-harvest"]')?.textContent?.trim(),
+    dryness: document.querySelector('[data-testid="berrydex-detail-dryness"]')?.textContent?.trim(),
+    flavours: document
+      .querySelector('[data-testid="berrydex-detail-flavours"]')
+      ?.textContent?.trim(),
+    effect: document.querySelector('[data-testid="berrydex-effect"]')?.textContent?.trim(),
+    /* Same structure as the item page, asserted rather than assumed: hero,
+       boxless fact rows, back control -- and nothing in a rectangle. */
+    hero: document.querySelectorAll('[data-testid="berrydex-detail"] .item-hero').length,
+    factRows: document.querySelectorAll('[data-testid="berrydex-facts"] li').length,
+    boxes: document.querySelectorAll('[data-testid="berrydex-detail"] .dex-card').length,
+  }))
+  const oranBerry = oran
+  log(`  Oran page: ${JSON.stringify(oranPage)}`)
+  check('the page names the berry', oranPage.name === 'Oran Berry', oranPage.name)
+  check(
+    'and prints the fields the card had no room for',
+    oranPage.dryness === String(oranBerry.soil_dryness) &&
+      oranPage.harvest === String(oranBerry.max_harvest),
+    `${oranPage.dryness} / ${oranPage.harvest}`,
+  )
+  check(
+    'all five flavours, not just the dominant one',
+    ['Spicy', 'Dry', 'Sweet', 'Bitter', 'Sour'].every((f) => oranPage.flavours?.includes(f)),
+    oranPage.flavours,
+  )
+  check(
+    "the effect text comes from the berry's linked item",
+    (oranPage.effect?.length ?? 0) > 20,
+    oranPage.effect?.slice(0, 40),
+  )
+  check(
+    "it is the item page's structure: a hero, fact rows, and no boxes",
+    oranPage.hero === 1 && oranPage.factRows >= 8 && oranPage.boxes === 0,
+    `hero=${oranPage.hero} rows=${oranPage.factRows} boxes=${oranPage.boxes}`,
+  )
+  await page.click('[data-testid="entity-back"]')
+  await page.waitForSelector('[data-testid="berrydex-rows"]', { timeout: 15000 })
   await page.screenshot({ path: `${SHOTS}/dex-berrydex.png` })
 
   hr("ITEM 5b — Berrydex gating (derived from each berry's linked item)")

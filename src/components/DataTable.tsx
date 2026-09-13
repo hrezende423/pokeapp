@@ -39,6 +39,17 @@ export interface Column<T> {
   sortValue?: (row: T) => SortValue
   /** Right-aligned, --font-numeric. For counts and measurements. */
   numeric?: boolean
+  /**
+   * Explicit column width, e.g. "7.5rem".
+   *
+   * Emitted as a <colgroup>, which under `table-layout: fixed` is what actually
+   * decides the width. Omit it and the table keeps whatever its stylesheet says
+   * -- the Movedex's six columns are sized in CSS and stay that way. The Pokedex
+   * list view sets one per column because 34 columns cannot be addressed by
+   * nth-child without becoming unreadable, and because the promise that its
+   * first twelve fit the window is a sum of these numbers.
+   */
+  width?: string
 }
 
 export type SortDirection = 'asc' | 'desc'
@@ -108,9 +119,19 @@ export function DataTable<T>({
     }
   }
 
+  const widths = columns.some((c) => c.width)
+
   return (
     <div className="data-table-wrap">
       <table className="data-table" data-testid={testId}>
+        {widths && (
+          <colgroup>
+            {columns.map((c) => (
+              <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+            ))}
+            {onRowClick && <col className="data-table-chevron-col" />}
+          </colgroup>
+        )}
         <thead>
           <tr>
             {columns.map((c) => {

@@ -97,7 +97,9 @@ feedback on a row inside a floating panel). Hover is not an accent use, which is
 why the third exists.
 
 **Type is coloured text. Nothing gets a badge.** No fill, no pill, no chip,
-anywhere. The community type palette is the palette in both themes, with
+anywhere — and that is now literally true: `components/TypeFilter.tsx` was the
+last exception, a bordered pill filled with the type's colour when selected, and
+it is a ghost label in that colour instead. The community type palette is the palette in both themes, with
 per-mode contrast overrides (dark overrides 5 of 17, light overrides 12 — light's
 bright pastels were the worse problem, Electric at 1.43:1). The muted custom set
 is retired: still in `design-tokens.json` for the record, referenced by nothing.
@@ -182,7 +184,7 @@ Reuse, in preference order:
 | label/value metadata row    | `StatRow` + `StatList` (`components/ds/DataRows.tsx`) |
 | sortable multi-column table | `DataTable` (`components/DataTable.tsx`)      |
 | dense browse list           | `LedgerList`                                  |
-| search / filter / sort      | a config: `FilterSection[]` + `SortField[]` (`modules/dex/query/dexQuery.ts`), rendered by `FilterPanel` / `SortPanel` |
+| search / filter / sort      | a config: `FilterSection[]` + `SortField[]` (`modules/dex/query/dexQuery.ts`), built by `DexQueryProvider` and rendered by the APP BAR's one `FilterPanel` / `SortPanel` pair — a module does not draw its own controls |
 | any list ordering           | `compareSortValues` / `sortRows` (`components/sortValues.ts`) — the one comparator, shared with `DataTable` |
 | binary state INDICATOR      | `components/ds/Toggle.tsx` — caught/not-caught and its like |
 | two-position CHOICE         | `components/ToggleSwitch.tsx` — both positions are real values (Ascending/Descending, Grid/List). No longer dead code, and no longer carrying a `box-shadow` |
@@ -275,7 +277,7 @@ from "back to top".
 ## 9. Verification
 
 Every module gets a suite in `scripts/`, driving the real app in a real browser —
-eleven of them — the dex filter/sort suite alone is 128 checks.
+sixteen of them — the Poképedia filter/sort suite alone is 112 checks.
 `"Reported done" ≠ "actually verified"`, and
 type-checking is not verification. What the existing suites do that a new one
 should:

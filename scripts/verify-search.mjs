@@ -210,15 +210,16 @@ log('')
 log('  dex side (each dex must consume the shared list, not filter locally):')
 const CONSUMERS = [
   /*
-    THE SPECIES CONSUMER IS THE PROVIDER NOW, not the list component. The dex
-    filter/sort pass moved the Pokedex's whole query into FiltersProvider -- the
-    controls live in the app bar and the list is a sibling of them, so the one
-    place that can own "which species are on screen" is the context both read.
-    SpeciesList renders what it is handed and no longer calls anything scoped.
-    The claim being checked is unchanged: the species list comes from the shared
-    scoped function and nothing re-derives the generation rule beside it.
+    THE SPECIES CONSUMER IS THE PROVIDER, not the list component -- and the
+    provider is now the app-wide one, because every dex's controls live in the
+    app bar and the bar is rendered above the active module. DexQueryProvider
+    calls speciesEntries (and moveEntries, itemEntries and abilityEntries) and
+    hands the result down; SpeciesList renders what it is given and no longer
+    calls anything scoped. The claim being checked is unchanged: each list comes
+    from the shared scoped function and nothing re-derives the generation rule
+    beside it.
   */
-  ['src/modules/filters/FiltersProvider.tsx', 'speciesEntries', 'isSpeciesInGeneration'],
+  ['src/modules/dex/query/DexQueryProvider.tsx', 'speciesEntries', 'isSpeciesInGeneration'],
   ['src/modules/dex/Movedex.tsx', 'moveEntries', 'moveExistsInGeneration'],
   ['src/modules/dex/Itemdex.tsx', 'itemEntries', 'itemExistsInGeneration'],
   ['src/modules/dex/Abilitydex.tsx', 'abilityEntries', 'abilityExistsInGeneration'],

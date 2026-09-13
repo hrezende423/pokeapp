@@ -1,21 +1,21 @@
+import { IconArrowLeft } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { ItemArtwork } from '../../components/ItemArtwork'
 import { TypeLabel } from '../../components/ds/TypeLabel'
-import { getItem, getType, typesInGeneration } from '../../data'
+import { getItem, getType } from '../../data'
 import type { Berry } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell } from './DexPageShell'
 import { berryEntries } from './entrySources'
-import type { FilterSection, SortField } from './query/dexQuery'
 
 /**
- * The Berrydex: one card per berry, and no detail page at all.
+ * The Berrydex: one card per berry, and a detail page behind it.
  *
- * A berry has six facts worth showing -- firmness, size, smoothness, natural gift
- * type, natural gift power, growth time -- and all six fit on the card, so there
- * is nothing left for a second screen to hold. DexPageShell's `detail` prop is
- * therefore omitted and the cards are not clickable: a card that opened a page
- * repeating itself would be worse than no page.
+ * THE CARD SHOWS SIX FACTS AND THE BERRY HAS TWELVE, which is what changed. This
+ * dex shipped with no detail page, on the reasoning that everything worth
+ * showing fitted on the card -- true of the six it shows, and not true of the
+ * berry: soil dryness, max harvest, the full five-flavour profile and the linked
+ * item's own effect text all had nowhere to go. See BerryDetail below.
  *
  * SIX FIELDS IN THREE SHORT LINES, and the card is TALLER, NOT WIDER. The natural
  * gift TYPE is a type, so it goes in the type row the species card already has,
@@ -62,7 +62,7 @@ function titleCase(value: string | null): string {
   return value.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function BerryCard({ berry }: { berry: Berry }) {
+function BerryCard({ berry, onSelect }: { berry: Berry; onSelect: (id: number) => void }) {
   const item = berry.item_id != null ? getItem(berry.item_id) : undefined
   const giftType = berry.natural_gift_type_id != null ? getType(berry.natural_gift_type_id) : null
 
@@ -72,6 +72,16 @@ function BerryCard({ berry }: { berry: Berry }) {
       data-testid={`berrydex-row-${berry.id}`}
       data-entry-id={berry.id}
     >
+      {/* The card opens the berry's page now, so it takes the same stretched
+          overlay button the species card uses: the card itself cannot become a
+          <button>, because its contents are spans and the geometry is shared. */}
+      <button
+        type="button"
+        className="species-card-hit"
+        data-testid={`berrydex-open-${berry.id}`}
+        aria-label={berryName(berry)}
+        onClick={() => onSelect(berry.id)}
+      />
       <span className="species-card-ghost" aria-hidden>
         {String(berry.id).padStart(3, '0')}
       </span>
@@ -124,42 +134,6 @@ function BerryCard({ berry }: { berry: Berry }) {
   )
 }
 
-/**
- * The berry's dominant flavour: the highest-potency entry of the five.
- *
- * `flavors` always carries all five with a potency each, and 0 is by far the
- * commonest value -- so "the flavour it tastes of" is the maximum, and a berry
- * whose maximum is 0 has no flavour at all rather than an arbitrary first one.
- * TIES ARE REAL and are not resolved here: a berry can be equally spicy and dry,
- * and this returns every flavour at the maximum so the filter matches on any of
- * them. Picking one would be inventing a precedence the games do not have.
- */
-function dominantFlavors(berry: Berry): string[] {
-  const potency = Math.max(0, ...berry.flavors.map((f) => f.potency))
-  if (potency === 0) return []
-  return berry.flavors.filter((f) => f.potency === potency && f.flavor).map((f) => f.flavor!)
-}
-
-/* Soft to hard, not alphabetical: firmness is an ordered scale and the reader is
-   picking a point on it, so the buttons read in the order the scale runs. */
-const FIRMNESS_OPTIONS = [
-  { value: 'very-soft', label: 'Very Soft' },
-  { value: 'soft', label: 'Soft' },
-  { value: 'hard', label: 'Hard' },
-  { value: 'very-hard', label: 'Very Hard' },
-  { value: 'super-hard', label: 'Super Hard' },
-]
-
-/* The games' own flavour order (spicy, dry, sweet, bitter, sour), which is the
-   order the five appear in on every berry record. */
-const FLAVOR_OPTIONS = [
-  { value: 'spicy', label: 'Spicy' },
-  { value: 'dry', label: 'Dry' },
-  { value: 'sweet', label: 'Sweet' },
-  { value: 'bitter', label: 'Bitter' },
-  { value: 'sour', label: 'Sour' },
-]
-
 export function Berrydex() {
   const { generation, isAll } = useVersionGroup()
 
@@ -167,148 +141,18 @@ export function Berrydex() {
   // have no generation field of their own. See data/availability.ts.
   const entries = useMemo(() => berryEntries({ generation, isAll }), [generation, isAll])
 
-  // Same clamp every type control in the app uses: a type that does not exist in
-  // this generation must not be offerable, even as a Natural Gift.
-  const availableTypes = useMemo(() => typesInGeneration(generation), [generation])
-
-  const sections: FilterSection<Berry>[] = useMemo(
-    () => [
-      {
-        id: 'name',
-        label: 'Name',
-        filters: [
-          {
-            kind: 'text',
-            key: 'name',
-            label: 'Search berries by name',
-            testId: 'berrydex-search',
-            match: (berry, term) => berryName(berry).toLowerCase().includes(term),
-          },
-        ],
-      },
-      {
-        /* The type filter stays a primary control here for the same reason it is
-           one on the Pokedex and the Movedex: it is the axis people come to a
-           list of 64 berries with. */
-        id: 'gift-type',
-        label: 'Natural Gift type',
-        filters: [
-          {
-            kind: 'types',
-            key: 'giftType',
-            label: 'Natural Gift type',
-            available: availableTypes,
-            testIdPrefix: 'berrydex-ng-type',
-            match: (berry, selected) =>
-              berry.natural_gift_type_id != null && selected.includes(berry.natural_gift_type_id),
-          },
-        ],
-      },
-      {
-        id: 'taste',
-        label: 'Taste',
-        more: true,
-        filters: [
-          {
-            kind: 'multi',
-            key: 'firmness',
-            label: 'Firmness',
-            options: FIRMNESS_OPTIONS,
-            match: (berry, selected) => berry.firmness != null && selected.includes(berry.firmness),
-          },
-          {
-            kind: 'multi',
-            key: 'flavor',
-            label: 'Dominant flavour',
-            options: FLAVOR_OPTIONS,
-            match: (berry, selected) =>
-              dominantFlavors(berry).some((flavor) => selected.includes(flavor)),
-          },
-        ],
-      },
-      {
-        id: 'values',
-        label: 'Values',
-        more: true,
-        filters: [
-          {
-            kind: 'range',
-            key: 'ngPower',
-            label: 'Natural Gift power',
-            value: (berry) => berry.natural_gift_power,
-            bounds: { min: 60, max: 80 },
-          },
-          {
-            kind: 'range',
-            key: 'size',
-            label: 'Size',
-            value: (berry) => berry.size,
-            bounds: { min: 20, max: 300 },
-            unit: 'mm',
-          },
-          {
-            kind: 'range',
-            key: 'smoothness',
-            label: 'Smoothness',
-            value: (berry) => berry.smoothness,
-            bounds: { min: 20, max: 60 },
-          },
-        ],
-      },
-      {
-        id: 'growing',
-        label: 'Growing',
-        more: true,
-        filters: [
-          {
-            kind: 'range',
-            key: 'growthTime',
-            label: 'Growth time',
-            value: (berry) => berry.growth_time,
-            bounds: { min: 2, max: 24 },
-            unit: 'h/stage',
-          },
-          {
-            kind: 'range',
-            key: 'maxHarvest',
-            label: 'Max harvest',
-            value: (berry) => berry.max_harvest,
-            bounds: { min: 5, max: 15 },
-          },
-        ],
-      },
-    ],
-    [availableTypes],
-  )
-
-  const sorts: SortField<Berry>[] = useMemo(
-    () => [
-      { key: 'id', label: 'Berry #', value: (b) => b.id },
-      { key: 'name', label: 'Name', value: (b) => berryName(b) },
-      { key: 'ngPower', label: 'Gift power', value: (b) => b.natural_gift_power },
-      { key: 'size', label: 'Size', value: (b) => b.size },
-      { key: 'growthTime', label: 'Growth time', value: (b) => b.growth_time },
-      { key: 'maxHarvest', label: 'Max harvest', value: (b) => b.max_harvest },
-    ],
-    [],
-  )
-
   return (
     <DexPageShell
       dexId="berrydex"
       entries={entries}
       entryId={(berry) => berry.id}
-      sections={sections}
-      sorts={sorts}
-      defaultSort="id"
-      searchLabel="Search/filter berries"
       gatedMessage={`No berry in the bundle exists in Generation ${generation}. Berries arrived with Generation 2 and the modern berry system with Generation 3 — pick a later game to browse them.`}
-      list={({ entries: visible }) => (
+      list={({ entries: visible, onSelect }) => (
         <div className="pokedex-grid-wrap">
           <ul className="pokedex-grid berry-grid" data-testid="berrydex-rows">
             {visible.map((berry) => (
               <li key={berry.id}>
-                <BerryCard berry={berry} />
+                <BerryCard berry={berry} onSelect={onSelect} />
               </li>
             ))}
             {visible.length === 0 && (
@@ -319,6 +163,133 @@ export function Berrydex() {
           </ul>
         </div>
       )}
+      detail={({ entry, onBack }) => <BerryDetail key={entry.id} berry={entry} onBack={onBack} />}
     />
+  )
+}
+
+/**
+ * One berry's page, built as the Itemdex's item page rather than beside it.
+ *
+ * SAME STRUCTURE, FIELD FOR FIELD: a back row, artwork beside the name with a
+ * meta line under it, the short effect, the full effect, then label/value rows
+ * on hairlines. Nothing is in a rectangle, which is the house rule for a detail
+ * page here, and it is the Itemdex's layout because a berry IS an item in this
+ * bundle -- two layouts for one kind of answer is the drift this app keeps
+ * closing.
+ *
+ * THE EFFECT TEXT IS THE LINKED ITEM'S, and that is the only place it can come
+ * from: a berry record carries numbers and flavours, not prose. Showing it here
+ * is joining the two halves of one thing rather than borrowing from another.
+ *
+ * ALL FIVE FLAVOURS ARE LISTED, not just the dominant one. The card shows what
+ * distinguishes a berry at a glance; the page is where the Pokeblock arithmetic
+ * lives, and the zeroes are part of that answer -- 10 spicy and nothing else is
+ * a different ingredient from 10 spicy and 10 dry.
+ */
+function BerryDetail({ berry, onBack }: { berry: Berry; onBack: () => void }) {
+  const item = berry.item_id != null ? getItem(berry.item_id) : undefined
+  const giftType = berry.natural_gift_type_id != null ? getType(berry.natural_gift_type_id) : null
+  const flavours = berry.flavors.filter((f) => f.flavor != null)
+  const num = (value: number | null) => (value != null ? <span className="num">{value}</span> : '—')
+
+  return (
+    <div className="entity-detail" data-testid="berrydex-detail" data-entry-id={berry.id}>
+      <div className="pokedex-back-row">
+        <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
+          <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
+          All berries
+        </button>
+      </div>
+
+      <div className="item-hero">
+        <ItemArtwork item={item} size={96} testId="berrydex-artwork" />
+        <div className="item-hero-text">
+          <h2 className="entity-detail-name" data-testid="berrydex-name">
+            {berryName(berry)}
+          </h2>
+          <p className="entity-detail-meta">
+            <span data-testid="berrydex-detail-firmness">{titleCase(berry.firmness)}</span>
+            {giftType && (
+              <>
+                {' · Natural Gift '}
+                <span data-testid="berrydex-detail-ng-type">
+                  <TypeLabel type={giftType.name} small />
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {item?.short_effect && (
+        <p className="item-short-effect" data-testid="berrydex-short-effect">
+          {item.short_effect}
+        </p>
+      )}
+      <p className="entity-detail-desc" data-testid="berrydex-effect">
+        {item?.effect ?? 'No effect text in the bundle.'}
+      </p>
+
+      <ul className="fact-rows" data-testid="berrydex-facts">
+        <li>
+          <span className="fact-label">Natural Gift power</span>
+          <span className="fact-value" data-testid="berrydex-detail-ng-power">
+            {num(berry.natural_gift_power)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Size</span>
+          <span className="fact-value" data-testid="berrydex-detail-size">
+            {num(berry.size)}
+            {berry.size != null && <span className="move-unit">mm</span>}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Smoothness</span>
+          <span className="fact-value" data-testid="berrydex-detail-smoothness">
+            {num(berry.smoothness)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Growth time</span>
+          <span className="fact-value" data-testid="berrydex-detail-growth">
+            {num(berry.growth_time)}
+            {berry.growth_time != null && <span className="move-unit">h/stage</span>}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Max harvest</span>
+          <span className="fact-value" data-testid="berrydex-detail-harvest">
+            {num(berry.max_harvest)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Soil dryness</span>
+          <span className="fact-value" data-testid="berrydex-detail-dryness">
+            {num(berry.soil_dryness)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Flavours</span>
+          <span className="fact-value" data-testid="berrydex-detail-flavours">
+            {flavours.length > 0
+              ? flavours.map((f, i) => (
+                  <span key={f.flavor}>
+                    {i > 0 && ' · '}
+                    {titleCase(f.flavor)} <span className="num">{f.potency}</span>
+                  </span>
+                ))
+              : '—'}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Item</span>
+          <span className="fact-value" data-testid="berrydex-detail-item">
+            {item?.display_name ?? '—'}
+          </span>
+        </li>
+      </ul>
+    </div>
   )
 }

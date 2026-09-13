@@ -9,7 +9,7 @@ import { ThemeSwitcher } from './components/ds/ThemeSwitcher'
 // the import rather than relying on Pokedex.tsx having pulled it in first.
 import './components/ds/ds.css'
 import { DesignSystemPage } from './modules/design-system/DesignSystemPage'
-import { FiltersProvider } from './modules/filters/FiltersProvider'
+import { DexQueryProvider } from './modules/dex/query/DexQueryProvider'
 import { ControlsPanel } from './modules/nav/ControlsPanel'
 import { NavMenu } from './modules/nav/NavMenu'
 import { NavProvider } from './modules/nav/NavProvider'
@@ -84,20 +84,23 @@ function Shell() {
           <NavMenu activeId={active.id} onSelect={nav.setModule} />
         </div>
         {/*
-          The bar's right-hand cluster: theme, then the controls disclosure.
+          THE THEME SWITCHER IS LAST, AND THAT IS ITS POSITION FOR GOOD. The
+          cluster is right-aligned, so the rightmost child's right edge is fixed
+          at the bar's padding on every screen -- which means the one control
+          that belongs to no page does not move as the page-specific triggers
+          (Grid/List, Sort) appear and disappear to its left. It was first, and
+          it slid a hundred pixels whenever the Pokedex's own controls changed.
 
-          THE THEME SWITCHER IS PERMANENT, which is a deliberate exception to the
-          "everything lives behind one toggle" simplification and worth stating.
-          That toggle is labelled "Search/filter species" and holds controls that
-          narrow what you are looking at; the theme changes how the whole app
-          looks and belongs to no dex. Filing it under a species filter would
-          miscategorise it, and a display preference people reach for once is one
-          they should not have to hunt for. It is 2 segments and ~110px, so the
-          cost to the bar is small.
+          IT IS ALSO PERMANENT, a deliberate exception to "everything lives
+          behind one toggle": that toggle holds controls that narrow what you are
+          looking at, where the theme changes how the whole app looks and belongs
+          to no dex. Filing it under a filter would miscategorise it, and a
+          display preference people reach for once is one they should not hunt
+          for.
         */}
         <div className="app-bar-utils">
-          <ThemeSwitcher />
           <ControlsPanel />
+          <ThemeSwitcher />
         </div>
       </div>
       {SHOW_DESIGN_SYSTEM ? <DesignSystemPage /> : <active.Component />}
@@ -142,11 +145,12 @@ export default function App() {
     <main className="panel">
       <VersionGroupProvider>
         <NavProvider>
-          {/* Inside VersionGroupProvider: the type-filter clamp reads the
-              generation from it. */}
-          <FiltersProvider>
+          {/* Inside VersionGroupProvider AND NavProvider: it builds the active
+              dex's filter config, which needs both the era and which page is
+              open. */}
+          <DexQueryProvider>
             <Shell />
-          </FiltersProvider>
+          </DexQueryProvider>
         </NavProvider>
       </VersionGroupProvider>
 

@@ -2,12 +2,10 @@ import { IconArrowLeft } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { ItemArtwork } from '../../components/ItemArtwork'
 import { itemIconUrl } from '../../data/itemArtwork'
-import { LATEST_GENERATION } from '../../data'
 import type { Item } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell, LedgerList } from './DexPageShell'
 import { itemEntries } from './entrySources'
-import { asStrings, type FilterSection, type SortField } from './query/dexQuery'
 
 function titleCase(value: string | null): string {
   if (!value) return '—'
@@ -67,130 +65,11 @@ export function Itemdex() {
   // Under "All" nothing is filtered out: there is no single era to filter by.
   const entries = useMemo(() => itemEntries({ generation, isAll }), [generation, isAll])
 
-  /*
-    POCKET FIRST, CATEGORY SECOND, AND THE SECOND IS SCOPED BY THE FIRST.
-
-    They are separate fields rather than a coarse and a fine version of one
-    thing -- 40 categories map onto 8 pockets, and the mapping lives on
-    item-category upstream -- but they are not independent either. Forty category
-    buttons is an unreadable row, and offering "Revival" while the reader has
-    narrowed to Poke Balls offers a choice that can only return nothing. So the
-    category options are DERIVED from the pocket selection (see `FilterOptions`),
-    which also means a category silently drops out of the filter when the pocket
-    that contained it is deselected, rather than quietly continuing to narrow a
-    list the control no longer mentions.
-
-    Both are read off the entries in scope, not hardcoded: the list is already
-    clamped by the selected game, and the pockets a Generation 1 bag has are not
-    the pockets a Generation 4 bag has.
-  */
-  const sections: FilterSection<Item>[] = useMemo(() => {
-    const label = (value: string) => titleCase(value)
-    const pockets = [...new Set(entries.map((i) => i.pocket))]
-      .filter((p): p is string => p != null)
-      .sort()
-    const categoriesByPocket = new Map<string, Set<string>>()
-    for (const item of entries) {
-      if (item.pocket == null || item.category == null) continue
-      const set = categoriesByPocket.get(item.pocket) ?? new Set<string>()
-      set.add(item.category)
-      categoriesByPocket.set(item.pocket, set)
-    }
-    const generations = [...new Set(entries.flatMap((i) => i.generation_ids))]
-      .filter((g) => g <= LATEST_GENERATION)
-      .sort((a, b) => a - b)
-
-    return [
-      {
-        id: 'name',
-        label: 'Name',
-        filters: [
-          {
-            kind: 'text',
-            key: 'name',
-            label: 'Search items by name',
-            testId: 'itemdex-search',
-            match: (item, term) => item.display_name.toLowerCase().includes(term),
-          },
-        ],
-      },
-      {
-        id: 'pocket',
-        label: 'Pocket',
-        filters: [
-          {
-            kind: 'multi',
-            key: 'pocket',
-            label: 'Pocket',
-            options: pockets.map((p) => ({ value: p, label: label(p) })),
-            match: (item, selected) => item.pocket != null && selected.includes(item.pocket),
-          },
-        ],
-      },
-      {
-        id: 'category',
-        label: 'Category',
-        more: true,
-        filters: [
-          {
-            kind: 'multi',
-            key: 'category',
-            label: 'Category',
-            options: (values) => {
-              const chosen = asStrings(values.pocket)
-              const inScope = new Set<string>()
-              for (const [pocket, categories] of categoriesByPocket) {
-                if (chosen.length > 0 && !chosen.includes(pocket)) continue
-                for (const category of categories) inScope.add(category)
-              }
-              return [...inScope]
-                .sort()
-                .map((category) => ({ value: category, label: label(category) }))
-            },
-            match: (item, selected) => item.category != null && selected.includes(item.category),
-          },
-        ],
-      },
-      {
-        id: 'generation',
-        label: 'Generation',
-        more: true,
-        filters: [
-          {
-            kind: 'select',
-            key: 'generation',
-            label: 'Available in generation',
-            options: generations.map((g) => ({ value: String(g), label: `Generation ${g}` })),
-            // `generation_ids` is every generation the item is INDEXED in, not
-            // one introduction figure, so this is a membership test rather than
-            // a comparison -- an item can leave and return.
-            match: (item, value) => item.generation_ids.includes(Number(value)),
-          },
-        ],
-      },
-    ]
-  }, [entries])
-
-  const sorts: SortField<Item>[] = useMemo(
-    () => [
-      { key: 'id', label: 'Item #', value: (i) => i.id },
-      { key: 'name', label: 'Name', value: (i) => i.display_name },
-      { key: 'fling', label: 'Fling power', value: (i) => i.fling_power },
-      { key: 'pocket', label: 'Pocket', value: (i) => i.pocket },
-      { key: 'category', label: 'Category', value: (i) => i.category },
-    ],
-    [],
-  )
-
   return (
     <DexPageShell
       dexId="itemdex"
       entries={entries}
       entryId={(item) => item.id}
-      sections={sections}
-      sorts={sorts}
-      defaultSort="id"
-      searchLabel="Search/filter items"
       gatedMessage={`No item in the bundle is indexed in Generation ${generation}.`}
       list={({ entries: visible, onSelect }) => (
         <LedgerList

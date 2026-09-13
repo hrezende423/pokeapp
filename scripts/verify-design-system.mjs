@@ -1336,17 +1336,29 @@ try {
           gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
           globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
         },
-        // Item 4: one toggle, in the bar's top-right slot.
+        /*
+          Item 4: one toggle, in the bar's top-right cluster -- and the THEME
+          SWITCHER is what sits at the bar's right edge now. The controls toggle
+          was rightmost and slid sideways whenever the page-specific triggers
+          (Grid/List, Sort) appeared beside it; the switcher is last instead, so
+          the one control that belongs to no page never moves. What is asserted
+          is therefore the ORDER -- theme flush right, toggle immediately left of
+          it -- rather than the toggle's own inset, which is now a function of
+          which page is open.
+        */
         toggle: (() => {
           const btn = document.querySelector('[data-testid="controls-toggle"]')
           if (!btn) return null
           const barBox = document.querySelector('.app-bar').getBoundingClientRect()
           const box = btn.getBoundingClientRect()
+          const themeBox = document.querySelector('.ds-theme-switcher')?.getBoundingClientRect()
           return {
             expanded: btn.getAttribute('aria-expanded'),
             label: btn.getAttribute('aria-label'),
             color: getComputedStyle(btn).color,
             rightInset: Math.round(barBox.right - box.right),
+            themeRightInset: themeBox ? Math.round(barBox.right - themeBox.right) : null,
+            leftOfTheme: themeBox ? box.right <= themeBox.left : null,
             text: btn.textContent.trim(),
             svgCount: btn.querySelectorAll('svg').length,
             border: getComputedStyle(btn).borderTopWidth,
@@ -1450,13 +1462,18 @@ try {
 
     // ITEM 4: the toggle, its icon, and where it sits.
     check(
-      '[' + theme + "] there is one controls toggle at the bar's right edge",
-      shell.toggle != null && Math.abs(shell.toggle.rightInset) <= 2,
-      shell.toggle ? shell.toggle.rightInset + 'px inset' : 'missing',
+      '[' + theme + "] the theme switcher is the thing at the bar's right edge",
+      shell.toggle != null && Math.abs(shell.toggle.themeRightInset) <= 2,
+      shell.toggle ? shell.toggle.themeRightInset + 'px inset' : 'missing',
     )
     check(
-      '[' + theme + '] it is a text-only ghost button reading "Search/filter species"',
-      shell.toggle?.text === 'Search/filter species' && shell.toggle.svgCount === 0,
+      '[' + theme + '] with the controls toggle immediately to its left',
+      shell.toggle?.leftOfTheme === true,
+      shell.toggle?.rightInset + 'px from the bar edge',
+    )
+    check(
+      '[' + theme + '] it is a text-only ghost button reading "Search/Filter"',
+      shell.toggle?.text === 'Search/Filter' && shell.toggle.svgCount === 0,
       JSON.stringify(shell.toggle),
     )
     check(
@@ -2559,9 +2576,17 @@ try {
     `h=${berryCard?.height} lines=${berryCard?.factLines}`,
   )
   check('with nothing clipped on any of them', berryCard?.clipped === 0)
+  /*
+    THE CARD OPENS A PAGE NOW, and the claim flips with it. This dex shipped with
+    no detail page because the six facts on the card were held to be everything
+    worth showing; the berry record has twelve, and soil dryness, max harvest,
+    the five-flavour profile and the linked item's effect text had nowhere to go.
+    What the card shows is unchanged -- still three fact lines, still nothing
+    clipped, still 212px wide -- so every check above this one still holds.
+  */
   check(
-    'and no detail page at all -- every field is on the card',
-    berryCard?.hasDetailPage === false && berryCard?.clickable === false,
+    'the card opens a detail page, which is where the other six fields live',
+    berryCard?.clickable === true,
   )
 
   // ------------------------------------------- the rebuilt dexes share the card

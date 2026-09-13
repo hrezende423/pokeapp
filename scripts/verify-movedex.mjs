@@ -151,7 +151,12 @@ check(
   "and the Pokedex's controls panel no longer renders one of its own",
   !importsFilter(controlsSrc),
 )
-check('Movedex imports the shared TypeFilter', importsFilter(movedexSrc))
+check('and the Movedex no longer renders one of its own either', !importsFilter(movedexSrc))
+check(
+  'both dexes declare their type filter as a `types` filter instead',
+  /kind: 'types'/.test(readFileSync('src/modules/dex/query/registries.ts', 'utf8')) &&
+    /kind: 'types'/.test(readFileSync('src/modules/pokedex/speciesQuery.ts', 'utf8')),
+)
 check('and SpeciesList no longer renders a filter of its own', !importsFilter(speciesListSrc))
 check(
   'no module re-implements the filter buttons',
@@ -322,9 +327,14 @@ try {
         cls: e.className,
       })),
     )
-  const moveFilter = await readFilter('movedex-type')
+  /*
+    BOTH FILTERS LIVE IN THE APP BAR'S MENU NOW, one per active dex, so reading
+    them means opening that menu on each dex in turn. They are still the same
+    component with the same ids -- which is the whole claim this section makes.
+  */
+  const moveFilter = await withControls(() => readFilter('movedex-type'))
   await goTo('pokedex')
-  const dexFilter = await readFilter('type-filter')
+  const dexFilter = await withControls(() => readFilter('type-filter'))
   await goTo('movedex')
 
   const norm = (rows, prefix) =>
@@ -356,32 +366,48 @@ try {
 
   // Filtering actually works, and "Any" clears it.
   const waterId = typeIdOf('water')
-  await page.click('[data-testid="movedex-type-water"]')
+  await withControls(() => page.click('[data-testid="movedex-type-water"]'))
   await page.waitForTimeout(150)
   const waterCount = await countOf('movedex')
   const expectedWater = moves.filter(
     (m) => (m.generation_id ?? 99) <= 4 && m.type_id === waterId,
   ).length
-  const waterSelected = await page.$eval('[data-testid="movedex-type-water"]', (e) => ({
-    bg: getComputedStyle(e).backgroundColor,
-    pressed: e.getAttribute('aria-pressed'),
-  }))
-  log(`  water filter: ${waterCount} moves (expected ${expectedWater}), bg=${waterSelected.bg}`)
+  const waterSelected = await withControls(() =>
+    page.$eval('[data-testid="movedex-type-water"]', (e) => ({
+      color: getComputedStyle(e).color,
+      bg: getComputedStyle(e).backgroundColor,
+      border: getComputedStyle(e).borderTopWidth,
+      pressed: e.getAttribute('aria-pressed'),
+    })),
+  )
+  log(
+    `  water filter: ${waterCount} moves (expected ${expectedWater}), ${JSON.stringify(waterSelected)}`,
+  )
   check('type filter narrows the list', waterCount === expectedWater, `(${waterCount})`)
   /*
-    #6890F0 -- the COMMUNITY palette's Water, which is now the only type palette
-    in the app. This asserted #2980EF, the Bulbapedia transcription that used to
-    live in typeColors.ts; that table was retired along with the muted custom set,
-    so the whole app draws from one palette in both themes. The value is hardcoded
-    on purpose: the point of the check is that the filter and the type text agree
-    on a specific colour, which a lookup shared with the source would not test.
+    #6890F0 -- the COMMUNITY palette's Water, which is the only type palette in
+    the app. The value is hardcoded on purpose: the point of the check is that
+    the filter and the type text agree on a specific colour, which a lookup
+    shared with the source would not test.
+
+    IT IS THE TEXT COLOUR NOW, NOT A FILL. The button was a bordered pill that
+    filled with the type's colour when selected -- the chip the design system
+    forbids everywhere else, and the last one in the app. It is a ghost label:
+    the same palette, applied to the glyphs. So this asserts the colour AND the
+    absence of the fill and the border, because an exception that has been taken
+    out grows back otherwise.
   */
   check(
-    'selected button is filled with the community palette Water',
-    waterSelected.bg === 'rgb(104, 144, 240)',
-    waterSelected.bg,
+    'the selected button is the community palette Water',
+    waterSelected.color === 'rgb(104, 144, 240)',
+    waterSelected.color,
   )
-  await page.click('[data-testid="movedex-type-fire"]')
+  check(
+    'and it is a ghost label -- no fill, no border',
+    waterSelected.bg === 'rgba(0, 0, 0, 0)' && waterSelected.border === '0px',
+    `${waterSelected.bg} / ${waterSelected.border}`,
+  )
+  await withControls(() => page.click('[data-testid="movedex-type-fire"]'))
   await page.waitForTimeout(150)
   const bothCount = await countOf('movedex')
   const expectedBoth = moves.filter(
@@ -389,7 +415,7 @@ try {
   ).length
   log(`  water + fire: ${bothCount} (expected ${expectedBoth}, OR semantics)`)
   check('two types are OR-ed', bothCount === expectedBoth, `(${bothCount})`)
-  await page.click('[data-testid="movedex-type-any"]')
+  await withControls(() => page.click('[data-testid="movedex-type-any"]'))
   await page.waitForTimeout(150)
   const clearedCount = await countOf('movedex')
   check('"Any" clears the type filter', clearedCount === moveCount(4), `(${clearedCount})`)

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { getEggGroup, listSpecies } from '../../data'
 import type { EggGroup, Species } from '../../data'
-import type { SpeciesCardFooter } from '../../components/speciesCardFooters'
+import { genderFooterLine, type SpeciesCardFooter } from '../../components/speciesCardFooters'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell, LedgerList } from './DexPageShell'
@@ -43,7 +43,13 @@ function membersOf(groupId: number, generationFilter: (id: number) => boolean): 
 }
 
 /**
- * Egg groups for one species, middot-separated, each opening that group.
+ * Egg groups for one species, then its gender split, each group opening that
+ * group.
+ *
+ * THE GENDER LINE IS HERE AND NOWHERE ELSE, which is the point: on a page about
+ * breeding it is the fact you came for, and on a page about a move it is noise.
+ * It comes from the shared `genderRatio` helper, so this line, the species
+ * page's bar and the Pokedex list view's column are one derivation.
  *
  * Built per render from the currently-open group's selector rather than being a
  * module constant, because it has to close over "what happens when you click
@@ -52,30 +58,33 @@ function membersOf(groupId: number, generationFilter: (id: number) => boolean): 
 function eggGroupsFooter(onSelectGroup: (id: number) => void): SpeciesCardFooter {
   return (species) => {
     const ids = species.egg_group_ids ?? []
-    if (ids.length === 0) return null
+    if (ids.length === 0) return genderFooterLine(species)
     return (
-      <span
-        className="species-card-egg-groups"
-        data-testid={`species-card-egg-groups-${species.id}`}
-      >
-        {ids.map((id, i) => {
-          const group = getEggGroup(id)
-          return (
-            <span key={id}>
-              {i > 0 && <span className="species-card-egg-sep">·</span>}
-              <button
-                type="button"
-                className="species-card-egg-group"
-                data-testid={`species-card-egg-group-${species.id}-${id}`}
-                data-egg-group-id={id}
-                onClick={() => onSelectGroup(id)}
-              >
-                {group?.display_name ?? String(id)}
-              </button>
-            </span>
-          )
-        })}
-      </span>
+      <>
+        <span
+          className="species-card-egg-groups"
+          data-testid={`species-card-egg-groups-${species.id}`}
+        >
+          {ids.map((id, i) => {
+            const group = getEggGroup(id)
+            return (
+              <span key={id}>
+                {i > 0 && <span className="species-card-egg-sep">·</span>}
+                <button
+                  type="button"
+                  className="species-card-egg-group"
+                  data-testid={`species-card-egg-group-${species.id}-${id}`}
+                  data-egg-group-id={id}
+                  onClick={() => onSelectGroup(id)}
+                >
+                  {group?.display_name ?? String(id)}
+                </button>
+              </span>
+            )
+          })}
+        </span>
+        {genderFooterLine(species)}
+      </>
     )
   }
 }
@@ -110,8 +119,6 @@ export function Breedingdex() {
       dexId="breedingdex"
       entries={entries}
       entryId={(group) => group.id}
-      searchText={(group) => group.display_name}
-      searchLabel="Search/filter egg groups"
       gatedMessage={
         entries.length === 0
           ? `Breeding did not exist in Generation ${generation}. Egg groups arrived in Generation ${BREEDING_INTRODUCED_IN_GENERATION} — pick a Generation ${BREEDING_INTRODUCED_IN_GENERATION}+ game to browse them.`

@@ -1,7 +1,7 @@
 import { useDexSelection, useNav } from '../nav/navContext'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
-import { useFilters } from '../filters/filtersContext'
+import { useDexQueryBundle } from '../dex/query/dexQueryContext'
 import { useVersionGroup } from '../version-group/context'
 import { SpeciesDetailPage } from './SpeciesDetailPage'
 import { SpeciesList } from './SpeciesList'
@@ -57,7 +57,7 @@ export function Pokedex() {
     calls the same two.
   */
   const { generation, isAll } = useVersionGroup()
-  const { query, view } = useFilters()
+  const { query, view } = useDexQueryBundle()
   // The signature covers every filter AND the sort, which is more than the
   // search term and type list it used to carry -- the invalidation story is
   // unchanged, it just describes the whole query now. The view is part of it

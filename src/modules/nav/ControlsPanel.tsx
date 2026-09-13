@@ -1,97 +1,104 @@
+import { IconRestore } from '@tabler/icons-react'
 import { ToggleSwitch } from '../../components/ToggleSwitch'
-// The Pokedex's type filter is declared as a `types` filter in speciesQuery.ts
-// and rendered by FilterPanel, which is the ONE place in the app that renders
-// components/TypeFilter -- so the Pokedex, the Movedex and the Berrydex cannot
-// drift apart in colours, OR semantics or clear behaviour. It used to be
-// imported directly here; the import moved with the markup, not the rule.
 import { FilterPanel } from '../dex/query/FilterPanel'
+import { PanelScroller } from '../dex/query/PanelScroller'
 import { SortPanel } from '../dex/query/SortPanel'
+import { useDexQueryBundle } from '../dex/query/dexQueryContext'
 import { useDisclosureGroup } from '../dex/query/useDisclosureGroup'
-import { useFilters } from '../filters/filtersContext'
 import { GlobalSearch } from '../search/GlobalSearch'
 import { VersionGroupSelector } from '../version-group/VersionGroupSelector'
-import { useNav } from './navContext'
 
 /**
- * The app bar's right-hand controls: everything that used to sit permanently on
- * screen, plus -- on the Pokedex -- that dex's filter and sort disclosures.
+ * The app bar's controls: the cross-dex search, the game scope, and -- for
+ * whichever Pokepedia page is open -- that page's filters and its sort.
  *
- * TRIGGERS: text-only ghost buttons -- no icon, no border, no fill. "Search/
- * filter species" replaced a Tabler IconFilter, because an icon had to be
- * guessed at (filter or magnifier, each promising something different) where the
- * words say exactly what the panel holds. .ghost-button is the treatment
- * .nav-trigger and .pokedex-back already used unnamed.
+ * ONE SEARCH/FILTER MENU AND ONE SORT MENU FOR THE WHOLE MODULE. Each dex used
+ * to carry its own control row above its own list; they are all here now, which
+ * is why the trigger reads "Search/Filter" rather than naming one dex's
+ * entities. What the menus CONTAIN changes with the page (see
+ * DexQueryProvider); where they are does not.
  *
- * TWO DISCLOSURES ON THE POKEDEX, ONE EVERYWHERE ELSE, and one open at a time.
- * Sort is a separate question from filtering and gets its own panel, the same
- * split every other dex's controls row makes; `useDisclosureGroup` makes "only
- * one" structural rather than a pair of handlers that have to remember each
- * other. The Sort trigger only renders on the Pokedex, because it is the only
- * module whose controls live up here -- see filtersContext.ts for why.
+ * TRIGGERS are text-only ghost buttons -- no icon, no border, no fill. The words
+ * say exactly what the panel holds, where an icon has to be guessed at (filter
+ * or magnifier, each promising something different).
  *
- * NEITHER PANEL DISMISSES ON AN OUTSIDE CLICK, which is the one place this
- * pattern differs from the per-dex version, and it is deliberate: this panel
- * holds the cross-dex search, whose results dropdown already owns Escape and
- * whose hits are clicked from inside a floating layer. A panel that vanished
- * while you were reaching for a result would be worse than one you close.
+ * ORDER IN THE BAR, left to right: the Pokedex's Grid/List switch, Sort,
+ * Search/Filter -- and then the theme switcher, which App.tsx renders after this
+ * and which is therefore the rightmost thing in the bar on every screen. That is
+ * the point of the order: the theme control does not move as the page-specific
+ * triggers come and go beside it.
  *
- * The panel stays MOUNTED while closed (display: none), so the filters keep
- * their values across a close/open and nothing inside is tabbable.
+ * ONE PANEL OPEN AT A TIME, and a press anywhere outside closes it. Both are
+ * `useDisclosureGroup`; the outside-click dismissal covers the cross-dex search
+ * results too, because they render inside the panel and so count as inside.
+ *
+ * Panels stay MOUNTED while closed (display: none), so filters keep their values
+ * across a close/open and nothing inside is tabbable.
  */
 export function ControlsPanel() {
-  const nav = useNav()
-  const filters = useFilters()
-  const onPokedex = nav.moduleId === 'pokedex'
-  const { openId, toggle } = useDisclosureGroup()
+  const bundle = useDexQueryBundle()
+  const { openId, toggle, close, ref } = useDisclosureGroup({ dismissOnOutsideClick: true })
   const filtersOpen = openId === 'filters'
-  const sortOpen = openId === 'sort'
-  const count = filters.query.visible.length
+  /*
+    `&& !sortDisabled` is not belt and braces: the Sort panel can be open when the
+    reader flips to the list view, and the trigger that would close it is disabled
+    the moment they do -- leaving a panel on screen with no way to dismiss it. The
+    switch closes the menus as well (below); this makes the state impossible
+    rather than merely unlikely.
+  */
+  const sortOpen = openId === 'sort' && !bundle.sortDisabled
+  const hasFilters = bundle.sections.length > 0
+  const hasSort = bundle.sorts.length > 0
+  const count = bundle.query.visible.length
 
   return (
-    <>
-      {onPokedex && (
-        <div className="app-controls" data-testid="species-sort" data-open={sortOpen}>
+    <div className="app-controls-cluster" ref={ref}>
+      {bundle.showViewToggle && (
+        <ToggleSwitch
+          id="species-view"
+          label="View"
+          offLabel="Grid"
+          onLabel="List"
+          checked={bundle.view === 'list'}
+          onChange={(next) => {
+            bundle.setView(next ? 'list' : 'grid')
+            close()
+          }}
+        />
+      )}
+
+      {hasSort && (
+        <div className="app-controls" data-testid="dex-sort" data-open={sortOpen}>
           <button
             type="button"
             className="ghost-button app-controls-toggle"
-            data-testid="species-sort-toggle"
+            data-testid="dex-sort-toggle"
             aria-expanded={sortOpen}
-            aria-controls="species-sort-panel"
-            data-filters-active={filters.query.sortKey !== 'dex'}
+            aria-controls="dex-sort-panel"
+            /*
+              DISABLED, NOT HIDDEN, on a page whose list is a table: the column
+              headers are the sort control there, and a trigger that vanished
+              when you switched view would read as a bug rather than as "not
+              here, and here is where it was".
+            */
+            disabled={bundle.sortDisabled}
+            title={bundle.sortDisabled ? 'Sort the list view from its column headers' : undefined}
+            data-filters-active={
+              !bundle.sortDisabled && bundle.query.sortKey !== bundle.sorts[0]?.key
+            }
             onClick={() => toggle('sort')}
           >
             Sort
           </button>
-          <div
-            className="app-controls-panel"
-            id="species-sort-panel"
-            data-testid="species-sort-panel"
+          <PanelScroller
+            className="app-controls-panel dex-menu"
+            testId="dex-sort-panel"
+            id="dex-sort-panel"
           >
             <div className="app-controls-field">
-              <SortPanel
-                dexId="species"
-                sorts={filters.sorts}
-                query={filters.query}
-                /*
-                  THE VIEW SWITCH LIVES IN THE SORT PANEL, not beside it, because
-                  the two are one decision: the grid can order by three fields and
-                  the table by all twelve, so "which orderings exist" is answered
-                  by "which view am I in". Putting the switch anywhere else would
-                  make the field list change for a reason off screen.
-                */
-                header={
-                  <ToggleSwitch
-                    id="species-view"
-                    label="View"
-                    offLabel="Grid"
-                    onLabel="List"
-                    checked={filters.view === 'list'}
-                    onChange={(next) => filters.setView(next ? 'list' : 'grid')}
-                  />
-                }
-              />
+              <SortPanel dexId="dex" sorts={bundle.sorts} query={bundle.query} />
             </div>
-          </div>
+          </PanelScroller>
         </div>
       )}
 
@@ -102,42 +109,63 @@ export function ControlsPanel() {
           data-testid="controls-toggle"
           aria-expanded={filtersOpen}
           aria-controls="app-controls-panel"
-          data-filters-active={onPokedex && filters.query.activeCount > 0}
+          data-filters-active={bundle.query.activeCount > 0}
           onClick={() => toggle('filters')}
         >
-          Search/filter species
+          Search/Filter
         </button>
 
-        <div className="app-controls-panel" id="app-controls-panel" data-testid="controls-panel">
+        <PanelScroller
+          className="app-controls-panel dex-menu"
+          testId="controls-panel"
+          id="app-controls-panel"
+        >
+          {/* The same action as "Clear all filters" at the foot of the panel, at
+              the head of it as well: with "More filters" open the bottom of this
+              menu is a long scroll away, and undoing a filter should not be. */}
+          {hasFilters && (
+            <div className="app-controls-field app-controls-reset">
+              <button
+                type="button"
+                className="ghost-button dex-filter-clear"
+                data-testid="controls-reset-top"
+                disabled={bundle.query.activeCount === 0}
+                onClick={bundle.query.clearAll}
+              >
+                <IconRestore size={13} stroke={1.5} aria-hidden focusable="false" />
+                Reset filters
+              </button>
+            </div>
+          )}
+
           <div className="app-controls-field">
             <span className="app-controls-label">Search all dexes</span>
             <GlobalSearch />
           </div>
 
-          {onPokedex && (
-            <div className="app-controls-field" data-testid="controls-species-filters">
-              <span className="app-controls-label">Filter species</span>
+          {/* Directly under the search input, in its own section: the game scope
+              governs every list and every era-sensitive field in the app, so it
+              belongs at the top of the menu rather than under a long fold. */}
+          <div className="app-controls-field">
+            <VersionGroupSelector />
+          </div>
+
+          {hasFilters && (
+            <div className="app-controls-field" data-testid="controls-dex-filters">
               <FilterPanel
-                dexId="species"
-                sections={filters.sections}
-                query={filters.query}
-                /* The Pokedex grid deliberately has no count on the page, so the
-                   readout lives here, where it answers the question the filters
-                   just raised: how many are left. */
+                dexId="dex"
+                sections={bundle.sections}
+                query={bundle.query}
                 footer={
-                  <p className="dex-filter-count" data-testid="species-count">
-                    {count} species
+                  <p className="dex-filter-count" data-testid="dex-filter-count">
+                    {count} {count === 1 ? 'match' : 'matches'}
                   </p>
                 }
               />
             </div>
           )}
-
-          <div className="app-controls-field">
-            <VersionGroupSelector />
-          </div>
-        </div>
+        </PanelScroller>
       </div>
-    </>
+    </div>
   )
 }

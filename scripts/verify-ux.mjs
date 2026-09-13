@@ -624,11 +624,25 @@ try {
     fireUnselected.bg,
   )
   check('three types are selected', selectedColors.length === 3, `(${selectedColors.length})`)
+  /*
+    THE PALETTE IS ON THE TEXT NOW, NOT ON A FILL. These buttons were bordered
+    pills that filled with the type's colour when selected -- the chip the design
+    system forbids everywhere else, and the last one left in the app. They are
+    ghost labels: same component, same ids, same cited palette, applied to the
+    glyphs instead. So the assertion moved from `backgroundColor` to `color`, and
+    the fill is asserted ABSENT rather than left unchecked -- an exception that
+    has been taken out grows back otherwise.
+  */
   for (const c of selectedColors) {
     check(
       `${c.type} renders its community-palette colour ${EXPECTED[c.type]}`,
-      c.declared === EXPECTED[c.type] && c.computed === hexToRgb(EXPECTED[c.type]),
-      `${c.computed} vs ${hexToRgb(EXPECTED[c.type])}`,
+      c.declared === EXPECTED[c.type] && c.text === hexToRgb(EXPECTED[c.type]),
+      `${c.text} vs ${hexToRgb(EXPECTED[c.type])}`,
+    )
+    check(
+      `and ${c.type} is a label, not a chip -- no fill`,
+      c.computed === 'rgba(0, 0, 0, 0)' || c.computed === 'transparent',
+      c.computed,
     )
   }
   // Every type button must declare the palette value, not just the three clicked.

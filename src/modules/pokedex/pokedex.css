@@ -133,36 +133,53 @@
 .type-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem;
-  margin: 0.6rem 0 0.35rem;
+  /* No border to separate them any more, so the gap does that job instead. */
+  gap: 0.1rem 0.55rem;
+  margin: 0.35rem 0 0.2rem;
 }
 
+/*
+  GHOST LABEL, NOT A PILL. These were bordered, rounded buttons that filled with
+  the type's colour when selected -- which is the chip the design system forbids
+  everywhere else, kept only because this control predates the rule. It is text
+  now: secondary while off, the TYPE's own colour while on (set inline by
+  TypeFilter, from the same cited palette the type labels use), and bold either
+  way it is selected. Same component, same test ids, same colours -- the badge is
+  what went.
+*/
 .tf {
-  padding: 0.15rem 0.4rem;
+  padding: 0;
   font: inherit;
-  font-size: 0.68rem;
-  color: var(--text);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 0.25rem;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 0;
   cursor: pointer;
   text-transform: capitalize;
 }
 
 .tf:hover {
-  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
-/* Type buttons get their own colour inline when selected; this covers the
-   generic on-state (the "Any" button, which has no type colour). */
+.tf:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The generic on-state. A selected TYPE overrides the colour inline with its
+   own; "Any" has no type colour and keeps this one. */
 .tf-on {
-  color: var(--text-h);
-  background: var(--accent-bg);
-  border-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
 }
 
 .tf-any {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 /*
@@ -325,6 +342,51 @@
 .species-list-table {
   width: auto;
   min-width: 0;
+}
+
+/*
+  THE WIDE TABLE, and why it does not inherit the six-column widths above.
+
+  `.data-table th:nth-child(n)` was written for the Movedex's six columns and
+  applies to every data table in the app. This one has thirty-four, so it resets
+  those rules and takes its widths from a <colgroup> instead -- one width per
+  column, declared beside the column in speciesColumns.tsx, which is the only
+  way thirty-four widths stay readable and the only way the "first twelve fit the
+  window" promise is a sum you can check.
+
+  SMALLER TYPE AND REGULAR WEIGHT. The table is the densest thing in the app and
+  was drawing at --font-size-body; at label size thirty-four columns are legible
+  without the page needing a zoom, and the first twelve fit a 1280px window with
+  room to spare. Regular weight throughout, including the name cell, which was
+  medium: at this density a bolded column reads as a heading rather than as data.
+*/
+.species-list-table .data-table {
+  font-size: var(--font-size-label);
+}
+
+.species-list-table .data-table th,
+.species-list-table .data-table td {
+  width: auto;
+}
+
+.species-list-table .data-table td {
+  padding: 4px 6px;
+}
+
+.species-list-table .data-table-sort {
+  padding: 4px 6px;
+  font-size: var(--font-size-caption);
+}
+
+.species-list-table .data-table-open {
+  font-weight: var(--font-weight-regular);
+}
+
+/* A cell wider than its column is clipped rather than widening the table --
+   otherwise one long evolution clause sets the width of every row. */
+.species-list-table .data-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pokedex-grid {
@@ -503,10 +565,57 @@
 .species-card-ability {
   display: block;
   font-size: var(--font-size-label);
+  /*
+    SET TIGHT SO A FOURTH LINE FITS. The text block starts at top: 136px in a
+    199px card, and the first three lines left 9px -- not enough for the stat row
+    added below. The 5px came out of the two BOTTOM lines' leading rather than out
+    of the card's height or the row above, because the card height and the y of
+    the number, type and ability lines are all Figma-calibrated ratios the
+    design-system suite asserts. Leading is the one dimension here that is not.
+    Both lines are `white-space: nowrap`, so nothing wraps into its neighbour.
+  */
+  line-height: 1;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/*
+  THE FOURTH LINE, and it fits inside the card that already existed. The text
+  block starts at top: 136px in a 199px card, which leaves 63px; the name line,
+  the type row and the ability line use about 46 of them. So this row is added
+  WITHOUT touching the card's height, the column pitch, the row gap or the grid
+  -- which is the whole brief for it. The Breeding dex's gender line uses the
+  same rule, in the same slot, for the same reason.
+
+  --font-size-caption, a step below the ability line above it: this is a
+  supporting readout rather than a second name, and the two lines have to be
+  distinguishable at a glance.
+*/
+.species-card-stats {
+  display: block;
+  font-size: var(--font-size-caption);
+  /* 11px, the last of the 63px the text block has. See the note above. */
+  line-height: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The mono face draws taller than Plex at the same px, so the inline numbers
+   would otherwise set this line's box and put it back over the card's edge. */
+.species-card-stats .num {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92em;
+  line-height: inherit;
+  color: var(--text-primary);
+}
+
+.species-card-stat-sep {
+  margin: 0 0.25rem;
 }
 
 /* Keyboard focus needs to be visible on a card with no border or fill of its
@@ -1490,8 +1599,71 @@
   margin-left: auto;
 }
 
+/*
+  THE PAGE-SPECIFIC TRIGGERS, as one cluster. Grid/List, Sort and Search/Filter
+  live here; the theme switcher is App.tsx's next child and therefore always to
+  their right, which is what keeps it still while these come and go.
+
+  It is the outside-click boundary too: the disclosure group's ref is on this
+  element, so a press on any trigger or inside any panel counts as inside.
+*/
+.app-controls-cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gap-md);
+}
+
+/*
+  THE GRID/LIST SWITCH IS ONE ROW HERE, not a labelled form field.
+
+  ToggleSwitch is `display: grid` with its label stacked above the track, which
+  is right in a form and wrong in a 33px bar: stacked, it made the whole bar two
+  lines tall and pushed the brand and the nav down with it. In the cluster it is
+  a single inline row, and its "View" heading is visually suppressed -- the two
+  captions either side of the track already say what the control is, and the
+  label stays in the DOM as the switch's accessible name.
+*/
+.app-controls-cluster .toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-controls-cluster .toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.app-controls-cluster .toggle-side {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.app-controls-cluster .toggle-side-on {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
 .app-controls {
   position: relative;
+}
+
+/* A trigger for a control that is not available here -- the Sort menu while the
+   list view's own column headers are doing the sorting. */
+.app-controls-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.app-controls-toggle:disabled:hover {
+  color: var(--text-secondary);
 }
 
 /* Open, or narrowing the list: either way the accent says "this is doing
@@ -2389,6 +2561,10 @@
 .species-card-egg-groups {
   display: block;
   font-size: var(--font-size-label);
+  /* Tight, for the same reason the ability line is: the Breeding dex's cards
+     gained a gender row below this one and the card's 63px text block has to
+     hold four lines without the card growing. */
+  line-height: 1;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -2403,6 +2579,10 @@
   padding: 0;
   font-family: inherit;
   font-size: inherit;
+  /* A <button> does not inherit line-height, and its UA box was three pixels
+     taller than the line it sits in -- enough to push the gender row below it
+     off the bottom of the card. */
+  line-height: inherit;
   color: var(--text-secondary);
   background: none;
   border: none;
@@ -2560,6 +2740,99 @@
   white-space: nowrap;
 }
 
+/* =========================================== the two app-bar menus, compact */
+
+/*
+  ONE TYPE SIZE FOR BOTH MENUS, and it is smaller than the data they narrow.
+  A control that shouts louder than the table it filters reads as the subject of
+  the page rather than as the thing acting on it -- so the menus sit at
+  --font-size-label where the tables are at --font-size-body, and the section
+  headings drop to caption. The spacing comes down with the type, for the reason
+  MODULE-PATTERNS gives about the Build Form: type that shrinks while padding
+  does not leaves every row keeping the rhythm of a larger face.
+*/
+.dex-menu {
+  font-size: var(--font-size-label);
+}
+
+.dex-menu .app-controls-field {
+  padding: var(--space-gap-sm) var(--space-gap-md);
+}
+
+.dex-menu .app-controls-label {
+  margin-bottom: 3px;
+  font-size: var(--font-size-caption);
+}
+
+.dex-menu .ds-field-label,
+.dex-menu .ds-section-label,
+.dex-menu .ds-filter,
+.dex-menu .ds-filters,
+.dex-menu .ds-filter-sep,
+.dex-menu .dex-filter-note,
+.dex-menu .dex-filter-count,
+.dex-menu .toggle-label,
+.dex-menu .toggle-side {
+  font-size: var(--font-size-caption);
+}
+
+.dex-menu .ds-field-control,
+.dex-menu .ds-search,
+.dex-menu input[type='search'] {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: var(--font-size-label);
+}
+
+.dex-menu .ds-field {
+  gap: 3px;
+}
+
+/* The reset row at the head of the filter menu: one action, no heading. */
+.app-controls-reset {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.app-controls-reset .dex-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-caption);
+}
+
+/*
+  BACK TO TOP, INSIDE THE MENU. The Pokedex's filter menu is taller than a laptop
+  window with "More filters" open, and a floating panel is bound by the same rule
+  as a module root: nothing may be clipped, so it scrolls -- and once it scrolls
+  it needs the way back. Sticky rather than fixed so it rides the panel's own
+  scroller and cannot escape it; bottom-right, out of the reading column.
+*/
+.panel-to-top {
+  position: sticky;
+  bottom: 6px;
+  left: calc(100% - 2.1rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--text-secondary);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.panel-to-top:hover {
+  color: var(--text-primary);
+}
+
+.panel-to-top:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ============================================ filter and sort panel bodies */
 
 /*
@@ -2574,14 +2847,21 @@
 .dex-sort-panel-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-gap-md);
+  gap: var(--space-gap-sm);
   min-width: 0;
 }
 
 .dex-filter-section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-gap-sm);
+  gap: 4px;
+  min-width: 0;
+}
+
+.dex-filter-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -2628,7 +2908,7 @@
 .dex-filter-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -2667,13 +2947,13 @@
 .dex-filter-more {
   display: flex;
   flex-direction: column;
-  gap: var(--space-gap-sm);
+  gap: 4px;
 }
 
 .dex-filter-more-panel {
   display: none;
   flex-direction: column;
-  gap: var(--space-gap-md);
+  gap: var(--space-gap-sm);
   /* Indented behind its own hairline so the fold reads as contained by the
      toggle above it rather than as a continuation of the panel. */
   padding-left: var(--space-gap-sm);

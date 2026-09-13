@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { evolutionThumbUrl, getItem, getLocation, getMove, getSpecies, getType } from '../../data'
+import { evolutionThumbUrl, getItem, getSpecies } from '../../data'
 import type { EvolutionDetail, EvolutionNode, Species } from '../../data'
 import { A, COND_ICON, ITEM_ICON, layoutEvolution, type PlacedArrow } from './evoLayout'
 import { EVO_GENDER_MALE, evoGenderIconUrl, evoGenderLabel } from './evoGenderIcon'
@@ -8,6 +8,7 @@ import {
   evoConditionIconUrl,
   isIndistinguishableFork,
 } from './evoConditionIcons'
+import { describeEvolution, relativeStatClause } from './evoDescribe'
 import { triggerKind } from './evolutionTriggers'
 
 /**
@@ -43,76 +44,6 @@ import { triggerKind } from './evolutionTriggers'
  * label. The accessible name comes from the image alt plus a hidden dex number,
  * so removing the visible name does not remove it from the accessibility tree.
  */
-
-/**
- * Render one evolution requirement as a readable clause.
- *
- * Still every non-null field, and still the full sentence: the icons carry the
- * distinguishing condition and the short label carries the level, so this is what
- * holds the rest -- Espeon needing friendship AND daytime, Mantyke needing a party
- * member. It is the title attribute and the hidden accessible text now rather than
- * body copy, because the reference has no body copy here.
- */
-function describe(detail: EvolutionDetail): string {
-  const parts: string[] = []
-
-  switch (detail.trigger) {
-    case 'level-up':
-      parts.push(detail.min_level != null ? `Level ${detail.min_level}` : 'Level up')
-      break
-    case 'use-item':
-      parts.push(`Use ${getItem(detail.item_id ?? -1)?.display_name ?? 'an item'}`)
-      break
-    case 'trade':
-      parts.push('Trade')
-      break
-    case 'shed':
-      parts.push('Shed (empty party slot + Poke Ball)')
-      break
-    default:
-      parts.push(detail.trigger ?? 'Unknown')
-  }
-
-  if (detail.held_item_id != null) {
-    parts.push(`holding ${getItem(detail.held_item_id)?.display_name ?? 'an item'}`)
-  }
-  if (detail.min_happiness != null) parts.push(`friendship ${detail.min_happiness}+`)
-  if (detail.min_beauty != null) parts.push(`beauty ${detail.min_beauty}+`)
-  if (detail.min_affection != null) parts.push(`affection ${detail.min_affection}+`)
-  if (detail.time_of_day) parts.push(`during the ${detail.time_of_day}`)
-  if (detail.location_id != null) {
-    parts.push(`at ${getLocation(detail.location_id)?.display_name ?? 'a location'}`)
-  }
-  if (detail.known_move_id != null) {
-    parts.push(`knowing ${getMove(detail.known_move_id)?.display_name ?? 'a move'}`)
-  }
-  if (detail.known_move_type_id != null) {
-    parts.push(`knowing a ${getType(detail.known_move_type_id)?.name ?? ''} move`)
-  }
-  if (detail.party_species_id != null) {
-    parts.push(`with ${getSpecies(detail.party_species_id)?.display_name ?? 'a species'} in party`)
-  }
-  if (detail.trade_species_id != null) {
-    parts.push(`traded for ${getSpecies(detail.trade_species_id)?.display_name ?? 'a species'}`)
-  }
-  if (detail.party_type_id != null) {
-    parts.push(`with a ${getType(detail.party_type_id)?.name ?? ''} type in party`)
-  }
-  if (detail.relative_physical_stats != null) {
-    parts.push(relativeStatClause(detail.relative_physical_stats))
-  }
-  if (detail.gender != null) parts.push(detail.gender === 1 ? 'female only' : 'male only')
-  if (detail.needs_overworld_rain) parts.push('while raining')
-  if (detail.turn_upside_down) parts.push('holding the console upside down')
-
-  return parts.join(', ')
-}
-
-function relativeStatClause(rel: number): string {
-  if (rel > 0) return 'Atk > Def'
-  if (rel < 0) return 'Atk < Def'
-  return 'Atk = Def'
-}
 
 const RARE_CANDY_ITEM_ID = 50
 const SOOTHE_BELL_ITEM_ID = 195
@@ -461,7 +392,7 @@ export function EvolutionTree({
             ) : (
               details.map((detail, i) => {
                 const { icons, level, clauses } = conditionParts(detail)
-                const sentence = describe(detail)
+                const sentence = describeEvolution(detail)
                 /*
                   THE DICE GOES INLINE, at the head of the first requirement's icon
                   row. The 2-branch-long frame draws Wurmple's fork exactly that

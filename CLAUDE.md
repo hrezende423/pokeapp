@@ -483,89 +483,91 @@ record and is NOT app code.
 
 ## Dex search / filter / sort
 
-Every dex now offers all three, and **a dex declares them as DATA, never as
-JSX**. `src/modules/dex/query/dexQuery.ts` defines the model — filter
-*sections*, each holding *filters* of six kinds (`text`, `multi`, `select`,
-`range`, `toggle`, `types`), plus a list of `SortField`s. `FilterPanel` and
-`SortPanel` render whatever they are handed. Same decision `DataTable`'s
-column config made for the Movedex, for the same reason: a second dense list
-should be a config, not a second component.
+**ONE Search/Filter menu and ONE Sort menu for the whole of Poképedia, both in
+the app bar.** Every dex used to carry its own control row above its own list;
+none does now. The bar is rendered ABOVE the active module in the tree, so a
+module cannot hand its config upward — `DexQueryProvider` (app level, inside
+NavProvider) builds the config for whichever page the nav says is active, owns
+the state, and hands the filtered, sorted list back DOWN. `DexPageShell` renders
+the COUNT and nothing else above the list: a readout, not a control.
 
-- **Add a filter by adding a definition**, not a control. A dex that drew its
-  own input would eventually draw a bordered one. If a dex needs a control
-  the model has no kind for, add a **seventh kind** — do not add an escape
-  hatch, which re-opens the drift this removed.
-- **`components/TypeFilter.tsx` has exactly ONE call site now**: `FilterPanel`,
-  via the `types` kind. Pokédex, Movedex and Berrydex all reach it from there.
-  `verify-movedex`'s static section asserts that.
+- **A dex declares its filters and sorts as DATA, never as JSX.**
+  `modules/dex/query/dexQuery.ts` defines the model — filter *sections*, each
+  holding filters of six kinds (`text`, `multi`, `select`, `range`, `toggle`,
+  `types`), plus `SortField`s. The configs live in
+  `modules/dex/query/registries.ts` (and `pokedex/speciesQuery.ts` for species,
+  which needs its own row type). `FilterPanel`/`SortPanel` render whatever they
+  are handed. Add a filter by adding a definition; if a dex needs a control the
+  model has no kind for, add a **seventh kind** — never an escape hatch.
+- **The context is type-erased and `useDexRows(dexId)` guards it at runtime.**
+  One dex's entries at a time, different shapes per dex, so the context carries
+  `unknown` and a module asking while another dex is active THROWS rather than
+  rendering a berry as a species.
+- **Switching dex resets the query**, via `resetKey` — state carries the key it
+  was written under and a mismatch derives back to defaults. Not an effect and
+  not setState-during-render: no extra render, no frame of the previous dex's
+  filters applied to this one's list.
+- **`components/TypeFilter.tsx` has exactly ONE call site**: `FilterPanel`, via
+  the `types` kind. Pokédex, Movedex and Berrydex all reach it from there.
+  **It is a GHOST LABEL now, not a chip** — no border, no fill; selected takes
+  the type's own colour on the TEXT, from the same cited palette. That was the
+  last badge in the app and its removal closes "type is data, not decoration".
 - **`hidden: true` is how an era removes a filter**, and a hidden filter is
-  skipped by the matcher as well as the renderer — so a habitat chosen in
-  Gen 4 cannot keep narrowing a Gen 1 list. Habitat is Gen 3+, egg groups are
-  Gen 2+, and Gen 1 offers the combined **Special** in place of the split pair
-  (same rule `resolveStatsForGeneration` applies to the data, applied to the
-  controls).
-- **Option lists are read off the entries in scope, never hardcoded** —
-  generations, pockets, colours, habitats, growth rates, gender buckets. A
-  hardcoded pair would offer Generation 4 to someone playing Ruby. The
-  Itemdex's categories go further and are *derived from the pocket selection*
-  (`FilterOptions` may be a function), and `clampValues` drops a selection its
-  own control has stopped offering — a filter still narrowing by a value the
-  row no longer lists is silent and unfindable.
-- **One comparator, app-wide**: `components/sortValues.ts`. `DataTable` and the
-  sort panels share it, so "Power, descending" cannot mean two things. Stable,
-  **null-last in both directions**.
+  skipped by the matcher as well as the renderer. Habitat is Gen 3+, egg groups
+  Gen 2+, and Gen 1 offers the combined **Special** in place of the split pair.
+- **Option lists are read off the entries in scope, never hardcoded.** The
+  Itemdex's categories go further and are derived from the pocket selection
+  (`FilterOptions` may be a function); `clampValues` drops a selection its own
+  control has stopped offering.
+- **One comparator, app-wide**: `components/sortValues.ts`, shared by
+  `DataTable` and the sort panels. Stable, **null-last in both directions**.
 - **Each dex's default sort IS its shipped order, declared as a field**
-  (`Ability #`, `Berry #`, `Item #`, `Dex #`). The brief asked for Name as the
-  Abilitydex default; the shipped list is in id order, which is what the `#001`
-  in every row says, so making Name the default would have re-ordered a screen
-  nobody asked to re-order — and leaving the order off the field list would
-  have left no way back to it.
-
-**WHERE THE CONTROLS LIVE DIFFERS ON THE POKÉDEX, deliberately.** Five dexes
-carry two ghost-button triggers in a `.dex-controls` row above their list. The
-Pokédex has no such row and must not grow one: its browse grid reproduces the
-Figma MainPage frame, which has no header, and "the grid sits directly under
-the app bar's own hairline" is signed off. So its two disclosures are in the
-**app bar** (`nav/ControlsPanel.tsx`), which is where its search and type filter
-already lived, and its query lives in `FiltersProvider` because the controls are
-a sibling of the list rather than its parent. Same components, same panel bodies,
-different host.
-
-- **Panels dismiss on an outside click — except the app bar's.** That one holds
-  the cross-dex search, whose results dropdown already owns Escape and whose
-  hits are clicked from a floating layer; it would take the results with it.
-  Both close on their own trigger, so nothing depends on knowing the rule.
-- **Opening one disclosure closes the other**, structurally —
+  (`Ability #`, `Berry #`, `Item #`, `Dex #`).
+- **Panels dismiss on an outside click**, and opening one closes the other —
   `useDisclosureGroup` holds one open id. Destructure its result at the call
   site: it returns a ref, and the react-hooks lint refuses to let an object
   carrying a ref be passed to a function during render.
-- **Movedex keeps its always-visible control row** (`variant="inline"`), by
-  standing decision: its table is dense enough that filtering is the primary
-  way through it, and its sorting is its column headers.
-- **Breedingdex gets no filters and no sort, and that is a decision.** An egg
-  group record is `{ id, name, display_name }` — there is no field to filter on
-  and nothing but the name and the id to order by, both visible at a glance in
-  a fifteen-row list.
-- **The Pokédex list view's table and its Sort panel are ONE state.**
-  `DataTable` takes optional `sortKey`/`direction`/`onSort`; the Pokédex passes
-  them, the Movedex does not. Two copies would disagree the first time either
-  was used and the reader could not tell which was in force.
+- **The bar's order is Grid/List · Sort · Search/Filter · theme**, and the theme
+  switcher being LAST is the point: the cluster is right-aligned, so the one
+  control that belongs to no page never moves as the page-specific triggers come
+  and go beside it. Its segments are sized to the word ("Light" + 2px either
+  side, `min-width: 33px` measured), not to the full-95 spec's 12px inset.
+- **The Sort trigger is DISABLED, not hidden, where the list is a table** (the
+  Pokédex list view). The column headers are the control there. Flipping the view
+  also closes the menus, and `sortOpen` is ANDed with `!sortDisabled`, so a panel
+  can never be left open under a disabled trigger.
 
-**`ToggleSwitch.tsx` IS LIVE NOW and the no-shadow allow-list is EMPTY.** It
-was unimported dead code carrying the repo's last `box-shadow`, allow-listed in
-`verify-design-system` for exactly that reason. The dex Sort panels use it for
-their direction control and the Pokédex for its grid/list view, so the shadow
-was removed rather than re-allowed — the knob reads against its track on a
-hairline and a tone-step. `SHADOW_EXCEPTIONS = []` is the strongest form of that
-check; keep it empty.
+### The Pokédex's two views
 
-**BLOCKED — the Pokédex's "Has evolutions" filter is UI-only.** It renders, it
+- **Grid** — the Figma MainPage frame, untouched: 212px cards, three columns,
+  9px/17px gaps. Its Sort menu offers only what a card prints (Dex #, Name, BST,
+  Speed). **The card gained a fourth line** (`BST 318 · Spe 45`) and the card did
+  NOT grow: the 5px came out of the bottom two lines' LEADING, because the card
+  height and the y of the number, type and ability lines are Figma ratios
+  `verify-design-system` asserts and leading is the one dimension that is not.
+  The Breeding dex's cards gained a gender row the same way — and
+  `.species-card-egg-group` needs `line-height: inherit`, because a `<button>`
+  does not inherit it and its UA box was 3px taller than its line.
+- **List** — 35 columns (`pokedex/speciesColumns.tsx`), widths declared per
+  column and emitted as a `<colgroup>`, because `.data-table th:nth-child(n)` was
+  written for the Movedex's six and reaches every table in the app. **The first
+  twelve fit the window** (national # → Speed); the rest are over a horizontal
+  scroll. **This table sorts itself from its own headers** — it is NOT wired to
+  the bar's sort state, because the menu holds four keys and the table has 35, so
+  a header click would set a key the menu could not hold and the fallback would
+  silently do nothing.
+- **Regional dex numbers are a written-out table**, not derived: a generation
+  does not determine the dex (FRLG are Gen 3 and use KANTO, Platinum extends
+  Sinnoh, HGSS use updated-johto). Colosseum, XD and "All games" have none and
+  print a dash rather than borrowing a number.
+
+**BLOCKED — the Pokédex's "Has evolutions" FILTER is UI-only.** It renders, it
 is settable, and it deliberately never matches and never counts as active
 (`stub: true`), with a note on screen saying so. The semantics need a decision:
-*can still evolve further* (which excludes Charizard) or *belongs to a
-multi-stage line* (which includes it). Those return different lists for 200+
-species. The evolution chains are already in the bundle and eagerly loaded, so
-wiring it is one function in `speciesQuery.ts` once the reading is chosen.
+*can still evolve further* (excludes Charizard) or *belongs to a multi-stage
+line* (includes it). The list view's **"Further evo" COLUMN** is not blocked and
+is implemented — "further" is unambiguous — so the definition for the filter is
+one line away in `speciesQuery.ts` once the reading is chosen.
 
 ## The scroll model and the back stack
 

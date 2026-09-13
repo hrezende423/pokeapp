@@ -32,6 +32,13 @@ import {
  * after a render that had already filtered with the stale selection, so the list
  * would flash the wrong contents; deriving the effective values means a
  * generation change and its clamp land in the same paint.
+ *
+ * SO DOES THE RESET. `resetKey` changes when the reader moves to another dex,
+ * and the state carries the key it was written under: a mismatch is simply
+ * ignored and the defaults are used instead. That is a derivation rather than a
+ * setState-during-render or an effect -- no extra render, no frame of the
+ * previous dex's filters applied to this dex's list, and nothing to remember to
+ * call.
  */
 export interface DexQuery<T> {
   /** Filtered and sorted, ready to render. */
@@ -53,60 +60,92 @@ export interface DexQuery<T> {
   signature: string
 }
 
+interface QueryState {
+  key: string
+  values: FilterValues
+  sortKey: string | null
+  direction: SortDirection
+}
+
+const freshState = (key: string, defaultSort: string | null): QueryState => ({
+  key,
+  values: {},
+  sortKey: defaultSort,
+  direction: 'asc',
+})
+
 export function useDexQuery<T>({
   entries,
   sections,
   sorts = [],
   defaultSort = null,
+  resetKey = 'dex',
 }: {
   entries: T[]
   sections: FilterSection<T>[]
   sorts?: SortField<T>[]
   /** Sort field applied before anything is picked. null keeps the entry order. */
   defaultSort?: string | null
+  /** Changing this abandons the current filters and sort. See the note above. */
+  resetKey?: string
 }): DexQuery<T> {
-  const [raw, setRaw] = useState<FilterValues>({})
-  const [pickedSort, setPickedSort] = useState<string | null>(defaultSort)
-  const [direction, setDirection] = useState<SortDirection>('asc')
+  const [stored, setStored] = useState<QueryState>(() => freshState(resetKey, defaultSort))
+  const state = stored.key === resetKey ? stored : freshState(resetKey, defaultSort)
+
+  /** Every write starts from the EFFECTIVE state, so a stale one is discarded. */
+  const update = useCallback(
+    (change: (current: QueryState) => QueryState) => {
+      setStored((prev) => change(prev.key === resetKey ? prev : freshState(resetKey, defaultSort)))
+    },
+    [resetKey, defaultSort],
+  )
+
+  const values = useMemo(() => clampValues(sections, state.values), [sections, state.values])
 
   /*
     The sort field list can SHRINK under a live selection: the Pokedex offers
-    eleven fields in its list view and three in its grid, so switching back to
-    the grid while sorted by Sp. Atk leaves a key nothing can satisfy. Falling
-    back to the default here rather than in an effect means the panel reports
-    what the list is really ordered by in the same paint, instead of showing a
-    field it no longer offers for one frame.
+    twelve fields in its list view and four in its grid, so switching back to the
+    grid while sorted by Sp. Atk leaves a key nothing can satisfy. Falling back to
+    the default here rather than in an effect means the panel reports what the
+    list is really ordered by in the same paint, instead of showing a field it no
+    longer offers for one frame.
   */
   const sortKey = useMemo(
-    () => (sorts.some((s) => s.key === pickedSort) ? pickedSort : defaultSort),
-    [sorts, pickedSort, defaultSort],
+    () => (sorts.some((s) => s.key === state.sortKey) ? state.sortKey : defaultSort),
+    [sorts, state.sortKey, defaultSort],
   )
+  const direction = state.direction
 
-  const values = useMemo(() => clampValues(sections, raw), [sections, raw])
-
-  const setValue = useCallback((key: string, value: FilterValue) => {
-    setRaw((prev) => ({ ...prev, [key]: value }))
-  }, [])
+  const setValue = useCallback(
+    (key: string, value: FilterValue) => {
+      update((current) => ({ ...current, values: { ...current.values, [key]: value } }))
+    },
+    [update],
+  )
 
   const resetSection = useCallback(
     (sectionId: string) => {
       const section = sections.find((s) => s.id === sectionId)
       if (!section) return
-      setRaw((prev) => {
-        const next = { ...prev }
+      update((current) => {
+        const next = { ...current.values }
         for (const filter of section.filters) next[filter.key] = defaultValue(filter)
-        return next
+        return { ...current, values: next }
       })
     },
-    [sections],
+    [sections, update],
   )
 
-  const clearAll = useCallback(() => setRaw({}), [])
+  const clearAll = useCallback(() => {
+    update((current) => ({ ...current, values: {} }))
+  }, [update])
 
-  const setSort = useCallback((key: string, next: SortDirection) => {
-    setPickedSort(key)
-    setDirection(next)
-  }, [])
+  const setSort = useCallback(
+    (key: string, next: SortDirection) => {
+      update((current) => ({ ...current, sortKey: key, direction: next }))
+    },
+    [update],
+  )
 
   const activeFilters: DexFilter<T>[] = useMemo(
     () =>
@@ -141,9 +180,9 @@ export function useDexQuery<T>({
     [sections, values, sortKey, direction],
   )
 
-  // Memoised because consumers memoise on it: the Pokedex hands this whole
-  // object through a context, and a fresh identity every render would make that
-  // context value change on every render of the app shell.
+  // Memoised because consumers memoise on it: this object travels through a
+  // context, and a fresh identity every render would make that context value
+  // change on every render of the app shell.
   return useMemo(
     () => ({
       visible,

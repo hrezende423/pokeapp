@@ -61,9 +61,12 @@ export function TypeFilter({
             data-color={color}
             aria-pressed={on}
             className={on ? 'tf tf-on' : 'tf'}
-            // Selected buttons take the type's own colour; unselected ones keep
-            // the neutral chrome so the selection stays readable.
-            style={on ? { backgroundColor: color, borderColor: color, color: '#fff' } : undefined}
+            // A selected button becomes its type's own colour -- the TEXT, not a
+            // fill. "Type is data, not decoration" is the whole rule now, and
+            // this control was the last thing in the app still drawing a chip.
+            // The palette is unchanged: typeColors.ts, the single cited table
+            // shared with every type label.
+            style={on ? { color } : undefined}
             onClick={() => toggle(type.id)}
           >
             {type.name}
