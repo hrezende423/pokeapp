@@ -234,7 +234,11 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
 
   const { withControls } = controls(page)
-  await page.waitForSelector('[data-testid="boot-ms"]', { timeout: 60000 })
+  // The boot readout now lives inside the footer's hover-only info panel
+  // (App.tsx), so it is attached but not visible until the trigger is
+  // hovered/focused -- 'attached' is the right wait here, since this step only
+  // needs the data, not the tooltip open.
+  await page.waitForSelector('[data-testid="boot-ms"]', { state: 'attached', timeout: 60000 })
   const wallMs = Date.now() - navStart
 
   log(`  app-reported boot    : ${await page.textContent('[data-testid="boot-ms"]')}`)
@@ -456,7 +460,7 @@ try {
   log('  context is now OFFLINE')
 
   await page.reload({ waitUntil: 'load' })
-  await page.waitForSelector('[data-testid="boot-ms"]', { timeout: 60000 })
+  await page.waitForSelector('[data-testid="boot-ms"]', { state: 'attached', timeout: 60000 })
   log(`  booted OFFLINE in ${await page.textContent('[data-testid="boot-ms"]')}`)
   check('app boots offline', true)
 

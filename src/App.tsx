@@ -1,4 +1,4 @@
-import { IconArrowLeft } from '@tabler/icons-react'
+import { IconArrowLeft, IconInfoCircle } from '@tabler/icons-react'
 import { LayoutOverlay } from './components/LayoutOverlay'
 import { useEffect, useState } from 'react'
 import './App.css'
@@ -154,10 +154,46 @@ export default function App() {
         </NavProvider>
       </VersionGroupProvider>
 
+      {/*
+        THE FOOTER IS A SIGNATURE NOW, not a readout. It carried the boot line --
+        decode time, byte count, six entity counts and the dex range -- across the
+        full width of every screen in the app. That is a diagnostic: true, useful
+        once, and re-read never, while occupying the one row that is on screen at
+        all times. It moved to the info control below; what is left is centred,
+        small and quiet.
+      */}
       <footer className="app-footer">
+        <p className="app-footer-mark">Powered by HRz</p>
+      </footer>
+
+      {/*
+        THE BOOT READOUT, behind an "i" pinned to the bottom-right of the VIEWPORT
+        -- fixed, so it does not travel with any module's scroller and is in the
+        same corner on every page.
+
+        CSS-ONLY REVEAL, the same mechanism the Team Builder's InfoTip uses and for
+        the same reason: :hover/:focus-within on the wrapper needs no state, no
+        enter/leave timers and no cleanup. The trigger is a real button so the
+        panel is reachable by keyboard; it does nothing on click.
+
+        IT KEEPS data-testid="boot-status". Half the suites wait on that id to know
+        the data layer has come up, and the id followed the fact rather than the
+        element -- the trigger only renders once `boot` resolves, which is exactly
+        what it meant before.
+      */}
+      <div className="app-info">
+        <button
+          type="button"
+          className="app-info-trigger"
+          data-testid="boot-status"
+          aria-label="Data layer"
+          title="Data layer"
+        >
+          <IconInfoCircle size={15} stroke={1.5} aria-hidden focusable="false" />
+        </button>
         {/* Every figure here is a count or a measurement, so every one of them is
             in --font-numeric -- the words between them are not. */}
-        <p className="subtitle" data-testid="boot-status">
+        <p className="app-info-panel" role="tooltip">
           data layer ready in{' '}
           <span data-testid="boot-ms" className="num">
             {boot.ms.toFixed(0)} ms
@@ -174,7 +210,7 @@ export default function App() {
           <span className="num">{counts.berries}</span> berries · dex{' '}
           <span className="num">1–{meta.scope.max_species_id}</span>
         </p>
-      </footer>
+      </div>
 
       {/* Inert until switched on; see components/LayoutOverlay.tsx. Last child
           so it paints over everything, including the bar and the footer. */}

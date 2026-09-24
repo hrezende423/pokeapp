@@ -180,6 +180,100 @@
 }
 
 /*
+  The signature line, centred in the footer.
+
+  A LIGHTER GREY THAN --text-secondary, and mixed rather than picked: a new hex
+  would need a light value and a dark one and would then be a fourth text tone
+  nobody could name. Stepping --text-secondary toward whatever --surface is
+  follows both themes from one declaration -- the same move the drawn scroll thumb
+  makes. Caption size, the smallest step on the scale, because this is the one
+  piece of text on screen that nobody needs to read.
+*/
+.app-footer-mark {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: color-mix(in srgb, var(--text-secondary) 60%, var(--surface));
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/*
+  THE BOOT READOUT'S "i", fixed to the bottom-right of the VIEWPORT.
+
+  position: fixed, not absolute: .panel is the app's scroll-owning flex column and
+  an absolute child would be positioned against it, which is nearly the same thing
+  today and stops being so the moment any module changes the shell. Fixed means
+  the corner of the window, which is what "does not scroll" actually asks for.
+
+  It sits in the footer band rather than over the content, and the module's own
+  back-to-top control is 0.75rem up inside the scroller above it, so the two never
+  meet. z-index 40 clears the app bar's dropdown panels (30) and stays well under
+  the layout overlay (9999), which is meant to paint over everything.
+*/
+.app-info {
+  position: fixed;
+  right: 1rem;
+  bottom: 0.45rem;
+  z-index: 40;
+  line-height: 0;
+}
+
+.app-info-trigger {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: color-mix(in srgb, var(--text-secondary) 60%, var(--surface));
+  background: none;
+  border: 0;
+  cursor: help;
+  line-height: 0;
+}
+
+.app-info-trigger:hover,
+.app-info:focus-within .app-info-trigger {
+  color: var(--text-secondary);
+}
+
+.app-info-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/*
+  The panel. display: none until the wrapper is hovered or holds focus -- no
+  state, no timers, and nothing in the event path.
+
+  It opens UP and to the LEFT because the trigger is in the bottom-right corner
+  and there is no room in either of the other two directions. max-width keeps the
+  boot line to a readable measure instead of one 700px sentence.
+*/
+.app-info-panel {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: min(30rem, calc(100vw - 2rem));
+  margin: 0;
+  padding: var(--space-gap-sm) var(--space-gap-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  text-align: left;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+}
+
+.app-info:hover .app-info-panel,
+.app-info:focus-within .app-info-panel {
+  display: block;
+}
+
+/*
   Placeholder screens for nav destinations that have no feature yet. Deliberately
   plain: tokens only, no layout work, nothing that could read as a half-built
   feature rather than an empty room.
