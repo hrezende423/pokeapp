@@ -1,0 +1,126 @@
+/*
+  Calculators.
+
+  TOKEN-SCALED (MODULE-PATTERNS §1): this is a set of forms, not a Figma frame
+  reproduction, so sizes come from --font-size-* and --space-* directly.
+
+  ITS OWN GAP SCALE, same reason Type Coverage declares --tc-*: the design
+  system's --space-gap-* starts at 8px, which is coarser than a form wants
+  between a label and its field.
+*/
+
+.calc {
+  --calc-1: 4px;
+  --calc-2: 8px;
+  --calc-3: 12px;
+  --calc-4: 16px;
+  --calc-field: 200px;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding: var(--space-gap-md) var(--space-gap-lg) 0;
+}
+
+.calc-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-gap-lg);
+  margin-bottom: var(--space-gap-md);
+  flex: none;
+}
+
+.calc-title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-medium);
+  line-height: 24px;
+}
+
+.calc-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-xl);
+  padding-bottom: var(--space-gap-xl);
+  max-width: 720px;
+}
+
+/* ------------------------------------------------------------------ tools */
+
+.calc-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-lg);
+}
+
+.calc-tool-note {
+  color: var(--text-secondary);
+  font-size: var(--font-size-body);
+  max-width: 60ch;
+}
+
+.calc-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--calc-3);
+}
+
+.calc-section-heading {
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.calc-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--calc-field), 1fr));
+  gap: var(--calc-4);
+}
+
+.calc-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--calc-4);
+  align-items: center;
+}
+
+.calc-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--calc-2);
+  font-size: var(--font-size-body);
+}
+
+/* ------------------------------------------------------------------ result */
+
+.calc-result {
+  border-top: 1px solid var(--border);
+  padding-top: var(--calc-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--calc-2);
+}
+
+.calc-result-headline {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-medium);
+}
+
+.calc-result-headline .num {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.calc-result-note {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+/* --accent's third sanctioned use: error/validation emphasis. */
+.calc-result-note[data-tone='alert'] {
+  color: var(--accent);
+}

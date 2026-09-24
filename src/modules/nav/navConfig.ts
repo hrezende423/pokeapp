@@ -1,3 +1,4 @@
+import { CALCULATORS_PAGES, findCalculatorsPage, type CalculatorsPageId } from '../calculators/pages'
 import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
@@ -27,7 +28,7 @@ import type { ComponentType } from 'react'
  * stubs (they have a real component). Keeping them separate is what lets findPage
  * resolve them without a stub fallback swallowing a real screen.
  */
-export type PageId = DexModuleId | TbPageId | TypeCoveragePageId | StubPageId
+export type PageId = DexModuleId | TbPageId | TypeCoveragePageId | CalculatorsPageId | StubPageId
 
 export interface NavEntry {
   /** The page this entry opens. */
@@ -99,14 +100,16 @@ export const NAV_TABS: readonly NavTab[] = [
   {
     id: 'tools',
     label: 'Tools',
-    entries: stubs(
-      'compare-pokemon',
-      'battle-simulator',
-      'training-optimization',
-      'breeding-planner',
-      // A leaf today. Give it `children` here when the calculators are scoped.
-      'calculators',
-    ),
+    /*
+      CALCULATORS LEADS, and is a real screen now rather than a stub -- see
+      calculators/pages.ts. It stays a single flat entry rather than gaining
+      `children`: the five tools are tabs of ONE screen (the Type Coverage
+      shape), not five destinations, so there is nothing to nest here.
+    */
+    entries: [
+      ...CALCULATORS_PAGES.map((p) => ({ id: p.id, label: p.label })),
+      ...stubs('compare-pokemon', 'battle-simulator', 'training-optimization', 'breeding-planner'),
+    ],
   },
 ]
 
@@ -135,6 +138,8 @@ export function findPage(id: PageId): ResolvedPage {
   if (tb) return { id: tb.id, label: tb.label, Component: tb.Component }
   const tc = findTypeCoveragePage(id)
   if (tc) return { id: tc.id, label: tc.label, Component: tc.Component }
+  const calc = findCalculatorsPage(id)
+  if (calc) return { id: calc.id, label: calc.label, Component: calc.Component }
   const stub = findStub(id)
   if (stub) return { id: stub.id, label: stub.label, Component: StubPage }
   // Not reachable through PageId; findPage is also the shell's fallback.
