@@ -56,10 +56,6 @@ export function SpeciesBanner({
 
   return (
     <header className="species-banner" data-testid="species-banner" data-species-id={species.id}>
-      <span className="species-banner-number num" data-testid="species-banner-number">
-        #{String(species.id).padStart(4, '0')}
-      </span>
-
       <div className="species-banner-title">
         <h2 className="species-banner-name" data-testid="species-banner-name">
           {species.display_name}

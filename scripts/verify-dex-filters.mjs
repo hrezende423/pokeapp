@@ -538,13 +538,12 @@ try {
     groups and the EV yield were each one cell holding a middot-separated run,
     which cannot be sorted or scanned; there are two type columns, two ability
     columns plus the hidden slot, two egg-group columns and one EV column per
-    stat now. That makes the identity block fifteen columns rather than twelve,
-    and it still has to land inside the window -- which is measured below
+    stat now. That makes the identity block thirteen columns, with the entry
+    numbers gone from it entirely (see speciesColumns.tsx), and it still has to
+    land inside the window -- which is measured below
     against the SCROLLER, not against the table's own wrapper.
   */
   const IDENTITY = [
-    'Nat #',
-    'Reg #',
     'Name',
     'Type 1',
     'Type 2',
@@ -582,7 +581,7 @@ try {
   }, IDENTITY.length)
   log(`  table: ${table.columns} columns, the identity block ends at ${table.identityRight}px`)
   log(`  labels: ${table.labels.join(' | ')}`)
-  check('forty-four columns', table.columns === 44, String(table.columns))
+  check('forty-two columns', table.columns === 42, String(table.columns))
   check(
     'the joined cells are split to the slots the games have',
     JSON.stringify(table.labels.slice(0, IDENTITY.length)) === JSON.stringify(IDENTITY),
@@ -590,9 +589,9 @@ try {
   )
   check(
     'one EV yield column per stat, named for it',
-    JSON.stringify(table.labels.slice(17, 23)) ===
+    JSON.stringify(table.labels.slice(15, 21)) ===
       JSON.stringify(['HP EVY', 'Atk EVY', 'Def EVY', 'SpA EVY', 'SpD EVY', 'Spe EVY']),
-    table.labels.slice(17, 23).join(','),
+    table.labels.slice(15, 21).join(','),
   )
   check(
     'the identity block still fits the window',
@@ -705,7 +704,7 @@ try {
     document.querySelector('[data-testid="pokedex-grid-scroll-area"]').scrollLeft = 0
   })
 
-  const charmander = await page.$eval('[data-testid="species-row-4"] td:nth-child(5)', (td) =>
+  const charmander = await page.$eval('[data-testid="species-row-4"] td:nth-child(3)', (td) =>
     td.textContent.trim(),
   )
 
@@ -716,56 +715,51 @@ try {
     return cells.map((c) => c.textContent.trim())
   })
   const bulba = speciesById[1]
-  log(`  Bulbasaur row: ${bulbaRow.slice(0, 23).join(' | ')}`)
-  check(
-    "the regional dex number is the SELECTED game's, not the national one",
-    bulbaRow[1] === String(bulba.pokedex_numbers['updated-johto']).padStart(3, '0'),
-    `${bulbaRow[1]} vs ${bulba.pokedex_numbers['updated-johto']}`,
-  )
+  log(`  Bulbasaur row: ${bulbaRow.slice(0, 21).join(' | ')}`)
   /* Lower-cased: the type labels are capitalised by CSS, the same as everywhere
      else in the app, so the DOM text is the bundle's own slug. */
   check(
     'the two types are two columns',
-    bulbaRow[3].toLowerCase() === 'grass' && bulbaRow[4].toLowerCase() === 'poison',
-    `${bulbaRow[3]} / ${bulbaRow[4]}`,
+    bulbaRow[1].toLowerCase() === 'grass' && bulbaRow[2].toLowerCase() === 'poison',
+    `${bulbaRow[1]} / ${bulbaRow[2]}`,
   )
   check(
     'a species with one type prints a dash in the second, never an empty cell',
     charmander === '—',
     charmander,
   )
-  check('the first ability slot', bulbaRow[5] === 'Overgrow', bulbaRow[5])
+  check('the first ability slot', bulbaRow[3] === 'Overgrow', bulbaRow[3])
   check(
     'and the hidden slot is a dash in Gen 1-4, where hidden abilities do not exist',
-    bulbaRow[7] === '—',
-    bulbaRow[7],
+    bulbaRow[5] === '—',
+    bulbaRow[5],
   )
   check(
     'egg groups come from the bundle, one per column',
-    bulbaRow[15] === 'Monster' && bulbaRow[16] === 'Grass',
-    `${bulbaRow[15]} / ${bulbaRow[16]}`,
+    bulbaRow[13] === 'Monster' && bulbaRow[14] === 'Grass',
+    `${bulbaRow[13]} / ${bulbaRow[14]}`,
   )
   check(
     'the EV yield is one number per stat, zero where it yields none',
-    bulbaRow.slice(17, 23).join(',') === '0,0,0,1,0,0',
-    bulbaRow.slice(17, 23).join(','),
+    bulbaRow.slice(15, 21).join(',') === '0,0,0,1,0,0',
+    bulbaRow.slice(15, 21).join(','),
   )
-  check('catch rate', bulbaRow[25] === String(bulba.capture_rate), bulbaRow[25])
+  check('catch rate', bulbaRow[23] === String(bulba.capture_rate), bulbaRow[23])
   check(
     'base experience',
-    bulbaRow[27] === String(defaultVariety(bulba).base_experience),
-    bulbaRow[27],
+    bulbaRow[25] === String(defaultVariety(bulba).base_experience),
+    bulbaRow[25],
   )
-  check('gender ratio', bulbaRow[28] === '87.5% ♂ / 12.5% ♀', bulbaRow[28])
-  check('egg cycles', bulbaRow[30] === String(bulba.hatch_counter), bulbaRow[30])
-  check('genus', bulbaRow[34] === bulba.genus, bulbaRow[34])
-  check('evolution stage', bulbaRow[40] === '1', bulbaRow[40])
+  check('gender ratio', bulbaRow[26] === '87.5% ♂ / 12.5% ♀', bulbaRow[26])
+  check('egg cycles', bulbaRow[28] === String(bulba.hatch_counter), bulbaRow[28])
+  check('genus', bulbaRow[32] === bulba.genus, bulbaRow[32])
+  check('evolution stage', bulbaRow[38] === '1', bulbaRow[38])
   check(
     'evolves to, with the trigger condition spelled out',
-    bulbaRow[42]?.startsWith('Ivysaur (Level 16'),
-    bulbaRow[42],
+    bulbaRow[40]?.startsWith('Ivysaur (Level 16'),
+    bulbaRow[40],
   )
-  check('and "further evolutions" is answered', bulbaRow[43] === 'Yes', bulbaRow[43])
+  check('and "further evolutions" is answered', bulbaRow[41] === 'Yes', bulbaRow[41])
   await page.screenshot({ path: `${SHOTS}/dexf-pokedex-list.png` })
 
   check(
@@ -787,9 +781,6 @@ try {
     listSpeedValues.every((v, i) => i === 0 || v >= listSpeedValues[i - 1]),
     listSpeedValues.slice(0, 8).join(','),
   )
-  await page.click('[data-testid="species-sort-natdex"]')
-  await page.waitForTimeout(250)
-
   // Back to the grid for the sections that follow.
   await page.click('[data-testid="toggle-species-view"]')
   await page.waitForTimeout(300)

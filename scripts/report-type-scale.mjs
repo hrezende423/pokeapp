@@ -95,7 +95,6 @@ try {
     ['hero name', '.species-hero-name', 51.1, 'hu'],
     ['hero romanisation', '.species-hero-roma', 51.1, 'hu'],
     ['region label', '.species-hero-region', 34.07, 'hu'],
-    ['banner dex number', '.species-banner-number', 43, 'dp'],
     ['banner name', '.species-banner-name', 66, 'dp'],
     ['banner genus', '.species-banner-genus', 40, 'dp'],
     ['banner type row', '.species-banner-types .ds-type', 26, 'dp'],

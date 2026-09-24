@@ -105,7 +105,7 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       case 'movedex': {
         const entries = moveEntries(scope)
         // No sort fields: this list is a table and its headers are its sort.
-        return erase('movedex', entries, movedexSections(availableTypes), [], null)
+        return erase('movedex', entries, movedexSections(entries, availableTypes), [], null)
       }
       case 'itemdex': {
         const entries = itemEntries(scope)

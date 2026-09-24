@@ -62,7 +62,12 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
           rowKey={(row) => row.species.id}
           onRowClick={(row) => onSelect(row.species.id)}
           selectedKey={selectedId}
-          initialSort="natdex"
+          /*
+            NO initialSort. It was "natdex", and that column is gone with every
+            other printed entry number -- the rows already arrive in dex order
+            from the shared query's default sort, so the table simply shows them
+            in it rather than re-sorting by a key that no longer exists.
+          */
           testId="species-rows"
           emptyNote="No species match those filters."
         />
@@ -111,7 +116,6 @@ export function SpeciesList({ selectedId, onSelect, layout = 'rail' }: Props) {
               }
               onClick={() => onSelect(species.id)}
             >
-              <span className="dex-no">#{String(species.id).padStart(3, '0')}</span>
               <span className="species-name">{species.display_name}</span>
               <span className="row-types">
                 {typeIds.map((id) => (

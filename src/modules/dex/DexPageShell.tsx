@@ -183,7 +183,6 @@ export function LedgerList({
             className={selectedId === r.id ? 'species-row species-row-active' : 'species-row'}
             onClick={() => onSelect(r.id)}
           >
-            <span className="dex-no">#{String(r.id).padStart(3, '0')}</span>
             <span className="row-main">
               <span className="row-title">
                 <span className="species-name">{r.label}</span>

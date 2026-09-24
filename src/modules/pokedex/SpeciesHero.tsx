@@ -66,7 +66,8 @@ export function SpeciesHero({
 
   return (
     <div className="species-hero" data-testid="species-hero" data-dex={species.id}>
-      {/* Decorative: the real number is in the banner, where it is read. */}
+      {/* Decorative, and now the only place the number appears on this page at
+          all: the banner printed it as a readout and no longer does. */}
       <span className="species-hero-ghost" data-testid="species-hero-ghost" aria-hidden>
         {String(species.id).padStart(3, '0')}
       </span>

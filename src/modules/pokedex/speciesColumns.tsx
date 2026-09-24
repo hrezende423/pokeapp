@@ -30,13 +30,26 @@ import { statFieldsFor, type SpeciesRow } from './speciesQuery'
  * games themselves have -- two types, two abilities and a hidden one, two egg
  * groups, one EV yield per stat -- so every cell holds a single value or a dash.
  *
- * THE IDENTITY BLOCK FITS THE WINDOW, deliberately and by measurement: national
- * number through Speed, which is the block that answers "what is this and how
- * good is it". Splitting the joined cells made that block fifteen columns rather
- * than twelve, and the widths below are sized so it still lands inside a normal
- * window; verify-dex-filters measures it rather than trusting it. Everything
- * after Speed is over the horizontal scroll, which the list view now actually
- * draws a bar for.
+ * NO ENTRY-NUMBER COLUMNS. "Nat #" and "Reg #" led this table and are gone, with
+ * every other printed entry number in the dexes -- the number is still what the
+ * list is ORDERED by (the Sort menu's "Dex #") and still printed beside a global
+ * search hit, which is the one place it answers a question. As a column it was
+ * two cells of ordinal that nobody reads across 493 rows.
+ *
+ * THE IDENTITY BLOCK FITS THE WINDOW, deliberately and by measurement: Name
+ * through Speed, which is the block that answers "what is this and how good is
+ * it". Splitting the joined cells made that block thirteen columns; the widths
+ * below are sized so it still lands inside a normal window, and
+ * verify-dex-filters measures it rather than trusting it. Everything after Speed
+ * is over the horizontal scroll, which the list view draws a bar for.
+ *
+ * EVERY WIDTH IS MEASURED, not chosen. Each one is the larger of what its HEADER
+ * needs (the label at --font-size-caption, uppercase, plus the 4px gap and the
+ * sort arrow it has to hold when active) and what its WIDEST CELL needs, plus the
+ * cell padding and 2px of air -- so a column is as wide as the thing in it and no
+ * wider. Two are deliberate CLAMPS rather than fits: "Held items" and "Evolves
+ * to" have cells of 208px and 1347px, and one Eevee would otherwise set the width
+ * of all 493 rows, so those two ellipsize and the detail page carries the rest.
  *
  * ERA CORRECTNESS runs through the same resolvers as everywhere else: abilities
  * do not exist before Generation 3 and neither does the EV yield, egg groups
@@ -48,37 +61,6 @@ const DASH = '—'
 
 const titleCase = (value: string | null | undefined) =>
   value ? value.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : DASH
-
-/**
- * Which regional dex a game numbers its species by.
- *
- * Written out rather than derived: a generation does not determine it --
- * FireRed/LeafGreen are Generation 3 games that use the KANTO dex, Platinum
- * extends Diamond/Pearl's Sinnoh dex rather than sharing it, and HeartGold/
- * SoulSilver use the updated Johto one. The three entries with no regional dex
- * at all (Colosseum, XD, and the "All games" scope, which is not one game) are
- * null on purpose, and the column prints a dash rather than borrowing a number
- * from a game the reader did not pick.
- */
-const REGIONAL_DEX: Record<string, string> = {
-  'red-blue': 'kanto',
-  yellow: 'kanto',
-  'red-green-japan': 'kanto',
-  'blue-japan': 'kanto',
-  'gold-silver': 'original-johto',
-  crystal: 'original-johto',
-  'ruby-sapphire': 'hoenn',
-  emerald: 'hoenn',
-  'firered-leafgreen': 'kanto',
-  'diamond-pearl': 'original-sinnoh',
-  platinum: 'extended-sinnoh',
-  'heartgold-soulsilver': 'updated-johto',
-}
-
-export function regionalDexKey(versionGroup: VersionGroup | null): string | null {
-  if (!versionGroup) return null
-  return REGIONAL_DEX[versionGroup.name] ?? null
-}
 
 /** A yes/no field, printed as a word rather than a tick nobody can sort. */
 const flag = (on: boolean) => (on ? 'Yes' : 'No')
@@ -128,17 +110,14 @@ export function speciesColumns({
   generation,
   versionGroup,
 }: SpeciesColumnScope): Column<SpeciesRow>[] {
-  const dexKey = regionalDexKey(versionGroup)
   const versions = (versionGroup?.versions ?? []).filter((v): v is string => v != null)
-  const regional = (row: SpeciesRow) =>
-    dexKey ? (row.species.pokedex_numbers[dexKey] ?? null) : null
 
   const statFields = statFieldsFor(generation)
 
   const statColumns: Column<SpeciesRow>[] = statFields.map((stat) => ({
     key: `stat-${stat.key}`,
     label: stat.label,
-    width: '3.4rem',
+    width: STAT_WIDTHS[stat.key] ?? '3.9rem',
     numeric: true,
     sortValue: (row) => row.stats[stat.key] ?? null,
     render: (row) => <span className="num">{row.stats[stat.key] ?? DASH}</span>,
@@ -150,7 +129,7 @@ export function speciesColumns({
       : statFields.map((stat) => ({
           key: `ev-${stat.key}`,
           label: `${EV_LABELS[stat.key] ?? stat.label} EVY`,
-          width: '4.2rem',
+          width: EV_WIDTHS[stat.key] ?? '3.7rem',
           numeric: true,
           sortValue: (row) => row.evs[stat.key] ?? 0,
           render: (row) => <span className="num">{row.evs[stat.key] ?? 0}</span>,
@@ -158,28 +137,9 @@ export function speciesColumns({
 
   return [
     {
-      key: 'natdex',
-      label: 'Nat #',
-      width: '3.9rem',
-      numeric: true,
-      sortValue: (row) => row.species.id,
-      render: (row) => <span className="num">{String(row.species.id).padStart(4, '0')}</span>,
-    },
-    {
-      key: 'regdex',
-      label: 'Reg #',
-      width: '3.9rem',
-      numeric: true,
-      sortValue: (row) => regional(row),
-      render: (row) => {
-        const n = regional(row)
-        return <span className="num">{n != null ? String(n).padStart(3, '0') : DASH}</span>
-      },
-    },
-    {
       key: 'name',
       label: 'Name',
-      width: '7.5rem',
+      width: '4.05rem',
       sortValue: (row) => row.species.display_name,
       render: (row) => row.species.display_name,
     },
@@ -194,14 +154,14 @@ export function speciesColumns({
     {
       key: 'type1',
       label: 'Type 1',
-      width: '4.8rem',
+      width: '3.5rem',
       sortValue: (row) => typeName(row, 0),
       render: (row) => typeCell(row, 0),
     },
     {
       key: 'type2',
       label: 'Type 2',
-      width: '4.8rem',
+      width: '3.5rem',
       sortValue: (row) => typeName(row, 1),
       render: (row) => typeCell(row, 1),
     },
@@ -217,28 +177,28 @@ export function speciesColumns({
     {
       key: 'ability1',
       label: 'Ability 1',
-      width: '7.6rem',
+      width: '5.15rem',
       sortValue: (row) => abilitySlot(row, generation, 1),
       render: (row) => abilitySlot(row, generation, 1) ?? DASH,
     },
     {
       key: 'ability2',
       label: 'Ability 2',
-      width: '7.6rem',
+      width: '5.15rem',
       sortValue: (row) => abilitySlot(row, generation, 2),
       render: (row) => abilitySlot(row, generation, 2) ?? DASH,
     },
     {
       key: 'abilityHidden',
       label: 'Hidden ability',
-      width: '7.6rem',
+      width: '6.1rem',
       sortValue: (row) => hiddenAbility(row, generation),
       render: (row) => hiddenAbility(row, generation) ?? DASH,
     },
     {
       key: 'bst',
       label: 'BST',
-      width: '3.6rem',
+      width: '2.3rem',
       numeric: true,
       sortValue: (row) => row.bst,
       render: (row) => <span className="num">{row.bst}</span>,
@@ -247,14 +207,14 @@ export function speciesColumns({
     {
       key: 'eggGroup1',
       label: 'Egg group 1',
-      width: '6.8rem',
+      width: '5.15rem',
       sortValue: (row) => eggGroupNames(row)[0] ?? null,
       render: (row) => eggGroupNames(row)[0] ?? DASH,
     },
     {
       key: 'eggGroup2',
       label: 'Egg group 2',
-      width: '6.8rem',
+      width: '5.15rem',
       sortValue: (row) => eggGroupNames(row)[1] ?? null,
       render: (row) => eggGroupNames(row)[1] ?? DASH,
     },
@@ -271,7 +231,7 @@ export function speciesColumns({
     {
       key: 'height',
       label: 'Height',
-      width: '4.6rem',
+      width: '3.45rem',
       numeric: true,
       sortValue: (row) => row.height,
       render: (row) => (
@@ -284,7 +244,7 @@ export function speciesColumns({
     {
       key: 'weight',
       label: 'Weight',
-      width: '5.4rem',
+      width: '3.6rem',
       numeric: true,
       sortValue: (row) => row.weight,
       render: (row) => (
@@ -297,7 +257,7 @@ export function speciesColumns({
     {
       key: 'catchRate',
       label: 'Catch rate',
-      width: '4.8rem',
+      width: '4.75rem',
       numeric: true,
       sortValue: (row) => row.species.capture_rate,
       render: (row) => <span className="num">{row.species.capture_rate ?? DASH}</span>,
@@ -305,7 +265,7 @@ export function speciesColumns({
     {
       key: 'friendship',
       label: 'Friendship',
-      width: '5rem',
+      width: '4.9rem',
       numeric: true,
       sortValue: (row) => row.species.base_happiness,
       render: (row) => <span className="num">{row.species.base_happiness ?? DASH}</span>,
@@ -313,7 +273,7 @@ export function speciesColumns({
     {
       key: 'baseExp',
       label: 'Base EXP',
-      width: '5rem',
+      width: '4.05rem',
       numeric: true,
       sortValue: (row) => row.variety.base_experience,
       render: (row) => <span className="num">{row.variety.base_experience ?? DASH}</span>,
@@ -321,7 +281,7 @@ export function speciesColumns({
     {
       key: 'gender',
       label: 'Gender ratio',
-      width: '7.5rem',
+      width: '6.15rem',
       // Sorted by the underlying eighths, so the column reads as a scale rather
       // than alphabetically by the label that describes it.
       sortValue: (row) => row.species.gender_rate ?? -1,
@@ -330,7 +290,7 @@ export function speciesColumns({
     {
       key: 'growth',
       label: 'Growth rate',
-      width: '8rem',
+      width: '6.3rem',
       sortValue: (row) => row.species.growth_rate,
       render: (row) => titleCase(row.species.growth_rate),
     },
@@ -345,11 +305,13 @@ export function speciesColumns({
     {
       key: 'color',
       label: 'Colour',
-      width: '5rem',
+      width: '3.55rem',
       sortValue: (row) => row.species.color,
       render: (row) => titleCase(row.species.color),
     },
     {
+      // A CLAMP, not a fit: the widest cell is 208px of joined item names. See
+      // the note at the top about the two columns that ellipsize on purpose.
       key: 'heldItems',
       label: 'Held items',
       width: '11rem',
@@ -359,28 +321,28 @@ export function speciesColumns({
     {
       key: 'genderDiff',
       label: 'Gender diff.',
-      width: '5.4rem',
+      width: '5.3rem',
       sortValue: (row) => flag(row.species.has_gender_differences),
       render: (row) => flag(row.species.has_gender_differences),
     },
     {
       key: 'genus',
       label: 'Genus',
-      width: '9rem',
+      width: '7.4rem',
       sortValue: (row) => row.species.genus,
       render: (row) => row.species.genus ?? DASH,
     },
     {
       key: 'shape',
       label: 'Body shape',
-      width: '6rem',
+      width: '4.95rem',
       sortValue: (row) => row.species.shape,
       render: (row) => titleCase(row.species.shape),
     },
     {
       key: 'generation',
       label: 'Gen',
-      width: '3.4rem',
+      width: '2.4rem',
       numeric: true,
       sortValue: (row) => row.species.generation_id,
       render: (row) => <span className="num">{row.species.generation_id ?? DASH}</span>,
@@ -388,28 +350,28 @@ export function speciesColumns({
     {
       key: 'baby',
       label: 'Baby',
-      width: '4rem',
+      width: '2.75rem',
       sortValue: (row) => flag(row.species.is_baby),
       render: (row) => flag(row.species.is_baby),
     },
     {
       key: 'legendary',
       label: 'Legendary',
-      width: '5rem',
+      width: '4.7rem',
       sortValue: (row) => flag(row.species.is_legendary),
       render: (row) => flag(row.species.is_legendary),
     },
     {
       key: 'mythical',
       label: 'Mythical',
-      width: '5rem',
+      width: '4.25rem',
       sortValue: (row) => flag(row.species.is_mythical),
       render: (row) => flag(row.species.is_mythical),
     },
     {
       key: 'evoStage',
       label: 'Evo stage',
-      width: '4.8rem',
+      width: '4.4rem',
       numeric: true,
       sortValue: (row) => evolutionFacts(row.species).stage,
       render: (row) => <span className="num">{evolutionFacts(row.species).stage ?? DASH}</span>,
@@ -417,11 +379,14 @@ export function speciesColumns({
     {
       key: 'evolvesFrom',
       label: 'Evolves from',
-      width: '7.5rem',
+      width: '5.6rem',
       sortValue: (row) => evolutionFacts(row.species).evolvesFrom?.display_name ?? null,
       render: (row) => evolutionFacts(row.species).evolvesFrom?.display_name ?? DASH,
     },
     {
+      // The other clamp, and by far the wider one: Eevee's seven evolutions with
+      // their conditions measure 1347px. 20rem shows the common one-evolution
+      // case whole and ellipsizes the rest.
       key: 'evolvesTo',
       label: 'Evolves to',
       width: '20rem',
@@ -440,7 +405,7 @@ export function speciesColumns({
     {
       key: 'hasFurther',
       label: 'Further evo',
-      width: '5.4rem',
+      width: '5.25rem',
       sortValue: (row) => flag(evolutionFacts(row.species).hasFurther),
       render: (row) => flag(evolutionFacts(row.species).hasFurther),
     },
@@ -456,6 +421,36 @@ export function speciesColumns({
  * key rather than derived by truncating the label, because no rule that turns
  * "Defense" into "Def" also turns "Sp. Atk" into "SpA".
  */
+/**
+ * Per-stat column widths for the two stat blocks, sized to the HEADER in both
+ * cases -- three digits are narrower than every one of these labels.
+ *
+ * Keyed rather than uniform because "HP" and "Defense" are not the same width and
+ * a block padded to its widest member is six columns of the same wasted 30px.
+ * Gen 1's combined `special` is here too, so the era swap changes the label AND
+ * the width together.
+ */
+const STAT_WIDTHS: Record<string, string> = {
+  hp: '2rem',
+  attack: '3.45rem',
+  defense: '3.85rem',
+  special: '3.4rem',
+  'special-attack': '3.4rem',
+  'special-defense': '3.4rem',
+  speed: '3.1rem',
+}
+
+/** The same, for the EV block, whose labels carry the " EVY" suffix. */
+const EV_WIDTHS: Record<string, string> = {
+  hp: '3.3rem',
+  attack: '3.65rem',
+  defense: '3.65rem',
+  special: '3.65rem',
+  'special-attack': '3.65rem',
+  'special-defense': '3.7rem',
+  speed: '3.65rem',
+}
+
 const EV_LABELS: Record<string, string> = {
   hp: 'HP',
   attack: 'Atk',

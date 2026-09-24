@@ -197,10 +197,17 @@
   border-top: 1px solid var(--border);
 }
 
+/*
+  ONE COLUMN, not two. This was `'dex name' / 'dex types'` -- a 2.9rem number
+  gutter beside a stacked name and type row -- and the number is gone from every
+  dex surface. The areas stay named rather than becoming a plain block, because
+  the ledger list overrides this same class into a flex row and the two layouts
+  are easier to tell apart when both are stated.
+*/
 .species-row {
   display: grid;
-  grid-template-columns: 2.9rem minmax(0, 1fr);
-  grid-template-areas: 'dex name' 'dex types';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'name' 'types';
   gap: 0 0.4rem;
   align-items: center;
   width: 100%;
@@ -213,10 +220,6 @@
   border: 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
-}
-
-.species-row .dex-no {
-  grid-area: dex;
 }
 
 .species-row .species-name {
@@ -241,11 +244,16 @@
 /*
   A catalog number in a list, which is one of the cases --font-numeric exists for.
 
-  This rule previously set font-variant-numeric but NOT font-family, so it was
-  asking for tabular digits from whatever family had already applied -- Plex Sans,
-  inherited from the shell. Only .species-card .dex-no named the face, which is
-  why the grid cards looked right and every ledger row did not. Exactly the
-  failure mode CLAUDE.md records under "font stack order matters", one level up.
+  ONE CALLER LEFT: the global search results, inside the Search/Filter menu. Every
+  dex surface that printed an entry number -- the grid card, the rail row, the
+  ledger row, the species banner, the list view's two leading columns -- no longer
+  does. A search hit still needs it: the number is how you tell two forms of the
+  same name apart in a flat result list.
+
+  It sets font-family as well as font-variant-numeric, which it did not always do:
+  asking for tabular digits from whatever family had already applied got Plex Sans
+  from the shell. Exactly the failure mode CLAUDE.md records under "font stack
+  order matters", one level up.
 */
 .dex-no {
   color: var(--text);
@@ -353,18 +361,20 @@
   THE WIDE TABLE, and why it does not inherit the six-column widths above.
 
   `.data-table th:nth-child(n)` was written for the Movedex's six columns and
-  applies to every data table in the app. This one has forty-four, so it takes
+  applies to every data table in the app. This one has forty-two, so it takes
   its widths from a <colgroup> instead -- one width per column, declared beside
-  the column in speciesColumns.tsx, which is the only way forty-four widths stay
+  the column in speciesColumns.tsx, which is the only way forty-two widths stay
   readable and the only way the "the identity block fits the window" promise is a
-  sum you can check. The rules that make a colgroup authoritative live with the
+  sum you can check. Every one of those widths is MEASURED against the column's
+  header and its widest cell rather than chosen; see the note in that file. The rules that make a colgroup authoritative live with the
   fallbacks themselves (see .data-table-sized below); the reset here is kept
   because this table's own widths are the point of it.
 
   SMALLER TYPE AND REGULAR WEIGHT. The table is the densest thing in the app and
-  was drawing at --font-size-body; at label size forty-four columns are legible
-  without the page needing a zoom, and the identity block fits a 1280px window. Regular weight throughout, including the name cell, which was
-  medium: at this density a bolded column reads as a heading rather than as data.
+  was drawing at --font-size-body; at label size forty-two columns are legible
+  without the page needing a zoom, and the identity block fits a 1280px window.
+  Regular weight throughout, including the name cell, which was medium: at this
+  density a bolded column reads as a heading rather than as data.
 */
 .species-list-table .data-table {
   font-size: var(--font-size-label);
@@ -375,12 +385,20 @@
   width: auto;
 }
 
+/*
+  4px, not 6px, of side padding -- and it is the gap BETWEEN columns that this
+  actually sets, since a column's own width is now measured to its content. Two
+  cells apart used to have 12px of nothing between them in a table whose numbers
+  are three digits wide; 8px still separates them without the eye having to
+  travel. The header button matches, or the labels would no longer sit over their
+  columns' left edge.
+*/
 .species-list-table .data-table td {
-  padding: 4px 6px;
+  padding: 4px 4px;
 }
 
 .species-list-table .data-table-sort {
-  padding: 4px 6px;
+  padding: 4px 4px;
   font-size: var(--font-size-caption);
 }
 
@@ -538,15 +556,6 @@
   /* Figma: Name starts 6 raw after Number's box ends, on every card. */
   gap: 3px;
   min-width: 0;
-}
-
-.species-card .dex-no {
-  flex: none;
-  font-family: var(--font-numeric);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-regular);
-  color: var(--text-secondary);
 }
 
 /* 600, not 700: across all six names in the reference the measured fit is 14.00px
@@ -1321,12 +1330,23 @@
   text-align: left;
 }
 
-/* Brand and tabs travel together on the left, so justify-content keeps spreading
-   just the three groups rather than four loose items. */
+/*
+  Brand and tabs travel together on the left, so justify-content keeps spreading
+  just the three groups rather than four loose items.
+
+  CENTRED, NOT BASELINE-ALIGNED. Baseline is the right answer for a row of pure
+  text and the wrong one for this row, which is not: a back arrow, a brand, three
+  text tabs, and -- across the bar -- a toggle track, two more text triggers and a
+  theme control. Baseline hangs every glyph-only control below the line the words
+  sit on, which is why the back arrow already had to opt out with
+  `align-self: center`. One rule for the whole bar instead of one exception per
+  non-text child; the bar itself, the right-hand cluster and the utility row were
+  already centring, so this is the last row that disagreed.
+*/
 .app-bar-nav {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   /* Figma: "Pokeapp" ends at x=134, "Pokedex" starts at 154 -- the brand sits in
      the same 20-raw (8.5px) rhythm as the tabs, not in a separate cluster. */
   gap: 8.5px;
@@ -1340,10 +1360,10 @@
   outlined button here would be the loudest thing in a bar whose own tabs are
   bare text.
 
-  align-self: center because .app-bar-nav aligns its children on the BASELINE,
-  which is right for the brand and the five text tabs and wrong for a glyph:
-  baseline-aligned, an 18px icon hangs below the row it sits in. It is the one
-  child of that row which is not text, so it is the one that opts out.
+  It no longer needs `align-self: center` to sit straight -- .app-bar-nav centres
+  its children now, for exactly the reason this control needed the exception -- but
+  it keeps it: the declaration is true of this control regardless of what the row
+  around it does, and it costs nothing.
 
   Rendered only where there is a step to undo, so it is never a dead control;
   see the note at the call site in App.tsx for what that costs.
@@ -1400,11 +1420,12 @@
   dividers between items, radius-control, and no shadow. Elevation is the
   tone-step and nothing else.
 */
-/* The same 8.5px rhythm the reference uses between top-level nav labels. */
+/* The same 8.5px rhythm the reference uses between top-level nav labels, and the
+   same centring as the row that holds it -- see .app-bar-nav. */
 .app-nav {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 8.5px;
 }
 
@@ -1628,6 +1649,12 @@
   a single inline row, and its "View" heading is visually suppressed -- the two
   captions either side of the track already say what the control is, and the
   label stays in the DOM as the switch's accessible name.
+*/
+/*
+  ONE UNIT. The switch is a caption, a track and a second caption, and they centre
+  on EACH OTHER here -- so the group has a single vertical centre for the bar to
+  align, rather than three children the bar could align individually and leave
+  the track riding high against the words either side of it.
 */
 .app-controls-cluster .toggle {
   display: flex;
@@ -2472,11 +2499,6 @@
   border-bottom: 1px solid var(--hairline);
 }
 
-.ledger-list .dex-no {
-  flex: none;
-  width: 2.9rem;
-}
-
 /* Right-aligned, and allowed to give up its space before the name does. */
 .ledger-list .row-meta {
   flex: 0 1 auto;
@@ -3074,6 +3096,17 @@
 
 .dex-filter-more[data-open='true'] .dex-filter-more-panel {
   display: flex;
+}
+
+/*
+  BOLD, and it is the only bold thing in either menu. "More filters" is not a
+  label among the labels -- it is the control that reveals the other two thirds of
+  the panel, and at --font-size-caption in a column of same-sized text it read as
+  one more section heading. Weight is the one axis available: the menu is
+  deliberately one type size throughout, and --accent is spoken for.
+*/
+.dex-filter-more-toggle {
+  font-weight: var(--font-weight-bold);
 }
 
 .dex-filter-more-toggle[data-filters-active='true'] {
@@ -3798,11 +3831,6 @@
   gap: calc(4 * var(--dp-u));
   padding-top: calc(4 * var(--dp-u));
   min-width: 0;
-}
-
-.species-banner-number {
-  font-size: var(--font-size-title);
-  color: var(--text-secondary);
 }
 
 .species-banner-title {

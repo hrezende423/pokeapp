@@ -17,6 +17,7 @@
 
 import { LATEST_GENERATION, getItem } from '../../../data'
 import type { Ability, Berry, EggGroup, Item, Move, Nature, PokemonType } from '../../../data'
+import { moveRangeLabel } from '../moveFacts'
 import { asStrings, type FilterSection, type SortField } from './dexQuery'
 
 const titleCase = (value: string) =>
@@ -434,8 +435,51 @@ export function breedingdexSections(): FilterSection<EggGroup>[] {
  * place the app now keeps them. Its SORTING is its column headers, which is the
  * right control for a table and is why no sort fields are declared -- the bar's
  * Sort trigger only appears for a dex that has some.
+ *
+ * EVERY COLUMN OF THE TABLE IS NOW FILTERABLE, which it was not: the table
+ * offered eight columns and the menu could narrow by two of them, so "show me the
+ * physical Water moves over 80 power" was a sort and a scroll. Category and the
+ * three battle numbers, the range and the introduced generation are all here now,
+ * in the same order the table reads.
+ *
+ * CATEGORY IS PRIMARY, beside the type filter; the rest are behind "More
+ * filters". Category is the axis that halves the list and it is one row of three
+ * words, where the four numeric fields are eight inputs.
+ *
+ * THE OPTIONS AND BOUNDS ARE READ OFF THE ENTRY LIST, never written down. The
+ * list is already clamped by the selected game, so a hardcoded 1-4 would offer
+ * Generation 4 to someone playing Ruby, and a hardcoded power ceiling would stop
+ * describing the data the moment the bundle is rebuilt.
  */
-export function movedexSections(availableTypes: PokemonType[]): FilterSection<Move>[] {
+export function movedexSections(
+  entries: Move[],
+  availableTypes: PokemonType[],
+): FilterSection<Move>[] {
+  const present = <V,>(read: (m: Move) => V | null | undefined): V[] =>
+    [...new Set(entries.map(read))].filter((v): v is V => v != null)
+
+  /* Physical, Special, Status -- the games' own order, not alphabetical, and only
+     the classes actually present in scope. */
+  const categories = ['physical', 'special', 'status'].filter((c) =>
+    entries.some((m) => m.damage_class === c),
+  )
+
+  const targets = present((m) => m.target)
+    .map((slug) => ({ value: slug, label: moveRangeLabel(slug) }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+
+  const generations = present((m) => m.generation_id).sort((a, b) => a - b)
+
+  /* The real extent of each number, shown as the inputs' placeholders. A move
+     with no value at all is skipped here for the same reason the range filter
+     excludes it when matching: null is "no power / never misses", not zero. */
+  const extent = (read: (m: Move) => number | null | undefined) => {
+    const values = present(read)
+    return values.length > 0
+      ? { min: Math.min(...values), max: Math.max(...values) }
+      : { min: 0, max: 0 }
+  }
+
   return [
     nameSection<Move>('movedex', 'moves', (m) => m.display_name),
     {
@@ -449,6 +493,99 @@ export function movedexSections(availableTypes: PokemonType[]): FilterSection<Mo
           available: availableTypes,
           testIdPrefix: 'movedex-type',
           match: (move, selected) => move.type_id != null && selected.includes(move.type_id),
+        },
+      ],
+    },
+    {
+      id: 'category',
+      label: 'Category',
+      filters: [
+        {
+          /*
+            damage_class, NOT meta.category -- the same distinction the table's
+            Category column makes. meta.category is what a move DOES (ailment,
+            ohko, field-effect and thirteen more); this is how its damage is
+            calculated, which is what "category" means everywhere a player uses
+            the word.
+          */
+          kind: 'multi',
+          key: 'category',
+          label: 'Category',
+          options: categories.map((c) => ({ value: c, label: titleCase(c) })),
+          match: (move, selected) =>
+            move.damage_class != null && selected.includes(move.damage_class),
+        },
+      ],
+    },
+    {
+      id: 'numbers',
+      label: 'Battle numbers',
+      more: true,
+      filters: [
+        {
+          /*
+            A STATUS MOVE IS EXCLUDED BY ANY POWER BOUND, and that is the shared
+            range rule rather than a decision taken here: null is "this move has
+            no base power", which no numeric question can answer. Fixed-damage
+            moves (Dragon Rage, Seismic Toss) go with them -- the table prints
+            "40 hp" for those, and 40 hp is not 40 power.
+          */
+          kind: 'range',
+          key: 'power',
+          label: 'Power',
+          value: (move) => move.power,
+          bounds: extent((m) => m.power),
+        },
+        {
+          /* null accuracy means the move CANNOT MISS, not that the figure is
+             unknown -- so Swift and Aerial Ace drop out of "accuracy 80-100"
+             even though they never fail. The alternative, treating them as 100,
+             would put a move with no accuracy check inside a range of accuracy
+             checks. */
+          kind: 'range',
+          key: 'accuracy',
+          label: 'Accuracy',
+          value: (move) => move.accuracy,
+          bounds: extent((m) => m.accuracy),
+          unit: '%',
+        },
+        {
+          kind: 'range',
+          key: 'pp',
+          label: 'PP',
+          value: (move) => move.pp,
+          bounds: extent((m) => m.pp),
+        },
+      ],
+    },
+    {
+      id: 'range',
+      label: 'Range',
+      more: true,
+      filters: [
+        {
+          /* Sorted by LABEL, like the table's column, so the two readings that
+             collapse to "Selected target" sit together rather than at opposite
+             ends of a slug-ordered list. */
+          kind: 'multi',
+          key: 'range',
+          label: 'Range',
+          options: targets,
+          match: (move, selected) => move.target != null && selected.includes(move.target),
+        },
+      ],
+    },
+    {
+      id: 'generation',
+      label: 'Generation introduced',
+      more: true,
+      filters: [
+        {
+          kind: 'select',
+          key: 'generation',
+          label: 'Generation introduced',
+          options: generations.map((g) => ({ value: String(g), label: `Generation ${g}` })),
+          match: (move, value) => String(move.generation_id) === value,
         },
       ],
     },

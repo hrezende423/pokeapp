@@ -88,7 +88,6 @@ function BerryCard({ berry, onSelect }: { berry: Berry; onSelect: (id: number) =
       <ItemArtwork item={item} size={96} testId={`berrydex-art-${berry.id}`} />
       <span className="species-card-text">
         <span className="species-card-line">
-          <span className="dex-no">#{String(berry.id).padStart(4, '0')}</span>
           <span className="species-name">{berryName(berry)}</span>
         </span>
         {/* The natural gift type, in the slot the species card gives typing. Same

@@ -1648,10 +1648,13 @@ try {
   log(`  ${JSON.stringify(before)}`)
   /* textContent concatenates without separators, so the expectation is the run
      rather than a spaced sentence -- and anchoring it is what makes this an order
-     check as well as a presence check: number, name, genus, type. */
+     check as well as a presence check: name, genus, type. The dex number was
+     dropped from the banner (see SpeciesBanner.tsx) -- it is redundant with the
+     hero's ghost numeral and the number that orders the list, so this page no
+     longer prints it as a readout at all. */
   check(
-    'the banner carries number, name, genus and types, in that order',
-    /^#0197UmbreonMoonlight Pok.mondark$/.test(before.text),
+    'the banner carries name, genus and types, in that order',
+    /^UmbreonMoonlight Pok.mondark$/.test(before.text),
     before.text,
   )
   check('the type row is in the banner', before.types.join('/') === 'dark', before.types.join('/'))

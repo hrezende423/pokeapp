@@ -45,9 +45,20 @@ const TARGET_LABELS: Record<string, string> = {
   'specific-move': 'A specific move',
 }
 
+/**
+ * The label for one target slug, exported so the Movedex's RANGE FILTER and its
+ * Range COLUMN cannot disagree about what "Own side" means.
+ *
+ * The filter needs slug -> label without a move to read it off, which is the only
+ * reason this is separate from `moveRange` rather than inlined in it.
+ */
+export function moveRangeLabel(target: string | null | undefined): string {
+  if (target == null) return DASH
+  return TARGET_LABELS[target] ?? titleCaseMove(target)
+}
+
 export function moveRange(move: Move): string {
-  if (move.target == null) return DASH
-  return TARGET_LABELS[move.target] ?? titleCaseMove(move.target)
+  return moveRangeLabel(move.target)
 }
 
 /** Sorted by the label, so the column groups the ranges that read alike. */
