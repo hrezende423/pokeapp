@@ -46,13 +46,7 @@ export function ExperienceCalculator() {
 
   const total = expForLevel(rate, level)
   const toNext = expToNextLevel(rate, level)
-  const gained = expGainedFromDefeat({
-    baseExperience,
-    level: defeatedLevel,
-    isTrainerBattle,
-    participants,
-    hasLuckyEgg,
-  })
+  const gained = expGainedFromDefeat({ baseExperience, level: defeatedLevel, isTrainerBattle, participants, hasLuckyEgg })
 
   return (
     <div className="calc-tool" data-testid="calc-experience">
@@ -86,10 +80,7 @@ export function ExperienceCalculator() {
           />
         </div>
         <StatList>
-          <StatRow
-            label="Total EXP"
-            value={<span className="num">{total.toLocaleString()}</span>}
-          />
+          <StatRow label="Total EXP" value={<span className="num">{total.toLocaleString()}</span>} />
           <StatRow
             label="EXP to next level"
             value={<span className="num">{toNext == null ? '—' : toNext.toLocaleString()}</span>}
@@ -106,9 +97,7 @@ export function ExperienceCalculator() {
             min={1}
             max={MAX_LEVEL}
             value={defeatedLevel}
-            onChange={(e) =>
-              setDefeatedLevel(Math.min(MAX_LEVEL, Math.max(1, Number(e.target.value))))
-            }
+            onChange={(e) => setDefeatedLevel(Math.min(MAX_LEVEL, Math.max(1, Number(e.target.value))))}
           />
           <TextField
             label="Participants sharing it"
@@ -129,11 +118,7 @@ export function ExperienceCalculator() {
             Trainer battle (×1.5)
           </label>
           <label className="calc-checkbox">
-            <input
-              type="checkbox"
-              checked={hasLuckyEgg}
-              onChange={(e) => setHasLuckyEgg(e.target.checked)}
-            />
+            <input type="checkbox" checked={hasLuckyEgg} onChange={(e) => setHasLuckyEgg(e.target.checked)} />
             Holding a Lucky Egg (×1.5)
           </label>
         </div>

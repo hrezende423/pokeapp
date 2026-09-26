@@ -101,9 +101,7 @@ function SidePanel({
           min={0}
           max={individualCap}
           value={state.individual}
-          onChange={(e) =>
-            onChange({ individual: Math.min(individualCap, Math.max(0, Number(e.target.value))) })
-          }
+          onChange={(e) => onChange({ individual: Math.min(individualCap, Math.max(0, Number(e.target.value))) })}
         />
         <TextField
           label={`Speed ${generation <= 2 ? 'Stat Exp' : 'EV'} (0–${effortCap})`}
@@ -111,9 +109,7 @@ function SidePanel({
           min={0}
           max={effortCap}
           value={state.effort}
-          onChange={(e) =>
-            onChange({ effort: Math.min(effortCap, Math.max(0, Number(e.target.value))) })
-          }
+          onChange={(e) => onChange({ effort: Math.min(effortCap, Math.max(0, Number(e.target.value))) })}
         />
         {hasNatures && (
           <SelectField
@@ -135,9 +131,7 @@ function SidePanel({
           min={-7}
           max={5}
           value={state.priority}
-          onChange={(e) =>
-            onChange({ priority: Math.min(5, Math.max(-7, Number(e.target.value))) })
-          }
+          onChange={(e) => onChange({ priority: Math.min(5, Math.max(-7, Number(e.target.value))) })}
         />
       </div>
       <div className="calc-toggle-row">
@@ -170,8 +164,7 @@ function speedFor(state: SideState, generation: number): SpeedParticipant {
   let base = 0
   if (target) {
     const variety = defaultVariety(target)
-    base =
-      resolveStatsForGeneration(variety, generation).find((s) => s.stat === 'speed')?.base_stat ?? 0
+    base = resolveStatsForGeneration(variety, generation).find((s) => s.stat === 'speed')?.base_stat ?? 0
   }
   const natureMods: NatureMods = hasNatures
     ? {
@@ -216,8 +209,8 @@ export function SpeedCalculator() {
   return (
     <div className="calc-tool" data-testid="calc-speed">
       <p className="calc-tool-note">
-        Priority decides first; Speed only breaks a tie inside the same priority bracket, exactly as
-        a battle does.
+        Priority decides first; Speed only breaks a tie inside the same priority bracket, exactly
+        as a battle does.
       </p>
 
       <SidePanel
@@ -242,11 +235,7 @@ export function SpeedCalculator() {
       {hasTrickRoom && (
         <div className="calc-toggle-row">
           <label className="calc-checkbox">
-            <input
-              type="checkbox"
-              checked={trickRoom}
-              onChange={(e) => setTrickRoom(e.target.checked)}
-            />
+            <input type="checkbox" checked={trickRoom} onChange={(e) => setTrickRoom(e.target.checked)} />
             Trick Room active
           </label>
         </div>
@@ -261,11 +250,9 @@ export function SpeedCalculator() {
           )}
         </p>
         <p className="calc-result-note">
-          {nameFor(a.speciesId)} effective Speed{' '}
-          <span className="num">{effectiveSpeed(speedA)}</span> · priority{' '}
+          {nameFor(a.speciesId)} effective Speed <span className="num">{effectiveSpeed(speedA)}</span> · priority{' '}
           <span className="num">{a.priority}</span> — {nameFor(b.speciesId)} effective Speed{' '}
-          <span className="num">{effectiveSpeed(speedB)}</span> · priority{' '}
-          <span className="num">{b.priority}</span>
+          <span className="num">{effectiveSpeed(speedB)}</span> · priority <span className="num">{b.priority}</span>
         </p>
       </div>
     </div>

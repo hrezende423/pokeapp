@@ -64,9 +64,7 @@ export function catchProbability(input: CatchRateInput): CatchRateResult {
   if (input.maxHp <= 0) return { guaranteed: false, probability: 0, a: 0 }
 
   const hpTerm = Math.max(1, 3 * input.maxHp - 2 * Math.min(input.currentHp, input.maxHp))
-  const modified = Math.floor(
-    (hpTerm * input.captureRate * BALL_BONUS[input.ball]) / (3 * input.maxHp),
-  )
+  const modified = Math.floor((hpTerm * input.captureRate * BALL_BONUS[input.ball]) / (3 * input.maxHp))
   const a = Math.min(255, Math.floor(modified * STATUS_BONUS[input.status]))
 
   if (a >= 255) return { guaranteed: true, probability: 1, a: 255 }

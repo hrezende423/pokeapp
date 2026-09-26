@@ -168,9 +168,7 @@ export function StatCalculator() {
                 value={individualFor(key)}
                 disabled={readOnly}
                 state={readOnly ? 'disabled' : 'default'}
-                helper={
-                  readOnly ? 'Derived from the other four DVs — not independently set.' : undefined
-                }
+                helper={readOnly ? 'Derived from the other four DVs — not independently set.' : undefined}
                 onChange={(e) =>
                   setIndividual((prev) => ({
                     ...prev,
@@ -200,17 +198,12 @@ export function StatCalculator() {
         <div className="calc-result" data-testid="calc-stat-result">
           <StatList>
             {rows.map((row) => (
-              <StatRow
-                key={row.key}
-                label={STAT_LABELS[row.key]}
-                value={<span className="num">{row.value}</span>}
-              />
+              <StatRow key={row.key} label={STAT_LABELS[row.key]} value={<span className="num">{row.value}</span>} />
             ))}
           </StatList>
           {hp && (
             <p className="calc-result-note">
-              Hidden Power: <span className="num">{hp.type}</span>, power{' '}
-              <span className="num">{hp.power}</span>
+              Hidden Power: <span className="num">{hp.type}</span>, power <span className="num">{hp.power}</span>
             </p>
           )}
         </div>

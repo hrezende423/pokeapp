@@ -6,14 +6,7 @@ import { TextField } from '../../components/ds/TextField'
 import { useVersionGroup } from '../version-group/context'
 import { speciesEntries } from '../dex/entrySources'
 import { computeStat, effortMax, individualMax } from '../team-builder/statMath'
-import {
-  BALL_BONUS,
-  STATUS_BONUS,
-  catchProbability,
-  oneInN,
-  type CatchStatus,
-  type PokeBall,
-} from './catchRateMath'
+import { BALL_BONUS, STATUS_BONUS, catchProbability, oneInN, type CatchStatus, type PokeBall } from './catchRateMath'
 
 /**
  * Catch Rate Calculator.
@@ -58,8 +51,7 @@ export function CatchRateCalculator() {
   const result = useMemo(() => {
     if (!target) return null
     const variety = defaultVariety(target)
-    const hpBase =
-      resolveStatsForGeneration(variety, generation).find((s) => s.stat === 'hp')?.base_stat ?? 0
+    const hpBase = resolveStatsForGeneration(variety, generation).find((s) => s.stat === 'hp')?.base_stat ?? 0
     const maxHp = computeStat({
       generation,
       level,
@@ -83,8 +75,8 @@ export function CatchRateCalculator() {
   return (
     <div className="calc-tool" data-testid="calc-catch-rate">
       <p className="calc-tool-note">
-        One throw's catch chance. The shake-value formula below is Generation III's — see the header
-        note in catchRateMath.ts for why Gen 1-2 shares it rather than a guessed variant.
+        One throw's catch chance. The shake-value formula below is Generation III's — see the
+        header note in catchRateMath.ts for why Gen 1-2 shares it rather than a guessed variant.
       </p>
 
       <div className="calc-section">
@@ -115,10 +107,9 @@ export function CatchRateCalculator() {
         </div>
         {result && (
           <p className="calc-tool-note">
-            <span className="num">{result.currentHp}</span> /{' '}
-            <span className="num">{result.maxHp}</span> HP at a max-IV,{' '}
-            {effortMax(generation) === 252 ? 'max-EV' : 'max-Stat-Exp'} spread · capture rate{' '}
-            <span className="num">{result.captureRate}</span>
+            <span className="num">{result.currentHp}</span> / <span className="num">{result.maxHp}</span>{' '}
+            HP at a max-IV, {effortMax(generation) === 252 ? 'max-EV' : 'max-Stat-Exp'} spread · capture
+            rate <span className="num">{result.captureRate}</span>
           </p>
         )}
       </div>
@@ -128,19 +119,13 @@ export function CatchRateCalculator() {
         <div className="calc-row">
           <SelectField
             label="Ball"
-            options={BALLS.map((b) => ({
-              value: b.value,
-              label: `${b.label} (×${BALL_BONUS[b.value]})`,
-            }))}
+            options={BALLS.map((b) => ({ value: b.value, label: `${b.label} (×${BALL_BONUS[b.value]})` }))}
             value={ball}
             onChange={(e) => setBall(e.target.value as PokeBall)}
           />
           <SelectField
             label="Status"
-            options={STATUSES.map((s) => ({
-              value: s.value,
-              label: `${s.label} (×${STATUS_BONUS[s.value]})`,
-            }))}
+            options={STATUSES.map((s) => ({ value: s.value, label: `${s.label} (×${STATUS_BONUS[s.value]})` }))}
             value={status}
             onChange={(e) => setStatus(e.target.value as CatchStatus)}
           />
