@@ -128,20 +128,109 @@
 /* ------------------------------------------------------ damage calculator */
 
 /*
-  THE TEAM-BUILD FORM LAYOUT (DESIGN-SYSTEM.md §5/§11): per Pokemon, a compact
-  strip on top and the spread table in the dominant position. Two panels side by
-  side when there is room for both at their minimum, one column otherwise.
+  LAID OUT AS THE SHOWDOWN CALCULATOR IS: both Pokemon's move results across the
+  top, the selected line under them, then Pokemon 1 | Field | Pokemon 2. Named
+  regions positioned by area (CLAUDE.md "Laying out a screen").
 
-  NAMED REGIONS, positioned by area (CLAUDE.md "Laying out a screen"): moving the
-  result below the panels is swapping words in the template, not a coordinate.
+  A SMALLER TYPE SCALE, SCOPED HERE, by request -- the reference's density. The
+  type tokens are redefined on `.dcalc`, the species page's technique, so every
+  ds control inside (fields, toggles, the EV table, the tiles) scales with no
+  per-component work; nothing outside this screen changes.
 */
 
 .calc-content-wide {
-  max-width: 1180px;
+  max-width: none;
 }
 
 .dcalc {
+  --font-size-title: 14px;
+  --font-size-body: 12px;
+  --font-size-label: 9.5px;
+  --font-size-caption: 10.5px;
+  --dcalc-gap: 10px;
   container-type: inline-size;
+  font-size: var(--font-size-body);
+  /* The page's inherited leading is ~26px -- sized for 18px body text. Left
+     alone, every row here was a 26px line box around 12px text. */
+  line-height: 1.3;
+}
+.dcalc .toggle,
+.dcalc .toggle-side {
+  font-size: var(--font-size-caption);
+}
+
+/* Denser fields: the ds field's 7px padding is sized for 14px text. */
+.dcalc .ds-field {
+  gap: 2px;
+}
+.dcalc .ds-field-control {
+  /* border-box: at width 100% the content-box control was its 2px of side
+     padding wider than a narrow strip cell, 2px past the screen on a phone. */
+  box-sizing: border-box;
+  padding: 3px 1px;
+}
+.dcalc .ds-field-control:focus,
+.dcalc .ds-field[data-state='focus'] .ds-field-control {
+  padding-bottom: 2px;
+}
+.dcalc .ds-select-chevron {
+  bottom: 4px;
+  font-size: 9px;
+}
+.dcalc .ds-toggle {
+  font-size: var(--font-size-caption);
+  gap: 5px;
+}
+.dcalc .ds-toggle-track {
+  width: 26px;
+  height: 14px;
+}
+.dcalc .ds-toggle-thumb {
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+}
+.dcalc .ds-toggle[aria-pressed='true'] .ds-toggle-thumb {
+  left: 14px;
+}
+.dcalc .ds-field-strip {
+  gap: 6px 10px;
+}
+.dcalc .ds-field-strip > .ds-field {
+  flex-basis: 90px;
+}
+.dcalc .ds-field-strip > .ds-field[data-size='narrow'] {
+  flex: 0 0 44px;
+}
+.dcalc .ds-form-section-head {
+  padding-bottom: 2px;
+}
+.dcalc .ds-ev-row {
+  padding: 1px 0;
+  column-gap: 6px;
+}
+.dcalc .ds-ev-effort[data-slider='true'] {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 6px;
+}
+.dcalc .ds-ev-extra .ds-field-control {
+  padding: 1px 1px;
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-caption);
+}
+.dcalc .ds-ev-extra .ds-select-chevron {
+  bottom: 2px;
+}
+.dcalc .ds-move-slot {
+  padding: 6px 8px;
+  gap: 3px;
+}
+.dcalc .ds-move-slot-grid {
+  gap: 6px;
+}
+.dcalc .ds-move-slot-value {
+  font-size: var(--font-size-body);
 }
 
 .dcalc-grid {
@@ -149,48 +238,49 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     'scope'
+    'results'
     'result'
-    'attacker'
-    'defender'
-    'field';
-  gap: var(--space-gap-lg);
+    'p1'
+    'field'
+    'p2';
+  gap: var(--space-gap-md);
 }
 
-@container (min-width: 860px) {
+/* Three columns once each Pokemon can have ~360px: Pokemon 1 | Field | Pokemon 2. */
+@container (min-width: 980px) {
   .dcalc-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px) minmax(0, 1fr);
     grid-template-areas:
-      'scope    scope'
-      'result   result'
-      'attacker defender'
-      'field    field';
-    column-gap: var(--space-gap-xl);
+      'scope   scope   scope'
+      'results results results'
+      'result  result  result'
+      'p1      field   p2';
+    column-gap: 18px;
   }
 }
 
 .dcalc-scope {
   grid-area: scope;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--calc-4);
-}
-.dcalc-scope .ds-field-strip {
-  flex: 0 1 140px;
 }
 .dcalc-scope .ds-field-strip > .ds-field {
-  flex: 0 0 104px;
+  flex: 0 0 92px;
+}
+
+.dcalc-results {
+  grid-area: results;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--dcalc-gap) 18px;
 }
 
 .dcalc-result-area {
   grid-area: result;
 }
-
-[data-layout='dcalc-attacker'] {
-  grid-area: attacker;
+[data-layout='dcalc-p1'] {
+  grid-area: p1;
 }
-[data-layout='dcalc-defender'] {
-  grid-area: defender;
+[data-layout='dcalc-p2'] {
+  grid-area: p2;
 }
 [data-layout='dcalc-field'] {
   grid-area: field;
@@ -199,48 +289,200 @@
 .dcalc-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--calc-4);
+  gap: var(--dcalc-gap);
   min-width: 0;
-}
-
-/* Two classes deep on purpose: App.css's `.panel h2` (uppercase, 0.8rem,
-   0.08em tracking) outranks a single class -- CLAUDE.md gotcha #1. */
-.dcalc .dcalc-panel-title {
-  margin: 0;
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-medium);
-  line-height: 24px;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--text-primary);
 }
 
 .dcalc-group {
   display: flex;
   flex-direction: column;
-  gap: var(--calc-3);
+  gap: 6px;
 }
 
-.dcalc-inline-toggles {
+/* ---- move results: name | percent, one row per slot */
+
+.dcalc-move-results {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--calc-3) var(--calc-4);
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
-.dcalc-move-options {
+.dcalc-move-result-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.dcalc-move-result {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) auto;
+  justify-content: start;
+  column-gap: 14px;
+  align-items: baseline;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: var(--font-size-body);
+  text-align: left;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  cursor: pointer;
+}
+.dcalc-move-result:not([data-selected='true']):hover {
+  background: var(--surface-hover);
+}
+/* Selected is a tone-step, not a colour -- the same treatment as the tile. */
+.dcalc-move-result[data-selected='true'] {
+  background: var(--surface-raised);
+  font-weight: var(--font-weight-bold);
+}
+.dcalc-move-result:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.dcalc-move-result-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dcalc-move-result-pct {
+  font-size: var(--font-size-caption);
+}
+.dcalc-move-result-empty {
+  cursor: default;
+  color: var(--text-secondary);
+}
+
+/* ---- the selected line */
+
+.dcalc-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.dcalc-result-line {
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.35;
+  user-select: text;
+}
+.dcalc-result-rolls {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ---- panel pieces */
+
+.dcalc-type-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--font-size-body);
+}
+.dcalc-type-line .ds-field-label {
+  margin-right: 4px;
+}
+.dcalc-type-sep {
+  margin-right: 6px;
+  color: var(--text-secondary);
+}
+
+.dcalc-hp-line {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--calc-3) var(--calc-4);
+  gap: 6px 10px;
 }
-.dcalc-move-options .ds-field {
+.dcalc-hp-line > .ds-field {
+  width: 44px;
+}
+.dcalc-hp-line > .ds-field:first-child {
   width: 72px;
 }
-
-.dcalc-move-facts {
-  flex: 1 1 100%;
+.dcalc-hp-of {
+  padding-bottom: 4px;
   font-size: var(--font-size-caption);
   color: var(--text-secondary);
+}
+.dcalc-hp-line .ds-toggle {
+  margin-left: auto;
+  padding-bottom: 3px;
+}
+
+.dcalc-tile-facts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: baseline;
+}
+.dcalc-tile-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px 10px;
+  padding-top: 2px;
+}
+.dcalc-tile-options .ds-field {
+  width: 44px;
+}
+.dcalc-tile-options .ds-toggle {
+  padding-bottom: 3px;
+}
+
+/* ---- the field column */
+
+.dcalc-field-shared {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+.dcalc-field-shared .ds-field {
+  width: 110px;
+}
+
+.dcalc-field-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.dcalc-field-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.dcalc-field-side-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dcalc-field-side .ds-field {
+  width: 100%;
+}
+.dcalc-field-toggles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+/* The Moves switch sits on the section label's own line, so its caption would
+   repeat the heading. Kept for assistive tech, taken off the screen. */
+.dcalc .ds-form-section-aside .toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .dcalc-note {
@@ -261,73 +503,4 @@
   background: none;
   border: none;
   cursor: pointer;
-}
-
-/* ---- the result: the selected move, in full */
-
-.dcalc-result {
-  display: flex;
-  flex-direction: column;
-  gap: var(--calc-2);
-  padding: var(--calc-3) 0;
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-}
-
-.dcalc-result-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--calc-2) var(--calc-4);
-}
-
-.dcalc-result-move {
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
-}
-
-.dcalc-result-range {
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
-}
-
-.dcalc-result-pct {
-  font-size: var(--font-size-title);
-  color: var(--text-secondary);
-}
-
-.dcalc-result-ko {
-  margin: 0;
-  font-size: var(--font-size-body);
-}
-
-.dcalc-result-desc {
-  margin: 0;
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-  user-select: text;
-}
-
-.dcalc-result-rolls {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-}
-.dcalc-result-rolls-label {
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* The Moves switch sits on the section label's own line, so its caption would
-   repeat the heading. Kept for assistive tech, taken off the screen. */
-.dcalc .ds-form-section-aside .toggle-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }

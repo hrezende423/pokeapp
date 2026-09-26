@@ -1,125 +1,124 @@
 import { useMemo, useState } from 'react'
-import { IconArrowsLeftRight } from '@tabler/icons-react'
-import { getAbility, getMove } from '../../data'
-import { Button } from '../../components/ds/Button'
+import { getAbility, getMove, getType, resolveTypesForGeneration } from '../../data'
 import { CompactFieldStrip } from '../../components/ds/FormParts'
 import { SelectField } from '../../components/ds/SelectField'
-import { resolveTypesForGeneration, getType } from '../../data'
-import { calculateDamage, emptyField, type CalcField, type DamageResult } from './damage'
+import { calculateDamage } from './damage'
 import {
   DEFAULT_ATTACKER_ID,
   DEFAULT_DEFENDER_ID,
   MOVE_SLOT_COUNT,
   defaultMoves,
+  emptyDualField,
+  fieldFor,
   newSide,
   normalizeField,
   normalizeSide,
   toCalcPokemon,
   varietyOf,
+  type DualField,
   type SideState,
 } from './damageCalcState'
 import { DamageFieldPanel } from './DamageFieldPanel'
 import { DamagePokemonPanel } from './DamagePokemonPanel'
-import { DamageResultView } from './DamageResultView'
+import { DamageResultView, MoveResultList, type MoveResult } from './DamageResultView'
 import { useDamageCalcScope } from './useDamageCalcScope'
 import { useGenerationLearnset } from './useGenerationLearnset'
 
 /**
- * Damage Calculator, Generations 1-4, singles, one attacker against one defender.
+ * Damage Calculator, Generations 1-4, singles, one Pokemon against another.
+ *
+ * LAID OUT AS THE SHOWDOWN CALCULATOR IS -- both Pokemon's moves with their
+ * percent across the top, one of the eight selected and its full line under
+ * them, then Pokemon 1 | Field | Pokemon 2 -- in this app's controls and a
+ * smaller type scale scoped to this screen. EVERY MOVE IS CALCULATED IN BOTH
+ * DIRECTIONS, so there is no attacker/defender role and no swap.
  *
  * THE ENGINE IS ./damage -- a port of the Showdown calculator's gen12/gen3/gen4
- * mechanics against pokeapp's own data -- and this file is only its form. Every
- * number on screen comes out of `calculateDamage`; nothing here does arithmetic
- * on a stat beyond what the form needs to display.
+ * mechanics against pokeapp's own data -- and this file is only its form.
  *
  * ITS OWN GENERATION (useDamageCalcScope), the third sanctioned exception to the
- * app-wide selector -- see that hook. Switching it normalizes both sides and the
- * field into the new era in the same update (normalizeSide/normalizeField), so no
- * frame renders a Gen 3 ability on a Gen 2 Pokemon.
+ * app-wide selector. Switching it normalizes both sides and the field into the
+ * new era in the same update, and each side remembers what an older era took
+ * away so a round trip gives it back.
  *
- * MOVES DEFAULT TO THE LEARNSET, with an "Any" switch for hypotheticals. The four
- * slots start as the attacker's four strongest learnable moves; the tiles each show
- * their result and the selected one opens in full above the panels -- the
- * reference calculator's own arrangement.
- *
- * Out of scope for this pass, and nothing here blocks them: doubles (spread
- * reduction is a field flag the Gen 3-4 modules have the reference's slot for),
- * and a whole-dex table (calculateDamage in a loop).
+ * MOVES DEFAULT TO THE LEARNSET, per Pokemon, with an "Any" switch for
+ * hypotheticals.
  */
+
+const OTHER = { 0: 1, 1: 0 } as const
+
 export function DamageCalculator() {
   const scope = useDamageCalcScope()
   const gen = scope.generation
 
-  const [attacker, setAttacker] = useState<SideState>(() => newSide(DEFAULT_ATTACKER_ID, gen))
-  const [defender, setDefender] = useState<SideState>(() => newSide(DEFAULT_DEFENDER_ID, gen))
-  const [field, setField] = useState<CalcField>(() => emptyField())
-  const [selectedSlot, setSelectedSlot] = useState(0)
-  const [anyMove, setAnyMove] = useState(false)
+  const [sides, setSides] = useState<[SideState, SideState]>(() => [
+    newSide(DEFAULT_ATTACKER_ID, gen),
+    newSide(DEFAULT_DEFENDER_ID, gen),
+  ])
+  const [field, setField] = useState<DualField>(() => emptyDualField())
+  const [selected, setSelected] = useState<{ side: 0 | 1; slot: number }>({ side: 0, slot: 0 })
+  const [anyMove, setAnyMove] = useState<[boolean, boolean]>([false, false])
+
+  const setSide = (i: 0 | 1) => (next: SideState) =>
+    setSides((s) => (i === 0 ? [next, s[1]] : [s[0], next]))
 
   const setGeneration = (next: number) => {
     scope.setGeneration(next)
-    setAttacker((s) => normalizeSide(s, next, DEFAULT_ATTACKER_ID))
-    setDefender((s) => normalizeSide(s, next, DEFAULT_DEFENDER_ID))
+    setSides((s) => [
+      normalizeSide(s[0], next, DEFAULT_ATTACKER_ID),
+      normalizeSide(s[1], next, DEFAULT_DEFENDER_ID),
+    ])
     setField((f) => normalizeField(f, next))
   }
 
-  const swap = () => {
-    setAttacker(defender)
-    setDefender(attacker)
-    setSelectedSlot(0)
-  }
+  const learn0 = useGenerationLearnset(sides[0].speciesId, varietyOf(sides[0]).pokemon_id, gen)
+  const learn1 = useGenerationLearnset(sides[1].speciesId, varietyOf(sides[1]).pokemon_id, gen)
+  const rows0 = learn0.state.status === 'ready' ? learn0.state.rows : null
+  const rows1 = learn1.state.status === 'ready' ? learn1.state.rows : null
 
-  const learnset = useGenerationLearnset(attacker.speciesId, varietyOf(attacker).pokemon_id, gen)
-  const learnRows = learnset.state.status === 'ready' ? learnset.state.rows : null
-  const attackerVariety = varietyOf(attacker)
-  const moves = useMemo<(number | null)[]>(() => {
-    if (attacker.moves) return attacker.moves
-    if (!learnRows) return Array(MOVE_SLOT_COUNT).fill(null)
-    const types = resolveTypesForGeneration(attackerVariety, gen).map(
-      (t) => getType(t.type_id)?.name ?? '',
-    )
-    return defaultMoves(learnRows, gen, types)
-  }, [attacker.moves, learnRows, gen, attackerVariety])
+  const moves0 = useSideMoves(sides[0], rows0, gen)
+  const moves1 = useSideMoves(sides[1], rows1, gen)
 
-  const { results, errors } = useMemo(() => {
-    const a = toCalcPokemon(attacker)
-    const d = toCalcPokemon(defender)
-    const out: (DamageResult | null)[] = []
-    const errs: (string | null)[] = []
-    moves.forEach((id, slot) => {
-      const move = id != null ? getMove(id) : undefined
-      if (!move) {
-        out.push(null)
-        errs.push(null)
-        return
-      }
-      try {
-        out.push(
-          calculateDamage(
-            gen,
-            a,
-            d,
-            {
-              move,
-              isCrit: attacker.crit[slot],
-              hits: attacker.hits[slot],
-              powerOverride: attacker.power[slot],
-            },
-            field,
-          ),
-        )
-        errs.push(null)
-      } catch (err) {
-        out.push(null)
-        errs.push(err instanceof Error ? err.message : String(err))
-      }
-    })
-    return { results: out, errors: errs }
-  }, [attacker, defender, field, gen, moves])
+  const results = useMemo(() => {
+    const mons = [toCalcPokemon(sides[0]), toCalcPokemon(sides[1])]
+    const run = (i: 0 | 1, moves: (number | null)[]): (MoveResult | null)[] =>
+      moves.map((id, slot) => {
+        const move = id != null ? getMove(id) : undefined
+        if (!move) return null
+        const side = sides[i]
+        try {
+          return {
+            name: move.display_name,
+            error: null,
+            result: calculateDamage(
+              gen,
+              mons[i],
+              mons[OTHER[i]],
+              {
+                move,
+                isCrit: side.crit[slot],
+                hits: side.hits[slot],
+                powerOverride: side.power[slot],
+              },
+              fieldFor(field, i),
+            ),
+          }
+        } catch (err) {
+          return {
+            name: move.display_name,
+            result: null,
+            error: err instanceof Error ? err.message : String(err),
+          }
+        }
+      })
+    return [run(0, moves0), run(1, moves1)] as const
+  }, [sides, field, gen, moves0, moves1])
 
-  const attackerHasRivalry =
-    gen >= 4 && attacker.abilityId != null && getAbility(attacker.abilityId)?.name === 'rivalry'
-  const selectedMove = moves[selectedSlot] != null ? getMove(moves[selectedSlot]!) : undefined
+  const hasRivalry = sides.some(
+    (s) => gen >= 4 && s.abilityId != null && getAbility(s.abilityId)?.name === 'rivalry',
+  )
+  const names: [string, string] = [displayName(sides[0]), displayName(sides[1])]
+  const current = results[selected.side][selected.slot] ?? null
 
   return (
     <div className="calc-tool dcalc" data-testid="calc-damage" data-generation={gen}>
@@ -134,51 +133,65 @@ export function DamageCalculator() {
               onChange={(e) => setGeneration(Number(e.target.value))}
             />
           </CompactFieldStrip>
-          <Button variant="secondary" onClick={swap} data-testid="dcalc-swap">
-            <IconArrowsLeftRight size={16} stroke={1.5} aria-hidden /> Swap sides
-          </Button>
+        </div>
+
+        <div className="dcalc-results" data-layout="dcalc-results">
+          {([0, 1] as const).map((i) => (
+            <MoveResultList
+              key={i}
+              index={i}
+              name={names[i]}
+              results={results[i]}
+              selected={selected.side === i ? selected.slot : null}
+              onSelect={(slot) => setSelected({ side: i, slot })}
+            />
+          ))}
         </div>
 
         <div className="dcalc-result-area" data-layout="dcalc-result">
-          <DamageResultView
-            result={results[selectedSlot] ?? null}
-            moveName={selectedMove?.display_name ?? null}
-            error={errors[selectedSlot] ?? null}
-          />
+          <DamageResultView selected={current} />
         </div>
 
-        <DamagePokemonPanel
-          role="attacker"
-          gen={gen}
-          side={attacker}
-          onChange={setAttacker}
-          showMoves
-          showGender={attackerHasRivalry}
-          anyMove={anyMove}
-          onAnyMove={setAnyMove}
-          results={results}
-          selectedSlot={selectedSlot}
-          onSelectSlot={setSelectedSlot}
-          learnset={learnset}
-          moves={moves}
-        />
-        <DamagePokemonPanel
-          role="defender"
-          gen={gen}
-          side={defender}
-          onChange={setDefender}
-          showMoves={false}
-          showGender={attackerHasRivalry}
-          anyMove={anyMove}
-          onAnyMove={setAnyMove}
-          results={[]}
-          selectedSlot={0}
-          onSelectSlot={() => {}}
-          learnset={learnset}
-          moves={[]}
-        />
-        <DamageFieldPanel gen={gen} field={field} onChange={setField} />
+        {([0, 1] as const).map((i) => (
+          <DamagePokemonPanel
+            key={i}
+            index={i}
+            gen={gen}
+            side={sides[i]}
+            onChange={setSide(i)}
+            showGender={hasRivalry}
+            anyMove={anyMove[i]}
+            onAnyMove={(v) => setAnyMove((a) => (i === 0 ? [v, a[1]] : [a[0], v]))}
+            learnset={i === 0 ? learn0 : learn1}
+            moves={i === 0 ? moves0 : moves1}
+          />
+        ))}
+
+        <DamageFieldPanel gen={gen} field={field} names={names} onChange={setField} />
       </div>
     </div>
   )
+}
+
+/** A side's four slots: its own once edited, otherwise the learnset's defaults. */
+function useSideMoves(side: SideState, learnRows: number[] | null, gen: number) {
+  const variety = varietyOf(side)
+  return useMemo<(number | null)[]>(() => {
+    if (side.moves) return side.moves
+    if (!learnRows) return Array(MOVE_SLOT_COUNT).fill(null)
+    const types = resolveTypesForGeneration(variety, gen).map((t) => getType(t.type_id)?.name ?? '')
+    return defaultMoves(learnRows, gen, types)
+  }, [side.moves, learnRows, gen, variety])
+}
+
+function displayName(side: SideState): string {
+  const p = toCalcPokemon(side)
+  const v = p.variety
+  if (v.is_default || !v.name.startsWith(`${p.species.name}-`)) return p.species.display_name
+  const form = v.name
+    .slice(p.species.name.length + 1)
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('-')
+  return `${p.species.display_name}-${form}`
 }

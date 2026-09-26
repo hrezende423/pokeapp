@@ -34,10 +34,13 @@ import { MAX_DV, MAX_IV, MAX_STAT_EXP, type StatNumbers } from '../team-builder/
 import {
   FIELD_RULES,
   HELD_ITEMS_INTRODUCED_IN_GENERATION,
+  emptySide,
   type Boosts,
   type CalcField,
   type CalcPokemon,
+  type SideConditions,
   type StatusId,
+  type Weather,
 } from './damage'
 
 export const MOVE_SLOT_COUNT = 4
@@ -240,9 +243,35 @@ export function normalizeSide(side: SideState, gen: number, fallbackId: number):
   }
 }
 
-export function normalizeField(field: CalcField, gen: number): CalcField {
+/**
+ * The field as the screen holds it: weather and Gravity are shared, and each
+ * Pokemon has ITS OWN side (Reflect, Spikes, Stealth Rock...), as in the
+ * reference's two side columns. Both directions are calculated, so which side is
+ * the "attacker's" is decided per calculation by `fieldFor`.
+ */
+export interface DualField {
+  weather: Weather | null
+  gravity: boolean
+  sides: [SideConditions, SideConditions]
+}
+
+export function emptyDualField(): DualField {
+  return { weather: null, gravity: false, sides: [emptySide(), emptySide()] }
+}
+
+/** The engine's field for Pokemon `attacker` (0 or 1) attacking the other. */
+export function fieldFor(field: DualField, attacker: 0 | 1): CalcField {
+  return {
+    weather: field.weather,
+    gravity: field.gravity,
+    attackerSide: field.sides[attacker],
+    defenderSide: field.sides[attacker === 0 ? 1 : 0],
+  }
+}
+
+export function normalizeField(field: DualField, gen: number): DualField {
   const rules = FIELD_RULES[gen]
-  const side = (s: CalcField['defenderSide']) => ({
+  const side = (s: SideConditions): SideConditions => ({
     ...s,
     spikes: Math.min(s.spikes, rules.maxSpikes),
     stealthRock: rules.stealthRock && s.stealthRock,
@@ -253,8 +282,7 @@ export function normalizeField(field: CalcField, gen: number): CalcField {
   return {
     weather: field.weather && rules.weathers.includes(field.weather) ? field.weather : null,
     gravity: rules.gravity && field.gravity,
-    attackerSide: side(field.attackerSide),
-    defenderSide: side(field.defenderSide),
+    sides: [side(field.sides[0]), side(field.sides[1])],
   }
 }
 

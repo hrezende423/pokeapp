@@ -17,6 +17,10 @@ import { useDraftNumber } from './useDraftNumber'
  * the placeholder. Its filled run is `--accent`, the same as the Build Form's:
  * stat magnitude, the fourth sanctioned use.
  *
+ * COLUMN ORDER IS THE SHOWDOWN CALCULATOR'S -- Stat | Base | IV | EV | Total, and
+ * an optional trailing cell (the damage calculator puts the stat stage there) --
+ * because that table is the one players already read.
+ *
  * ERA-AGNOSTIC BY CONSTRUCTION. A row takes an effort cell and an individual cell,
  * either of which may be absent or read-only, and says nothing about EVs vs Stat
  * Exp: the caller decides which columns an era has (Gen 1-2 Stat Exp takes no
@@ -47,15 +51,25 @@ export function EvStatTable({
   footer,
   testId,
 }: {
-  /** Header text for [stat, base, effort, individual, total]; null hides that header cell. */
-  columns: [string, string | null, string | null, string | null, string]
+  /**
+   * Header text for [stat, base, individual, effort, total, extra?]; null leaves
+   * a header cell blank. A sixth entry turns on the trailing column for every row.
+   */
+  columns:
+    | [string, string | null, string | null, string | null, string]
+    | [string, string | null, string | null, string | null, string, string | null]
   children: ReactNode
   /** The running total / notes line, plain secondary text. */
   footer?: ReactNode
   testId?: string
 }) {
   return (
-    <div className="ds-ev-table" data-ds="ev-stat-table" data-testid={testId}>
+    <div
+      className="ds-ev-table"
+      data-ds="ev-stat-table"
+      data-extra={columns.length === 6 ? 'true' : undefined}
+      data-testid={testId}
+    >
       <div className="ds-ev-row ds-ev-head" aria-hidden>
         {columns.map((c, i) => (
           <span key={i} className={`ds-ev-h ds-ev-h-${i}`}>
@@ -75,6 +89,7 @@ export function EvStatRow({
   effort,
   individual,
   total,
+  extra,
   testId,
 }: {
   label: string
@@ -83,13 +98,35 @@ export function EvStatRow({
   individual?: IvCell | null
   /** The computed stat. */
   total: number
+  /** The trailing cell, when the table declares one (a stat-stage select). */
+  extra?: ReactNode
   testId?: string
 }) {
   return (
     <div className="ds-ev-row" data-ds="ev-stat-row" data-testid={testId}>
       <span className="ds-ev-label">{label}</span>
       <span className="ds-ev-base num">{base ?? ''}</span>
-      <span className="ds-ev-effort">
+      <span className="ds-ev-individual">
+        {individual &&
+          (individual.onChange ? (
+            <NumberCell
+              value={individual.value}
+              max={individual.max}
+              label={`${label} individual value`}
+              testId={individual.testId}
+              onChange={individual.onChange}
+            />
+          ) : (
+            <span
+              className="ds-ev-readonly num"
+              data-testid={individual.testId}
+              title="Derived from the other DVs"
+            >
+              {individual.value}
+            </span>
+          ))}
+      </span>
+      <span className="ds-ev-effort" data-slider={effort?.slider ? 'true' : undefined}>
         {effort && (
           <>
             <NumberCell
@@ -111,29 +148,10 @@ export function EvStatRow({
           </>
         )}
       </span>
-      <span className="ds-ev-individual">
-        {individual &&
-          (individual.onChange ? (
-            <NumberCell
-              value={individual.value}
-              max={individual.max}
-              label={`${label} individual value`}
-              testId={individual.testId}
-              onChange={individual.onChange}
-            />
-          ) : (
-            <span
-              className="ds-ev-readonly num"
-              data-testid={individual.testId}
-              title="Derived from the other DVs"
-            >
-              {individual.value}
-            </span>
-          ))}
-      </span>
       <span className="ds-ev-total num" data-testid={testId ? `${testId}-total` : undefined}>
         {total}
       </span>
+      {extra !== undefined && <span className="ds-ev-extra">{extra}</span>}
     </div>
   )
 }

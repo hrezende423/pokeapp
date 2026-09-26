@@ -2,11 +2,13 @@ import { useMemo } from 'react'
 import {
   getAbility,
   getMove,
+  getType,
   listMoves,
   listNatures,
   moveExistsInGeneration,
   resolveAbilitiesForGeneration,
   resolveStatsForGeneration,
+  resolveTypesForGeneration,
   type Move,
 } from '../../data'
 import { resolveMovePowerForGeneration, resolveMoveTypeNameForGeneration } from '../../data/moveEra'
@@ -17,8 +19,9 @@ import { SearchSelect, type SearchOption } from '../../components/ds/SearchSelec
 import { SelectField } from '../../components/ds/SelectField'
 import { TextField } from '../../components/ds/TextField'
 import { Toggle } from '../../components/ds/Toggle'
-import { ToggleSwitch } from '../../components/ToggleSwitch'
+import { TypeLabel } from '../../components/ds/TypeLabel'
 import { useDraftNumber } from '../../components/ds/useDraftNumber'
+import { ToggleSwitch } from '../../components/ToggleSwitch'
 import { speciesEntries } from '../dex/entrySources'
 import {
   MAX_DV,
@@ -37,7 +40,6 @@ import {
   HELD_ITEMS_INTRODUCED_IN_GENERATION,
   POWER_OVERRIDE_DEFAULTS,
   type BoostStat,
-  type DamageResult,
   type StatId,
   type StatusId,
 } from './damage'
@@ -57,13 +59,14 @@ import type { useGenerationLearnset } from './useGenerationLearnset'
 type Learnset = ReturnType<typeof useGenerationLearnset>
 
 /**
- * One Pokemon's inputs, laid out as the team-build form (DESIGN-SYSTEM.md §5,
- * §11): a compact strip of configuration fields on top, then named groups --
- * Battle setup, the spread table in the dominant position, and (for the attacker)
- * the four move tiles.
+ * One Pokemon's inputs, in the Showdown calculator's arrangement -- species, type
+ * and level; the stat table with each stage inline on its row; nature, ability,
+ * item, status; current HP; four moves -- drawn with this app's controls (the
+ * hairline fields, the ds Toggle, the move-slot tiles). Both Pokemon are the same
+ * component: every calculation runs both ways, so neither is "the attacker".
  *
  * EVERY ERA GATE IS A HIDE, NOT A DISABLE, the same idiom as the species page:
- * no item field in Gen 1, no ability or nature before Gen 3, Stat Exp and DVs
+ * no item before Gen 2, no ability or nature before Gen 3, Stat Exp and DVs
  * instead of EVs and IVs before Gen 3, one Special in Gen 1.
  */
 
@@ -79,7 +82,7 @@ const STATUS_OPTIONS: { value: StatusId; label: string }[] = [
 
 const STAGE_OPTIONS = [6, 5, 4, 3, 2, 1, 0, -1, -2, -3, -4, -5, -6].map((n) => ({
   value: String(n),
-  label: n > 0 ? `+${n}` : String(n),
+  label: n > 0 ? `+${n}` : n === 0 ? '—' : String(n),
 }))
 
 interface SpreadRow {
@@ -101,7 +104,7 @@ function spreadRows(gen: number): SpreadRow[] {
       { stat: 'spe', label: 'Spe', key: 'speed', baseKey: 'speed' },
     ]
   }
-  const special = gen === 2
+  const shared = gen === 2
   return [
     { stat: 'hp', label: 'HP', key: 'hp', baseKey: 'hp' },
     { stat: 'atk', label: 'Atk', key: 'attack', baseKey: 'attack' },
@@ -109,49 +112,34 @@ function spreadRows(gen: number): SpreadRow[] {
     {
       stat: 'spa',
       label: 'SpA',
-      key: special ? 'special' : 'special-attack',
+      key: shared ? 'special' : 'special-attack',
       baseKey: 'special-attack',
     },
     {
       stat: 'spd',
       label: 'SpD',
-      key: special ? 'special' : 'special-defense',
+      key: shared ? 'special' : 'special-defense',
       baseKey: 'special-defense',
     },
     { stat: 'spe', label: 'Spe', key: 'speed', baseKey: 'speed' },
   ]
 }
 
-const STAGE_STATS: Record<number, { stat: BoostStat; label: string }[]> = {
-  1: [
-    { stat: 'atk', label: 'Atk' },
-    { stat: 'def', label: 'Def' },
-    { stat: 'spa', label: 'Spc' },
-    { stat: 'spe', label: 'Spe' },
-  ],
+const SHORT_STAT: Record<string, string> = {
+  attack: 'Atk',
+  defense: 'Def',
+  'special-attack': 'SpA',
+  'special-defense': 'SpD',
+  speed: 'Spe',
 }
-const MODERN_STAGES: { stat: BoostStat; label: string }[] = [
-  { stat: 'atk', label: 'Atk' },
-  { stat: 'def', label: 'Def' },
-  { stat: 'spa', label: 'SpA' },
-  { stat: 'spd', label: 'SpD' },
-  { stat: 'spe', label: 'Spe' },
-]
 
 function natureLabel(n: {
   display_name: string
   increased_stat: string | null
   decreased_stat: string | null
 }) {
-  const short: Record<string, string> = {
-    attack: 'Atk',
-    defense: 'Def',
-    'special-attack': 'SpA',
-    'special-defense': 'SpD',
-    speed: 'Spe',
-  }
   if (!n.increased_stat || n.increased_stat === n.decreased_stat) return n.display_name
-  return `${n.display_name} (+${short[n.increased_stat]} −${short[n.decreased_stat ?? '']})`
+  return `${n.display_name} (+${SHORT_STAT[n.increased_stat]} −${SHORT_STAT[n.decreased_stat ?? '']})`
 }
 
 function formLabel(speciesName: string, varietyName: string, speciesSlug: string): string {
@@ -164,40 +152,34 @@ function formLabel(speciesName: string, varietyName: string, speciesSlug: string
   return `${speciesName}-${form}`
 }
 
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
 export function DamagePokemonPanel({
-  role,
+  index,
   gen,
   side,
   onChange,
-  showMoves,
   showGender,
   anyMove,
   onAnyMove,
-  results,
-  selectedSlot,
-  onSelectSlot,
   learnset,
   moves,
 }: {
-  role: 'attacker' | 'defender'
+  /** 0 or 1: "Pokémon 1" / "Pokémon 2". */
+  index: 0 | 1
   gen: number
   side: SideState
   onChange: (next: SideState) => void
-  showMoves: boolean
   showGender: boolean
   anyMove: boolean
   onAnyMove: (next: boolean) => void
-  /** One per slot; null where the slot is empty or the calc failed. */
-  results: (DamageResult | null)[]
-  selectedSlot: number
-  onSelectSlot: (slot: number) => void
-  /** The attacker's learnset, owned by the calculator because it also derives the default moves. */
   learnset: Learnset
   /** The four slots as calculated: the side's own, or the learnset defaults. */
   moves: (number | null)[]
 }) {
   const variety = varietyOf(side)
   const set = (patch: Partial<SideState>) => onChange({ ...side, ...patch })
+  const role = `p${index + 1}`
   const testId = (s: string) => `dcalc-${role}-${s}`
 
   // ---------------------------------------------------------------- options
@@ -229,6 +211,7 @@ export function DamagePokemonPanel({
     () => [...listNatures()].sort((a, b) => a.display_name.localeCompare(b.display_name)),
     [],
   )
+  const types = resolveTypesForGeneration(variety, gen).map((t) => getType(t.type_id)?.name ?? '')
 
   // ------------------------------------------------------------- the spread
   const rawStats = computeRawStats(toCalcPokemon(side), gen)
@@ -263,6 +246,7 @@ export function DamagePokemonPanel({
 
   const maxHp = rawStats.hp
   const hp = side.currentHp ?? maxHp
+  const pct = maxHp > 0 ? Math.round((hp / maxHp) * 100) : 0
   const levelDraft = useDraftNumber(side.level, (level) => set({ level, currentHp: null }), {
     min: 1,
     max: 100,
@@ -270,15 +254,30 @@ export function DamagePokemonPanel({
   const hpDraft = useDraftNumber(hp, (n) => set({ currentHp: n === maxHp ? null : n }), {
     max: maxHp,
   })
+  const pctDraft = useDraftNumber(
+    pct,
+    (p) => set({ currentHp: p >= 100 ? null : Math.floor((maxHp * p) / 100) }),
+    { max: 100 },
+  )
+
   const toggledAbility = abilities.find((a) => a.ability.id === side.abilityId)?.ability
   const showAbilityOn =
     gen >= 3 && toggledAbility != null && TOGGLED_ABILITIES.includes(toggledAbility.name)
 
+  const stageSelect = (stat: BoostStat, label: string) => (
+    <SelectField
+      label={`${label} stage`}
+      hideLabel
+      options={STAGE_OPTIONS}
+      value={String(side.boosts[stat] ?? 0)}
+      data-testid={testId(`stage-${stat}`)}
+      onChange={(e) => set({ boosts: { ...side.boosts, [stat]: Number(e.target.value) } })}
+    />
+  )
+
   return (
     <div className="dcalc-panel" data-layout={`dcalc-${role}`} data-testid={`dcalc-${role}`}>
-      <div className="dcalc-panel-head">
-        <h2 className="dcalc-panel-title">{role === 'attacker' ? 'Attacker' : 'Defender'}</h2>
-      </div>
+      <FormSectionLabel>{`Pokémon ${index + 1}`}</FormSectionLabel>
 
       <CompactFieldStrip testId={testId('strip')}>
         <SearchSelect
@@ -301,18 +300,93 @@ export function DamagePokemonPanel({
           data-testid={testId('level')}
           {...levelDraft}
         />
-        {gen >= HELD_ITEMS_INTRODUCED_IN_GENERATION && (
-          <SearchSelect
-            label="Item"
-            options={itemOptions}
-            value={side.itemId != null ? String(side.itemId) : ''}
-            onChange={(v) =>
-              set({
-                itemId: v ? Number(v) : null,
-                remembered: { ...side.remembered, itemId: null },
-              })
+        {showGender && (
+          <SelectField
+            label="Gender"
+            fieldSize="narrow"
+            options={[
+              { value: 'N', label: '—' },
+              { value: 'M', label: 'M' },
+              { value: 'F', label: 'F' },
+            ]}
+            value={side.gender}
+            data-testid={testId('gender')}
+            onChange={(e) => set({ gender: e.target.value as SideState['gender'] })}
+          />
+        )}
+      </CompactFieldStrip>
+
+      <div className="dcalc-type-line" data-testid={testId('types')}>
+        <span className="ds-field-label">Type</span>
+        {types.map((t, i) => (
+          <span key={t} className="dcalc-type">
+            {i > 0 && <span className="dcalc-type-sep">·</span>}
+            <TypeLabel type={t} small />
+          </span>
+        ))}
+      </div>
+
+      <EvStatTable
+        testId={testId('spread')}
+        columns={[
+          'Stat',
+          'Base',
+          modern ? 'IV' : 'DV',
+          modern ? 'EVs' : 'Stat Exp',
+          'Total',
+          'Stage',
+        ]}
+        footer={
+          modern ? (
+            <span data-testid={testId('ev-total')}>{`${evTotal} / ${MAX_EV_TOTAL} EVs`}</span>
+          ) : gen === 2 ? (
+            'SpA and SpD share one Special DV and Stat Exp in Gen 2; the HP DV is derived.'
+          ) : (
+            'The HP DV is derived from the other four.'
+          )
+        }
+      >
+        {rows.map((row) => (
+          <EvStatRow
+            key={row.stat}
+            testId={testId(`row-${row.stat}`)}
+            label={row.label}
+            base={bases.get(row.baseKey) ?? null}
+            individual={
+              !modern && row.stat === 'hp'
+                ? {
+                    value: hpDvFrom(side.individual),
+                    max: MAX_DV,
+                    testId: testId(`iv-${row.stat}`),
+                  }
+                : {
+                    value: side.individual[row.key] ?? 0,
+                    max: modern ? MAX_IV : MAX_DV,
+                    onChange: (n) => setIndividual(row.key, n),
+                    testId: testId(`iv-${row.stat}`),
+                  }
             }
-            testId={testId('item')}
+            effort={{
+              value: side.effort[row.key] ?? 0,
+              max: modern ? MAX_EV : MAX_STAT_EXP,
+              slider: modern,
+              onChange: (n) => setEffort(row.key, n),
+              testId: testId(`ev-${row.stat}`),
+            }}
+            total={rawStats[row.stat]}
+            extra={row.stat === 'hp' ? null : stageSelect(row.stat as BoostStat, row.label)}
+          />
+        ))}
+      </EvStatTable>
+
+      <CompactFieldStrip testId={testId('setup')}>
+        {gen >= 3 && (
+          <SelectField
+            label="Nature"
+            options={natures.map((n) => ({ value: String(n.id), label: natureLabel(n) }))}
+            value={side.natureId != null ? String(side.natureId) : ''}
+            data-testid={testId('nature')}
+            onChange={(e) => set({ natureId: Number(e.target.value) })}
           />
         )}
         {gen >= 3 && (
@@ -327,13 +401,18 @@ export function DamagePokemonPanel({
             onChange={(e) => set({ abilityId: Number(e.target.value), abilityOn: false })}
           />
         )}
-        {gen >= 3 && (
-          <SelectField
-            label="Nature"
-            options={natures.map((n) => ({ value: String(n.id), label: natureLabel(n) }))}
-            value={side.natureId != null ? String(side.natureId) : ''}
-            data-testid={testId('nature')}
-            onChange={(e) => set({ natureId: Number(e.target.value) })}
+        {gen >= HELD_ITEMS_INTRODUCED_IN_GENERATION && (
+          <SearchSelect
+            label="Item"
+            options={itemOptions}
+            value={side.itemId != null ? String(side.itemId) : ''}
+            onChange={(v) =>
+              set({
+                itemId: v ? Number(v) : null,
+                remembered: { ...side.remembered, itemId: null },
+              })
+            }
+            testId={testId('item')}
           />
         )}
         <SelectField
@@ -345,142 +424,54 @@ export function DamagePokemonPanel({
         />
       </CompactFieldStrip>
 
-      <div className="dcalc-group">
-        <FormSectionLabel>Battle setup</FormSectionLabel>
-        <CompactFieldStrip testId={testId('battle')}>
-          <TextField
-            label="Current HP"
-            type="number"
-            min={0}
-            max={maxHp}
-            helper={`of ${maxHp} · ${maxHp > 0 ? Math.round((hp / maxHp) * 100) : 0}%`}
-            data-testid={testId('hp')}
-            {...hpDraft}
-          />
-          {(STAGE_STATS[gen] ?? MODERN_STAGES).map(({ stat, label }) => (
-            <SelectField
-              key={stat}
-              label={label}
-              fieldSize="narrow"
-              options={STAGE_OPTIONS}
-              value={String(side.boosts[stat] ?? 0)}
-              data-testid={testId(`stage-${stat}`)}
-              onChange={(e) => set({ boosts: { ...side.boosts, [stat]: Number(e.target.value) } })}
-            />
-          ))}
-          {showGender && (
-            <SelectField
-              label="Gender"
-              options={[
-                { value: 'N', label: '—' },
-                { value: 'M', label: 'Male' },
-                { value: 'F', label: 'Female' },
-              ]}
-              value={side.gender}
-              data-testid={testId('gender')}
-              onChange={(e) => set({ gender: e.target.value as SideState['gender'] })}
-            />
-          )}
-        </CompactFieldStrip>
+      <div className="dcalc-hp-line">
+        <TextField
+          label="Current HP"
+          fieldSize="narrow"
+          type="number"
+          min={0}
+          max={maxHp}
+          data-testid={testId('hp')}
+          {...hpDraft}
+        />
+        <span className="dcalc-hp-of num">/ {maxHp}</span>
+        <TextField
+          label="%"
+          fieldSize="narrow"
+          type="number"
+          min={0}
+          max={100}
+          data-testid={testId('hp-pct')}
+          {...pctDraft}
+        />
         {showAbilityOn && (
-          <div className="dcalc-inline-toggles">
-            <Toggle
-              on={side.abilityOn}
-              label={`${toggledAbility!.display_name} active`}
-              onChange={(next) => set({ abilityOn: next })}
-            />
-          </div>
+          <Toggle
+            on={side.abilityOn}
+            label={`${toggledAbility!.display_name} active`}
+            onChange={(next) => set({ abilityOn: next })}
+          />
         )}
       </div>
 
-      <div className="dcalc-group">
-        <FormSectionLabel
-          aside={
-            modern ? (
-              <span data-testid={testId('ev-total')}>
-                {evTotal} / {MAX_EV_TOTAL} EVs
-              </span>
-            ) : undefined
-          }
-        >
-          {modern ? 'EV allocation' : 'Stat Exp & DVs'}
-        </FormSectionLabel>
-        <EvStatTable
-          testId={testId('spread')}
-          columns={['Stat', 'Base', modern ? 'EVs' : 'Stat Exp', modern ? 'IV' : 'DV', 'Total']}
-          footer={
-            modern
-              ? `${MAX_EV_TOTAL - evTotal} EVs left`
-              : gen === 2
-                ? 'SpA and SpD share one Special DV and one Stat Exp in Gen 2. The HP DV is derived from the other four.'
-                : 'The HP DV is derived from the other four.'
-          }
-        >
-          {rows.map((row) => (
-            <EvStatRow
-              key={row.stat}
-              testId={testId(`row-${row.stat}`)}
-              label={row.label}
-              base={bases.get(row.baseKey) ?? null}
-              effort={{
-                value: side.effort[row.key] ?? 0,
-                max: modern ? MAX_EV : MAX_STAT_EXP,
-                slider: modern,
-                onChange: (n) => setEffort(row.key, n),
-                testId: testId(`ev-${row.stat}`),
-              }}
-              individual={
-                !modern && row.stat === 'hp'
-                  ? {
-                      value: hpDvFrom(side.individual),
-                      max: MAX_DV,
-                      testId: testId(`iv-${row.stat}`),
-                    }
-                  : {
-                      value: side.individual[row.key] ?? 0,
-                      max: modern ? MAX_IV : MAX_DV,
-                      onChange: (n) => setIndividual(row.key, n),
-                      testId: testId(`iv-${row.stat}`),
-                    }
-              }
-              total={rawStats[row.stat]}
-            />
-          ))}
-        </EvStatTable>
-      </div>
-
-      {showMoves && (
-        <MovesGroup
-          gen={gen}
-          side={side}
-          onChange={onChange}
-          anyMove={anyMove}
-          onAnyMove={onAnyMove}
-          results={results}
-          selectedSlot={selectedSlot}
-          onSelectSlot={onSelectSlot}
-          testId={testId}
-          learnset={learnset}
-          moves={moves}
-        />
-      )}
+      <MovesGroup
+        gen={gen}
+        side={side}
+        onChange={onChange}
+        anyMove={anyMove}
+        onAnyMove={onAnyMove}
+        learnset={learnset}
+        moves={moves}
+        testId={testId}
+      />
     </div>
   )
 }
 
-function moveOption(m: Move) {
-  return { value: String(m.id), label: m.display_name }
-}
-
-function slotDetail(result: DamageResult | null, move: Move | undefined, gen: number): string {
-  if (!move) return 'Empty'
-  const type = resolveMoveTypeNameForGeneration(move, gen) ?? ''
-  const typeLabel = type ? type.charAt(0).toUpperCase() + type.slice(1) : ''
-  if (!result) return typeLabel
-  if (result.noDamageReason === 'immune' || result.noDamageReason === 'ability')
-    return `${typeLabel} · no effect`
-  if (result.noDamageReason === 'variable') return `${typeLabel} · not calculated`
-  return `${result.percent[0]} – ${result.percent[1]}%`
+type SlotPatch = {
+  move?: number | null
+  crit?: boolean
+  hits?: number | null
+  power?: number | null
 }
 
 function MovesGroup({
@@ -489,24 +480,18 @@ function MovesGroup({
   onChange,
   anyMove,
   onAnyMove,
-  results,
-  selectedSlot,
-  onSelectSlot,
-  testId,
   learnset,
   moves,
+  testId,
 }: {
   gen: number
   side: SideState
   onChange: (next: SideState) => void
   anyMove: boolean
   onAnyMove: (next: boolean) => void
-  results: (DamageResult | null)[]
-  selectedSlot: number
-  onSelectSlot: (slot: number) => void
-  testId: (s: string) => string
   learnset: Learnset
   moves: (number | null)[]
+  testId: (s: string) => string
 }) {
   const { state, retry } = learnset
   const learnable = state.status === 'ready' ? state.rows : null
@@ -518,46 +503,34 @@ function MovesGroup({
     return pool.filter(isDamaging).sort((a, b) => a.display_name.localeCompare(b.display_name))
   }, [anyMove, learnable, gen])
 
-  const setSlot = (slot: number, moveId: number | null) => {
-    const next = [...moves]
-    next[slot] = moveId
-    const power = [...side.power]
-    const hits = [...side.hits]
-    power[slot] = null
-    hits[slot] = null
-    onChange({ ...side, moves: next, power, hits })
-  }
-
-  const selectedMove = moves[selectedSlot] != null ? getMove(moves[selectedSlot]!) : undefined
-  const minHits = selectedMove?.meta?.min_hits ?? null
-  const maxHits = selectedMove?.meta?.max_hits ?? null
-  const hitChoices =
-    selectedMove?.name === 'triple-kick'
-      ? gen === 2
-        ? [1, 2, 3]
-        : null
-      : minHits != null && maxHits != null && minHits < maxHits && selectedMove?.name !== 'beat-up'
-        ? Array.from({ length: maxHits - minHits + 1 }, (_, i) => minHits + i)
-        : null
-  const hasPowerOverride = selectedMove != null && selectedMove.name in POWER_OVERRIDE_DEFAULTS
-  const powerDraft = useDraftNumber(
-    side.power[selectedSlot] ??
-      (selectedMove ? (POWER_OVERRIDE_DEFAULTS[selectedMove.name] ?? 1) : 1),
-    (n) => {
-      const power = [...side.power]
-      power[selectedSlot] = n
-      onChange({ ...side, moves, power })
-    },
-    { min: 1, max: 255 },
-  )
   const skillLink = side.abilityId != null && getAbility(side.abilityId)?.name === 'skill-link'
+
+  // Any edit materializes the four slots, so the learnset defaults stop applying.
+  const patchSlot = (slot: number, patch: SlotPatch) => {
+    const next = {
+      ...side,
+      moves: [...moves],
+      crit: [...side.crit],
+      hits: [...side.hits],
+      power: [...side.power],
+    }
+    if ('move' in patch) {
+      next.moves[slot] = patch.move ?? null
+      next.hits[slot] = null
+      next.power[slot] = null
+    }
+    if (patch.crit !== undefined) next.crit[slot] = patch.crit
+    if ('hits' in patch) next.hits[slot] = patch.hits ?? null
+    if ('power' in patch) next.power[slot] = patch.power ?? null
+    onChange(next)
+  }
 
   return (
     <div className="dcalc-group">
       <FormSectionLabel
         aside={
           <ToggleSwitch
-            id={`${testId('any-move')}`}
+            id={testId('any-move')}
             label="Moves"
             offLabel="Learnable"
             onLabel="Any"
@@ -571,7 +544,7 @@ function MovesGroup({
 
       {!anyMove && state.status === 'loading' && (
         <p className="dcalc-note" data-testid={testId('learnset-loading')}>
-          Loading this Pokémon's Generation {gen} learnset…
+          Loading the Generation {gen} learnset…
         </p>
       )}
       {!anyMove && state.status === 'error' && (
@@ -585,106 +558,135 @@ function MovesGroup({
       )}
 
       <MoveSlotGrid testId={testId('moves')}>
-        {Array.from({ length: MOVE_SLOT_COUNT }, (_, slot) => {
-          const id = moves[slot]
-          const move = id != null ? getMove(id) : undefined
-          const slotOptions =
-            move && !options.some((o) => o.id === move.id) ? [move, ...options] : options
-          return (
-            <MoveSlotTile
-              key={slot}
-              label={`Move ${slot + 1}`}
-              selected={slot === selectedSlot}
-              onSelect={() => onSelectSlot(slot)}
-              detail={slotDetail(results[slot] ?? null, move, gen)}
-              testId={testId(`slot-${slot}`)}
-            >
-              <SelectField
-                label={`Move ${slot + 1}`}
-                hideLabel
-                options={[{ value: '', label: '(empty)' }, ...slotOptions.map(moveOption)]}
-                value={id != null ? String(id) : ''}
-                data-testid={testId(`move-${slot}`)}
-                onChange={(e) => setSlot(slot, e.target.value ? Number(e.target.value) : null)}
-              />
-            </MoveSlotTile>
-          )
-        })}
-      </MoveSlotGrid>
-
-      {selectedMove && (
-        <div className="dcalc-move-options" data-testid={testId('move-options')}>
-          <span className="dcalc-move-facts">
-            {selectedMove.display_name} ·{' '}
-            {(() => {
-              const t = resolveMoveTypeNameForGeneration(selectedMove, gen) ?? ''
-              return t.charAt(0).toUpperCase() + t.slice(1)
-            })()}{' '}
-            ·{' '}
-            {capitalize(
-              categoryFor(
-                gen,
-                selectedMove,
-                resolveMoveTypeNameForGeneration(selectedMove, gen) ?? '',
-              ),
-            )}{' '}
-            · {resolveMovePowerForGeneration(selectedMove, gen) ?? '—'} power
-          </span>
-          <Toggle
-            on={side.crit[selectedSlot]}
-            label="Critical hit"
-            onChange={(next) => {
-              const crit = [...side.crit]
-              crit[selectedSlot] = next
-              onChange({ ...side, moves, crit })
-            }}
+        {Array.from({ length: MOVE_SLOT_COUNT }, (_, slot) => (
+          <MoveTile
+            key={slot}
+            slot={slot}
+            gen={gen}
+            moveId={moves[slot]}
+            options={options}
+            crit={side.crit[slot]}
+            hits={side.hits[slot]}
+            power={side.power[slot]}
+            skillLink={skillLink}
+            onPatch={(patch) => patchSlot(slot, patch)}
+            testId={testId}
           />
-          {hitChoices && (
-            <SelectField
-              label="Hits"
-              fieldSize="narrow"
-              options={hitChoices.map((n) => ({ value: String(n), label: String(n) }))}
-              value={String(
-                side.hits[selectedSlot] ??
-                  defaultHits(selectedMove.name, gen, minHits, maxHits, skillLink),
-              )}
-              data-testid={testId('hits')}
-              onChange={(e) => {
-                const hits = [...side.hits]
-                hits[selectedSlot] = Number(e.target.value)
-                onChange({ ...side, moves, hits })
-              }}
-            />
-          )}
-          {hasPowerOverride && (
-            <TextField
-              label="Power"
-              fieldSize="narrow"
-              type="number"
-              min={1}
-              max={255}
-              data-testid={testId('power')}
-              {...powerDraft}
-            />
-          )}
-        </div>
-      )}
+        ))}
+      </MoveSlotGrid>
     </div>
   )
 }
 
-/** The engine's own default (moveResolve.ts), so the selector shows what is being calculated. */
+/** The engine's own default hit count (moveResolve.ts), so the selector shows what is calculated. */
 function defaultHits(
   slug: string,
   gen: number,
   min: number | null,
   max: number | null,
   skillLink: boolean,
-): number {
+) {
   if (slug === 'triple-kick') return gen === 2 ? 2 : 3
   if (min == null || max == null) return 1
   if (min === max) return min
   return skillLink ? max : min + 1
 }
 
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+function MoveTile({
+  slot,
+  gen,
+  moveId,
+  options,
+  crit,
+  hits,
+  power,
+  skillLink,
+  onPatch,
+  testId,
+}: {
+  slot: number
+  gen: number
+  moveId: number | null
+  options: Move[]
+  crit: boolean
+  hits: number | null
+  power: number | null
+  skillLink: boolean
+  onPatch: (patch: SlotPatch) => void
+  testId: (s: string) => string
+}) {
+  const move = moveId != null ? getMove(moveId) : undefined
+  const slotOptions = move && !options.some((o) => o.id === move.id) ? [move, ...options] : options
+  const type = move ? (resolveMoveTypeNameForGeneration(move, gen) ?? '') : ''
+  const min = move?.meta?.min_hits ?? null
+  const max = move?.meta?.max_hits ?? null
+  const hitChoices =
+    move?.name === 'triple-kick'
+      ? gen === 2
+        ? [1, 2, 3]
+        : null
+      : min != null && max != null && min < max && move?.name !== 'beat-up'
+        ? Array.from({ length: max - min + 1 }, (_, i) => min + i)
+        : null
+  const hasPower = move != null && move.name in POWER_OVERRIDE_DEFAULTS
+  const powerDraft = useDraftNumber(
+    power ?? (move ? (POWER_OVERRIDE_DEFAULTS[move.name] ?? 1) : 1),
+    (n) => onPatch({ power: n }),
+    { min: 1, max: 255 },
+  )
+
+  return (
+    <MoveSlotTile
+      label={`Move ${slot + 1}`}
+      testId={testId(`slot-${slot}`)}
+      detail={
+        move ? (
+          <span className="dcalc-tile-facts">
+            <TypeLabel type={type} small /> · {capitalize(categoryFor(gen, move, type))} ·{' '}
+            {resolveMovePowerForGeneration(move, gen) ?? '—'}
+          </span>
+        ) : (
+          'Empty'
+        )
+      }
+    >
+      <SelectField
+        label={`Move ${slot + 1}`}
+        hideLabel
+        options={[
+          { value: '', label: '(empty)' },
+          ...slotOptions.map((m) => ({ value: String(m.id), label: m.display_name })),
+        ]}
+        value={moveId != null ? String(moveId) : ''}
+        data-testid={testId(`move-${slot}`)}
+        onChange={(e) => onPatch({ move: e.target.value ? Number(e.target.value) : null })}
+      />
+      {move && (
+        <div className="dcalc-tile-options">
+          <Toggle on={crit} label="Crit" onChange={(next) => onPatch({ crit: next })} />
+          {hitChoices && (
+            <SelectField
+              label="Hits"
+              fieldSize="narrow"
+              options={hitChoices.map((n) => ({ value: String(n), label: String(n) }))}
+              value={String(hits ?? defaultHits(move.name, gen, min, max, skillLink))}
+              data-testid={testId(`hits-${slot}`)}
+              onChange={(e) => onPatch({ hits: Number(e.target.value) })}
+            />
+          )}
+          {hasPower && (
+            <TextField
+              label="Power"
+              fieldSize="narrow"
+              type="number"
+              min={1}
+              max={255}
+              data-testid={testId(`power-${slot}`)}
+              {...powerDraft}
+            />
+          )}
+        </div>
+      )}
+    </MoveSlotTile>
+  )
+}

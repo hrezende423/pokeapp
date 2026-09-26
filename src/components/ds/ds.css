@@ -953,10 +953,11 @@
   --ds-slider-thumb-border: #ffffff;
 }
 
-/* One grid for header and rows, so the columns line up without a <table>. */
+/* One grid for header and rows, so the columns line up without a <table>.
+   Stat | Base | IV | EV (+slider) | Total [| extra]. */
 .ds-ev-row {
   display: grid;
-  grid-template-columns: 40px 30px minmax(0, 1fr) 44px 44px;
+  grid-template-columns: 34px 28px 34px minmax(0, 1fr) 38px;
   column-gap: 10px;
   align-items: center;
   padding: 5px 0;
@@ -970,10 +971,16 @@
   letter-spacing: 0.05em;
   color: var(--text-secondary);
 }
+.ds-ev-table[data-extra='true'] .ds-ev-row {
+  grid-template-columns: 34px 28px 34px minmax(0, 1fr) 38px 46px;
+}
 .ds-ev-h-1,
-.ds-ev-h-3,
+.ds-ev-h-2,
 .ds-ev-h-4 {
   text-align: right;
+}
+.ds-ev-extra .ds-field {
+  width: 100%;
 }
 
 .ds-ev-label {
@@ -998,6 +1005,11 @@
 
 .ds-ev-individual {
   text-align: right;
+}
+/* Without a slider (Gen 1-2 Stat Exp) the number takes the cell: 65535 is five
+   mono digits and does not fit the slider layout's box. */
+.ds-ev-effort:not([data-slider='true']) {
+  grid-template-columns: minmax(0, 64px);
 }
 
 .ds-ev-input {

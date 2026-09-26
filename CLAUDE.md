@@ -521,6 +521,15 @@ calculator tabs and the single nav entry are unchanged.
   method, any of the generation's games — `getLearnsetsForSpecies`, not Team
   Building's stricter legal moveset), with an "Any" switch for hypotheticals.
   Prevo-only moves are reachable only through Any.
+- **Laid out as the Showdown calc is, in our controls** (by request): both
+  Pokemon's move results across the top, the selected line under them, then
+  Pokemon 1 | Field | Pokemon 2, with stat stages inline in the stat table and a
+  field column per side. **Every move runs in both directions** — there is no
+  attacker/defender role and no swap; `DualField.sides` is per Pokemon and
+  `fieldFor` picks attacker/defender per calculation. **The type scale is
+  redefined on `.dcalc`** (12px body, 14 title), the species page's technique, so
+  nothing outside this screen changes; it also sets `line-height: 1.3`, because
+  the inherited ~26px leading made every 12px row a 26px box.
 - **Its form is the team-build form, built as shared components** in
   `components/ds/` (`FormParts`, `EvStatTable`, `MoveSlotTile`, `SearchSelect`).
   EV entry is the Build Form's slider + number box by decision, not §5's plain

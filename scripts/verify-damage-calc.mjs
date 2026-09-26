@@ -15,7 +15,7 @@
  * `window.calc`, 2026-09-26) and are cited below with the exact line it printed.
  *
  * Then the screen: every generation's field gates, the move picker's learnset
- * default and Any switch, swap, the EV cap, the calculator's own generation not
+ * default and Any switch, both directions, the EV cap, the calculator's own generation not
  * moving the app's, no box-shadow, no console errors, both themes photographed.
  *
  * Usage: node scripts/verify-damage-calc.mjs
@@ -293,25 +293,27 @@ try {
       const has = (s) => q(s) != null
       const weather = [...(q('[data-testid="dcalc-weather"]')?.options ?? [])].map((o) => o.value)
       return {
-        item: has('[data-testid="dcalc-attacker-item"]'),
-        ability: has('[data-testid="dcalc-attacker-ability"]'),
-        nature: has('[data-testid="dcalc-attacker-nature"]'),
-        rows: document.querySelectorAll('[data-testid="dcalc-attacker-spread"] [data-ds="ev-stat-row"]').length,
-        sliders: document.querySelectorAll('[data-testid="dcalc-attacker-spread"] .ds-range').length,
-        hpDvEditable: q('[data-testid="dcalc-attacker-iv-hp"]')?.tagName === 'INPUT',
+        item: has('[data-testid="dcalc-p1-item"]'),
+        ability: has('[data-testid="dcalc-p1-ability"]'),
+        nature: has('[data-testid="dcalc-p1-nature"]'),
+        rows: document.querySelectorAll('[data-testid="dcalc-p1-spread"] [data-ds="ev-stat-row"]').length,
+        sliders: document.querySelectorAll('[data-testid="dcalc-p1-spread"] .ds-range').length,
+        hpDvEditable: q('[data-testid="dcalc-p1-iv-hp"]')?.tagName === 'INPUT',
         weather,
-        spikes: [...(q('[data-testid="dcalc-spikes"]')?.options ?? [])].length,
-        toggles: [...document.querySelectorAll('[data-testid="dcalc-field-toggles"] [data-ds="toggle"]')].map((t) => t.textContent.trim()),
-        stages: document.querySelectorAll('[data-testid^="dcalc-attacker-stage-"]').length,
+        spikes: [...(q('[data-testid="dcalc-spikes-2"]')?.options ?? [])].length,
+        toggles: [...document.querySelectorAll('[data-testid="dcalc-field-toggles-2"] [data-ds="toggle"]')].map((t) => t.textContent.trim()),
+        gravity: [...document.querySelectorAll('[data-testid="dcalc-field"] [data-ds="toggle"]')].some((t) => t.textContent.trim() === 'Gravity'),
+        sideColumns: document.querySelectorAll('[data-testid^="dcalc-field-side-"]').length,
+        stages: document.querySelectorAll('[data-testid^="dcalc-p1-stage-"]').length,
         desc: q('[data-testid="calc-damage-desc"]')?.textContent ?? '',
       }
     })
 
   const expectGate = {
-    1: { item: false, ability: false, nature: false, rows: 5, sliders: 0, weather: [], spikes: 0, toggles: ['Reflect', 'Light Screen'], stages: 4 },
-    2: { item: true, ability: false, nature: false, rows: 6, sliders: 0, weather: ['', 'sun', 'rain', 'sand'], spikes: 2, toggles: ['Reflect', 'Light Screen', 'Foresight', 'Defender switching out'], stages: 5 },
-    3: { item: true, ability: true, nature: true, rows: 6, sliders: 6, weather: ['', 'sun', 'rain', 'sand', 'hail'], spikes: 4, toggles: ['Reflect', 'Light Screen', 'Foresight', 'Defender switching out', 'Attacker charged'], stages: 5 },
-    4: { item: true, ability: true, nature: true, rows: 6, sliders: 6, weather: ['', 'sun', 'rain', 'sand', 'hail'], spikes: 4, toggles: ['Reflect', 'Light Screen', 'Stealth Rock', 'Foresight', 'Defender switching out', 'Attacker charged', 'Gravity'], stages: 5 },
+    1: { item: false, ability: false, nature: false, rows: 5, sliders: 0, weather: [], spikes: 0, toggles: ['Reflect', 'Light Screen'], gravity: false, sideColumns: 2, stages: 4 },
+    2: { item: true, ability: false, nature: false, rows: 6, sliders: 0, weather: ['', 'sun', 'rain', 'sand'], spikes: 2, toggles: ['Reflect', 'Light Screen', 'Foresight', 'Switching out'], gravity: false, sideColumns: 2, stages: 5 },
+    3: { item: true, ability: true, nature: true, rows: 6, sliders: 6, weather: ['', 'sun', 'rain', 'sand', 'hail'], spikes: 4, toggles: ['Reflect', 'Light Screen', 'Foresight', 'Switching out', 'Charge'], gravity: false, sideColumns: 2, stages: 5 },
+    4: { item: true, ability: true, nature: true, rows: 6, sliders: 6, weather: ['', 'sun', 'rain', 'sand', 'hail'], spikes: 4, toggles: ['Stealth Rock', 'Reflect', 'Light Screen', 'Foresight', 'Switching out', 'Charge'], gravity: true, sideColumns: 2, stages: 5 },
   }
   for (const g of [1, 2, 3, 4]) {
     await page.selectOption('[data-testid="dcalc-generation"]', String(g))
@@ -335,45 +337,45 @@ try {
   // The screen's result must be the engine's result for the same inputs.
   const screenDesc = await page.textContent('[data-testid="calc-damage-desc"]')
   const moveName = await page.evaluate(() => {
-    const sel = document.querySelector('[data-testid="dcalc-attacker-move-0"]')
+    const sel = document.querySelector('[data-testid="dcalc-p1-move-0"]')
     return sel.options[sel.selectedIndex].value
   })
   const engineDesc = await page.evaluate(async (moveId) => {
     const data = await import('/pokeapp/src/data/index.ts')
     const eng = await import('/pokeapp/src/modules/calculators/damage/index.ts')
     const st = await import('/pokeapp/src/modules/calculators/damageCalcState.ts')
-    const r = eng.calculateDamage(4, st.toCalcPokemon(st.newSide(6, 4)), st.toCalcPokemon(st.newSide(9, 4)), { move: data.getMove(Number(moveId)), isCrit: false, hits: null, powerOverride: null }, eng.emptyField())
+    const r = eng.calculateDamage(4, st.toCalcPokemon(st.newSide(6, 4)), st.toCalcPokemon(st.newSide(9, 4)), { move: data.getMove(Number(moveId)), isCrit: false, hits: null, powerOverride: null }, st.fieldFor(st.emptyDualField(), 0))
     return r.fullText
   }, moveName)
   check('the screen prints exactly what the engine returns', screenDesc === engineDesc, screenDesc)
 
   // Learnable by default; Any widens the list.
-  const count = () => page.evaluate(() => document.querySelector('[data-testid="dcalc-attacker-move-1"]').options.length)
+  const count = () => page.evaluate(() => document.querySelector('[data-testid="dcalc-p1-move-1"]').options.length)
   const learnable = await count()
-  await page.click('[data-testid="toggle-dcalc-attacker-any-move"]')
+  await page.click('[data-testid="toggle-dcalc-p1-any-move"]')
   const any = await count()
   check('moves default to the learnset; Any offers more', learnable > 10 && any > learnable, `${learnable} -> ${any}`)
-  await page.click('[data-testid="toggle-dcalc-attacker-any-move"]')
+  await page.click('[data-testid="toggle-dcalc-p1-any-move"]')
 
   // Selecting a slot changes the result shown.
   const before = await page.textContent('[data-testid="calc-damage-desc"]')
-  await page.click('[data-testid="dcalc-attacker-slot-2"] .ds-move-slot-label')
+  await page.click('[data-testid="dcalc-p1-result-2"]')
   const after = await page.textContent('[data-testid="calc-damage-desc"]')
-  check('selecting a move tile opens that move in full', before !== after && (await page.getAttribute('[data-testid="dcalc-attacker-slot-2"]', 'data-selected')) === 'true')
+  check('selecting a move result opens that move in full', before !== after && (await page.getAttribute('[data-testid="dcalc-p1-result-2"]', 'data-selected')) === 'true')
 
   // Species search.
-  await page.click('[data-testid="dcalc-defender-species-input"]')
-  await page.fill('[data-testid="dcalc-defender-species-input"]', 'blissey')
+  await page.click('[data-testid="dcalc-p2-species-input"]')
+  await page.fill('[data-testid="dcalc-p2-species-input"]', 'blissey')
   await page.keyboard.press('Enter')
   await settle()
   check('the species picker searches and commits', /vs\. .*Blissey/.test(await page.textContent('[data-testid="calc-damage-desc"]')))
 
   // Found by hand-testing the deployed preview, 2026-09-26 -- each was a real bug.
   // (a) An exact name wins over earlier substring matches: "Mew" once picked Mewtwo.
-  await page.click('[data-testid="dcalc-defender-species-input"]')
-  await page.fill('[data-testid="dcalc-defender-species-input"]', 'Mew')
+  await page.click('[data-testid="dcalc-p2-species-input"]')
+  await page.fill('[data-testid="dcalc-p2-species-input"]', 'Mew')
   await page.keyboard.press('Enter')
-  check('"Mew" + Enter picks Mew, not Mewtwo', (await page.inputValue('[data-testid="dcalc-defender-species-input"]')) === 'Mew')
+  check('"Mew" + Enter picks Mew, not Mewtwo', (await page.inputValue('[data-testid="dcalc-p2-species-input"]')) === 'Mew')
   // (b) A number field can be emptied mid-edit: clearing Level used to snap it to 1,
   //     so typing "50" gave "150" -> 100; clearing an EV left "0252".
   const typeInto = async (sel, keys) => {
@@ -383,15 +385,15 @@ try {
     await page.keyboard.type(keys)
     return page.inputValue(sel)
   }
-  check('clear Level, type 50 -> 50', (await typeInto('[data-testid="dcalc-attacker-level"]', '50')) === '50')
-  check('clear an EV, type 252 -> "252" (no leading zero)', (await typeInto('[data-testid="dcalc-attacker-ev-atk"]', '252')) === '252')
-  await typeInto('[data-testid="dcalc-attacker-level"]', '100')
-  await typeInto('[data-testid="dcalc-attacker-ev-atk"]', '0')
+  check('clear Level, type 50 -> 50', (await typeInto('[data-testid="dcalc-p1-level"]', '50')) === '50')
+  check('clear an EV, type 252 -> "252" (no leading zero)', (await typeInto('[data-testid="dcalc-p1-ev-atk"]', '252')) === '252')
+  await typeInto('[data-testid="dcalc-p1-level"]', '100')
+  await typeInto('[data-testid="dcalc-p1-ev-atk"]', '0')
   // (c) A round trip through an older era gives back what it took away.
-  await page.click('[data-testid="dcalc-attacker-item-input"]')
-  await page.fill('[data-testid="dcalc-attacker-item-input"]', 'Choice Band')
+  await page.click('[data-testid="dcalc-p1-item-input"]')
+  await page.fill('[data-testid="dcalc-p1-item-input"]', 'Choice Band')
   await page.keyboard.press('Enter')
-  await typeInto('[data-testid="dcalc-attacker-ev-atk"]', '252')
+  await typeInto('[data-testid="dcalc-p1-ev-atk"]', '252')
   const roundTrip = await page.textContent('[data-testid="calc-damage-desc"]')
   for (const g of ['2', '1', '4']) {
     await page.selectOption('[data-testid="dcalc-generation"]', g)
@@ -402,19 +404,19 @@ try {
     (await page.textContent('[data-testid="calc-damage-desc"]')) === roundTrip && /252 Atk Choice Band/.test(roundTrip),
     roundTrip,
   )
-  await page.click('[data-testid="dcalc-defender-species-input"]')
-  await page.fill('[data-testid="dcalc-defender-species-input"]', 'Blissey')
+  await page.click('[data-testid="dcalc-p2-species-input"]')
+  await page.fill('[data-testid="dcalc-p2-species-input"]', 'Blissey')
   await page.keyboard.press('Enter')
   await settle()
 
-  // Swap sides.
-  await page.click('[data-testid="dcalc-swap"]')
-  await settle()
-  check('Swap sides puts Blissey on the attacking side', /Blissey .* vs\. .*Charizard/.test(await page.textContent('[data-testid="calc-damage-desc"]')))
+  // Both directions: Pokemon 2's moves are calculated against Pokemon 1.
+  await page.click('[data-testid="dcalc-p2-result-0"]')
+  check("Pokémon 2's moves run against Pokémon 1", /^.*Blissey .* vs\. .*Charizard/.test(await page.textContent('[data-testid="calc-damage-desc"]')))
+  await page.click('[data-testid="dcalc-p1-result-0"]')
 
   // EV budget: four stats at 252 cannot exceed 510.
-  for (const s of ['hp', 'atk', 'def', 'spa']) await page.fill(`[data-testid="dcalc-attacker-ev-${s}"]`, '252')
-  const evTotal = await page.textContent('[data-testid="dcalc-attacker-ev-total"]')
+  for (const s of ['hp', 'atk', 'def', 'spa']) await page.fill(`[data-testid="dcalc-p1-ev-${s}"]`, '252')
+  const evTotal = await page.textContent('[data-testid="dcalc-p1-ev-total"]')
   check('the EV total is capped at 510, clamping the field being edited', evTotal.trim().startsWith('510'), evTotal)
 
   // Design-system rules on this screen.
@@ -423,15 +425,17 @@ try {
     const all = [root, ...root.querySelectorAll('*')]
     return {
       shadows: all.filter((el) => getComputedStyle(el).boxShadow !== 'none').length,
-      titleCase: getComputedStyle(root.querySelector('.dcalc-panel-title')).textTransform,
-      selectedBg: getComputedStyle(root.querySelector('.ds-move-slot[data-selected="true"]')).backgroundColor,
+      selectedBg: getComputedStyle(root.querySelector('.dcalc-move-result[data-selected="true"]')).backgroundColor,
+      bodySize: getComputedStyle(root).fontSize,
+      rowHeight: root.querySelector('[data-ds="ev-stat-row"]:nth-of-type(2)').getBoundingClientRect().height,
       raised: getComputedStyle(document.body).getPropertyValue('--surface-raised').trim(),
       overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth,
     }
   })
   check('no box-shadow anywhere in the calculator', ds.shadows === 0, `${ds.shadows} elements`)
-  check('panel titles are not uppercased by `.panel h2`', ds.titleCase === 'none', ds.titleCase)
-  check('the selected tile is a tone-step, not a colour', ds.selectedBg !== 'rgba(0, 0, 0, 0)')
+  check('the selected result is a tone-step, not a colour', ds.selectedBg !== 'rgba(0, 0, 0, 0)')
+  check('the calculator runs on its smaller type scale (12px body)', ds.bodySize === '12px', ds.bodySize)
+  check('stat rows are dense, not the page leading (< 28px)', ds.rowHeight < 28, `${ds.rowHeight}px`)
 
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   await page.screenshot({ path: shot('damage-dark.png') })
