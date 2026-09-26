@@ -489,10 +489,14 @@ record and is NOT app code.
   own — `typeEffectivenessAgainst` in `data/era.ts` already composes across a
   dual typing, and a wrong matrix still renders as a matrix.
 
-## Damage calculator (Tools → Calculators → Damage)
+## Damage calculator (Tools → Calculators → Damage Calculator)
 
-Replaced the simplified Damage tab from `9ac37d7` in place; the other four
-calculator tabs and the single nav entry are unchanged.
+First replaced the simplified Damage tab from `9ac37d7`; then, by the owner's
+request (2026-09-26), moved to ITS OWN PAGE (`damage-calculator` in
+calculators/pages.ts), nested under Calculators as the nav's first `children`
+entry. The Calculators screen keeps the other four tabs. The page head is the
+title with the generation select beside it -- no tab strip -- so the form
+starts high. The IV / EV headers are ghost buttons that zero that side's spread.
 
 - **The engine (`calculators/damage/`) is a PORT of the Showdown calculator, not
   a dependency.** `gen12.ts` / `gen3.ts` / `gen4.ts` mirror smogon/damage-calc's

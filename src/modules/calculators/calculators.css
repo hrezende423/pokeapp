@@ -138,8 +138,22 @@
   per-component work; nothing outside this screen changes.
 */
 
-.calc-content-wide {
-  max-width: none;
+/* The page head: the title with the generation beside it, no tab strip. */
+.dcalc-head {
+  justify-content: flex-start;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+/* Two classes: App.css's `.panel h1` (0,1,1) would otherwise set 1.75rem. */
+.dcalc .dcalc-title {
+  font-size: 18px;
+  letter-spacing: normal;
+  line-height: 1.2;
+}
+.dcalc-head .ds-field {
+  width: 72px;
+  padding-bottom: 1px;
 }
 
 .dcalc {
@@ -210,9 +224,51 @@
   padding: 1px 0;
   column-gap: 6px;
 }
-.dcalc .ds-ev-effort[data-slider='true'] {
-  grid-template-columns: 40px minmax(0, 1fr);
+/* IV and EV values centred under their headers. The EV header is laid out on
+   the effort cell's own grid, so it centres over the number box, not the slider. */
+.dcalc .ds-ev-table {
+  --dcalc-ev-num: 40px;
+}
+.dcalc .ds-ev-table:has(.ds-ev-effort:not([data-slider='true'])) {
+  --dcalc-ev-num: 64px;
+}
+.dcalc .ds-ev-effort,
+.dcalc .ds-ev-effort[data-slider='true'],
+.dcalc .ds-ev-h-3 {
+  display: grid;
+  grid-template-columns: var(--dcalc-ev-num) minmax(0, 1fr);
   gap: 6px;
+}
+.dcalc .ds-ev-h-3 {
+  justify-items: center;
+}
+.dcalc .ds-ev-h-2,
+.dcalc .ds-ev-individual,
+.dcalc .ds-ev-input {
+  text-align: center;
+}
+/* Typed values, no steppers: the spinner covered the centred digits. */
+.dcalc input[type='number'] {
+  appearance: textfield;
+}
+.dcalc input[type='number']::-webkit-inner-spin-button,
+.dcalc input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+/* The IV / EV headers reset their spread: ghost buttons wearing the header type. */
+.dcalc .dcalc-reset {
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--text-secondary);
+}
+.dcalc .dcalc-reset:hover {
+  color: var(--text-primary);
+}
+.dcalc .dcalc-reset:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .dcalc .ds-ev-extra .ds-field-control {
   padding: 1px 1px;
@@ -237,13 +293,14 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    'scope'
     'results'
     'result'
     'p1'
     'field'
     'p2';
   gap: var(--space-gap-md);
+  /* Clear of the ScrollArea's drawn thumb, which sits over the right edge. */
+  padding: 0 20px var(--space-gap-xl) 0;
 }
 
 /* Three columns once each Pokemon can have ~360px: Pokemon 1 | Field | Pokemon 2. */
@@ -251,19 +308,11 @@
   .dcalc-grid {
     grid-template-columns: minmax(0, 1fr) minmax(220px, 260px) minmax(0, 1fr);
     grid-template-areas:
-      'scope   scope   scope'
       'results results results'
       'result  result  result'
       'p1      field   p2';
     column-gap: 18px;
   }
-}
-
-.dcalc-scope {
-  grid-area: scope;
-}
-.dcalc-scope .ds-field-strip > .ds-field {
-  flex: 0 0 92px;
 }
 
 .dcalc-results {
@@ -380,14 +429,24 @@
 
 /* ---- panel pieces */
 
+/* Species | Type | Level on one strip: the species box sized for a name, the
+   types taking the room between it and the level. */
+.dcalc .ds-field-strip > .ds-field:has(+ .dcalc-type-field) {
+  flex: 0 1 140px;
+  min-width: 0;
+}
+.dcalc .ds-field-strip > .dcalc-type-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .dcalc-type-line {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  /* The field control's own box: 3px padding plus its 1px underline. */
+  padding: 3px 0 4px;
   font-size: var(--font-size-body);
-}
-.dcalc-type-line .ds-field-label {
-  margin-right: 4px;
+  white-space: nowrap;
 }
 .dcalc-type-sep {
   margin-right: 6px;
@@ -405,6 +464,18 @@
 }
 .dcalc-hp-line > .ds-field:first-child {
   width: 72px;
+}
+/* The percent box is sized for "100", and its % sits right against it. */
+.dcalc-hp-line > .ds-field:has(+ .dcalc-hp-pct) {
+  width: 30px;
+}
+.dcalc-hp-pct {
+  margin-left: -8px;
+}
+/* The stat name is 9.5px caps in a 1.3 line box: it rode above the row's
+   centre line next to the 10.5px numerals. */
+.dcalc .ds-ev-label {
+  line-height: 1;
 }
 .dcalc-hp-of {
   padding-bottom: 4px;
@@ -467,11 +538,15 @@
 .dcalc-field-side .ds-field {
   width: 100%;
 }
+/* One column as wide as the longest label ("Switching out"), each toggle
+   stretched to it with the track pushed right, so the tracks line up. */
 .dcalc-field-toggles {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: max-content;
   gap: 5px;
+}
+.dcalc-field-toggles .ds-toggle {
+  justify-content: space-between;
 }
 
 /* The Moves switch sits on the section label's own line, so its caption would

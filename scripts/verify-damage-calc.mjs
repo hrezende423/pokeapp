@@ -281,7 +281,27 @@ try {
   hr('5. THE SCREEN')
   await page.selectOption('[data-testid="vg-select"]', { index: 1 }).catch(() => {})
   const appSelection = await page.inputValue('[data-testid="vg-select"]').catch(() => null)
+  // Tools -> Calculators -> Damage Calculator: its own page, nested in the nav.
+  const nav = await page.evaluate(() => {
+    const sub = document.querySelector('[data-testid="nav-subdropdown-calculators"]')
+    return {
+      parent: document.querySelector('[data-testid="nav-calculators"]')?.textContent.trim(),
+      children: [...(sub?.querySelectorAll('.nav-item') ?? [])].map((el) => el.textContent.trim()),
+    }
+  })
+  check('Calculators has a sub-menu holding Damage Calculator', nav.parent === 'Calculators' && JSON.stringify(nav.children) === '["Damage Calculator"]', JSON.stringify(nav))
   await page.evaluate(() => document.querySelector('[data-testid="nav-calculators"]').click())
+  await page.waitForSelector('[data-testid="calc-scroll-area"]', { timeout: 60000 })
+  const calcTabs = await page.evaluate(() => ({
+    panel: document.querySelector('[role="tabpanel"]')?.dataset.testid,
+    tabs: [...document.querySelectorAll('.calc-subnav [role="tab"]')].map((el) => el.textContent.trim()),
+  }))
+  check(
+    'the Calculators page keeps four tabs, no Damage, opening on Catch Rate',
+    calcTabs.panel === 'calc-panel-catch-rate' && JSON.stringify(calcTabs.tabs) === '["Catch Rate","Stat","Experience","Speed"]',
+    JSON.stringify(calcTabs),
+  )
+  await page.evaluate(() => document.querySelector('[data-testid="nav-damage-calculator"]').click())
   await page.waitForSelector('[data-testid="calc-damage"]', { timeout: 60000 })
   const settle = () =>
     page.waitForFunction(() => !document.querySelector('[data-testid$="learnset-loading"]'), null, { timeout: 60000 })
@@ -418,6 +438,63 @@ try {
   for (const s of ['hp', 'atk', 'def', 'spa']) await page.fill(`[data-testid="dcalc-p1-ev-${s}"]`, '252')
   const evTotal = await page.textContent('[data-testid="dcalc-p1-ev-total"]')
   check('the EV total is capped at 510, clamping the field being edited', evTotal.trim().startsWith('510'), evTotal)
+
+  // The owner's layout fixes, 2026-09-26.
+  const box = (sel) => page.evaluate((s) => {
+    const r = document.querySelector(s)?.getBoundingClientRect()
+    return r ? { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: (r.left + r.right) / 2 } : null
+  }, sel)
+  const head = await page.evaluate(() => {
+    const t = document.querySelector('.dcalc-title')
+    const g = document.querySelector('[data-testid="dcalc-generation"]')
+    const tr = t.getBoundingClientRect()
+    const gr = g.getBoundingClientRect()
+    return { text: t.textContent, size: parseFloat(getComputedStyle(t).fontSize), right: tr.right, genLeft: gr.left, overlapY: gr.top < tr.bottom && gr.bottom > tr.top }
+  })
+  check('the page is titled "Damage Calculator", at a reduced size', head.text === 'Damage Calculator' && head.size <= 18, JSON.stringify(head))
+  check('the generation selector sits to the right of the title', head.genLeft > head.right && head.overlapY, JSON.stringify(head))
+  for (const i of [1, 2]) {
+    const tracks = await page.evaluate((n) => [...document.querySelectorAll(`[data-testid="dcalc-field-toggles-${n}"] .ds-toggle-track`)].map((el) => Math.round(el.getBoundingClientRect().left)), i)
+    check(`field side ${i}: the toggles line up in one column`, tracks.length > 1 && new Set(tracks).size === 1, JSON.stringify(tracks))
+    const sp = await box(`[data-testid="dcalc-p${i}-species"]`)
+    const ty = await box(`[data-testid="dcalc-p${i}-types"]`)
+    const lv = await box(`[data-testid="dcalc-p${i}-level"]`)
+    check(`Pokémon ${i}: types sit between the species and level fields`, sp.r <= ty.l && ty.r <= lv.l && Math.abs(sp.t - ty.t) < 4, JSON.stringify({ sp, ty, lv }))
+    for (const [h, cell] of [['individual', 'iv-atk'], ['effort', 'ev-atk']]) {
+      const hb = await box(`[data-testid="dcalc-p${i}-reset-${h}"]`)
+      const cb = await box(`[data-testid="dcalc-p${i}-${cell}"]`)
+      const align = await page.evaluate((s) => getComputedStyle(document.querySelector(s)).textAlign, `[data-testid="dcalc-p${i}-${cell}"]`)
+      check(`Pokémon ${i}: the ${h === 'individual' ? 'IV' : 'EV'} header is centred on its column`, Math.abs(hb.cx - cb.cx) <= 1.5 && align === 'center', `${hb.cx} vs ${cb.cx}, ${align}`)
+    }
+    const pct = await box(`[data-testid="dcalc-p${i}-hp-pct"]`)
+    const sign = await page.evaluate((n) => {
+      const f = document.querySelector(`[data-testid="dcalc-p${n}-hp-pct"]`).closest('.ds-field')
+      const next = f.nextElementSibling
+      const label = f.querySelector('.ds-field-label')
+      return { text: next?.textContent.trim(), left: next?.getBoundingClientRect().left, labelShown: label.getBoundingClientRect().height > 1 }
+    }, i)
+    check(`Pokémon ${i}: % follows the number, not a header over it`, sign.text === '%' && sign.left >= pct.r && !sign.labelShown, JSON.stringify(sign))
+  }
+  // The IV / EV headers are ghost buttons that zero their spread.
+  await page.click('[data-testid="dcalc-p1-reset-effort"]')
+  check('the EVs header resets the EVs to 0', (await page.textContent('[data-testid="dcalc-p1-ev-total"]')).trim().startsWith('0 /'))
+  await page.click('[data-testid="dcalc-p2-reset-individual"]')
+  const ivs = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="dcalc-p2-iv-"]')].map((el) => el.value))
+  const p1ivs = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="dcalc-p1-iv-"]')].map((el) => el.value))
+  check("the IV header resets only its own side's IVs to 0", ivs.every((v) => v === '0') && p1ivs.every((v) => v === '31'), `${ivs} / ${p1ivs}`)
+  check('the reset headers are ghost buttons', await page.evaluate(() => {
+    const b = document.querySelector('[data-testid="dcalc-p1-reset-individual"]')
+    const cs = getComputedStyle(b)
+    return b.tagName === 'BUTTON' && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderTopWidth === '0px'
+  }))
+  // Clear of the scroll thumb on the right.
+  const gutter = await page.evaluate(() => {
+    const area = document.querySelector('[data-testid="calc-scroll-area"]').getBoundingClientRect()
+    const p2 = document.querySelector('[data-testid="dcalc-p2"]').getBoundingClientRect()
+    return area.right - p2.right
+  })
+  check('the form stops short of the scrollbar (>= 16px gutter)', gutter >= 16, `${gutter}px`)
+  await page.screenshot({ path: shot('damage-layout-fixes.png') })
 
   // Design-system rules on this screen.
   const ds = await page.evaluate(() => {

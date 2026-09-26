@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { getAbility, getMove, getType, resolveTypesForGeneration } from '../../data'
-import { CompactFieldStrip } from '../../components/ds/FormParts'
+import { ScrollArea } from '../../components/ScrollArea'
+import { scrollKey } from '../../components/scrollMemory'
 import { SelectField } from '../../components/ds/SelectField'
 import { calculateDamage } from './damage'
 import {
@@ -23,9 +24,16 @@ import { DamagePokemonPanel } from './DamagePokemonPanel'
 import { DamageResultView, MoveResultList, type MoveResult } from './DamageResultView'
 import { useDamageCalcScope } from './useDamageCalcScope'
 import { useGenerationLearnset } from './useGenerationLearnset'
+import '../../components/ds/ds.css'
+import './calculators.css'
 
 /**
  * Damage Calculator, Generations 1-4, singles, one Pokemon against another.
+ *
+ * ITS OWN PAGE, under Tools -> Calculators -> Damage Calculator, with the
+ * Calculators screen's shell (a fixed head over a ScrollArea) but no tab strip:
+ * the head is the title with the generation beside it, so the form starts as
+ * high on the screen as it can.
  *
  * LAID OUT AS THE SHOWDOWN CALCULATOR IS -- both Pokemon's moves with their
  * percent across the top, one of the eight selected and its full line under
@@ -47,7 +55,7 @@ import { useGenerationLearnset } from './useGenerationLearnset'
 
 const OTHER = { 0: 1, 1: 0 } as const
 
-export function DamageCalculator() {
+export function DamageCalculatorPage() {
   const scope = useDamageCalcScope()
   const gen = scope.generation
 
@@ -121,54 +129,56 @@ export function DamageCalculator() {
   const current = results[selected.side][selected.slot] ?? null
 
   return (
-    <div className="calc-tool dcalc" data-testid="calc-damage" data-generation={gen}>
-      <div className="dcalc-grid" data-layout="damage-calc">
-        <div className="dcalc-scope" data-layout="dcalc-scope">
-          <CompactFieldStrip testId="dcalc-scope">
-            <SelectField
-              label="Generation"
-              options={scope.generations.map((g) => ({ value: String(g), label: `Gen ${g}` }))}
-              value={String(gen)}
-              data-testid="dcalc-generation"
-              onChange={(e) => setGeneration(Number(e.target.value))}
-            />
-          </CompactFieldStrip>
-        </div>
+    <div className="calc dcalc" data-testid="calc-damage" data-generation={gen}>
+      <div className="calc-head dcalc-head" data-layout="dcalc-head">
+        <h1 className="calc-title dcalc-title">Damage Calculator</h1>
+        <SelectField
+          label="Generation"
+          hideLabel
+          options={scope.generations.map((g) => ({ value: String(g), label: `Gen ${g}` }))}
+          value={String(gen)}
+          data-testid="dcalc-generation"
+          onChange={(e) => setGeneration(Number(e.target.value))}
+        />
+      </div>
 
-        <div className="dcalc-results" data-layout="dcalc-results">
+      <ScrollArea testId="calc-scroll-area" memoryKey={scrollKey('calc', 'damage')}>
+        <div className="dcalc-grid" data-layout="damage-calc">
+          <div className="dcalc-results" data-layout="dcalc-results">
+            {([0, 1] as const).map((i) => (
+              <MoveResultList
+                key={i}
+                index={i}
+                name={names[i]}
+                results={results[i]}
+                selected={selected.side === i ? selected.slot : null}
+                onSelect={(slot) => setSelected({ side: i, slot })}
+              />
+            ))}
+          </div>
+
+          <div className="dcalc-result-area" data-layout="dcalc-result">
+            <DamageResultView selected={current} />
+          </div>
+
           {([0, 1] as const).map((i) => (
-            <MoveResultList
+            <DamagePokemonPanel
               key={i}
               index={i}
-              name={names[i]}
-              results={results[i]}
-              selected={selected.side === i ? selected.slot : null}
-              onSelect={(slot) => setSelected({ side: i, slot })}
+              gen={gen}
+              side={sides[i]}
+              onChange={setSide(i)}
+              showGender={hasRivalry}
+              anyMove={anyMove[i]}
+              onAnyMove={(v) => setAnyMove((a) => (i === 0 ? [v, a[1]] : [a[0], v]))}
+              learnset={i === 0 ? learn0 : learn1}
+              moves={i === 0 ? moves0 : moves1}
             />
           ))}
+
+          <DamageFieldPanel gen={gen} field={field} names={names} onChange={setField} />
         </div>
-
-        <div className="dcalc-result-area" data-layout="dcalc-result">
-          <DamageResultView selected={current} />
-        </div>
-
-        {([0, 1] as const).map((i) => (
-          <DamagePokemonPanel
-            key={i}
-            index={i}
-            gen={gen}
-            side={sides[i]}
-            onChange={setSide(i)}
-            showGender={hasRivalry}
-            anyMove={anyMove[i]}
-            onAnyMove={(v) => setAnyMove((a) => (i === 0 ? [v, a[1]] : [a[0], v]))}
-            learnset={i === 0 ? learn0 : learn1}
-            moves={i === 0 ? moves0 : moves1}
-          />
-        ))}
-
-        <DamageFieldPanel gen={gen} field={field} names={names} onChange={setField} />
-      </div>
+      </ScrollArea>
     </div>
   )
 }

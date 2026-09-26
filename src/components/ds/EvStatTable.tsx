@@ -52,12 +52,14 @@ export function EvStatTable({
   testId,
 }: {
   /**
-   * Header text for [stat, base, individual, effort, total, extra?]; null leaves
-   * a header cell blank. A sixth entry turns on the trailing column for every row.
+   * Header for [stat, base, individual, effort, total, extra?]; null leaves a
+   * header cell blank. A sixth entry turns on the trailing column for every row.
+   * Text is presentational (the rows carry their own accessible names); a node
+   * -- the damage calculator's reset buttons -- stays in the accessibility tree.
    */
   columns:
-    | [string, string | null, string | null, string | null, string]
-    | [string, string | null, string | null, string | null, string, string | null]
+    | [string, ReactNode, ReactNode, ReactNode, string]
+    | [string, ReactNode, ReactNode, ReactNode, string, ReactNode]
   children: ReactNode
   /** The running total / notes line, plain secondary text. */
   footer?: ReactNode
@@ -70,9 +72,13 @@ export function EvStatTable({
       data-extra={columns.length === 6 ? 'true' : undefined}
       data-testid={testId}
     >
-      <div className="ds-ev-row ds-ev-head" aria-hidden>
+      <div className="ds-ev-row ds-ev-head">
         {columns.map((c, i) => (
-          <span key={i} className={`ds-ev-h ds-ev-h-${i}`}>
+          <span
+            key={i}
+            className={`ds-ev-h ds-ev-h-${i}`}
+            aria-hidden={c == null || typeof c === 'string' ? true : undefined}
+          >
             {c ?? ''}
           </span>
         ))}

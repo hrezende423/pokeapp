@@ -236,6 +236,23 @@ export function DamagePokemonPanel({
       set({ effort: { ...side.effort, [key]: Math.min(value, MAX_STAT_EXP) } })
     }
   }
+  // Gen 1-2's HP DV is derived from the other four, so it has no key to reset.
+  const resetSpread = (which: 'individual' | 'effort') => {
+    const keys = effortKeys.filter((k) => modern || which === 'effort' || k !== 'hp')
+    set({ [which]: Object.fromEntries(keys.map((k) => [k, 0])) as StatNumbers })
+  }
+  const resetHeader = (text: string, which: 'individual' | 'effort', what: string) => (
+    <button
+      type="button"
+      className="ghost-button dcalc-reset"
+      title={`Reset ${what} to 0`}
+      aria-label={`Reset ${what} to 0`}
+      data-testid={testId(`reset-${which}`)}
+      onClick={() => resetSpread(which)}
+    >
+      {text}
+    </button>
+  )
   const setIndividual = (key: StatKey, value: number) =>
     set({
       individual: {
@@ -282,7 +299,6 @@ export function DamagePokemonPanel({
       <CompactFieldStrip testId={testId('strip')}>
         <SearchSelect
           label="Pokémon"
-          fieldSize="wide"
           options={speciesOptions}
           value={`${side.speciesId}:${side.varietyName}`}
           onChange={(v) => {
@@ -291,6 +307,17 @@ export function DamagePokemonPanel({
           }}
           testId={testId('species')}
         />
+        <div className="ds-field dcalc-type-field" data-testid={testId('types')}>
+          <span className="ds-field-label">Type</span>
+          <span className="dcalc-type-line">
+            {types.map((t, i) => (
+              <span key={t} className="dcalc-type">
+                {i > 0 && <span className="dcalc-type-sep">·</span>}
+                <TypeLabel type={t} small />
+              </span>
+            ))}
+          </span>
+        </div>
         <TextField
           label="Level"
           fieldSize="narrow"
@@ -316,23 +343,13 @@ export function DamagePokemonPanel({
         )}
       </CompactFieldStrip>
 
-      <div className="dcalc-type-line" data-testid={testId('types')}>
-        <span className="ds-field-label">Type</span>
-        {types.map((t, i) => (
-          <span key={t} className="dcalc-type">
-            {i > 0 && <span className="dcalc-type-sep">·</span>}
-            <TypeLabel type={t} small />
-          </span>
-        ))}
-      </div>
-
       <EvStatTable
         testId={testId('spread')}
         columns={[
           'Stat',
           'Base',
-          modern ? 'IV' : 'DV',
-          modern ? 'EVs' : 'Stat Exp',
+          resetHeader(modern ? 'IV' : 'DV', 'individual', modern ? 'IVs' : 'DVs'),
+          resetHeader(modern ? 'EVs' : 'Stat Exp', 'effort', modern ? 'EVs' : 'Stat Exp'),
           'Total',
           'Stage',
         ]}
@@ -436,7 +453,8 @@ export function DamagePokemonPanel({
         />
         <span className="dcalc-hp-of num">/ {maxHp}</span>
         <TextField
-          label="%"
+          label="Current HP percent"
+          hideLabel
           fieldSize="narrow"
           type="number"
           min={0}
@@ -444,6 +462,9 @@ export function DamagePokemonPanel({
           data-testid={testId('hp-pct')}
           {...pctDraft}
         />
+        <span className="dcalc-hp-of dcalc-hp-pct" aria-hidden>
+          %
+        </span>
         {showAbilityOn && (
           <Toggle
             on={side.abilityOn}

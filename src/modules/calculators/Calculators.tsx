@@ -3,7 +3,6 @@ import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
 import { Tabs } from '../../components/ds/Navigation'
 import { CatchRateCalculator } from './CatchRateCalculator'
-import { DamageCalculator } from './DamageCalculator'
 import { ExperienceCalculator } from './ExperienceCalculator'
 import { SpeedCalculator } from './SpeedCalculator'
 import { StatCalculator } from './StatCalculator'
@@ -19,20 +18,21 @@ import './calculators.css'
  * nothing to keep in the same place across tabs, so the shell is just the tab
  * strip and a scroller.
  *
- * Five tools, in the order agreed: Damage, Catch Rate, Stat, Experience, Speed.
- * A sixth would be a data edit to TABS plus one more `tab === '…' &&` line, not
- * a new file's worth of shell — the same reason Type Coverage's four readings
- * live in one component.
+ * Four tools, in the order agreed: Catch Rate, Stat, Experience, Speed. A fifth
+ * would be a data edit to TABS plus one more `tab === '…' &&` line, not a new
+ * file's worth of shell — the same reason Type Coverage's four readings live in
+ * one component. The Damage Calculator was a tab here and is now its own page
+ * (DamageCalculator.tsx), nested under Calculators in the nav.
  */
 
-const TABS = ['Damage', 'Catch Rate', 'Stat', 'Experience', 'Speed'] as const
+const TABS = ['Catch Rate', 'Stat', 'Experience', 'Speed'] as const
 type CalculatorTab = (typeof TABS)[number]
 
 /** Test-id slug: lowercase, spaces to hyphens — "Catch Rate" -> "catch-rate". */
 const slug = (tab: string) => tab.toLowerCase().replace(/\s+/g, '-')
 
 export function Calculators() {
-  const [tab, setTab] = useState<CalculatorTab>('Damage')
+  const [tab, setTab] = useState<CalculatorTab>('Catch Rate')
 
   return (
     <div className="calc">
@@ -44,12 +44,7 @@ export function Calculators() {
       </div>
 
       <ScrollArea testId="calc-scroll-area" memoryKey={scrollKey('calc', tab)}>
-        <div
-          className={tab === 'Damage' ? 'calc-content calc-content-wide' : 'calc-content'}
-          role="tabpanel"
-          data-testid={`calc-panel-${slug(tab)}`}
-        >
-          {tab === 'Damage' && <DamageCalculator />}
+        <div className="calc-content" role="tabpanel" data-testid={`calc-panel-${slug(tab)}`}>
           {tab === 'Catch Rate' && <CatchRateCalculator />}
           {tab === 'Stat' && <StatCalculator />}
           {tab === 'Experience' && <ExperienceCalculator />}

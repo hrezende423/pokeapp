@@ -1,8 +1,12 @@
-import { CALCULATORS_PAGES, findCalculatorsPage, type CalculatorsPageId } from '../calculators/pages'
+import { findCalculatorsPage, type CalculatorsPageId } from '../calculators/pages'
 import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
-import { TYPE_COVERAGE_PAGES, findTypeCoveragePage, type TypeCoveragePageId } from '../typecoverage/pages'
+import {
+  TYPE_COVERAGE_PAGES,
+  findTypeCoveragePage,
+  type TypeCoveragePageId,
+} from '../typecoverage/pages'
 import { DEX_MODULES, findModule, type DexModuleId } from './registry'
 import type { ComponentType } from 'react'
 
@@ -102,12 +106,16 @@ export const NAV_TABS: readonly NavTab[] = [
     label: 'Tools',
     /*
       CALCULATORS LEADS, and is a real screen now rather than a stub -- see
-      calculators/pages.ts. It stays a single flat entry rather than gaining
-      `children`: the five tools are tabs of ONE screen (the Type Coverage
-      shape), not five destinations, so there is nothing to nest here.
+      calculators/pages.ts. The four small tools are tabs of ONE screen (the Type
+      Coverage shape); the Damage Calculator is its own page, nested under it as
+      the first `children` entry the nav has used.
     */
     entries: [
-      ...CALCULATORS_PAGES.map((p) => ({ id: p.id, label: p.label })),
+      {
+        id: 'calculators',
+        label: 'Calculators',
+        children: [{ id: 'damage-calculator', label: 'Damage Calculator' }],
+      },
       ...stubs('compare-pokemon', 'battle-simulator', 'training-optimization', 'breeding-planner'),
     ],
   },

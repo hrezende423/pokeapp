@@ -1052,6 +1052,12 @@
   color: var(--text-secondary);
 }
 
+/* The same class name as the running-total line (DataRows' EvTotal); its
+   margin-top is not for a table cell, and pushed each row's total off centre. */
+.ds-ev-row .ds-ev-total {
+  margin-top: 0;
+}
+
 /* The Build Form's slider (SpreadControls.Range / .tb-range), as a shared control. */
 .ds-range {
   width: 100%;
