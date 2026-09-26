@@ -6,6 +6,7 @@ import { Berrydex } from '../dex/Berrydex'
 import { Itemdex } from '../dex/Itemdex'
 import { Movedex } from '../dex/Movedex'
 import { Naturedex } from '../dex/Naturedex'
+import { Trainerdex } from '../dex/Trainerdex'
 
 export interface DexModule {
   /** Stable slug: the switcher's test id and the active-module key. */
@@ -40,6 +41,7 @@ export const DEX_MODULES = [
   { id: 'berrydex', label: 'Berrydex', Component: Berrydex },
   { id: 'movedex', label: 'Movedex', Component: Movedex },
   { id: 'breedingdex', label: 'Breeding dex', Component: Breedingdex },
+  { id: 'trainerdex', label: 'Trainer Dex', Component: Trainerdex },
 ] as const satisfies readonly DexModule[]
 
 /** Union of the registered ids, so a reference to an unregistered module fails to compile. */

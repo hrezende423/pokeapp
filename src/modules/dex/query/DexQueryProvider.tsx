@@ -18,6 +18,7 @@ import {
   natureEntries,
   speciesEntries,
 } from '../entrySources'
+import { trainerEntries, useTrainerPartition } from '../trainerEntries'
 import { DexQueryContext } from './dexQueryContext'
 import type { FilterSection, SortField } from './dexQuery'
 import {
@@ -30,6 +31,8 @@ import {
   itemdexSorts,
   movedexSections,
   naturedexSections,
+  trainerdexSections,
+  trainerdexSorts,
 } from './registries'
 import { useDexQuery } from './useDexQuery'
 
@@ -82,12 +85,27 @@ const erase = <T,>(
 
 export function DexQueryProvider({ children }: { children: ReactNode }) {
   const nav = useNav()
-  const { generation, isAll } = useVersionGroup()
+  const { generation, isAll, versionGroup } = useVersionGroup()
   const [view, setView] = useState<SpeciesView>('grid')
   const [selectedSpecies] = useDexSelection('pokedex')
 
   const availableTypes = useMemo(() => typesInGeneration(generation), [generation])
   const moduleId = nav.moduleId
+
+  /*
+    THE ONE DEX WHOSE LIST IS FETCHED. Trainers are per game and live in an
+    on-demand partition, so the list is empty until it arrives and this provider
+    re-runs its config when it does. Asked for only while the Trainer Dex is the
+    open module, so browsing elsewhere never downloads a game's trainers.
+  */
+  const trainerLoad = useTrainerPartition(
+    moduleId === 'trainerdex' ? (versionGroup?.name ?? null) : null,
+  )
+  const trainerPartition = trainerLoad.state.status === 'ready' ? trainerLoad.state.partition : null
+  const trainerRows = useMemo(
+    () => (trainerPartition ? trainerEntries(trainerPartition) : []),
+    [trainerPartition],
+  )
 
   const config = useMemo<DexConfig>(() => {
     const scope = { generation, isAll }
@@ -125,12 +143,20 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
         return erase('naturedex', natureEntries(scope), naturedexSections(), [], null)
       case 'breedingdex':
         return erase('breedingdex', eggGroupEntries(scope), breedingdexSections(), [], null)
+      case 'trainerdex':
+        return erase(
+          'trainerdex',
+          trainerRows,
+          trainerdexSections(trainerRows),
+          trainerdexSorts,
+          'order',
+        )
       default:
         // Type Coverage, Team Building, the design-system page: not a dex, so the
         // bar shows no filters and no sort.
         return EMPTY
     }
-  }, [moduleId, generation, isAll, availableTypes])
+  }, [moduleId, generation, isAll, availableTypes, trainerRows])
 
   const query = useDexQuery({
     entries: config.entries,

@@ -13,6 +13,10 @@ Source: [PokeAPI/api-data](https://github.com/PokeAPI/api-data), downloaded once
 tarball into `.cache/` (gitignored). The live PokeAPI REST service is never called at
 build time. `meta.json` records the snapshot hash, the exact scope, and all counts.
 
+`trainers/<version-group>.json` is a separate build (`npm run build:trainers`,
+see `scripts/build-trainers.mjs`): trainer parties from the pret disassemblies and
+placement from Bulbapedia, one file per main-series game, fetched on demand.
+
 ## Scope
 
 National dex **1–493** (Gen 1–4, Bulbasaur through Arceus) across 14 version groups:

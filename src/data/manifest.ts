@@ -38,8 +38,9 @@ export const EAGER_DATA_FILES = [
 export type EagerDataFile = (typeof EAGER_DATA_FILES)[number]
 
 /**
- * Subdirectories holding the 14-files-each per-version-group partitions. Fetched
+ * Subdirectories holding the per-version-group partitions (14 files each for
+ * learnsets and encounters, 10 for trainers). Fetched
  * on demand and populated into the runtime cache on first request, never
  * precached at install time.
  */
-export const PARTITION_DIRS = ['learnsets', 'encounters'] as const
+export const PARTITION_DIRS = ['learnsets', 'encounters', 'trainers'] as const

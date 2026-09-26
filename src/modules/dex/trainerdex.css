@@ -1,0 +1,129 @@
+/*
+  Trainer Dex.
+
+  TOKEN-SCALED (MODULE-PATTERNS §1): a list and a detail page built from the
+  shared ledger row and entity-detail classes, so this file only adds the party
+  pieces. No box-shadow, no badges: a Pokemon card is a hairline-bordered tile
+  like the move-slot tiles, and gender is a glyph after the name, not a chip.
+*/
+
+.trainer-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.trainer-strip img {
+  image-rendering: pixelated;
+}
+
+.trainer-rules {
+  margin-top: var(--space-gap-md);
+}
+
+.trainer-source {
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.trainer-party {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-gap-md);
+}
+
+.trainer-mon {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+  min-width: 0;
+  padding: var(--space-gap-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control, 8px);
+}
+
+.trainer-mon-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-gap-sm);
+}
+.trainer-mon-head img {
+  flex: none;
+  image-rendering: pixelated;
+}
+
+.trainer-mon-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.trainer-mon-name {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+.trainer-mon-name:hover {
+  text-decoration: underline;
+}
+
+.trainer-mon-gender {
+  color: var(--text-secondary);
+}
+
+.trainer-mon-level {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.trainer-mon-types {
+  display: inline-flex;
+  gap: var(--space-gap-sm);
+}
+
+.trainer-mon-facts,
+.trainer-mon-moves {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trainer-mon-facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-gap-sm);
+  padding: 2px 0;
+  font-size: var(--font-size-caption);
+  border-bottom: 1px solid var(--hairline);
+}
+.trainer-mon-facts li > span:first-child {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--font-size-label);
+}
+
+.trainer-mon-moves li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-gap-sm);
+  padding: 2px 0;
+  font-size: var(--font-size-body);
+}
+
+.trainer-mon-note {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.trainer-credit {
+  margin: var(--space-gap-xl) 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+.trainer-credit a {
+  color: inherit;
+}

@@ -1769,6 +1769,7 @@ try {
         'nav-berrydex',
         'nav-movedex',
         'nav-breedingdex',
+        'nav-trainerdex',
         // Not a dex, but it is on this tab: Type Coverage registers in its own
         // typecoverage/pages.ts and navConfig appends it after the dexes.
         'nav-type-coverage',

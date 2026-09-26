@@ -18,6 +18,7 @@
 import { LATEST_GENERATION, getItem } from '../../../data'
 import type { Ability, Berry, EggGroup, Item, Move, Nature, PokemonType } from '../../../data'
 import { moveRangeLabel } from '../moveFacts'
+import { TRAINER_KIND_LABEL, type TrainerEntry, type TrainerKind } from '../trainerEntries'
 import { asStrings, type FilterSection, type SortField } from './dexQuery'
 
 const titleCase = (value: string) =>
@@ -455,7 +456,7 @@ export function movedexSections(
   entries: Move[],
   availableTypes: PokemonType[],
 ): FilterSection<Move>[] {
-  const present = <V,>(read: (m: Move) => V | null | undefined): V[] =>
+  const present = <V>(read: (m: Move) => V | null | undefined): V[] =>
     [...new Set(entries.map(read))].filter((v): v is V => v != null)
 
   /* Physical, Special, Status -- the games' own order, not alphabetical, and only
@@ -591,3 +592,104 @@ export function movedexSections(
     },
   ]
 }
+
+// ------------------------------------------------------------------- trainers
+
+/*
+  KIND LEADS: story, rematch, battle facility, unused. The reader's first
+  question about a list of 900 trainers is which of those they are looking at,
+  and the unused ones (dummy slots the game never loads) should be one click to
+  hide, not mixed in silently.
+
+  CLASS AND LOCATION ARE READ OFF THE LIST, in walkthrough order for locations
+  (the order the reader meets them), so the options are always this game's.
+*/
+export function trainerdexSections(entries: TrainerEntry[]): FilterSection<TrainerEntry>[] {
+  const kinds = (Object.keys(TRAINER_KIND_LABEL) as TrainerKind[]).filter((k) =>
+    entries.some((e) => e.kind === k),
+  )
+  const classes = [...new Set(entries.map((e) => e.className).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  )
+  const locations: string[] = []
+  for (const e of [...entries].sort((a, b) => a.order - b.order)) {
+    if (e.location && !locations.includes(e.location)) locations.push(e.location)
+  }
+  return [
+    {
+      id: 'name',
+      label: 'Name',
+      filters: [
+        {
+          kind: 'text',
+          key: 'name',
+          label: 'Search trainers by name or class',
+          testId: 'trainerdex-search',
+          match: (e, term) => e.label.toLowerCase().includes(term),
+        },
+      ],
+    },
+    {
+      id: 'kind',
+      label: 'Kind',
+      filters: [
+        {
+          kind: 'multi',
+          key: 'kind',
+          label: 'Kind',
+          options: kinds.map((k) => ({ value: k, label: TRAINER_KIND_LABEL[k] })),
+          match: (e, selected) => selected.includes(e.kind),
+        },
+      ],
+    },
+    {
+      id: 'where',
+      label: 'Class and location',
+      filters: [
+        {
+          kind: 'select',
+          key: 'class',
+          label: 'Class',
+          anyLabel: 'Any class',
+          options: classes.map((c) => ({ value: c, label: c })),
+          match: (e, v) => e.className === v,
+        },
+        {
+          kind: 'select',
+          key: 'location',
+          label: 'Location',
+          anyLabel: 'Anywhere',
+          options: locations.map((l) => ({ value: l, label: l })),
+          match: (e, v) => e.location === v,
+        },
+      ],
+    },
+    {
+      id: 'level',
+      label: 'Level',
+      more: true,
+      filters: [
+        {
+          kind: 'range',
+          key: 'level',
+          label: 'Highest level',
+          value: (e) => e.levels?.[1] ?? null,
+          bounds: { min: 1, max: 100 },
+        },
+      ],
+    },
+  ]
+}
+
+/*
+  WALKTHROUGH ORDER IS THE DEFAULT: the list then reads as the game plays, which
+  is what a walkthrough is. Facility trainers and anything the sources could not
+  place sort after it.
+*/
+export const trainerdexSorts: SortField<TrainerEntry>[] = [
+  { key: 'order', label: 'Walkthrough order', value: (e) => e.order },
+  { key: 'name', label: 'Name', value: (e) => e.label },
+  { key: 'class', label: 'Class', value: (e) => e.className },
+  { key: 'level', label: 'Highest level', value: (e) => e.levels?.[1] ?? null },
+  { key: 'prize', label: 'Prize money', value: (e) => e.prize },
+]
