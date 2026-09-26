@@ -44,7 +44,11 @@ export function Calculators() {
       </div>
 
       <ScrollArea testId="calc-scroll-area" memoryKey={scrollKey('calc', tab)}>
-        <div className="calc-content" role="tabpanel" data-testid={`calc-panel-${slug(tab)}`}>
+        <div
+          className={tab === 'Damage' ? 'calc-content calc-content-wide' : 'calc-content'}
+          role="tabpanel"
+          data-testid={`calc-panel-${slug(tab)}`}
+        >
           {tab === 'Damage' && <DamageCalculator />}
           {tab === 'Catch Rate' && <CatchRateCalculator />}
           {tab === 'Stat' && <StatCalculator />}

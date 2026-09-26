@@ -80,7 +80,15 @@ disagrees with §1–§11, which were written before implementation.
   diverges; the dependency runs one way only, so neither selector can move
   the other. Generation only, no version-group axis: every game in a
   generation shares one chart, so a second row would offer a choice that
-  changes nothing. Do not add a third exception without asking.
+  changes nothing.
+- **The Damage calculator has its OWN generation selector — the THIRD
+  sanctioned exception**, approved by the owner 2026-09-26
+  (`calculators/useDamageCalcScope.ts`). A calc is pinned to a ruleset; changing
+  the app's game to change one calc's era would re-filter every screen behind it.
+  Same shape as Type Coverage: seeded once, then independent, one-way, generation
+  only (legality is answered across all of a generation's games at once). It
+  scopes the Damage TAB only — the other four calculator tabs still follow the
+  app. Do not add a fourth exception without asking.
 - Sprites: GitHub Release assets in `hrezende423/pokeapp-sprites`,
   runtime-cached, NOT precached (648MB total, too large to bundle).
   `species-background-colors.json` lives in the same repo, fetched at
@@ -480,6 +488,43 @@ record and is NOT app code.
   three single-type views call `singleCombos()`. It computes no chart of its
   own — `typeEffectivenessAgainst` in `data/era.ts` already composes across a
   dual typing, and a wrong matrix still renders as a matrix.
+
+## Damage calculator (Tools → Calculators → Damage)
+
+Replaced the simplified Damage tab from `9ac37d7` in place; the other four
+calculator tabs and the single nav entry are unchanged.
+
+- **The engine (`calculators/damage/`) is a PORT of the Showdown calculator, not
+  a dependency.** `gen12.ts` / `gen3.ts` / `gen4.ts` mirror smogon/damage-calc's
+  `calc/src/mechanics` files line for line, against pokeapp's own records and
+  resolvers (era.ts, moveEra.ts, statMath.ts). Pure, no React. `index.ts`
+  dispatches by a table: **Gen 5 is a new module + one table line + a
+  `FIELD_RULES` entry**, not an edit to the existing three.
+- **Checked against the reference, not against itself.** `npm run
+  verify:damage-calc` (port 4186) diffs every roll and every character of the
+  description line for 155 matchups in `scripts/fixtures/damage-calc-reference.json`,
+  recorded from @smogon/calc at the commit named in that file, plus five lines
+  quoted verbatim from the live calc.pokemonshowdown.com. To extend it, build the
+  reference locally and regenerate — never hand-edit an expectation.
+- **ONE DELIBERATE DEVIATION: Gen 4 Triple Kick hits 10/20/30.** The reference's
+  gen4.ts computes every hit at 10 BP (it does not pass the hit index; its gen3.ts
+  does). The fixture marks the case and the suite asserts our numbers.
+- **Where the reference prints nothing, so do we — except these.** Present,
+  Magnitude, Spit Up, Trump Card, Return and Frustration take an editable Power
+  with a stated default (`POWER_OVERRIDE_DEFAULTS`); OHKOs, Counter-likes, Super
+  Fang, Endeavor, Psywave and Bide are "not calculated", never a guessed number.
+- **The category is by TYPE before Gen 4** (`moveResolve.ts`, one gate). Gen 1-2
+  roll 39 values (217..255), Gen 3-4 sixteen. Field conditions come from
+  `FIELD_RULES` (Gen 2: no Hail, one Spikes layer; Stealth Rock and Gravity Gen 4)
+  and the UI hides what an era lacks.
+- **Moves default to the learnset** (`useGenerationLearnset`: every row, any
+  method, any of the generation's games — `getLearnsetsForSpecies`, not Team
+  Building's stricter legal moveset), with an "Any" switch for hypotheticals.
+  Prevo-only moves are reachable only through Any.
+- **Its form is the team-build form, built as shared components** in
+  `components/ds/` (`FormParts`, `EvStatTable`, `MoveSlotTile`, `SearchSelect`).
+  EV entry is the Build Form's slider + number box by decision, not §5's plain
+  field. The Build Form does not use these yet — see deferred debt.
 
 ## Dex search / filter / sort
 
@@ -985,9 +1030,23 @@ Rules that must not be re-derived:
   var(--font-size-caption)` on each variant's `.tb-card-facts` — which WILL
   change both card heights. Ask before applying it.
 
-- **Shedinja's fixed 1 HP is not special-cased in the stat math.** It is the
-  one species whose HP does not follow the normal formula — it is always 1,
-  at every level, with any DV/IV or EV spread — and `statMath.ts` computes it
-  like everything else. Affects exactly one species (Gen 3+ only, since it
-  does not exist before then). Low priority and an easy guarded early return
-  whenever convenient.
+- ~~**Shedinja's fixed 1 HP is not special-cased in the stat math.**~~
+  **FIXED** with the damage calculator: `computeStat` returns 1 for base HP 1
+  (the reference does the same). The same pass fixed `statExpBonus`, which
+  lacked the game's 255 cap on sqrt(Stat Exp) — every maxed Gen 1-2 stat was one
+  point high at level 100 (Mewtwo's Special 407, real 406; pret `CalcStat`).
+  verify-team-builder still passes.
+
+- **The Build Form does not use the shared team-build form components.** They
+  were built for the damage calculator in `components/ds/` (FormParts,
+  EvStatTable + RangeSlider, MoveSlotTile, SearchSelect); the Build Form keeps
+  its own `.tb-form-*` / SpreadControls / MoveSlots, because its layout is
+  frozen. Two copies until someone asks for the migration — it must land with
+  no visual change and verify-team-builder unchanged.
+
+- **verify-design-system fails at HEAD, independent of the calculator** (checked
+  with the calculator's changes stashed): "Tools lists its five destinations"
+  expects Calculators last and `9ac37d7` put it first, and its GRID section then
+  throws (`Cannot read properties of null (reading 'color')`) — so the static
+  scans after it (ports, shadows) do not currently run. Needs a decision on the
+  Tools order before either the nav or the assertion changes.

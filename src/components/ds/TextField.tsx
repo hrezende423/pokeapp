@@ -29,6 +29,7 @@ export function TextField({
   helper,
   error,
   state = 'default',
+  fieldSize,
   ...rest
 }: {
   label: string
@@ -45,10 +46,16 @@ export function TextField({
   helper?: string
   error?: string
   state?: FieldState
+  /**
+   * Width inside a CompactFieldStrip: 'narrow' for a two- or three-digit value
+   * (level, a stat stage), 'wide' for a name that must not truncate (species).
+   * Unset fields share the strip's remaining width. Outside a strip it does nothing.
+   */
+  fieldSize?: 'narrow' | 'wide'
 } & InputHTMLAttributes<HTMLInputElement>) {
   const isError = state === 'error'
   return (
-    <label className="ds-field" data-ds="text-field" data-state={state}>
+    <label className="ds-field" data-ds="text-field" data-state={state} data-size={fieldSize}>
       <span className={hideLabel ? 'ds-field-label visually-hidden' : 'ds-field-label'}>
         {label}
       </span>

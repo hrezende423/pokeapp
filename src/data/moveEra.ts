@@ -88,3 +88,25 @@ export function resolveMoveTypeNameForGeneration(move: Move, generation: number)
   const typeId = resolveMoveTypeIdForGeneration(move, generation)
   return typeId == null ? null : (getType(typeId)?.name ?? null)
 }
+
+/**
+ * The POWER this move had in `generation` -- the same `past_values` rule as the
+ * type above, read off the `power` field instead.
+ *
+ * Written for the damage calculator, which is its only caller: a Gen 1 Dig is 100
+ * and a Gen 2-3 one is 60 (entries `gold-silver=100`, `diamond-pearl=60`, the
+ * earliest later-than-the-build entry winning), Tackle is 35 throughout Gen 1-4,
+ * and Low Kick is a flat 50 before its Gen 3 weight rework. The Movedex and the
+ * learnset tables still print the modern number; wiring this in there is the same
+ * separate decision the type resolver's header describes.
+ */
+export function resolveMovePowerForGeneration(move: Move, generation: number): number | null {
+  let best: { generation: number; power: number } | null = null
+  for (const past of move.past_values) {
+    if (past.power == null || past.version_group == null) continue
+    const changedIn = generationOfChange(past.version_group)
+    if (changedIn == null || changedIn <= generation) continue
+    if (!best || changedIn < best.generation) best = { generation: changedIn, power: past.power }
+  }
+  return best ? best.power : move.power
+}

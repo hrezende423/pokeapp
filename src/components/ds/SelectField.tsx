@@ -16,6 +16,7 @@ export function SelectField({
   helper,
   options,
   state = 'default',
+  fieldSize,
   ...rest
 }: {
   label: string
@@ -29,9 +30,20 @@ export function SelectField({
    */
   options: (string | { value: string; label: string })[]
   state?: FieldState
+  /**
+   * Width inside a CompactFieldStrip: 'narrow' for a two- or three-digit value
+   * (level, a stat stage), 'wide' for a name that must not truncate (species).
+   * Unset fields share the strip's remaining width. Outside a strip it does nothing.
+   */
+  fieldSize?: 'narrow' | 'wide'
 } & SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <label className="ds-field ds-select-wrap" data-ds="select-field" data-state={state}>
+    <label
+      className="ds-field ds-select-wrap"
+      data-ds="select-field"
+      data-state={state}
+      data-size={fieldSize}
+    >
       <span className={hideLabel ? 'ds-field-label visually-hidden' : 'ds-field-label'}>
         {label}
       </span>

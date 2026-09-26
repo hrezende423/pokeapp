@@ -26,6 +26,7 @@
     "verify:evo-icons": "node scripts/verify-evo-icons.mjs",
     "verify:species-page": "node scripts/verify-species-page.mjs",
     "verify:type-coverage": "node scripts/verify-type-coverage.mjs",
+    "verify:damage-calc": "node scripts/verify-damage-calc.mjs",
     "verify:scroll-nav": "node scripts/verify-scroll-nav.mjs",
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
     "audit:supplement": "node scripts/audit-supplement.mjs",

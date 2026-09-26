@@ -886,3 +886,322 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* ------------------------------------------------ team-build form (FormParts) */
+
+/*
+  The team-build form's pieces (§5; FormParts.tsx, EvStatTable.tsx,
+  MoveSlotTile.tsx, SearchSelect.tsx). First implemented for the damage
+  calculator; Team Building's Build Form still draws its own `.tb-form-*`.
+*/
+
+.ds-form-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-gap-sm);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ds-form-section-label {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.ds-form-section-aside {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.ds-field-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+/* Fields share the row; narrow ones hold a short number, wide ones a name. */
+.ds-field-strip > .ds-field {
+  width: auto;
+  flex: 1 1 112px;
+  min-width: 0;
+}
+.ds-field-strip > .ds-field[data-size='narrow'] {
+  flex: 0 0 56px;
+}
+.ds-field-strip > .ds-field[data-size='wide'] {
+  flex: 2 1 168px;
+}
+.ds-field-strip .ds-field-control {
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------- EV/stat table */
+
+.ds-ev-table {
+  /* The Build Form's slider tokens, hosted here rather than at :root for the
+     same reason .tb hosts them: they belong to this control, not the app. */
+  --ds-slider-track: #e2e2e6;
+  --ds-slider-thumb-border: #9b9ba1;
+  --ds-on-accent: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+[data-theme='dark'] .ds-ev-table {
+  --ds-slider-track: #3a3a3e;
+  --ds-slider-thumb-border: #ffffff;
+}
+
+/* One grid for header and rows, so the columns line up without a <table>. */
+.ds-ev-row {
+  display: grid;
+  grid-template-columns: 40px 30px minmax(0, 1fr) 44px 44px;
+  column-gap: 10px;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.ds-ev-head {
+  padding-top: 0;
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+.ds-ev-h-1,
+.ds-ev-h-3,
+.ds-ev-h-4 {
+  text-align: right;
+}
+
+.ds-ev-label {
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.ds-ev-base {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.ds-ev-effort {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.ds-ev-individual {
+  text-align: right;
+}
+
+.ds-ev-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 2px 0;
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  text-align: right;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+}
+.ds-ev-input:hover {
+  border-bottom-color: var(--hairline);
+}
+.ds-ev-input:focus {
+  outline: none;
+  border-bottom: var(--field-focus-border-width) solid var(--field-focus-border);
+  padding-bottom: 1px;
+}
+
+.ds-ev-readonly {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.ds-ev-total {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  text-align: right;
+}
+
+.ds-ev-footer {
+  margin: 6px 0 0;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+/* The Build Form's slider (SpreadControls.Range / .tb-range), as a shared control. */
+.ds-range {
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+}
+.ds-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill, 0%),
+    var(--ds-slider-track) var(--fill, 0%) 100%
+  );
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+}
+.ds-range::-moz-range-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill, 0%),
+    var(--ds-slider-track) var(--fill, 0%) 100%
+  );
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+}
+.ds-range::-webkit-slider-thumb {
+  width: 20px;
+  height: 11px;
+  margin-top: -4px;
+  appearance: none;
+  cursor: grab;
+  background: var(--ds-on-accent);
+  border: 1px solid var(--ds-slider-thumb-border);
+  border-radius: 6px;
+}
+.ds-range::-moz-range-thumb {
+  width: 20px;
+  height: 11px;
+  cursor: grab;
+  background: var(--ds-on-accent);
+  border: 1px solid var(--ds-slider-thumb-border);
+  border-radius: 6px;
+}
+.ds-range:focus-visible {
+  outline: none;
+}
+.ds-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--field-focus-border);
+}
+.ds-range:focus-visible::-moz-range-thumb {
+  border-color: var(--field-focus-border);
+}
+.ds-range:disabled {
+  cursor: not-allowed;
+  opacity: var(--field-disabled-opacity);
+}
+
+/* ---------------------------------------------------------- move-slot tile */
+
+.ds-move-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ds-move-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  background: transparent;
+}
+
+/* Selected is a tone-step, not a colour: elevation, per "no shadow". */
+.ds-move-slot[data-selected='true'] {
+  background: var(--surface-raised);
+  border-color: var(--text-secondary);
+}
+
+.ds-move-slot-label {
+  align-self: flex-start;
+  padding: 0;
+  font: inherit;
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+span.ds-move-slot-label {
+  cursor: default;
+}
+.ds-move-slot-label:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-move-slot-value {
+  min-width: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+/* A picker inside a tile is the tile's value: no label of its own, full width. */
+.ds-move-slot-value .ds-field {
+  width: 100%;
+}
+
+.ds-move-slot-detail {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* ----------------------------------------------------------- search select */
+
+.ds-search-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+}
+
+.ds-search-option,
+.ds-search-empty {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: var(--font-size-caption);
+}
+
+.ds-search-option {
+  cursor: pointer;
+}
+.ds-search-option[data-active='true'] {
+  background: var(--surface-hover);
+}
+.ds-search-option[aria-selected='true'] {
+  font-weight: var(--font-weight-bold);
+}
+
+.ds-search-empty,
+.ds-search-hint {
+  color: var(--text-secondary);
+}
+.ds-search-hint {
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-label);
+}

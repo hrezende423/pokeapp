@@ -124,3 +124,210 @@
 .calc-result-note[data-tone='alert'] {
   color: var(--accent);
 }
+
+/* ------------------------------------------------------ damage calculator */
+
+/*
+  THE TEAM-BUILD FORM LAYOUT (DESIGN-SYSTEM.md §5/§11): per Pokemon, a compact
+  strip on top and the spread table in the dominant position. Two panels side by
+  side when there is room for both at their minimum, one column otherwise.
+
+  NAMED REGIONS, positioned by area (CLAUDE.md "Laying out a screen"): moving the
+  result below the panels is swapping words in the template, not a coordinate.
+*/
+
+.calc-content-wide {
+  max-width: 1180px;
+}
+
+.dcalc {
+  container-type: inline-size;
+}
+
+.dcalc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'scope'
+    'result'
+    'attacker'
+    'defender'
+    'field';
+  gap: var(--space-gap-lg);
+}
+
+@container (min-width: 860px) {
+  .dcalc-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'scope    scope'
+      'result   result'
+      'attacker defender'
+      'field    field';
+    column-gap: var(--space-gap-xl);
+  }
+}
+
+.dcalc-scope {
+  grid-area: scope;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--calc-4);
+}
+.dcalc-scope .ds-field-strip {
+  flex: 0 1 140px;
+}
+.dcalc-scope .ds-field-strip > .ds-field {
+  flex: 0 0 104px;
+}
+
+.dcalc-result-area {
+  grid-area: result;
+}
+
+[data-layout='dcalc-attacker'] {
+  grid-area: attacker;
+}
+[data-layout='dcalc-defender'] {
+  grid-area: defender;
+}
+[data-layout='dcalc-field'] {
+  grid-area: field;
+}
+
+.dcalc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--calc-4);
+  min-width: 0;
+}
+
+/* Two classes deep on purpose: App.css's `.panel h2` (uppercase, 0.8rem,
+   0.08em tracking) outranks a single class -- CLAUDE.md gotcha #1. */
+.dcalc .dcalc-panel-title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-medium);
+  line-height: 24px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-primary);
+}
+
+.dcalc-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--calc-3);
+}
+
+.dcalc-inline-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--calc-3) var(--calc-4);
+}
+
+.dcalc-move-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--calc-3) var(--calc-4);
+}
+.dcalc-move-options .ds-field {
+  width: 72px;
+}
+
+.dcalc-move-facts {
+  flex: 1 1 100%;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.dcalc-note {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+/* --accent's third sanctioned use: error emphasis. */
+.dcalc-note[data-tone='alert'] {
+  color: var(--accent);
+}
+
+.dcalc-link {
+  padding: 0;
+  font: inherit;
+  color: var(--text-primary);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ---- the result: the selected move, in full */
+
+.dcalc-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--calc-2);
+  padding: var(--calc-3) 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.dcalc-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--calc-2) var(--calc-4);
+}
+
+.dcalc-result-move {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.dcalc-result-range {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+}
+
+.dcalc-result-pct {
+  font-size: var(--font-size-title);
+  color: var(--text-secondary);
+}
+
+.dcalc-result-ko {
+  margin: 0;
+  font-size: var(--font-size-body);
+}
+
+.dcalc-result-desc {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  user-select: text;
+}
+
+.dcalc-result-rolls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+.dcalc-result-rolls-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* The Moves switch sits on the section label's own line, so its caption would
+   repeat the heading. Kept for assistive tech, taken off the screen. */
+.dcalc .ds-form-section-aside .toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

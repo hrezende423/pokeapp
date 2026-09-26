@@ -40,13 +40,21 @@ export const SHINY_FIXED_DV = 10
 const at = (numbers: StatNumbers, key: StatKey): number => numbers[key] ?? 0
 
 /**
- * Gen 1-2's Stat Exp contribution: floor(ceil(sqrt(statExp)) / 4).
+ * Gen 1-2's Stat Exp contribution: floor(min(255, ceil(sqrt(statExp))) / 4).
  *
  * The inner ceil is not decoration -- it is why 63504 (252^2) and 63505 give
- * different results, and why maxing a stat means 65535 rather than "enough".
+ * different results.
+ *
+ * THE 255 CAP IS THE GAME'S, and it was missing here once: without it 65535 gave
+ * ceil(255.998) = 256, a bonus of 64, and every maxed Gen 1-2 stat came out one
+ * point high at level 100 (Mewtwo's Special 407 against the real 406). pret's
+ * `CalcStat` (pokered home/move_mon.asm, `.statExpLoop`) counts the root up in one
+ * byte and stops at `cp $ff`, so the root never exceeds 255 and the bonus never
+ * exceeds 63 -- which is also what the Showdown calculator produces for max Stat
+ * Exp, and what the damage calculator's suite cross-checks against.
  */
 export function statExpBonus(statExp: number): number {
-  return Math.floor(Math.ceil(Math.sqrt(Math.max(0, statExp))) / 4)
+  return Math.floor(Math.min(255, Math.ceil(Math.sqrt(Math.max(0, statExp)))) / 4)
 }
 
 /**
@@ -157,6 +165,10 @@ export function computeStat(input: StatInput): number {
     const shared = Math.floor(((base + dv) * 2 + statExpBonus(at(effort, key))) * (level / 100))
     return isHp ? shared + level + 10 : shared + 5
   }
+
+  // Shedinja: base HP 1 means max HP 1, at every level and spread. The one species
+  // it applies to is Gen 3+, which is why only this branch carries it.
+  if (isHp && base === 1) return 1
 
   const shared = Math.floor(
     (2 * base + at(individual, key) + Math.floor(at(effort, key) / 4)) * (level / 100),

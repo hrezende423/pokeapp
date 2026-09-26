@@ -348,6 +348,13 @@ space so a more complex component (the EV table) can take the dominant
 visual position on the page. Only meaningful when one section of a form is
 genuinely more important than the rest — not a default pattern.
 
+*Built (2026-09-26), first used by the damage calculator: `components/ds/`
+FormParts (`FormSectionLabel`, `CompactFieldStrip`), EvStatTable (`EvStatRow`,
+`RangeSlider` — the Build Form's slider, which replaced the plain-number
+placeholder above), MoveSlotTile (selectable: the chosen tile steps up to
+`--surface-raised`, no accent) and SearchSelect. The Build Form predates them
+and still draws its own.*
+
 ## 6. Component coverage — now complete
 
 All 95 components from the original scope are covered: 14 in §5 (validated

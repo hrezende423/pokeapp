@@ -1,7 +1,7 @@
 /**
  * Catch probability, Gen 1-4.
  *
- * PURE, AND UI-FREE, same discipline as damageMath.ts.
+ * PURE, AND UI-FREE, same discipline as the damage engine (./damage).
  *
  * ONE FORMULA FOR ALL FOUR GENERATIONS, AND THAT IS A STATED SIMPLIFICATION, NOT
  * A CLAIM OF BYTE-EXACT ACCURACY. The shake-value algorithm below (the
