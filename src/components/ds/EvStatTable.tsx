@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
+import { useDraftNumber } from './useDraftNumber'
 
 /**
  * The EV/stat editable table (DESIGN-SYSTEM.md §5 "EV/stat editable row").
@@ -68,9 +69,6 @@ export function EvStatTable({
   )
 }
 
-const clamp = (n: number, max: number) =>
-  Number.isFinite(n) ? Math.max(0, Math.min(max, Math.round(n))) : 0
-
 export function EvStatRow({
   label,
   base,
@@ -94,16 +92,12 @@ export function EvStatRow({
       <span className="ds-ev-effort">
         {effort && (
           <>
-            <input
-              type="number"
-              className="ds-ev-input"
-              min={0}
-              max={effort.max}
-              step={1}
+            <NumberCell
               value={effort.value}
-              aria-label={`${label} effort`}
-              data-testid={effort.testId}
-              onChange={(e) => effort.onChange(clamp(Number(e.target.value), effort.max))}
+              max={effort.max}
+              label={`${label} effort`}
+              testId={effort.testId}
+              onChange={effort.onChange}
             />
             {effort.slider && (
               <RangeSlider
@@ -120,16 +114,12 @@ export function EvStatRow({
       <span className="ds-ev-individual">
         {individual &&
           (individual.onChange ? (
-            <input
-              type="number"
-              className="ds-ev-input"
-              min={0}
-              max={individual.max}
-              step={1}
+            <NumberCell
               value={individual.value}
-              aria-label={`${label} individual value`}
-              data-testid={individual.testId}
-              onChange={(e) => individual.onChange!(clamp(Number(e.target.value), individual.max))}
+              max={individual.max}
+              label={`${label} individual value`}
+              testId={individual.testId}
+              onChange={individual.onChange}
             />
           ) : (
             <span
@@ -145,6 +135,35 @@ export function EvStatRow({
         {total}
       </span>
     </div>
+  )
+}
+
+/** An editable spread value: can be empty mid-edit, see useDraftNumber. */
+function NumberCell({
+  value,
+  max,
+  label,
+  testId,
+  onChange,
+}: {
+  value: number
+  max: number
+  label: string
+  testId?: string
+  onChange: (next: number) => void
+}) {
+  const draft = useDraftNumber(value, onChange, { max })
+  return (
+    <input
+      type="number"
+      className="ds-ev-input"
+      min={0}
+      max={max}
+      step={1}
+      aria-label={label}
+      data-testid={testId}
+      {...draft}
+    />
   )
 }
 

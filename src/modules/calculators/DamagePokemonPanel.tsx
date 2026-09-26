@@ -18,6 +18,7 @@ import { SelectField } from '../../components/ds/SelectField'
 import { TextField } from '../../components/ds/TextField'
 import { Toggle } from '../../components/ds/Toggle'
 import { ToggleSwitch } from '../../components/ToggleSwitch'
+import { useDraftNumber } from '../../components/ds/useDraftNumber'
 import { speciesEntries } from '../dex/entrySources'
 import {
   MAX_DV,
@@ -262,6 +263,13 @@ export function DamagePokemonPanel({
 
   const maxHp = rawStats.hp
   const hp = side.currentHp ?? maxHp
+  const levelDraft = useDraftNumber(side.level, (level) => set({ level, currentHp: null }), {
+    min: 1,
+    max: 100,
+  })
+  const hpDraft = useDraftNumber(hp, (n) => set({ currentHp: n === maxHp ? null : n }), {
+    max: maxHp,
+  })
   const toggledAbility = abilities.find((a) => a.ability.id === side.abilityId)?.ability
   const showAbilityOn =
     gen >= 3 && toggledAbility != null && TOGGLED_ABILITIES.includes(toggledAbility.name)
@@ -290,18 +298,20 @@ export function DamagePokemonPanel({
           type="number"
           min={1}
           max={100}
-          value={side.level}
           data-testid={testId('level')}
-          onChange={(e) =>
-            set({ level: Math.max(1, Math.min(100, Number(e.target.value) || 1)), currentHp: null })
-          }
+          {...levelDraft}
         />
         {gen >= HELD_ITEMS_INTRODUCED_IN_GENERATION && (
           <SearchSelect
             label="Item"
             options={itemOptions}
             value={side.itemId != null ? String(side.itemId) : ''}
-            onChange={(v) => set({ itemId: v ? Number(v) : null })}
+            onChange={(v) =>
+              set({
+                itemId: v ? Number(v) : null,
+                remembered: { ...side.remembered, itemId: null },
+              })
+            }
             testId={testId('item')}
           />
         )}
@@ -343,13 +353,9 @@ export function DamagePokemonPanel({
             type="number"
             min={0}
             max={maxHp}
-            value={hp}
             helper={`of ${maxHp} · ${maxHp > 0 ? Math.round((hp / maxHp) * 100) : 0}%`}
             data-testid={testId('hp')}
-            onChange={(e) => {
-              const n = Math.max(0, Math.min(maxHp, Math.round(Number(e.target.value) || 0)))
-              set({ currentHp: n === maxHp ? null : n })
-            }}
+            {...hpDraft}
           />
           {(STAGE_STATS[gen] ?? MODERN_STAGES).map(({ stat, label }) => (
             <SelectField
@@ -534,6 +540,16 @@ function MovesGroup({
         ? Array.from({ length: maxHits - minHits + 1 }, (_, i) => minHits + i)
         : null
   const hasPowerOverride = selectedMove != null && selectedMove.name in POWER_OVERRIDE_DEFAULTS
+  const powerDraft = useDraftNumber(
+    side.power[selectedSlot] ??
+      (selectedMove ? (POWER_OVERRIDE_DEFAULTS[selectedMove.name] ?? 1) : 1),
+    (n) => {
+      const power = [...side.power]
+      power[selectedSlot] = n
+      onChange({ ...side, moves, power })
+    },
+    { min: 1, max: 255 },
+  )
   const skillLink = side.abilityId != null && getAbility(side.abilityId)?.name === 'skill-link'
 
   return (
@@ -647,13 +663,8 @@ function MovesGroup({
               type="number"
               min={1}
               max={255}
-              value={side.power[selectedSlot] ?? POWER_OVERRIDE_DEFAULTS[selectedMove.name]}
               data-testid={testId('power')}
-              onChange={(e) => {
-                const power = [...side.power]
-                power[selectedSlot] = Math.max(1, Math.min(255, Number(e.target.value) || 1))
-                onChange({ ...side, moves, power })
-              }}
+              {...powerDraft}
             />
           )}
         </div>

@@ -368,6 +368,45 @@ try {
   await settle()
   check('the species picker searches and commits', /vs\. .*Blissey/.test(await page.textContent('[data-testid="calc-damage-desc"]')))
 
+  // Found by hand-testing the deployed preview, 2026-09-26 -- each was a real bug.
+  // (a) An exact name wins over earlier substring matches: "Mew" once picked Mewtwo.
+  await page.click('[data-testid="dcalc-defender-species-input"]')
+  await page.fill('[data-testid="dcalc-defender-species-input"]', 'Mew')
+  await page.keyboard.press('Enter')
+  check('"Mew" + Enter picks Mew, not Mewtwo', (await page.inputValue('[data-testid="dcalc-defender-species-input"]')) === 'Mew')
+  // (b) A number field can be emptied mid-edit: clearing Level used to snap it to 1,
+  //     so typing "50" gave "150" -> 100; clearing an EV left "0252".
+  const typeInto = async (sel, keys) => {
+    await page.click(sel)
+    await page.keyboard.press('Control+A')
+    await page.keyboard.press('Backspace')
+    await page.keyboard.type(keys)
+    return page.inputValue(sel)
+  }
+  check('clear Level, type 50 -> 50', (await typeInto('[data-testid="dcalc-attacker-level"]', '50')) === '50')
+  check('clear an EV, type 252 -> "252" (no leading zero)', (await typeInto('[data-testid="dcalc-attacker-ev-atk"]', '252')) === '252')
+  await typeInto('[data-testid="dcalc-attacker-level"]', '100')
+  await typeInto('[data-testid="dcalc-attacker-ev-atk"]', '0')
+  // (c) A round trip through an older era gives back what it took away.
+  await page.click('[data-testid="dcalc-attacker-item-input"]')
+  await page.fill('[data-testid="dcalc-attacker-item-input"]', 'Choice Band')
+  await page.keyboard.press('Enter')
+  await typeInto('[data-testid="dcalc-attacker-ev-atk"]', '252')
+  const roundTrip = await page.textContent('[data-testid="calc-damage-desc"]')
+  for (const g of ['2', '1', '4']) {
+    await page.selectOption('[data-testid="dcalc-generation"]', g)
+    await settle()
+  }
+  check(
+    'Gen 4 -> 2 -> 1 -> 4 restores the EVs and the Choice Band',
+    (await page.textContent('[data-testid="calc-damage-desc"]')) === roundTrip && /252 Atk Choice Band/.test(roundTrip),
+    roundTrip,
+  )
+  await page.click('[data-testid="dcalc-defender-species-input"]')
+  await page.fill('[data-testid="dcalc-defender-species-input"]', 'Blissey')
+  await page.keyboard.press('Enter')
+  await settle()
+
   // Swap sides.
   await page.click('[data-testid="dcalc-swap"]')
   await settle()

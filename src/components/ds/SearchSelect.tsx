@@ -53,8 +53,20 @@ export function SearchSelect({
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const hits = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options
-    return hits.slice(0, maxResults)
+    if (!q) return options.slice(0, maxResults)
+    // Exact name first, then names that start with the query, then any substring,
+    // each group in the caller's order. Plain substring order made "Mew" + Enter
+    // pick Mewtwo, which sorts first by dex number.
+    const exact: SearchOption[] = []
+    const prefix: SearchOption[] = []
+    const inner: SearchOption[] = []
+    for (const o of options) {
+      const label = o.label.toLowerCase()
+      if (label === q) exact.push(o)
+      else if (label.startsWith(q)) prefix.push(o)
+      else if (label.includes(q)) inner.push(o)
+    }
+    return [...exact, ...prefix, ...inner].slice(0, maxResults)
   }, [options, query, maxResults])
 
   useEffect(() => {

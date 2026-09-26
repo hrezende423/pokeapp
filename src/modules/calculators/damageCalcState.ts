@@ -68,6 +68,19 @@ export interface SideState {
   crit: boolean[]
   hits: (number | null)[]
   power: (number | null)[]
+  /**
+   * What an older era took away, kept so a round trip gives it back: switching
+   * Gen 4 -> Gen 2 -> Gen 4 restores the EV spread, nature, ability and Choice
+   * Band instead of leaving the reader to rebuild the set. Each spread model
+   * (Stat Exp/DVs, EVs/IVs) keeps its own last values.
+   */
+  remembered?: {
+    classic?: { effort: StatNumbers; individual: StatNumbers }
+    modern?: { effort: StatNumbers; individual: StatNumbers }
+    itemId?: number | null
+    natureId?: number | null
+    abilityId?: number | null
+  }
 }
 
 /** Species that exist in every generation in scope, for a default matchup. */
@@ -142,6 +155,7 @@ export function withSpecies(
     abilityOn: false,
     currentHp: null,
     moves: null,
+    remembered: { ...side.remembered, abilityId: null },
     crit: [false, false, false, false],
     hits: [null, null, null, null],
     power: [null, null, null, null],
@@ -175,22 +189,32 @@ export function normalizeSide(side: SideState, gen: number, fallbackId: number):
     species.varieties.find((v) => v.name === side.varietyName) ?? defaultVariety(species)
   if (!formAvailable(variety, gen)) variety = defaultVariety(species)
 
+  const remembered = { ...side.remembered }
+  // Anything the target era lacks is remembered before it is dropped.
+  if (side.itemId != null) remembered.itemId = side.itemId
+  if (side.natureId != null) remembered.natureId = side.natureId
+  if (side.abilityId != null) remembered.abilityId = side.abilityId
+
   const abilities = resolveAbilitiesForGeneration(variety, gen)
-  const abilityId = abilities.some((a) => a.ability.id === side.abilityId)
-    ? side.abilityId
+  const wantAbility = side.abilityId ?? remembered.abilityId ?? null
+  const abilityId = abilities.some((a) => a.ability.id === wantAbility)
+    ? wantAbility
     : (abilities[0]?.ability.id ?? null)
 
-  const item = side.itemId != null ? getItem(side.itemId) : undefined
+  const wantItem = side.itemId ?? remembered.itemId ?? null
+  const item = wantItem != null ? getItem(wantItem) : undefined
   const itemId =
     gen >= HELD_ITEMS_INTRODUCED_IN_GENERATION && item && itemExistsInGeneration(item, gen)
-      ? side.itemId
+      ? wantItem
       : null
 
   const wasModern = side.individual.hp != null
-  const spread =
-    gen >= 3 === wasModern
-      ? { effort: side.effort, individual: side.individual }
-      : spreadDefaults(gen)
+  const current = { effort: side.effort, individual: side.individual }
+  let spread = current
+  if (gen >= 3 !== wasModern) {
+    remembered[wasModern ? 'modern' : 'classic'] = current
+    spread = remembered[gen >= 3 ? 'modern' : 'classic'] ?? spreadDefaults(gen)
+  }
 
   const moves = side.moves
     ? side.moves.map((id) => {
@@ -206,12 +230,13 @@ export function normalizeSide(side: SideState, gen: number, fallbackId: number):
     ...side,
     varietyName: variety.name,
     abilityId: gen >= 3 ? abilityId : null,
-    natureId: gen >= 3 ? (side.natureId ?? neutralNatureId()) : null,
+    natureId: gen >= 3 ? (side.natureId ?? remembered.natureId ?? neutralNatureId()) : null,
     itemId,
     ...spread,
     boosts,
     gender: gen >= 4 ? side.gender : 'N',
     moves,
+    remembered,
   }
 }
 
