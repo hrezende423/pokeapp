@@ -553,8 +553,9 @@ try {
   const r1 = await box('[data-testid="dcalc-p1-results"]')
   const r2 = await box('[data-testid="dcalc-p2-results"]')
   check('the matchup artwork sits between the two move lists', r1.r <= spritesBox.l && spritesBox.r <= r2.l, JSON.stringify({ r1, spritesBox, r2 }))
-  check('it shows both Pokémon', await page.evaluate(() => ['1', '2'].every((n) => document.querySelector(`[data-testid="dcalc-p${n}-sprite"]`)?.getAttribute('src'))))
+  check('it shows both Pokémon, in official artwork', await page.evaluate(() => ['1', '2'].every((n) => /official-artwork/.test(document.querySelector(`[data-testid="dcalc-p${n}-sprite"]`)?.getAttribute('src') ?? ''))))
 
+  let lastList = null
   const pickOption = async (side, query, pattern) => {
     await page.click(`[data-testid="dcalc-p${side}-species-input"]`)
     await page.fill(`[data-testid="dcalc-p${side}-species-input"]`, query)
@@ -568,6 +569,18 @@ try {
       .catch(() => {})
     const labels = await page.evaluate((s) => [...document.querySelectorAll(`[data-testid="dcalc-p${s}-species-list"] .ds-search-option`)].map((o) => o.firstChild.textContent), side)
     const index = labels.findIndex((l) => pattern.test(l))
+    lastList = await page.evaluate((s) => {
+      const list = document.querySelector(`[data-testid="dcalc-p${s}-species-list"]`)
+      const field = document.querySelector(`[data-testid="dcalc-p${s}-species"]`)
+      const opts = [...list.querySelectorAll('.ds-search-option')]
+      const lr = list.getBoundingClientRect()
+      return {
+        tallest: Math.max(...opts.map((o) => o.getBoundingClientRect().height)),
+        clipped: opts.filter((o) => o.firstChild.scrollWidth > o.firstChild.clientWidth + 1).length,
+        wider: lr.width > field.getBoundingClientRect().width,
+        inView: lr.left >= 0 && lr.right <= document.documentElement.clientWidth,
+      }
+    }, side)
     if (index >= 0) await page.locator(`[data-testid="dcalc-p${side}-species-list"] .ds-search-option`).nth(index).dispatchEvent('pointerdown')
     else await page.keyboard.press('Escape')
     return { labels, index }
@@ -607,6 +620,7 @@ try {
   })
   const build = await pickOption(2, 'Chompy', /^Garchomp \(Chompy \| Team Builder\)$/)
   check('a Team Builder build is in the list', build.index >= 0, build.labels.slice(0, 6).join(' / '))
+  check('the set list is wider than the field, one line per set, inside the page', lastList.wider && lastList.tallest < 26 && lastList.clipped === 0 && lastList.inView, JSON.stringify(lastList))
   const loadedBuild = await page.evaluate(() => ({
     level: document.querySelector('[data-testid="dcalc-p2-level"]').value,
     ev: document.querySelector('[data-testid="dcalc-p2-ev-atk"]').value,
@@ -636,6 +650,16 @@ try {
     return { scroll: el.scrollWidth, client: el.clientWidth }
   })
   check('no sideways overflow at phone width', narrow.scroll <= narrow.client + 1, JSON.stringify(narrow))
+  for (const n of [1, 2]) {
+    await page.click(`[data-testid="dcalc-p${n}-species-input"]`)
+    await page.fill(`[data-testid="dcalc-p${n}-species-input"]`, 'Leader')
+    const r = await page.evaluate((k) => {
+      const b = document.querySelector(`[data-testid="dcalc-p${k}-species-list"]`).getBoundingClientRect()
+      return { l: b.left, r: b.right, vw: document.documentElement.clientWidth }
+    }, n)
+    check(`phone: Pokémon ${n}'s set list stays on screen`, r.l >= 0 && r.r <= r.vw, JSON.stringify(r))
+    await page.keyboard.press('Escape')
+  }
   await page.screenshot({ path: shot('damage-phone-dark.png') })
 
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))

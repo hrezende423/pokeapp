@@ -230,18 +230,17 @@ function useSideMoves(side: SideState, learnRows: number[] | null, gen: number) 
 }
 
 /**
- * The Pokemon's artwork between the two move lists, as KinglerCalc shows the
- * matchup: the animated artwork (female where the side is), or a form's own
- * official artwork, which the animated set does not have. Pokemon 1 is mirrored
- * so the two face each other.
+ * The Pokemon's official artwork between the two move lists, as KinglerCalc
+ * shows the matchup -- per variety, so a form shows its own. Pokemon 1 is
+ * mirrored so the two face each other.
  */
 function SideSprite({ side, index }: { side: SideState; index: 0 | 1 }) {
   const { species, variety } = toCalcPokemon(side)
   const url = resolveArtworkUrl(species, variety, {
     source: 'artwork',
     shiny: false,
-    motion: variety.is_default ? 'animated' : 'static',
-    gender: side.gender === 'F' ? 'female' : 'male',
+    motion: 'static',
+    gender: 'male',
   })
   if (!url) return <span className="dcalc-sprite" />
   return (

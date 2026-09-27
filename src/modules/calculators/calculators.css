@@ -359,6 +359,32 @@
   height: 96px;
   object-fit: contain;
 }
+/* The picker's list is as wide as its longest set, one line per option, rather
+   than the field's width -- "Bulbasaur (Bulba | Team #001 | Team Builder)" would
+   wrap to three lines under a narrow species field. */
+.dcalc .ds-search-list {
+  right: auto;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(560px, calc(100vw - 32px));
+}
+.dcalc .ds-search-option > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dcalc .ds-search-hint {
+  white-space: nowrap;
+}
+/* In three columns Pokemon 2 sits at the page's right edge: its list opens leftward. */
+@container (min-width: 980px) {
+  [data-layout='dcalc-p2'] .ds-search-list {
+    left: auto;
+    right: 0;
+  }
+}
+
 /* Pokemon 1 turned to face Pokemon 2. */
 .dcalc-sprite[data-side='0'] {
   transform: scaleX(-1);
