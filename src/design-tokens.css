@@ -329,6 +329,9 @@
 
   --font-size-display: 38px;
   --font-size-title: 20px;
+  /* Every page's own heading ("Pokédex", "Damage Calculator"), smaller than the
+     title scale by the owner's call (2026-09-27). */
+  --font-size-page-title: 15px;
   --font-size-body: 14px;
   --font-size-label: 11px;
   --font-size-caption: 10px;

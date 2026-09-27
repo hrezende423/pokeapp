@@ -98,10 +98,7 @@ export const NAV_TABS: readonly NavTab[] = [
       list screen first. The two list screens follow, then the one entry here
       that is still a stub.
     */
-    entries: [
-      ...teamBuilding('new-team', 'new-build', 'my-teams', 'build-library'),
-      ...stubs('pokemon-collection'),
-    ],
+    entries: [...teamBuilding('new-team', 'new-build', 'my-teams', 'build-library')],
   },
   {
     id: 'tools',

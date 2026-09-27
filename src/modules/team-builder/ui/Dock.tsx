@@ -25,6 +25,9 @@ export interface DockItem {
   onClick: () => void
   danger?: boolean
   testId?: string
+  /** An on/off item: drawn pressed while on, in `tone`'s colour. */
+  active?: boolean
+  tone?: 'done'
 }
 
 function partition(items: DockItem[]) {
@@ -42,6 +45,8 @@ export function Dock({ items, testId }: { items: DockItem[]; testId?: string }) 
           label={item.label}
           onClick={item.onClick}
           testId={item.testId}
+          active={item.active}
+          tone={item.tone}
         />
       ))}
       {danger.length > 0 && <span className="tb-dock-sep" aria-hidden />}

@@ -56,6 +56,12 @@ export interface Build {
   tags: string[]
   notes: string
   /**
+   * The reader's own "this build is finished" mark: the green check beside the
+   * level on its card, toggled from the Build Form's dock. Optional because no
+   * build stored before it existed has one.
+   */
+  done?: boolean
+  /**
    * A BUILD THAT HAS NOT CLAIMED ITS PLACE YET.
    *
    * Starting a new member used to write it into a team slot immediately, before

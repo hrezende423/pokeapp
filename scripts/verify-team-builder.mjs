@@ -4180,6 +4180,11 @@ try {
 
   // ================================================ the owner's round, 2026-09-27
   hr('OWNER ROUND 2026-09-27: LIBRARY GRID, KANA, GENERATION FIELD')
+  const moveId = await page.evaluate(async () => {
+    const d = await import('/pokeapp/src/data/index.ts')
+    const by = (n) => d.listMoves().find((m) => m.name === n)?.id ?? null
+    return { eq: by('earthquake'), claw: by('dragon-claw') }
+  })
   await seedStore({
     nextBuildSeq: 6,
     nextTeamSeq: 2,
@@ -4192,7 +4197,7 @@ try {
         pokemonId: 445,
         nickname: 'Chompy',
         effort: { attack: 252, speed: 252 },
-        moveIds: [moveIdByName['earthquake'] ?? null, moveIdByName['dragon-claw'] ?? null, null, null],
+        moveIds: [moveId.eq, moveId.claw, null, null],
       }),
     ]),
     teams: [mkTeam('t1', 1, ['b1'], { generation: 4 })],
@@ -4228,7 +4233,74 @@ try {
     }
   })
   check('the Build Library shows three cards to a row', lib.perRow === 3, JSON.stringify(lib))
-  check('each card is at most 320px wide', lib.width <= 320, `${lib.width}px`)
+  check('each card is two-thirds of the old 320px (<= 216px)', lib.width <= 216, `${lib.width}px`)
+  const centred = await page.evaluate(() => {
+    const g = document.querySelector('[data-testid="tb-build-grid"]').getBoundingClientRect()
+    const cells = [...document.querySelectorAll('.tb-library-cell')].map((c) => c.getBoundingClientRect())
+    const left = Math.min(...cells.map((c) => c.left)) - g.left
+    const right = g.right - Math.max(...cells.map((c) => c.right))
+    return { left: Math.round(left), right: Math.round(right) }
+  })
+  check('the build grid is centred, with space either side', centred.left > 40 && Math.abs(centred.left - centred.right) <= 2, JSON.stringify(centred))
+  check('the gender sign is drawn bold', await page.evaluate(() => {
+    const g = document.querySelector('.tb-card-library .tb-card-gender')
+    return g != null && parseFloat(getComputedStyle(g).webkitTextStrokeWidth) > 0 && getComputedStyle(g).fontWeight === '700'
+  }))
+
+  // Search, filter and sort from the app bar's own menus.
+  const cardIds = () => page.$$eval('.tb-library-cell', (els) => els.map((e) => e.querySelector('[data-build-id]')?.dataset.buildId))
+  await page.click('[data-testid="controls-toggle"]')
+  await page.fill('[data-testid="tb-builds-search"]', 'chomp')
+  await page.waitForTimeout(200)
+  check('the Search/Filter menu searches builds by nickname or species', JSON.stringify(await cardIds()) === '["b5"]', JSON.stringify(await cardIds()))
+  await page.fill('[data-testid="tb-builds-search"]', '')
+  await page.selectOption('[data-testid="dex-filter-move"]', String(moveId.eq))
+  await page.waitForTimeout(200)
+  check('and filters them by move', JSON.stringify(await cardIds()) === '["b5"]', JSON.stringify(await cardIds()))
+  await page.click('[data-testid="controls-reset-top"]')
+  await page.click('[data-testid="dex-filter-more-toggle"]')
+  await page.fill('[data-testid="dex-filter-bst-min"]', '600')
+  await page.waitForTimeout(200)
+  check('and by a base-stat-total range', JSON.stringify(await cardIds()) === '["b5"]', JSON.stringify(await cardIds()))
+  await page.click('[data-testid="controls-reset-top"]')
+  await page.keyboard.press('Escape')
+  await page.mouse.click(5, 900)
+  await page.click('[data-testid="dex-sort-toggle"]')
+  const sortKeys = await page.$$eval('[data-testid^="dex-sortfield-"]', (els) => els.map((e) => e.dataset.testid.replace('dex-sortfield-', '')))
+  check('builds sort by numbers and names only -- no type, move or ability sort', ['species', 'level', 'bst', 'speed'].every((k) => sortKeys.includes(k)) && !sortKeys.some((k) => /type|move|ability/.test(k)), sortKeys.join(','))
+  await page.click('[data-testid="dex-sortfield-species"]')
+  await page.click('[data-testid="dex-sortfield-species"]')
+  await page.waitForTimeout(200)
+  check('sorting by species, descending, puts Garchomp (#445) first', (await cardIds())[0] === 'b5', JSON.stringify(await cardIds()))
+  await page.click('[data-testid="dex-sortfield-order"]')
+  await page.mouse.click(5, 900)
+
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-team-rows"]')
+  check('the Team Library has no search box of its own any more', (await page.$$('[data-testid="tb-team-search"]')).length === 0)
+  await page.click('[data-testid="controls-toggle"]')
+  await page.fill('[data-testid="tb-teams-search"]', 'zzz-no-such-team')
+  await page.waitForTimeout(200)
+  check('the bar searches teams too', (await page.$$('.tb-team-row')).length === 0 && (await page.$$('[data-testid="tb-teams-no-match"]')).length === 1)
+  await page.click('[data-testid="controls-reset-top"]')
+  await page.mouse.click(5, 900)
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+
+  // The finished mark: the dock's check toggles it, the card shows it.
+  await page.click('[data-testid="tb-build-b5-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  const dockOrder = await page.$$eval('[data-testid="tb-form-dock"] .tb-icon-btn', (els) => els.map((e) => e.dataset.testid))
+  check('the Build Form dock has a check, right below Duplicate', dockOrder[0] === 'tb-form-duplicate' && dockOrder[1] === 'tb-form-done', dockOrder.join(','))
+  await page.click('[data-testid="tb-form-done"]')
+  await page.click('[data-testid="tb-build-back"]')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  const doneMark = await page.evaluate(() => {
+    const mark = document.querySelector('[data-testid="tb-build-b5-done"]')
+    const level = mark?.parentElement?.querySelector('.tb-card-level')
+    return mark && level ? { right: mark.getBoundingClientRect().left >= level.getBoundingClientRect().right, color: getComputedStyle(mark).color } : null
+  })
+  check('a finished build shows a green check right of its level', doneMark?.right === true && doneMark.color === 'rgb(22, 194, 71)', JSON.stringify(doneMark))
   check('rows are spaced wider than before (>= 24px)', lib.rowGap >= 24, `${lib.rowGap}px`)
   check('the card dock sits above the artwork, not over it', lib.dockClear, JSON.stringify(lib))
   check('the headline is one row: nickname (species) gender level', lib.headline === 'Mon1 (Whismur) ♂ Lv.50' && lib.oneRow, lib.headline)

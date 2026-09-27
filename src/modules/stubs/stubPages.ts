@@ -16,7 +16,6 @@ export const STUB_PAGES = [
     graduation the note above describes -- the entries left this list and the nav
     resolves them from that registry instead.
   */
-  { id: 'pokemon-collection', label: 'Pokemon Collection' },
   { id: 'compare-pokemon', label: 'Compare Pokemon' },
   { id: 'battle-simulator', label: 'Battle Simulator' },
   { id: 'training-optimization', label: 'Training and Optimization' },

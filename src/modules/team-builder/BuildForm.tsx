@@ -65,6 +65,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   IconChevronLeft,
+  IconCheck,
   IconCopy,
   IconDeviceFloppy,
   IconInfoCircle,
@@ -815,6 +816,14 @@ function BuildFormFields({
           const copy = duplicateBuild(savedId)
           if (copy) goTo({ kind: 'build-form', buildId: copy.id, origin })
         }),
+    },
+    {
+      icon: <IconCheck size={18} stroke={1.5} />,
+      label: build.done ? 'Finished — click to unmark' : 'Mark as finished',
+      testId: 'tb-form-done',
+      active: build.done === true,
+      tone: 'done' as const,
+      onClick: () => commit({ done: !build.done }),
     },
     {
       icon: <IconInfoCircle size={18} stroke={1.5} />,

@@ -49,6 +49,8 @@ import {
   useTeamBuilderData,
 } from './store'
 import { goTo, type TbScreen } from './tbNav'
+import { useDexQueryBundle } from '../dex/query/dexQueryContext'
+import type { BuildRow } from './libraryQuery'
 
 export function BuildLibrary({
   pickFor,
@@ -64,6 +66,16 @@ export function BuildLibrary({
   const prompt = usePrompt()
   const bulk = useBulkSelect()
   const libraryBuilds = orderedBuilds(data)
+  /*
+    WHAT THE APP BAR'S SEARCH/FILTER AND SORT LEAVE ON SCREEN (libraryQuery.ts).
+    Read softly: if the bar's query is momentarily for another list, the library
+    shows every build rather than throwing.
+  */
+  const bundle = useDexQueryBundle()
+  const shown =
+    bundle.dexId === 'tb-builds'
+      ? (bundle.query.visible as BuildRow[]).map((r) => r.build)
+      : libraryBuilds
 
   /* Nothing is created to open the form -- see BuildForm and the shell's
      `new-build` verb, which this has to match or the same button would behave
@@ -105,10 +117,10 @@ export function BuildLibrary({
           ?.memberIds.filter((m): m is string => m != null) ?? [])
       : [],
   )
-  const pickable = picking
-    ? libraryBuilds.filter((build) => !onTeamAlready.has(build.id))
-    : libraryBuilds
-  const hiddenFromPicker = libraryBuilds.length - pickable.length
+  const pickable = picking ? shown.filter((build) => !onTeamAlready.has(build.id)) : shown
+  const hiddenFromPicker = picking
+    ? libraryBuilds.filter((build) => onTeamAlready.has(build.id)).length
+    : 0
 
   /** Where cancelling or picking hands the reader back to. See tbNav. */
   const backFromPick = (buildId: string | null): TbScreen =>
@@ -208,9 +220,11 @@ export function BuildLibrary({
       {pickable.length === 0 ? (
         <div className="tb-empty" data-testid="tb-build-library-empty">
           <p className="tb-empty-note">
-            {picking && libraryBuilds.length > 0
-              ? 'Every build in your library is already on this team.'
-              : 'No builds yet.'}
+            {libraryBuilds.length === 0
+              ? 'No builds yet.'
+              : shown.length === 0
+                ? 'No build matches the current search or filters.'
+                : 'Every build in your library is already on this team.'}
           </p>
         </div>
       ) : (

@@ -1145,9 +1145,9 @@ try {
     `${comp.typeLabel.color} vs ${EXPECTED.light[`--type-${comp.typeLabel.type}`]}`,
   )
   check(
-    'uppercase and bold',
+    'uppercase and regular weight (bold dropped, owner 2026-09-27)',
     comp.typeLabel.transform === 'uppercase' &&
-      comp.typeLabel.weight === SCALE['--font-weight-bold'],
+      comp.typeLabel.weight === SCALE['--font-weight-regular'],
   )
 
   // Every rendered type label must match its token, in both themes.
@@ -1508,10 +1508,10 @@ try {
       shell.brand.fontSize + ' / ' + shell.activeTrigger.fontSize,
     )
     check(
-      '[' + theme + '] all of them at --font-weight-medium; only colour separates them',
-      shell.brand.weight === SCALE['--font-weight-medium'] &&
-        shell.activeTrigger.weight === SCALE['--font-weight-medium'] &&
-        shell.idleTrigger.weight === SCALE['--font-weight-medium'],
+      '[' + theme + '] the brand bold, every nav label regular (owner 2026-09-27); colour marks the current page',
+      shell.brand.weight === SCALE['--font-weight-bold'] &&
+        shell.activeTrigger.weight === SCALE['--font-weight-regular'] &&
+        shell.idleTrigger.weight === SCALE['--font-weight-regular'],
       shell.brand.weight + ' / ' + shell.activeTrigger.weight + ' / ' + shell.idleTrigger.weight,
     )
     check(
@@ -1868,7 +1868,7 @@ try {
   })
   log('  team items: ' + JSON.stringify(team))
   check(
-    'Team Building lists its five destinations, in order',
+    'Team Building lists its four destinations, in order (Pokemon Collection removed 2026-09-27)',
     /* "Team Library", which is what the design system called it all along. It
        spent a while as "My Teams" while the screen was being built and is back
        to sitting beside "Build Library", which is the pair it belongs to. The
@@ -1879,14 +1879,13 @@ try {
         'New Build',
         'Team Library',
         'Build Library',
-        'Pokemon Collection',
       ]),
     team.labels.join(','),
   )
   // They lead to stub pages, but they are real destinations now, so nothing is
   // inert and nothing needs aria-disabled to stay keyboard-reachable.
   check(
-    'all five are live destinations, none inert',
+    'all four are live destinations, none inert',
     team.noneDisabled,
     JSON.stringify(team.testids),
   )
@@ -1901,15 +1900,16 @@ try {
   })
   log('  tools: ' + JSON.stringify(tools))
   check(
-    'Tools lists its five destinations, in order',
+    'Tools lists Calculators (with Damage Calculator under it) first, then the four stubs',
     tools.visible &&
       JSON.stringify(tools.labels) ===
         JSON.stringify([
+          'Calculators',
+          'Damage Calculator',
           'Compare Pokemon',
           'Battle Simulator',
           'Training and Optimization',
           'Breeding Planner',
-          'Calculators',
         ]),
     tools.labels.join(','),
   )

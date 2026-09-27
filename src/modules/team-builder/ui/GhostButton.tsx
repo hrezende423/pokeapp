@@ -63,6 +63,7 @@ export function IconButton({
   testId,
   danger = false,
   active = false,
+  tone,
 }: {
   icon: ReactNode
   /** Accessible name and tooltip. These controls are icon-only by design. */
@@ -71,6 +72,8 @@ export function IconButton({
   testId?: string
   danger?: boolean
   active?: boolean
+  /** 'done': the green of the finished mark, while active. */
+  tone?: 'done'
 }) {
   return (
     <button
@@ -78,6 +81,8 @@ export function IconButton({
       className="tb-icon-btn"
       data-danger={danger ? 'true' : undefined}
       data-active={active ? 'true' : undefined}
+      data-tone={tone}
+      aria-pressed={tone ? active : undefined}
       data-testid={testId}
       aria-label={label}
       title={label}

@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { typesInGeneration } from '../../../data'
 import { useDexSelection, useNav } from '../../nav/navContext'
-import type { DexModuleId } from '../../nav/registry'
 import {
   buildSpeciesRows,
   speciesFilterSections,
@@ -19,7 +18,17 @@ import {
   speciesEntries,
 } from '../entrySources'
 import { trainerEntries, useTrainerPartition } from '../trainerEntries'
-import { DexQueryContext } from './dexQueryContext'
+import { DexQueryContext, type QueryListId } from './dexQueryContext'
+import {
+  buildFilterSections,
+  buildRows,
+  buildSortFields,
+  teamFilterSections,
+  teamRows,
+  teamSortFields,
+} from '../../team-builder/libraryQuery'
+import { useTeamBuilderData } from '../../team-builder/store'
+import { useTbScreen } from '../../team-builder/tbNav'
 import type { FilterSection, SortField } from './dexQuery'
 import {
   abilitydexSections,
@@ -51,7 +60,7 @@ import { useDexQuery } from './useDexQuery'
  * rebuild the list it filters.
  */
 interface DexConfig {
-  dexId: DexModuleId | null
+  dexId: QueryListId | null
   entries: unknown[]
   sections: FilterSection<unknown>[]
   sorts: SortField<unknown>[]
@@ -70,7 +79,7 @@ const EMPTY: DexConfig = {
    config is built for ONE dex and consumed by that dex, and useDexRows checks
    the pairing at runtime because the compiler cannot see across the context. */
 const erase = <T,>(
-  dexId: DexModuleId,
+  dexId: QueryListId,
   entries: T[],
   sections: FilterSection<T>[],
   sorts: SortField<T>[],
@@ -82,6 +91,8 @@ const erase = <T,>(
   sorts: sorts as unknown as SortField<unknown>[],
   defaultSort,
 })
+
+const TEAM_BUILDING_IDS = new Set(['my-teams', 'build-library', 'new-team', 'new-build'])
 
 export function DexQueryProvider({ children }: { children: ReactNode }) {
   const nav = useNav()
@@ -107,8 +118,32 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
     [trainerPartition],
   )
 
+  /*
+    THE TEAM BUILDER'S TWO LIBRARIES, which are lists too. Which one is on screen
+    is the module's own screen state (tbNav), not the nav id -- "New team" is a
+    nav id that lands on the Team Library -- so it is read from there, and only
+    while the Team Building module is the one open.
+  */
+  const tbScreen = useTbScreen()
+  const tbData = useTeamBuilderData()
+  const tbList: 'tb-builds' | 'tb-teams' | null = TEAM_BUILDING_IDS.has(moduleId)
+    ? tbScreen.kind === 'build-library'
+      ? 'tb-builds'
+      : tbScreen.kind === 'my-teams'
+        ? 'tb-teams'
+        : null
+    : null
+
   const config = useMemo<DexConfig>(() => {
     const scope = { generation, isAll }
+    if (tbList === 'tb-builds') {
+      const rows = buildRows(tbData)
+      return erase('tb-builds', rows, buildFilterSections(rows), buildSortFields(), 'order')
+    }
+    if (tbList === 'tb-teams') {
+      const rows = teamRows(tbData)
+      return erase('tb-teams', rows, teamFilterSections(rows), teamSortFields(), 'order')
+    }
     switch (moduleId) {
       case 'pokedex': {
         const rows = buildSpeciesRows(speciesEntries(scope), generation)
@@ -156,7 +191,7 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
         // bar shows no filters and no sort.
         return EMPTY
     }
-  }, [moduleId, generation, isAll, availableTypes, trainerRows])
+  }, [moduleId, generation, isAll, availableTypes, trainerRows, tbList, tbData])
 
   const query = useDexQuery({
     entries: config.entries,

@@ -52,7 +52,9 @@
   overflow: hidden;
 }
 
-.panel h1 {
+/* The boot screens' own heading only: as `.panel h1` this outranked every page
+   title's class and drew "Pokédex" at 31.5px. */
+.panel > h1 {
   margin: 0;
   font-size: 1.75rem;
   color: var(--text-h);
@@ -286,7 +288,7 @@
 .stub-page-title {
   margin: 0 0 var(--space-gap-sm);
   font-family: var(--font-body);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-page-title);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
 }
@@ -757,4 +759,31 @@
 
 .layout-overlay-legend span[data-swatch='pad']::before {
   background: rgba(60, 220, 130, 0.85);
+}
+
+/*
+  NATIVE DROPDOWNS FOLLOW THE THEME. A <select>'s open list is drawn by the
+  browser, which painted each <optgroup> heading on a white band in dark mode --
+  the "Gen 1 / Gen 2" rows of the game pickers. `color-scheme` tells it which
+  palette to draw, and the explicit colours cover the engines that ignore it.
+*/
+select {
+  color-scheme: light;
+}
+:root[data-theme='dark'] select {
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) select {
+    color-scheme: dark;
+  }
+}
+select optgroup,
+select option {
+  color: var(--text-primary);
+  background-color: var(--surface-raised);
+}
+select optgroup {
+  font-weight: var(--font-weight-bold);
+  color: var(--text-secondary);
 }

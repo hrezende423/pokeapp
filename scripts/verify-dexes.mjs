@@ -1091,6 +1091,30 @@ try {
   check('clicking "Poképedia" opens the Pokédex, titled so', pokedexHead.title === 'Pokédex', JSON.stringify(pokedexHead))
   check('Pokédex cards carry the katakana name under the number, behind the artwork', pokedexHead.kana === 'フシギダネ' && pokedexHead.belowNumber && pokedexHead.behindArt, JSON.stringify(pokedexHead))
   check('type labels are regular weight, not bold', pokedexHead.typeWeight === '400', String(pokedexHead.typeWeight))
+  const layout = await page.evaluate(() => {
+    const title = document.querySelector('[data-testid="pokedex-title"]').getBoundingClientRect()
+    const card = document.querySelector('[data-testid="species-row-1"]')
+    const c = card.getBoundingClientRect()
+    const grid = document.querySelector('.pokedex-grid').getBoundingClientRect()
+    const wrap = document.querySelector('.pokedex-grid-wrap').getBoundingClientRect()
+    const kana = card.querySelector('.species-card-ghost-ja')
+    const types = card.querySelector('.species-card-types').getBoundingClientRect()
+    const name = card.querySelector('.species-card-line').getBoundingClientRect()
+    return {
+      titleTop: Math.round(title.top),
+      cardTop: Math.round(c.top),
+      centred: Math.abs(grid.left - wrap.left - (wrap.right - grid.right)) <= 2,
+      kanaSize: parseFloat(getComputedStyle(kana).fontSize),
+      kanaTop: parseFloat(getComputedStyle(kana).top),
+      nameToTypes: Math.round(types.top - name.bottom),
+      titleSize: parseFloat(getComputedStyle(document.querySelector('.dex-title')).fontSize),
+    }
+  })
+  check('the first row of cards is level with the "Pokédex" title, the grid still centred', Math.abs(layout.titleTop - layout.cardTop) <= 2 && layout.centred, JSON.stringify(layout))
+  check('the katakana is larger and one line lower (22px at 100px)', layout.kanaSize === 22 && layout.kanaTop === 100, JSON.stringify(layout))
+  check('the card lines are spaced further apart', layout.nameToTypes >= 6, JSON.stringify(layout))
+  check('page titles use the smaller page-title size (15px)', layout.titleSize === 15, String(layout.titleSize))
+  check('Pokemon Collection is gone from the app', await page.evaluate(() => document.querySelector('[data-testid="nav-pokemon-collection"]') == null))
 
   // ------------------------------------------------------------ errors
   hr('CONSOLE / PAGE / HTTP ERRORS')

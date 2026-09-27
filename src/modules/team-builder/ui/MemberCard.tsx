@@ -29,6 +29,7 @@
  */
 
 import type { ReactNode } from 'react'
+import { IconCheck } from '@tabler/icons-react'
 import { TypeLabel } from '../../../components/ds/TypeLabel'
 import { resolveArtworkUrl } from '../../../data'
 import {
@@ -332,6 +333,16 @@ export function MemberCard({
             </span>
           )}
           {showLevel && <span className="tb-card-level num">Lv.{build.level}</span>}
+          {/* The reader's own "finished" mark, set from the Build Form's dock. */}
+          {showLevel && build.done && (
+            <IconCheck
+              className="tb-card-done"
+              size={13}
+              stroke={3}
+              aria-label="Finished"
+              data-testid={testId ? `${testId}-done` : undefined}
+            />
+          )}
         </span>
         {/*
           TYPES, NATURE AND ABILITY ON ONE LINE on a team card -- three facts

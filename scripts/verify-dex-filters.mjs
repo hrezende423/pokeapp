@@ -486,8 +486,8 @@ try {
   })
   log(`  card geometry: ${JSON.stringify(cardBox)}`)
   check(
-    'it is UNDER the ability line and inside the card, which did not grow',
-    cardBox.statsBelowAbility && cardBox.clipped === false && cardBox.height === 199,
+    'it is UNDER the ability line and inside the card (214px since the looser leading of 2026-09-27)',
+    cardBox.statsBelowAbility && cardBox.clipped === false && cardBox.height === 214,
     JSON.stringify(cardBox),
   )
   check(
@@ -1134,8 +1134,8 @@ try {
   log(`  breeding card: ${JSON.stringify(memberCard)}`)
   check('every card carries a gender-ratio row', memberCard != null)
   check(
-    'below the egg-group row, inside a card that did not grow',
-    memberCard?.belowGroups && memberCard?.clipped === false && memberCard?.height === 199,
+    'below the egg-group row, inside the card (214px since 2026-09-27)',
+    memberCard?.belowGroups && memberCard?.clipped === false && memberCard?.height === 214,
     JSON.stringify(memberCard),
   )
   const expectedGender = speciesById[memberCard.id].gender_rate

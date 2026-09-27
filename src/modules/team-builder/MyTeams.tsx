@@ -14,10 +14,8 @@
  * THE ID, THEN THE NAME. A team is identified by its "#001"; the optional name,
  * game and purpose asked for by the New team popup sit beside it. No timestamp.
  *
- * THE SEARCH BAR IS DELIBERATELY INERT. It renders because the layout is built
- * around it -- "+ New team" sits immediately to its left -- but no filtering is
- * wired up, per the spec. It is disabled rather than merely non-functional, so it
- * cannot silently swallow typing.
+ * SEARCH, FILTER AND SORT ARE THE APP BAR'S, like every other list: the inert
+ * search box that used to sit beside "+ New team" is gone (libraryQuery.ts).
  */
 
 import { useState } from 'react'
@@ -31,6 +29,8 @@ import {
   IconTrash,
 } from '@tabler/icons-react'
 import { goTo } from './tbNav'
+import { useDexQueryBundle } from '../dex/query/dexQueryContext'
+import type { TeamRow as TeamQueryRow } from './libraryQuery'
 import { GhostButton } from './ui/GhostButton'
 import { Dock, Kebab } from './ui/Dock'
 import { BulkBar, SelectCircle } from './ui/BulkSelect'
@@ -61,7 +61,13 @@ export function MyTeams({ creating }: { creating: boolean }) {
     Creation order is the numbering order, and since there is no team name it is
     also the only sort there is data for.
   */
-  const teams = listedTeams(data)
+  const allTeams = listedTeams(data)
+  /* Narrowed and ordered by the app bar's Search/Filter and Sort (libraryQuery.ts);
+     read softly, like the Build Library's. */
+  const bundle = useDexQueryBundle()
+  const teams =
+    bundle.dexId === 'tb-teams' ? (bundle.query.visible as TeamQueryRow[]).map((r) => r.team) : allTeams
+  const numberOf = new Map(allTeams.map((t, i) => [t.id, uiId(i)]))
 
   const deleteSelected = () => {
     const ids = [...bulk.selected]
@@ -83,7 +89,7 @@ export function MyTeams({ creating }: { creating: boolean }) {
   const newTeam = () => goTo({ kind: 'my-teams', creating: true })
   const popup = creating && <NewTeamModal onClose={() => goTo({ kind: 'my-teams' })} />
 
-  if (teams.length === 0) {
+  if (allTeams.length === 0) {
     return (
       <section className="tb-screen tb-my-teams" data-testid="tb-my-teams">
         {/* No search bar in the empty state: there is nothing to search. */}
@@ -106,14 +112,6 @@ export function MyTeams({ creating }: { creating: boolean }) {
           <IconPlus size={18} stroke={1.5} />
           New team
         </GhostButton>
-        <input
-          className="tb-search"
-          type="search"
-          placeholder="Search teams"
-          aria-label="Search teams"
-          data-testid="tb-team-search"
-          disabled
-        />
         <div className="tb-dock-anchor tb-library-dock-anchor">
           <Dock
             testId="tb-teams-dock"
@@ -139,17 +137,22 @@ export function MyTeams({ creating }: { creating: boolean }) {
         />
       )}
 
+      {teams.length === 0 && (
+        <p className="tb-empty-note" data-testid="tb-teams-no-match">
+          No team matches the current search or filters.
+        </p>
+      )}
       <div className="tb-team-rows" data-testid="tb-team-rows">
-        {teams.map((team, index) => (
+        {teams.map((team) => (
           <TeamRow
             key={team.id}
             team={team}
-            label={uiId(index)}
+            label={numberOf.get(team.id) ?? uiId(-1)}
             buildById={buildById}
             selecting={bulk.active}
             selectProps={bulk.itemProps(team.id)}
             onDelete={() =>
-              prompt.confirm(`Delete team ${uiId(index)}?`, () => deleteTeam(team.id), {
+              prompt.confirm(`Delete team ${numberOf.get(team.id)}?`, () => deleteTeam(team.id), {
                 body: 'Builds used only by this team are deleted with it. Builds that other teams also use are kept.',
                 testId: 'tb-delete-team-prompt',
               })

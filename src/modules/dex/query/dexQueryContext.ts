@@ -23,9 +23,15 @@ import type { FilterSection, SortField } from './dexQuery'
 import type { DexQuery } from './useDexQuery'
 import type { SpeciesView } from '../../pokedex/speciesQuery'
 
+/**
+ * A list the app bar's menus can drive: a dex, or one of the Team Builder's two
+ * libraries (team-builder/libraryQuery.ts), which borrow the same machinery.
+ */
+export type QueryListId = DexModuleId | 'tb-builds' | 'tb-teams'
+
 export interface DexQueryBundle {
-  /** The dex the bundle describes, or null on a page that is not a dex. */
-  dexId: DexModuleId | null
+  /** The list the bundle describes, or null on a page that has none. */
+  dexId: QueryListId | null
   sections: FilterSection<unknown>[]
   sorts: SortField<unknown>[]
   query: DexQuery<unknown>
@@ -59,7 +65,7 @@ export function useDexQueryBundle(): DexQueryBundle {
  * below safe to read. A module that asks while another dex is active is a wiring
  * bug, and it fails here rather than rendering the wrong entity's fields.
  */
-export function useDexRows<T>(dexId: DexModuleId): { rows: T[]; query: DexQuery<T> } {
+export function useDexRows<T>(dexId: QueryListId): { rows: T[]; query: DexQuery<T> } {
   const bundle = useDexQueryBundle()
   if (bundle.dexId !== dexId) {
     throw new Error(`useDexRows('${dexId}') called while the active dex query is '${bundle.dexId}'`)

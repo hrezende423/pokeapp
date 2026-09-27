@@ -586,14 +586,17 @@
   /* Three to a row at a fixed, narrower width (owner, 2026-09-27): the cards
      were stretching to fill the page and their moves ran away from their names.
      Two, then one, as the window narrows. */
-  grid-template-columns: repeat(3, minmax(0, 320px));
-  column-gap: var(--space-gap-lg);
+  /* 216px, two-thirds of the first pass, centred with room either side
+     (owner, 2026-09-27, twice). */
+  grid-template-columns: repeat(3, minmax(0, 216px));
+  justify-content: center;
+  column-gap: calc(var(--space-gap-xl) * 1.5);
   row-gap: calc(var(--space-gap-xl) * 1.5);
   padding-top: var(--space-gap-md);
 }
-@media (max-width: 1100px) {
+@media (max-width: 820px) {
   .tb-build-grid {
-    grid-template-columns: repeat(2, minmax(0, 320px));
+    grid-template-columns: repeat(2, minmax(0, 216px));
   }
 }
 @media (max-width: 640px) {
@@ -2459,4 +2462,25 @@
   gap: 2px;
   width: 132px;
   min-width: 0;
+}
+
+/* ------------------------------------------------------- the finished mark */
+
+.tb-card-done {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--tb-done);
+}
+.tb-icon-btn[data-tone='done'][data-active='true'] {
+  color: var(--tb-done);
+}
+.tb {
+  /* The owner's reference green, bright enough to read on both themes. */
+  --tb-done: #16c247;
+}
+
+/* The gender sign drawn bold: the glyph has no bold cut in the body face, so
+   the weight alone did nothing (owner, 2026-09-27). */
+.tb-card-gender {
+  -webkit-text-stroke: 0.5px currentColor;
 }
