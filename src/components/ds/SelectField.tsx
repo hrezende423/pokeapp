@@ -28,7 +28,12 @@ export function SelectField({
    * what the dex filter panels need: "Any" has to submit an empty value, and a
    * growth rate's value is `medium-slow` where its label is "Medium Slow".
    */
-  options: (string | { value: string; label: string })[]
+  options: (
+    | string
+    | { value: string; label: string }
+    /** An <optgroup>: a heading the options under it are indented beneath. */
+    | { group: string; options: { value: string; label: string }[] }
+  )[]
   state?: FieldState
   /**
    * Width inside a CompactFieldStrip: 'narrow' for a two- or three-digit value
@@ -50,6 +55,17 @@ export function SelectField({
       <span style={{ position: 'relative', display: 'block' }}>
         <select className="ds-field-control" disabled={state === 'disabled'} {...rest}>
           {options.map((o) => {
+            if (typeof o !== 'string' && 'group' in o) {
+              return (
+                <optgroup key={`group:${o.group}`} label={o.group}>
+                  {o.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )
+            }
             const option = typeof o === 'string' ? { value: o, label: o } : o
             return (
               <option key={option.value} value={option.value}>

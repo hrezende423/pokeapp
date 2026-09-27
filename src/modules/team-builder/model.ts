@@ -6,10 +6,10 @@
  * vocabulary itself (`StatKey`, `StatNumbers`) is NOT redefined here; it lives in
  * statMath.ts beside the arithmetic that consumes it, and this file imports it.
  *
- * NO NAME FIELD ON EITHER TYPE, and that is deliberate rather than an omission:
- * teams are identified by their id, builds by nickname-or-species plus tags. A
- * `name` here would immediately grow a header input on Team Viewer, which the
- * spec rules out.
+ * A TEAM MAY CARRY A NAME, A GAME AND A PURPOSE (owner, 2026-09-27), all asked
+ * for when it is created and all optional -- the id stays the identity, and the
+ * "#001" stays on screen whether or not a name is set. Builds still have none:
+ * they are nickname-or-species plus tags.
  */
 
 import type { StatKey, StatNumbers } from './statMath'
@@ -75,10 +75,29 @@ export interface Team {
   /** Display number: the "#001" on the row. Stable, never reused. */
   seq: number
   generation: number
+  /** The game the team is for ('platinum'); absent on teams made before it was asked. */
+  versionGroup?: string | null
+  /** Optional, reader-given. Empty is the same as absent. */
+  name?: string
+  /** Optional: one of TEAM_PURPOSES' values, or absent. */
+  purpose?: string
   /** Exactly TEAM_SIZE long. Nulls are empty slots. */
   memberIds: (string | null)[]
   notes: string
 }
+
+/** What a team is for, offered when it is created. */
+export const TEAM_PURPOSES = [
+  { value: 'main-story', label: 'Main story' },
+  { value: 'nuzlocke', label: 'Nuzlocke' },
+  { value: 'battle-facility', label: 'Battle facility' },
+  { value: 'competitive', label: 'Competitive' },
+  { value: 'challenge', label: 'Challenge run' },
+  { value: 'other', label: 'Other' },
+] as const
+
+export const purposeLabel = (value: string | undefined): string | null =>
+  TEAM_PURPOSES.find((p) => p.value === value)?.label ?? null
 
 export interface TeamBuilderData {
   builds: Build[]

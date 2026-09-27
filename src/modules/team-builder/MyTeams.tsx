@@ -11,8 +11,8 @@
  * every row roughly three times as tall and turn the list into a stack of cards.
  * The reference images settle it: name, gender, types, ability and nature only.
  *
- * NO TEAM NAME AND NO TIMESTAMP, anywhere on this screen. Teams are identified by
- * id; there is no name field in this module at all.
+ * THE ID, THEN THE NAME. A team is identified by its "#001"; the optional name,
+ * game and purpose asked for by the New team popup sit beside it. No timestamp.
  *
  * THE SEARCH BAR IS DELIBERATELY INERT. It renders because the layout is built
  * around it -- "+ New team" sits immediately to its left -- but no filtering is
@@ -42,9 +42,11 @@ import { MemberCard } from './ui/MemberCard'
 import { TeamMatchup } from './ui/TypeMatchup'
 import { buildSpecies, typeIdsFor } from './buildFacts'
 import { listedTeams, uiId, type Build, type Team } from './model'
-import { createTeam, deleteTeam, duplicateTeam, updateTeam, useTeamBuilderData } from './store'
+import { deleteTeam, duplicateTeam, updateTeam, useTeamBuilderData } from './store'
+import { NewTeamModal } from './ui/NewTeamModal'
+import { TeamMetaFields, TeamTitle } from './ui/TeamTitle'
 
-export function MyTeams({ generation }: { generation: number }) {
+export function MyTeams({ creating }: { creating: boolean }) {
   const data = useTeamBuilderData()
   const prompt = usePrompt()
   const bulk = useBulkSelect()
@@ -78,10 +80,8 @@ export function MyTeams({ generation }: { generation: number }) {
     )
   }
 
-  const newTeam = () => {
-    const team = createTeam(generation)
-    goTo({ kind: 'team-viewer', teamId: team.id })
-  }
+  const newTeam = () => goTo({ kind: 'my-teams', creating: true })
+  const popup = creating && <NewTeamModal onClose={() => goTo({ kind: 'my-teams' })} />
 
   if (teams.length === 0) {
     return (
@@ -94,6 +94,7 @@ export function MyTeams({ generation }: { generation: number }) {
           </GhostButton>
           <p className="tb-empty-note">No teams yet.</p>
         </div>
+        {popup}
       </section>
     )
   }
@@ -158,6 +159,7 @@ export function MyTeams({ generation }: { generation: number }) {
       </div>
 
       {prompt.config && <ConfirmPrompt config={prompt.config} onClose={prompt.close} />}
+      {popup}
     </section>
   )
 }
@@ -271,8 +273,11 @@ function TeamRow({
             <TeamMatchup members={matchupMembers} generation={team.generation} />
           </Popover>
         )}
-        <span className="tb-team-id num" data-testid={`tb-team-${team.id}-label`}>
-          {label}
+        <span className="tb-team-idblock">
+          <span className="tb-team-id num" data-testid={`tb-team-${team.id}-label`}>
+            {label}
+          </span>
+          <TeamTitle team={team} testId={`tb-team-${team.id}-title`} />
         </span>
       </div>
 
@@ -309,6 +314,7 @@ function TeamRow({
           onClose={() => setInfo(false)}
           testId={`tb-team-${team.id}-info-modal`}
         >
+          <TeamMetaFields team={team} testId={`tb-team-${team.id}-meta`} />
           <textarea
             className="tb-notes"
             defaultValue={team.notes}

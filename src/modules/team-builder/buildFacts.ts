@@ -22,6 +22,7 @@
 
 import {
   getAbility,
+  getGenerationForSpecies,
   getItem,
   getMove,
   getNature,
@@ -30,6 +31,7 @@ import {
   itemExistsInGeneration,
   listItems,
   listNatures,
+  moveExistsInGeneration,
   naturesExistInGeneration,
   resolveAbilitiesForGeneration,
   resolveStatsForGeneration,
@@ -395,6 +397,58 @@ export function newBuildInit(generation: number, speciesId = 1): Omit<Build, 'id
     individual: {},
     tags: [],
     notes: '',
+  }
+}
+
+/** Can `speciesId` be built in `generation` at all? */
+export const speciesInGeneration = (speciesId: number, generation: number): boolean =>
+  (getGenerationForSpecies(speciesId) ?? Infinity) <= generation
+
+/**
+ * The same build, carried into another generation: what the new era has is kept,
+ * what it does not is dropped, and what the new era needs is filled with the
+ * defaults a fresh build there would get.
+ *
+ *   Spread: crossing the Gen 2 / Gen 3 line swaps Stat Exp + DVs for EVs + IVs,
+ *     which do not translate, so the spread starts over (blank). Within a side of
+ *     the line it is kept.
+ *   Item: none in Gen 1; one the new era does not have is removed.
+ *   Ability and nature: none before Gen 3; entering Gen 3+ takes the species'
+ *     first ability, and a kept ability the era does not offer is replaced.
+ *   Moves: a move that does not exist yet is emptied. Legality is left to the
+ *     form's own learnset check, as for any edit.
+ *   Friendship: Gen 1 has none.
+ */
+export function buildInGeneration(build: Build, generation: number): Build {
+  if (build.generation === generation) return build
+  const fresh = newBuildInit(generation, build.speciesId)
+  const species = getSpecies(build.speciesId)
+  const variety =
+    species?.varieties.find((v) => v.pokemon_id === build.pokemonId) ??
+    species?.varieties.find((v) => v.is_default) ??
+    null
+  const modernBefore = build.generation >= 3
+  const modernAfter = generation >= 3
+  const abilities = variety ? abilityOptionsFor(variety, generation) : []
+  const item = build.itemId != null ? getItem(build.itemId) : undefined
+  return {
+    ...build,
+    generation,
+    effort: modernBefore === modernAfter ? build.effort : {},
+    individual: modernBefore === modernAfter ? build.individual : {},
+    itemId: generation >= 2 && item && itemExistsInGeneration(item, generation) ? build.itemId : null,
+    abilityId: !modernAfter
+      ? null
+      : abilities.some((a) => a.value === build.abilityId)
+        ? build.abilityId
+        : fresh.abilityId,
+    natureId: modernAfter ? build.natureId : null,
+    shiny: modernAfter ? build.shiny : false,
+    friendship: generation >= 2 ? (build.generation >= 2 ? build.friendship : fresh.friendship) : 0,
+    moveIds: build.moveIds.map((id) => {
+      const move = id != null ? getMove(id) : undefined
+      return move && moveExistsInGeneration(move, generation) ? id : null
+    }),
   }
 }
 

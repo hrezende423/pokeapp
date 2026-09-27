@@ -44,6 +44,7 @@ import { EmptySlot, MemberCard } from './ui/MemberCard'
 import { MovesetCoverage, SpeciesMatchup, TeamMatchup, TeamOffence } from './ui/TypeMatchup'
 import { buildSpecies, typeIdsFor } from './buildFacts'
 import { TEAM_SIZE, teamUiId, type Build, type Team } from './model'
+import { TeamMetaFields, TeamTitle } from './ui/TeamTitle'
 import {
   deleteTeam,
   duplicateTeam,
@@ -150,6 +151,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
         <span className="tb-team-id num" data-testid="tb-viewer-team-id">
           {label}
         </span>
+        <TeamTitle team={team} testId="tb-viewer-team-title" />
         <div className="tb-dock-anchor">
           <Dock
             testId="tb-viewer-dock"
@@ -299,6 +301,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
           onClose={() => setInfo(false)}
           testId="tb-viewer-info-modal"
         >
+          <TeamMetaFields team={team} testId="tb-viewer-meta" />
           <textarea
             className="tb-notes"
             defaultValue={team.notes}

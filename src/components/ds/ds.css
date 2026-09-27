@@ -376,7 +376,8 @@
    is deliberately not implemented here -- see the note in TypeLabel.tsx. */
 .ds-type {
   font-size: var(--font-size-label);
-  font-weight: var(--font-weight-bold);
+  /* Regular, not bold: the colour already carries the type (owner, 2026-09-27). */
+  font-weight: var(--font-weight-regular);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }

@@ -26,7 +26,7 @@ import { BuildForm } from './BuildForm'
 import { BuildLibrary } from './BuildLibrary'
 import { MyTeams } from './MyTeams'
 import { TeamViewer } from './TeamViewer'
-import { createTeam, deleteBuild, deleteTeam, readData } from './store'
+import { deleteBuild, deleteTeam, readData } from './store'
 import { goTo, readTbScreen, useTbScreen, type TbScreen } from './tbNav'
 import './teamBuilder.css'
 
@@ -67,8 +67,8 @@ export function TeamBuilding() {
       immediately override the screen we just opened.
     */
     if (nav.moduleId === 'new-team') {
-      const team = createTeam(generation)
-      goTo({ kind: 'team-viewer', teamId: team.id })
+      /* The popup asks which game first; the team is created when it is confirmed. */
+      goTo({ kind: 'my-teams', creating: true })
       return
     }
     if (nav.moduleId === 'new-build') {
@@ -163,7 +163,7 @@ export function TeamBuilding() {
           screen.kind === 'build-form' ? screen.buildId : null,
         )}
       >
-        {screen.kind === 'my-teams' && <MyTeams generation={generation} />}
+        {screen.kind === 'my-teams' && <MyTeams creating={screen.creating ?? false} />}
         {screen.kind === 'team-viewer' && <TeamViewer teamId={screen.teamId} />}
         {screen.kind === 'build-library' && (
           <BuildLibrary generation={generation} pickFor={screen.pickFor} />

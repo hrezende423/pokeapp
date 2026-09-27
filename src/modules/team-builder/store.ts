@@ -150,12 +150,19 @@ export function forkBuildInTeam(originalId: string, edited: Build, teamId: strin
 
 /* ------------------------------------------------------------------- teams */
 
-export function createTeam(generation: number, memberIds: (string | null)[] = []): Team {
+export function createTeam(
+  generation: number,
+  memberIds: (string | null)[] = [],
+  meta: Pick<Team, 'versionGroup' | 'name' | 'purpose'> = {},
+): Team {
   const data = readData()
   const team: Team = {
     id: `t${data.nextTeamSeq}`,
     seq: data.nextTeamSeq,
     generation,
+    ...(meta.versionGroup ? { versionGroup: meta.versionGroup } : {}),
+    ...(meta.name?.trim() ? { name: meta.name.trim() } : {}),
+    ...(meta.purpose ? { purpose: meta.purpose } : {}),
     memberIds: padSlots([...memberIds], TEAM_SIZE, null),
     notes: '',
   }
@@ -225,6 +232,9 @@ export function duplicateTeam(id: string): Team | null {
     id: `t${data.nextTeamSeq}`,
     seq: data.nextTeamSeq,
     generation: source.generation,
+    ...(source.versionGroup ? { versionGroup: source.versionGroup } : {}),
+    ...(source.name ? { name: source.name } : {}),
+    ...(source.purpose ? { purpose: source.purpose } : {}),
     memberIds,
     notes: source.notes,
   }

@@ -528,6 +528,26 @@
   user-select: none;
 }
 
+.species-card-ghost-ja {
+  position: absolute;
+  z-index: 0;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  letter-spacing: 0.24em;
+  white-space: nowrap;
+  color: var(--ghost-watermark);
+  /* The number's own opacity: at 5% a 17px glyph behind the artwork vanishes,
+     so it takes the doubled value the team cards use for theirs. */
+  opacity: calc(var(--ghost-watermark-opacity) * 2);
+  pointer-events: none;
+  user-select: none;
+}
+
 .species-card-art {
   position: absolute;
   z-index: 1;
@@ -1405,7 +1425,7 @@
 .app-brand {
   font-family: var(--font-body);
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 
@@ -1444,10 +1464,9 @@
   padding: 0;
   font-family: var(--font-body);
   font-size: var(--font-size-body);
-  /* One weight across every label: measured against the reference, 600 fits each
-     to within 0.13px of --font-size-body where 400 is 0.52px out. Only colour
-     separates the current page from the rest. */
-  font-weight: var(--font-weight-medium);
+  /* Regular, by the owner's call (2026-09-27): only the brand is bold. Colour
+     alone separates the current page from the rest. */
+  font-weight: var(--font-weight-regular);
   color: var(--text-secondary);
   background: none;
   border: none;
@@ -1563,7 +1582,7 @@
 }
 
 .nav-item-parent {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
 }
 
 .nav-item:focus-visible {
@@ -2694,6 +2713,17 @@
   flex: 0 0 auto;
 }
 
+.dex-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+.pokedex-title-row {
+  padding: 0 0 var(--space-gap-sm);
+}
+
 .dex-controls-count {
   margin: 0;
   font-family: var(--font-numeric);
@@ -2807,7 +2837,18 @@
   min-width: 0;
 }
 
-.dex-controls-inline .dex-controls-count {
+.dex-controls-inline .dex-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+.pokedex-title-row {
+  padding: 0 0 var(--space-gap-sm);
+}
+
+.dex-controls-count {
   margin-left: auto;
   white-space: nowrap;
 }

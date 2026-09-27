@@ -152,7 +152,8 @@
   line-height: 1.2;
 }
 .dcalc-head .ds-field {
-  width: 72px;
+  /* Fits "HeartGold/SoulSilver", the longest game. */
+  width: 170px;
   padding-bottom: 1px;
 }
 

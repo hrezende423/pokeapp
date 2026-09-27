@@ -94,6 +94,13 @@ export function SpeciesCard({
       <span className="species-card-ghost" aria-hidden>
         {String(species.id).padStart(3, '0')}
       </span>
+      {/* The katakana name, the same texture one line under the number and
+          behind the artwork -- the pairing the Build Form's portrait uses. */}
+      {species.name_ja && (
+        <span className="species-card-ghost-ja" aria-hidden>
+          {species.name_ja}
+        </span>
+      )}
       {badge && (
         <span className="species-card-badge" data-testid={`species-card-badge-${species.id}`}>
           {badge}

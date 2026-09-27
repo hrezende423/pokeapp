@@ -74,7 +74,7 @@ try {
   page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`))
 
   await page.goto(APP_URL, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('[data-testid="boot-status"]', { timeout: 60000 })
+  await page.waitForSelector('.app-info-trigger[data-testid="boot-status"]', { timeout: 60000 })
 
   const seedStore = async (doc) => {
     await page.evaluate(
@@ -85,7 +85,7 @@ try {
       ['pokeapp:team-builder:v1', doc],
     )
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.waitForSelector('[data-testid="boot-status"]', { timeout: 60000 })
+    await page.waitForSelector('.app-info-trigger[data-testid="boot-status"]', { timeout: 60000 })
   }
   const readStore = () =>
     page.evaluate(() => JSON.parse(localStorage.getItem('pokeapp:team-builder:v1') ?? 'null'))
@@ -94,6 +94,13 @@ try {
     await page.hover('[data-testid="nav-tab-team-building"]')
     await page.waitForSelector('[data-testid="nav-dropdown-team-building"]', { state: 'visible' })
     await page.click(`[data-testid="nav-${id}"]`)
+    // "New team" asks for the game first; the suite takes the default.
+    if (id === 'new-team') await confirmNewTeam()
+  }
+  const confirmNewTeam = async () => {
+    await page.waitForSelector('[data-testid="tb-new-team-modal"]')
+    await page.mouse.move(5, 900)
+    await page.click('[data-testid="tb-new-team-create"]')
   }
 
   /** Move ids come from the bundle, so the suite never hardcodes one. */
@@ -211,9 +218,26 @@ try {
       (await page.$$('[data-testid="tb-team-search"]')).length === 0,
   )
 
-  // ---- creating a team lands in an EMPTY Team Viewer
+  // ---- "+ New team" asks for the game, a name and a purpose first
   await page.click('[data-testid="tb-new-team"]')
+  await page.waitForSelector('[data-testid="tb-new-team-modal"]')
+  const popup = await page.evaluate(() => ({
+    groups: [...document.querySelectorAll('[data-testid="tb-new-team-game"] optgroup')].map((g) => g.label),
+    purposes: [...document.querySelectorAll('[data-testid="tb-new-team-purpose"] option')].map((o) => o.textContent),
+    teams: JSON.parse(localStorage.getItem('pokeapp:team-builder:v1') ?? 'null')?.teams?.length ?? 0,
+  }))
+  check(
+    'the New team popup offers games by generation and optional purposes, and creates nothing yet',
+    JSON.stringify(popup.groups) === '["Gen 1","Gen 2","Gen 3","Gen 4"]' && popup.purposes.includes('Nuzlocke') && popup.teams === 0,
+    JSON.stringify(popup),
+  )
+  await page.selectOption('[data-testid="tb-new-team-game"]', 'platinum')
+  await page.fill('[data-testid="tb-new-team-name"]', 'Sinnoh run')
+  await page.selectOption('[data-testid="tb-new-team-purpose"]', 'nuzlocke')
+  await page.click('[data-testid="tb-new-team-create"]')
   await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  const titled = (await page.textContent('[data-testid="tb-viewer-team-title"]'))?.trim()
+  check('the new team carries its name, game and purpose', titled === 'Sinnoh runPlatinum · Nuzlocke', titled)
   const emptySlots = (await page.$$('[data-tb="empty-slot"]')).length
   const viewerId = (await page.textContent('[data-testid="tb-viewer-team-id"]'))?.trim()
   log(`  new team ${viewerId} opened with ${emptySlots} empty slots`)
@@ -1069,7 +1093,7 @@ try {
     check here also proves those area names really are what the stylesheet says.
   */
   await page.goto(`${APP_URL}?layout=1`, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('[data-testid="boot-status"]', { timeout: 60000 })
+  await page.waitForSelector('.app-info-trigger[data-testid="boot-status"]', { timeout: 60000 })
   await goTo('build-library')
   await page.waitForSelector('[data-testid="tb-build-grid"]')
   await page.click('[data-testid="tb-build-b1-open"]')
@@ -1097,7 +1121,7 @@ try {
   )
   /* Back to a clean page so the conventions section is not inspecting the tool. */
   await page.goto(APP_URL, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('[data-testid="boot-status"]', { timeout: 60000 })
+  await page.waitForSelector('.app-info-trigger[data-testid="boot-status"]', { timeout: 60000 })
   await goTo('build-library')
   await page.waitForSelector('[data-testid="tb-build-grid"]')
   await page.click('[data-testid="tb-build-b1-open"]')
@@ -3254,8 +3278,8 @@ try {
     JSON.stringify(cardGeometry.lineLefts),
   )
   check(
-    'the type run is CENTRED inside that box, while the lines around it are not',
-    cardGeometry.typesJustify === 'center',
+    'the type run is LEFT-aligned like the lines around it (owner, 2026-09-27)',
+    cardGeometry.typesJustify === 'flex-start',
     cardGeometry.typesJustify,
   )
   check(
@@ -3513,14 +3537,14 @@ try {
   )
   check(
     'and the weights and families are UNTOUCHED -- only the size was levelled',
-    /* The name and the numbers stay numeric-face, the gender and the type run
-       stay bold, the rest stay regular sans. Levelling the size by setting one
-       rule on the facts block would have flattened all of this. */
+    /* The name and the numbers stay numeric-face, the gender stays bold, the
+       rest -- the type run too, since 2026-09-27 -- regular sans. Levelling the
+       size by setting one rule on the facts block would have flattened this. */
     display.styles.name.family === 'Martian Mono' &&
       display.styles.spread.family === 'Martian Mono' &&
       display.styles.moveName.family === 'Martian Mono' &&
       display.styles.gender.fw === '700' &&
-      display.styles.type.fw === '700' &&
+      display.styles.type.fw === '400' &&
       display.styles.meta.fw === '400' &&
       display.styles.species.family === 'IBM Plex Sans',
     JSON.stringify(display.styles),
@@ -3650,11 +3674,11 @@ try {
   })
   log(`  library order: ${libraryCard.order.join(' / ')}`)
   check(
-    'the Build Library card keeps its own order: species on its own line, no id line, no bars',
+    'the Build Library card: "Nickname (Species) gender level" on one row, no id line, no bars',
     libraryCard.idLines === 0 &&
       libraryCard.separators === 0 &&
-      libraryCard.speciesInHeadline === 0 &&
-      libraryCard.order.some((c) => /tb-card-species/.test(c)) &&
+      libraryCard.speciesInHeadline === 1 &&
+      !libraryCard.order.some((c) => /tb-card-species/.test(c)) &&
       libraryCard.order.some((c) => /tb-card-meta/.test(c)),
     JSON.stringify(libraryCard),
   )
@@ -4153,6 +4177,91 @@ try {
     boxed.length === 0,
     boxed.join(' | '),
   )
+
+  // ================================================ the owner's round, 2026-09-27
+  hr('OWNER ROUND 2026-09-27: LIBRARY GRID, KANA, GENERATION FIELD')
+  await seedStore({
+    nextBuildSeq: 6,
+    nextTeamSeq: 2,
+    builds: [1, 2, 3, 4].map((n) =>
+      mkBuild(`b${n}`, { generation: 4, speciesId: 292 + n, pokemonId: 292 + n, nickname: `Mon${n}` }),
+    ).concat([
+      mkBuild('b5', {
+        generation: 4,
+        speciesId: 445,
+        pokemonId: 445,
+        nickname: 'Chompy',
+        effort: { attack: 252, speed: 252 },
+        moveIds: [moveIdByName['earthquake'] ?? null, moveIdByName['dragon-claw'] ?? null, null, null],
+      }),
+    ]),
+    teams: [mkTeam('t1', 1, ['b1'], { generation: 4 })],
+  })
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-team-rows"]')
+  const teamKana = await page.evaluate(() => {
+    const card = document.querySelector('.tb-card-compact')
+    const num = card.querySelector('.tb-card-ghost').getBoundingClientRect()
+    const kana = card.querySelector('.tb-card-ghost-ja')
+    return { text: kana?.textContent ?? null, below: kana ? kana.getBoundingClientRect().top >= num.top + 10 : false }
+  })
+  check('a team card carries the katakana name under the dex number', !!teamKana.text && teamKana.below, JSON.stringify(teamKana))
+
+  await goTo('build-library')
+  await page.waitForSelector('[data-testid="tb-build-grid"]')
+  await page.waitForTimeout(400)
+  const lib = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('.tb-library-cell')]
+    const tops = cells.map((c) => Math.round(c.getBoundingClientRect().top))
+    const first = cells[0]
+    const dock = first.querySelector('.tb-library-dock').getBoundingClientRect()
+    const art = first.querySelector('.tb-card-art img:not(.tb-held-item)')?.getBoundingClientRect()
+    const head = first.querySelector('.tb-card-headline')
+    const hb = head.getBoundingClientRect()
+    return {
+      perRow: tops.filter((t) => t === tops[0]).length,
+      width: Math.round(first.getBoundingClientRect().width),
+      rowGap: tops[3] - (tops[0] + first.getBoundingClientRect().height),
+      dockClear: art ? dock.bottom <= art.top + 1 : false,
+      headline: [...head.children].map((c) => c.textContent).join(' '),
+      oneRow: [...head.children].every((c) => Math.abs(c.getBoundingClientRect().top - hb.top) < 6),
+    }
+  })
+  check('the Build Library shows three cards to a row', lib.perRow === 3, JSON.stringify(lib))
+  check('each card is at most 320px wide', lib.width <= 320, `${lib.width}px`)
+  check('rows are spaced wider than before (>= 24px)', lib.rowGap >= 24, `${lib.rowGap}px`)
+  check('the card dock sits above the artwork, not over it', lib.dockClear, JSON.stringify(lib))
+  check('the headline is one row: nickname (species) gender level', lib.headline === 'Mon1 (Whismur) ♂ Lv.50' && lib.oneRow, lib.headline)
+
+  // The generation field, top right of the form.
+  await page.click('[data-testid="tb-build-b5-open"]')
+  await page.waitForSelector('[data-testid="tb-build-form"]')
+  const genField = await page.evaluate(() => {
+    const sel = document.querySelector('[data-testid="tb-generation"]')
+    const r = sel.getBoundingClientRect()
+    const dock = document.querySelector('[data-testid="tb-form-dock"]').getBoundingClientRect()
+    const species = document.querySelector('[data-testid="tb-species"]').getBoundingClientRect()
+    return { value: sel.value, disabled: sel.disabled, leftOfDock: r.right <= dock.left + 1, topRow: Math.abs(r.top - species.top) < 4, nearDock: dock.left - r.right < 40 }
+  })
+  check('the build form has a generation field in its top-right corner, beside the dock', genField.value === '4' && genField.topRow && genField.leftOfDock && genField.nearDock, JSON.stringify(genField))
+  await page.selectOption('[data-testid="tb-generation"]', '2')
+  await page.waitForTimeout(200)
+  const gen2 = await page.evaluate(() => ({
+    gen: document.querySelector('[data-testid="tb-generation"]').value,
+    ability: document.querySelector('[data-testid="tb-ability"]') != null,
+    nature: document.querySelector('[data-testid="tb-nature"]') != null,
+  }))
+  check('switching a Gen 4 build to Gen 2 drops ability and nature', gen2.gen === '2' && !gen2.ability && !gen2.nature, JSON.stringify(gen2))
+  const optionsGen1 = await page.evaluate(() => document.querySelector('[data-testid="tb-generation"] option[value="1"]').disabled)
+  check('a generation the species did not exist in is not offered (Garchomp, Gen 1)', optionsGen1)
+  await goTo('my-teams')
+  await page.waitForSelector('[data-testid="tb-team-rows"]')
+  await page.click('[data-testid="tb-team-t1-open"]')
+  await page.waitForSelector('[data-testid="tb-team-viewer"]')
+  await page.click('[data-testid="tb-slot-0-open"]').catch(() => {})
+  await page.waitForSelector('[data-testid="tb-build-form"]', { timeout: 5000 }).catch(() => {})
+  const locked = await page.evaluate(() => document.querySelector('[data-testid="tb-generation"]')?.disabled ?? null)
+  check("a team member's generation is locked to the team's game", locked === true, String(locked))
 
   check('no console or page errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '))
 

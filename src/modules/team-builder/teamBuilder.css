@@ -583,9 +583,23 @@
 */
 .tb-build-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
-  gap: var(--space-gap-md);
+  /* Three to a row at a fixed, narrower width (owner, 2026-09-27): the cards
+     were stretching to fill the page and their moves ran away from their names.
+     Two, then one, as the window narrows. */
+  grid-template-columns: repeat(3, minmax(0, 320px));
+  column-gap: var(--space-gap-lg);
+  row-gap: calc(var(--space-gap-xl) * 1.5);
   padding-top: var(--space-gap-md);
+}
+@media (max-width: 1100px) {
+  .tb-build-grid {
+    grid-template-columns: repeat(2, minmax(0, 320px));
+  }
+}
+@media (max-width: 640px) {
+  .tb-build-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .tb-slot-count {
   position: absolute;
@@ -728,6 +742,13 @@
   white-space: nowrap;
   opacity: calc(var(--ghost-watermark-opacity) * 2);
   transform: translateX(-50%);
+}
+/* On a team row the kana sits under the half-size numeral, behind the sprite,
+   rather than at the art box's foot where the names below would crowd it. */
+.tb-card-compact .tb-card-ghost-ja {
+  top: calc(var(--font-size-ghost-watermark-grid) * 0.5 + 2px);
+  bottom: auto;
+  font-size: var(--font-size-caption);
 }
 /* Half again: the kana reads as texture rather than as a name at body size. */
 .tb-card-library .tb-card-ghost-ja,
@@ -1242,6 +1263,8 @@
 
 .tb-library-cell {
   position: relative;
+  /* Room above the card for its dock, which used to sit over the artwork. */
+  padding-top: 34px;
 }
 .tb-library-dock {
   position: absolute;
@@ -1575,15 +1598,11 @@
   line-height: var(--tb-compact-line);
 }
 /*
-  THE TYPES ARE CENTRED; EVERY OTHER LINE IS LEFT.
-
-  Both are measured from the same left edge -- the 5px inset -- so the type line
-  is a centred run of text inside a box that starts exactly where the name above
-  it starts. At the longest pair the two coincide, which is the case the card
-  width was derived from.
+  EVERY LINE IS LEFT, the types included (owner, 2026-09-27; they were centred),
+  all from the same 5px inset the name starts at.
 */
 .tb-card-compact .tb-card-types {
-  justify-content: center;
+  justify-content: flex-start;
 }
 /*
   THE SAME STRUCTURE AS THE IDENTITY PANEL'S SPRITE, at the rail's scale: a
@@ -2393,4 +2412,51 @@
   gap: var(--space-gap-md);
   align-items: flex-start;
   padding-top: var(--space-gap-lg);
+}
+
+/* ---------------------------------------------------------- new team popup */
+
+.tb-new-team-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-md);
+  width: min(360px, 80vw);
+}
+.tb-new-team-form .tb-prompt-actions {
+  padding-top: var(--space-gap-sm);
+}
+
+/* The team's name and "Game · Purpose" beside its "#001". */
+.tb-team-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tb-team-name {
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tb-team-sub {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tb-team-meta-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-gap-md);
+}
+
+/* The "#001" with the name and game under it, one fixed width on every row so
+   the member cards still start on one line down the list. */
+.tb-team-idblock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 132px;
+  min-width: 0;
 }

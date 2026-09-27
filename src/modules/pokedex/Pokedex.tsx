@@ -1,7 +1,8 @@
 import { useDexSelection, useNav } from '../nav/navContext'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
-import { useDexQueryBundle } from '../dex/query/dexQueryContext'
+import { useDexQueryBundle, useDexRows } from '../dex/query/dexQueryContext'
+import { DexTitle } from '../dex/DexPageShell'
 import { useVersionGroup } from '../version-group/context'
 import { SpeciesDetailPage } from './SpeciesDetailPage'
 import { SpeciesList } from './SpeciesList'
@@ -58,6 +59,7 @@ export function Pokedex() {
   */
   const { generation, isAll } = useVersionGroup()
   const { query, view } = useDexQueryBundle()
+  const pokedexCount = useDexRows('pokedex').rows.length
   // The signature covers every filter AND the sort, which is more than the
   // search term and type list it used to carry -- the invalidation story is
   // unchanged, it just describes the whole query now. The view is part of it
@@ -78,6 +80,9 @@ export function Pokedex() {
       */}
       {browsing ? (
         <div className="pokedex-body pokedex-body-grid">
+          <div className="pokedex-title-row">
+            <DexTitle dexId="pokedex" count={pokedexCount} />
+          </div>
           {/*
             The grid scrolls itself and the page does not scroll at all. The
             scroll-down indicator and the back-to-top control come from

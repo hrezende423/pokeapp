@@ -31,6 +31,7 @@ import { DamageFieldPanel } from './DamageFieldPanel'
 import { DamagePokemonPanel } from './DamagePokemonPanel'
 import { DamageResultView, MoveResultList, type MoveResult } from './DamageResultView'
 import { useDamageCalcScope } from './useDamageCalcScope'
+import { generationOfGame } from '../version-group/games'
 import { useGenerationLearnset } from './useGenerationLearnset'
 import '../../components/ds/ds.css'
 import './calculators.css'
@@ -52,8 +53,9 @@ import './calculators.css'
  * THE ENGINE IS ./damage -- a port of the Showdown calculator's gen12/gen3/gen4
  * mechanics against pokeapp's own data -- and this file is only its form.
  *
- * ITS OWN GENERATION (useDamageCalcScope), the third sanctioned exception to the
- * app-wide selector. Switching it normalizes both sides and the field into the
+ * ITS OWN GAME (useDamageCalcScope), the third sanctioned exception to the
+ * app-wide selector, picked from games grouped under their generation. A switch
+ * that crosses generations normalizes both sides and the field into the
  * new era in the same update, and each side remembers what an older era took
  * away so a round trip gives it back.
  *
@@ -82,8 +84,10 @@ export function DamageCalculatorPage() {
   const setSide = (i: 0 | 1) => (next: SideState) =>
     setSides((s) => (i === 0 ? [next, s[1]] : [s[0], next]))
 
-  const setGeneration = (next: number) => {
-    scope.setGeneration(next)
+  const setGame = (vg: string) => {
+    const next = generationOfGame(vg) ?? gen
+    scope.setVersionGroup(vg)
+    if (next === gen) return
     setSides((s) => [
       normalizeSide(s[0], next, DEFAULT_ATTACKER_ID),
       normalizeSide(s[1], next, DEFAULT_DEFENDER_ID),
@@ -96,7 +100,7 @@ export function DamageCalculatorPage() {
   const rows0 = learn0.state.status === 'ready' ? learn0.state.rows : null
   const rows1 = learn1.state.status === 'ready' ? learn1.state.rows : null
 
-  const partitions = useTrainerSetPartitions(gen)
+  const partitions = useTrainerSetPartitions(scope.versionGroup)
   const builds = useTeamBuilderData()
   const catalog = useMemo(
     () => setCatalog(speciesPickerOptions(gen), partitions, builds, gen),
@@ -156,16 +160,21 @@ export function DamageCalculatorPage() {
   const current = results[selected.side][selected.slot] ?? null
 
   return (
-    <div className="calc dcalc" data-testid="calc-damage" data-generation={gen}>
+    <div
+      className="calc dcalc"
+      data-testid="calc-damage"
+      data-generation={gen}
+      data-game={scope.versionGroup}
+    >
       <div className="calc-head dcalc-head" data-layout="dcalc-head">
         <h1 className="calc-title dcalc-title">Damage Calculator</h1>
         <SelectField
-          label="Generation"
+          label="Game"
           hideLabel
-          options={scope.generations.map((g) => ({ value: String(g), label: `Gen ${g}` }))}
-          value={String(gen)}
-          data-testid="dcalc-generation"
-          onChange={(e) => setGeneration(Number(e.target.value))}
+          options={scope.games.map((g) => ({ group: g.label, options: g.options }))}
+          value={scope.versionGroup}
+          data-testid="dcalc-game"
+          onChange={(e) => setGame(e.target.value)}
         />
       </div>
 

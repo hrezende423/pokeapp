@@ -24,7 +24,10 @@ import type { Build } from './model'
 export type BuildOrigin = { kind: 'team'; teamId: string } | { kind: 'library' }
 
 export type TbScreen =
-  | { kind: 'my-teams' }
+  /* `creating` opens the New team popup over the list -- the "+ New team" button
+     and the nav's New team both land here, and the team exists only once the
+     popup is confirmed. */
+  | { kind: 'my-teams'; creating?: boolean }
   | { kind: 'team-viewer'; teamId: string }
   /*
     `pickFor` turns the library into a PICKER for one team slot. Choosing "Pick

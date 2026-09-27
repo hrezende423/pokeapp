@@ -27,6 +27,7 @@ import { chromium } from 'playwright'
 import { startDevServer } from './lib/devServer.mjs'
 
 const PORT = 4186
+const GAME_OF = { 1: 'red-blue', 2: 'gold-silver', 3: 'ruby-sapphire', 4: 'platinum' }
 const SHOTS = new URL('./.verify-shots/', import.meta.url)
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/damage-calc-reference.json', import.meta.url), 'utf8'))
 
@@ -336,7 +337,7 @@ try {
     4: { item: true, ability: true, nature: true, rows: 6, sliders: 6, weather: ['', 'sun', 'rain', 'sand', 'hail'], spikes: 4, toggles: ['Stealth Rock', 'Reflect', 'Light Screen', 'Foresight', 'Switching out', 'Charge'], gravity: true, sideColumns: 2, stages: 5 },
   }
   for (const g of [1, 2, 3, 4]) {
-    await page.selectOption('[data-testid="dcalc-generation"]', String(g))
+    await page.selectOption('[data-testid="dcalc-game"]', GAME_OF[g])
     await settle()
     const got = await gate()
     const exp = expectGate[g]
@@ -415,8 +416,8 @@ try {
   await page.keyboard.press('Enter')
   await typeInto('[data-testid="dcalc-p1-ev-atk"]', '252')
   const roundTrip = await page.textContent('[data-testid="calc-damage-desc"]')
-  for (const g of ['2', '1', '4']) {
-    await page.selectOption('[data-testid="dcalc-generation"]', g)
+  for (const g of ['crystal', 'yellow', 'platinum']) {
+    await page.selectOption('[data-testid="dcalc-game"]', g)
     await settle()
   }
   check(
@@ -446,7 +447,7 @@ try {
   }, sel)
   const head = await page.evaluate(() => {
     const t = document.querySelector('.dcalc-title')
-    const g = document.querySelector('[data-testid="dcalc-generation"]')
+    const g = document.querySelector('[data-testid="dcalc-game"]')
     const tr = t.getBoundingClientRect()
     const gr = g.getBoundingClientRect()
     return { text: t.textContent, size: parseFloat(getComputedStyle(t).fontSize), right: tr.right, genLeft: gr.left, overlapY: gr.top < tr.bottom && gr.bottom > tr.top }
@@ -629,13 +630,17 @@ try {
   check('loading the build brings its level, EVs and moves', loadedBuild.level === '50' && loadedBuild.ev === '252' && loadedBuild.move0 === '89', JSON.stringify(loadedBuild))
   await page.screenshot({ path: shot('damage-sets.png') })
 
-  await page.selectOption('[data-testid="dcalc-generation"]', '1')
+  const gameMenu = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="dcalc-game"] optgroup')].map((g) => `${g.label}: ${[...g.children].map((o) => o.textContent).join(', ')}`),
+  )
+  check("the game selector groups each generation's games", gameMenu[0] === 'Gen 1: Red/Blue, Yellow' && gameMenu[1] === 'Gen 2: Gold/Silver, Crystal' && gameMenu.length === 4, JSON.stringify(gameMenu))
+  await page.selectOption('[data-testid="dcalc-game"]', 'yellow')
   await settle()
-  const gen1 = await pickOption(1, 'Brock', /^Onix \(Leader Brock \| (RB|Y)\)$/)
-  check("Gen 1 lists the Red/Blue and Yellow trainers", gen1.index >= 0 && gen1.labels.some((l) => /\| RB\)$/.test(l)) && gen1.labels.some((l) => /\| Y\)$/.test(l)), gen1.labels.slice(0, 6).join(' / '))
+  const gen1 = await pickOption(1, 'Brock', /^Onix \(Leader Brock \| Y\)$/)
+  check("Yellow lists Yellow's trainers and no other game's", gen1.index >= 0 && gen1.labels.filter((l) => l.includes('(')).every((l) => /\| Y\)$/.test(l)), gen1.labels.slice(0, 6).join(' / '))
   const dvs = await page.evaluate(() => ['atk', 'def', 'spe', 'spa'].map((s) => document.querySelector(`[data-testid="dcalc-p1-iv-${s}"]`).value))
   check('a Gen 1 trainer mon loads the trainer DVs (9/8/8/8), no Stat Exp', JSON.stringify(dvs) === '["9","8","8","8"]' && (await page.inputValue('[data-testid="dcalc-p1-ev-atk"]')) === '0', JSON.stringify(dvs))
-  await page.selectOption('[data-testid="dcalc-generation"]', '4')
+  await page.selectOption('[data-testid="dcalc-game"]', 'platinum')
   await settle()
 
   const favicon = readFileSync(new URL('../public/favicon.svg', import.meta.url), 'utf8')

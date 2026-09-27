@@ -5,6 +5,7 @@ import { scrollKey } from '../../components/scrollMemory'
 import { useDexSelection } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import type { DexModuleId } from '../nav/registry'
+import { DEX_LABELS } from '../nav/dexLabels'
 import { useDexRows } from './query/dexQueryContext'
 
 /**
@@ -87,13 +88,9 @@ export function DexPageShell<T>({
   if (entries.length === 0 && gatedMessage) {
     return (
       <div className="pokedex" data-testid={`dex-${dexId}`}>
+        <DexTitle dexId={dexId} count={0} />
         <p className="subtitle" data-testid={`${dexId}-empty`}>
           {gatedMessage}
-        </p>
-        {/* The count still exists and still reports zero: an era with no entries
-            is a real answer, not a missing readout. */}
-        <p className="subtitle" data-testid={`${dexId}-count`}>
-          0 entries
         </p>
       </div>
     )
@@ -104,9 +101,7 @@ export function DexPageShell<T>({
       {selected == null ? (
         <>
           <div className="dex-controls">
-            <p className="subtitle dex-controls-count" data-testid={`${dexId}-count`}>
-              {visible.length} {visible.length === 1 ? 'entry' : 'entries'}
-            </p>
+            <DexTitle dexId={dexId} count={visible.length} />
           </div>
           {/* The query signature is part of the key for the reason the Pokedex
               grid's filters already were: a narrowed or re-ordered list is a
@@ -128,6 +123,23 @@ export function DexPageShell<T>({
         </ScrollArea>
       )}
     </div>
+  )
+}
+
+/**
+ * The list's heading: the dex's name ("Movedex"), which replaced the "514
+ * entries" readout the owner asked to lose. The count is still there for a
+ * screen reader -- it is the answer to "did my filter match anything" -- just not
+ * drawn.
+ */
+export function DexTitle({ dexId, count }: { dexId: DexModuleId; count: number }) {
+  return (
+    <h1 className="dex-title" data-testid={`${dexId}-title`}>
+      {DEX_LABELS[dexId]}
+      <span className="visually-hidden" data-testid={`${dexId}-count`}>
+        {` ${count} ${count === 1 ? 'entry' : 'entries'}`}
+      </span>
+    </h1>
   )
 }
 

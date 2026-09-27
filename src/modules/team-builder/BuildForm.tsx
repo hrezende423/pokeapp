@@ -93,6 +93,7 @@ import {
   abilityEffectFor,
   abilityName,
   abilityOptionsFor,
+  buildInGeneration,
   buildSpecies,
   displayName,
   isPristineBuild,
@@ -103,6 +104,7 @@ import {
   itemOptionsFor,
   natureOptionsFor,
   newBuildInit,
+  speciesInGeneration,
   typeIdsFor,
 } from './buildFacts'
 import {
@@ -1149,6 +1151,29 @@ function BuildFormFields({
                 data-testid="tb-nickname"
                 onChange={(e) => commit({ nickname: e.target.value.slice(0, NICKNAME_MAX) })}
               />
+            </Field>
+            {/*
+              THE GENERATION, in the row's last cell -- the form's top-right
+              corner, beside the dock (owner, 2026-09-27). A build on a team is
+              held to the team's game, so there it is shown but locked; a
+              generation the species did not exist in yet is not offered.
+            */}
+            <span className="tb-field-spacer" aria-hidden />
+            <Field label="Generation">
+              <select
+                className="tb-select"
+                value={generation}
+                data-testid="tb-generation"
+                disabled={railTeam != null}
+                title={railTeam != null ? 'Set by the team’s game' : undefined}
+                onChange={(e) => commit(buildInGeneration(build, Number(e.target.value)))}
+              >
+                {[1, 2, 3, 4].map((g) => (
+                  <option key={g} value={g} disabled={!speciesInGeneration(build.speciesId, g)}>
+                    Gen {g}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
 

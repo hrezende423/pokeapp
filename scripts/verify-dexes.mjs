@@ -1054,6 +1054,44 @@ try {
     (await page.$('[data-testid="berrydex-note"]')) == null,
   )
 
+  // ------------------------------------------- the owner's round, 2026-09-27
+  hr('DEX TITLES, NAVBAR WEIGHTS, KANA WATERMARK')
+  await goTo('movedex')
+  await toDexList('movedex')
+  const movedexHead = await page.evaluate(() => {
+    const t = document.querySelector('[data-testid="movedex-title"]')
+    const visibleText = [...t.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim()
+    const count = t.querySelector('[data-testid="movedex-count"]').getBoundingClientRect()
+    return { visibleText, countDrawn: count.width > 2 && count.height > 2 }
+  })
+  check('a dex list is headed by its name, not "N entries"', movedexHead.visibleText === 'Movedex' && !movedexHead.countDrawn, JSON.stringify(movedexHead))
+  const weights = await page.evaluate(() => ({
+    brand: getComputedStyle(document.querySelector('[data-testid="app-brand"]')).fontWeight,
+    tabs: [...document.querySelectorAll('.nav-trigger')].map((el) => getComputedStyle(el).fontWeight),
+  }))
+  check('the navbar labels are regular and only "Pokeapp" is bold', weights.brand === '700' && weights.tabs.length > 0 && weights.tabs.every((w) => w === '400'), JSON.stringify(weights))
+  await page.click('[data-testid="nav-tab-pokepedia"]')
+  await page.waitForSelector('[data-testid="species-row-1"]', { timeout: 30000 })
+  await page.mouse.move(1200, 900)
+  const pokedexHead = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="species-row-1"]')
+    const ghost = card.querySelector('.species-card-ghost').getBoundingClientRect()
+    const kana = card.querySelector('.species-card-ghost-ja')
+    const k = kana?.getBoundingClientRect()
+    const art = card.querySelector('.species-card-art').getBoundingClientRect()
+    const type = document.querySelector('.species-card .ds-type')
+    return {
+      title: document.querySelector('[data-testid="pokedex-title"]')?.childNodes[0]?.textContent,
+      kana: kana?.textContent,
+      belowNumber: k ? k.top > ghost.top + 30 : false,
+      behindArt: k ? k.top < art.bottom && getComputedStyle(kana).zIndex < getComputedStyle(card.querySelector('.species-card-art')).zIndex : false,
+      typeWeight: type ? getComputedStyle(type).fontWeight : null,
+    }
+  })
+  check('clicking "Poképedia" opens the Pokédex, titled so', pokedexHead.title === 'Pokédex', JSON.stringify(pokedexHead))
+  check('Pokédex cards carry the katakana name under the number, behind the artwork', pokedexHead.kana === 'フシギダネ' && pokedexHead.belowNumber && pokedexHead.behindArt, JSON.stringify(pokedexHead))
+  check('type labels are regular weight, not bold', pokedexHead.typeWeight === '400', String(pokedexHead.typeWeight))
+
   // ------------------------------------------------------------ errors
   hr('CONSOLE / PAGE / HTTP ERRORS')
   log(`  console errors : ${consoleErrors.length}`)

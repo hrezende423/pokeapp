@@ -290,7 +290,7 @@ export function MemberCard({
         <span className="tb-card-ghost" aria-hidden>
           {String(species.id).padStart(3, '0')}
         </span>
-        {variant !== 'compact' && species.name_ja && (
+        {species.name_ja && (
           <span className="tb-card-ghost-ja" aria-hidden>
             {species.name_ja}
           </span>
@@ -316,14 +316,15 @@ export function MemberCard({
         <span className="tb-card-headline">
           <span className="tb-card-name">{primary}</span>
           {/*
-            THE SPECIES SITS IN THE HEADLINE ON A TEAM CARD, on its own line on
-            a library card. It is the same fact either way -- "this nickname is
-            a Magnezone" -- but on the team display seven lines have to fit in a
-            grid row twice over, and a parenthetical that only appears when a
-            build HAS a nickname made the card's height depend on its contents.
-            Only rendered when the nickname actually differs from the species.
+            THE SPECIES SITS IN THE HEADLINE, on a team card and (since
+            2026-09-27) on a library card too: "Nickname (Species) ♂ Lv.50".
+            On its own line it made the card's height depend on whether the
+            build HAS a nickname. Only rendered when the nickname differs from
+            the species.
           */}
-          {secondary && oneLine && <span className="tb-card-species">({secondary})</span>}
+          {secondary && (oneLine || variant === 'library') && (
+            <span className="tb-card-species">({secondary})</span>
+          )}
           {/* Genderless renders NOTHING -- not a symbol, not a dash. */}
           {glyph && (
             <span className="tb-card-gender" data-gender={build.gender}>
@@ -332,9 +333,6 @@ export function MemberCard({
           )}
           {showLevel && <span className="tb-card-level num">Lv.{build.level}</span>}
         </span>
-        {secondary && !oneLine && variant !== 'compact' && (
-          <span className="tb-card-species">({secondary})</span>
-        )}
         {/*
           TYPES, NATURE AND ABILITY ON ONE LINE on a team card -- three facts
           that are each a word or two, which as three lines spent three line

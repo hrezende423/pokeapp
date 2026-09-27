@@ -7,6 +7,7 @@ import { Itemdex } from '../dex/Itemdex'
 import { Movedex } from '../dex/Movedex'
 import { Naturedex } from '../dex/Naturedex'
 import { Trainerdex } from '../dex/Trainerdex'
+import { DEX_LABELS } from './dexLabels'
 
 export interface DexModule {
   /** Stable slug: the switcher's test id and the active-module key. */
@@ -34,14 +35,14 @@ export interface DexModule {
  * with ?ds=1. See App.tsx.
  */
 export const DEX_MODULES = [
-  { id: 'pokedex', label: 'Pokédex', Component: Pokedex },
-  { id: 'itemdex', label: 'Itemdex', Component: Itemdex },
-  { id: 'abilitydex', label: 'Abilitydex', Component: Abilitydex },
-  { id: 'naturedex', label: 'Naturedex', Component: Naturedex },
-  { id: 'berrydex', label: 'Berrydex', Component: Berrydex },
-  { id: 'movedex', label: 'Movedex', Component: Movedex },
-  { id: 'breedingdex', label: 'Breeding dex', Component: Breedingdex },
-  { id: 'trainerdex', label: 'Trainer Dex', Component: Trainerdex },
+  { id: 'pokedex', label: DEX_LABELS.pokedex, Component: Pokedex },
+  { id: 'itemdex', label: DEX_LABELS.itemdex, Component: Itemdex },
+  { id: 'abilitydex', label: DEX_LABELS.abilitydex, Component: Abilitydex },
+  { id: 'naturedex', label: DEX_LABELS.naturedex, Component: Naturedex },
+  { id: 'berrydex', label: DEX_LABELS.berrydex, Component: Berrydex },
+  { id: 'movedex', label: DEX_LABELS.movedex, Component: Movedex },
+  { id: 'breedingdex', label: DEX_LABELS.breedingdex, Component: Breedingdex },
+  { id: 'trainerdex', label: DEX_LABELS.trainerdex, Component: Trainerdex },
 ] as const satisfies readonly DexModule[]
 
 /** Union of the registered ids, so a reference to an unregistered module fails to compile. */

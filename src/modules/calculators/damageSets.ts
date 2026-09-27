@@ -4,9 +4,8 @@
  * Andrea | Rematch 2 | Pt)" beside the bare species.
  *
  * TWO SOURCES TODAY, ONE SHAPE FOR THE NEXT:
- *   - the in-game trainers of every game in the generation (the Trainer Dex's
- *     bundle, data/trainers.ts), story fights and rematches -- never the unused
- *     slots;
+ *   - the in-game trainers of the selected game (the Trainer Dex's bundle,
+ *     data/trainers.ts), story fights and rematches -- never the unused slots;
  *   - the reader's own Team Builder builds for that generation.
  * Smogon's sets are meant to arrive as a third `CalcSet` producer; nothing here
  * assumes only two.
@@ -20,13 +19,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   getSpecies,
-  getVersionGroupByName,
   resolveAbilitiesForGeneration,
   type Species,
   type Variety,
 } from '../../data'
 import {
-  TRAINER_VERSION_GROUPS,
+  hasTrainerData,
   loadTrainers,
   peekTrainers,
   trainerLabel,
@@ -72,9 +70,6 @@ const GAME_ABBR: Record<string, string> = {
   'heartgold-soulsilver': 'HGSS',
 }
 
-export function trainerGamesFor(gen: number): string[] {
-  return TRAINER_VERSION_GROUPS.filter((vg) => getVersionGroupByName(vg)?.generation_id === gen)
-}
 
 const varietyFor = (species: Species, pokemonId: number): Variety =>
   species.varieties.find((v) => v.pokemon_id === pokemonId) ?? defaultVariety(species)
@@ -227,11 +222,15 @@ function applyBuild(
 }
 
 /**
- * The trainer partitions of the generation's games, loading on mount. They are
- * the Trainer Dex's own files, so a game already opened there is instant here.
+ * The selected game's trainer partition, loading on mount -- none for a game
+ * with no trainer data (Colosseum, XD). It is the Trainer Dex's own file, so a
+ * game already opened there is instant here.
  */
-export function useTrainerSetPartitions(gen: number): TrainerPartition[] {
-  const games = useMemo(() => trainerGamesFor(gen), [gen])
+export function useTrainerSetPartitions(versionGroup: string): TrainerPartition[] {
+  const games = useMemo(
+    () => (hasTrainerData(versionGroup) ? [versionGroup] : []),
+    [versionGroup],
+  )
   const [loaded, setLoaded] = useState<Record<string, TrainerPartition>>({})
   useEffect(() => {
     let cancelled = false

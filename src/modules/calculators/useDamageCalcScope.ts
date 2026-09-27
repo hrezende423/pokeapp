@@ -1,5 +1,5 @@
 /**
- * The damage calculator's OWN generation -- the THIRD sanctioned exception to the
+ * The damage calculator's OWN game -- the THIRD sanctioned exception to the
  * app-wide selector, approved by the owner when this calculator was built.
  *
  * Why it departs from the rule: a damage calc is pinned to a ruleset. Someone
@@ -9,32 +9,43 @@
  * screen behind it.
  *
  * SAME SHAPE AS useTypeCoverageScope, deliberately: seeded once from the app
- * selection (so opening the tool shows the era you were browsing), then
+ * selection (so opening the tool shows the game you were browsing), then
  * independent. It reads the app selection and never calls `setVersionGroup`, so
  * the dependency runs one way only.
  *
- * GENERATION ONLY, no game axis. Every mechanic the engine models is per
- * generation, and "can this Pokemon learn the move" is answered across all of a
- * generation's games at once (useGenerationLearnset), so a second row of game
- * buttons would offer a choice that changes nothing on this screen.
+ * A GAME, NOT ONLY A GENERATION (owner, 2026-09-27). Every mechanic the engine
+ * models is still per generation, and "can this Pokemon learn the move" is still
+ * answered across the generation's games (useGenerationLearnset) -- what the game
+ * decides is whose trainers the set list offers.
  */
 
 import { useState } from 'react'
 import { useVersionGroup } from '../version-group/context'
+import { gameGroups, generationOfGame, type GameGroup } from '../version-group/games'
 import { CALC_GENERATIONS } from './damage'
 
 export interface DamageCalcScope {
+  versionGroup: string
   generation: number
-  generations: readonly number[]
-  setGeneration: (generation: number) => void
+  games: GameGroup[]
+  setVersionGroup: (vg: string) => void
 }
+
+const LATEST = 'heartgold-soulsilver'
 
 export function useDamageCalcScope(): DamageCalcScope {
   const app = useVersionGroup()
-  const [generation, setGeneration] = useState<number>(() =>
-    (CALC_GENERATIONS as readonly number[]).includes(app.generation)
-      ? app.generation
-      : CALC_GENERATIONS[CALC_GENERATIONS.length - 1],
+  const [games] = useState(() =>
+    gameGroups().filter((g) => (CALC_GENERATIONS as readonly number[]).includes(g.generation)),
   )
-  return { generation, generations: CALC_GENERATIONS, setGeneration }
+  const [versionGroup, setVersionGroup] = useState<string>(() => {
+    const name = app.versionGroup?.name
+    return name && games.some((g) => g.options.some((o) => o.value === name)) ? name : LATEST
+  })
+  return {
+    versionGroup,
+    generation: generationOfGame(versionGroup) ?? 4,
+    games,
+    setVersionGroup,
+  }
 }

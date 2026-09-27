@@ -73,6 +73,8 @@ export const NAV_TABS: readonly NavTab[] = [
   {
     id: 'pokepedia',
     label: 'Poképedia',
+    /* Clicking the word opens the Pokédex, the tab's first dex. */
+    destination: 'pokedex',
     itemsTestId: 'dex-switcher',
     /*
       THE DEXES, THEN THE SCREENS THAT ARE NOT DEXES. Type Coverage belongs on
