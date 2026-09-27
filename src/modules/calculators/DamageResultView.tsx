@@ -32,6 +32,8 @@ export function MoveResultList({
   results,
   selected,
   onSelect,
+  crit,
+  onCrit,
 }: {
   index: 0 | 1
   name: string
@@ -40,29 +42,51 @@ export function MoveResultList({
   /** The selected slot when this side's move is the selected one, else null. */
   selected: number | null
   onSelect: (slot: number) => void
+  /** Per slot: calculate as a critical hit. */
+  crit: boolean[]
+  onCrit: (slot: number, next: boolean) => void
 }) {
+  // Lanes, not buttons: each row is one line of the list, selected by a click
+  // anywhere on it (the name's button is stretched over the row), with the crit
+  // switch the one control drawn on it. The list is a grid the rows subgrid into,
+  // so every crit sits one small gap past the LONGEST move name of the four.
   return (
     <div className="dcalc-move-results" data-testid={`dcalc-p${index + 1}-results`}>
       <FormSectionLabel>{`${name}’s moves`}</FormSectionLabel>
       <div className="dcalc-move-result-list">
         {results.map((r, slot) =>
           r ? (
-            <button
+            <div
               key={slot}
-              type="button"
               className="dcalc-move-result"
-              aria-pressed={selected === slot}
               data-selected={selected === slot ? 'true' : undefined}
               data-testid={`dcalc-p${index + 1}-result-${slot}`}
-              onClick={() => onSelect(slot)}
             >
-              <span className="dcalc-move-result-name">{r.name}</span>
+              <button
+                type="button"
+                className="dcalc-move-result-name"
+                aria-pressed={selected === slot}
+                onClick={() => onSelect(slot)}
+              >
+                {r.name}
+              </button>
+              <button
+                type="button"
+                className="dcalc-crit"
+                aria-pressed={crit[slot]}
+                aria-label={`${r.name}: critical hit`}
+                title="Calculate as a critical hit"
+                data-testid={`dcalc-p${index + 1}-crit-${slot}`}
+                onClick={() => onCrit(slot, !crit[slot])}
+              >
+                Crit
+              </button>
               <span className="dcalc-move-result-pct num">{summary(r)}</span>
-            </button>
+            </div>
           ) : (
-            <span key={slot} className="dcalc-move-result dcalc-move-result-empty">
+            <div key={slot} className="dcalc-move-result dcalc-move-result-empty">
               <span className="dcalc-move-result-name">(empty)</span>
-            </span>
+            </div>
           ),
         )}
       </div>

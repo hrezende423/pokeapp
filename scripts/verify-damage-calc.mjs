@@ -514,6 +514,119 @@ try {
   check('the calculator runs on its smaller type scale (12px body)', ds.bodySize === '12px', ds.bodySize)
   check('stat rows are dense, not the page leading (< 28px)', ds.rowHeight < 28, `${ds.rowHeight}px`)
 
+  // The owner's second round, 2026-09-27: crit on the move lanes, the matchup
+  // artwork between the lists, and the species picker as a set list.
+  hr('5b. CRIT LANES, SPRITES, SETS')
+  const lanes = await page.evaluate(() =>
+    [1, 2].map((n) => {
+      const rows = [...document.querySelectorAll(`[data-testid="dcalc-p${n}-results"] .dcalc-move-result:not(.dcalc-move-result-empty)`)]
+      return rows.map((r) => ({
+        nameRight: r.querySelector('.dcalc-move-result-name').getBoundingClientRect().right,
+        nameText: r.querySelector('.dcalc-move-result-name').scrollWidth,
+        nameLeft: r.querySelector('.dcalc-move-result-name').getBoundingClientRect().left,
+        crit: r.querySelector('.dcalc-crit')?.getBoundingClientRect().left ?? null,
+        critTag: r.querySelector('.dcalc-crit')?.tagName,
+        bg: r.querySelector('.dcalc-crit') ? getComputedStyle(r.querySelector('.dcalc-crit')).backgroundColor : null,
+        border: r.querySelector('.dcalc-crit') ? getComputedStyle(r.querySelector('.dcalc-crit')).borderTopWidth : null,
+      }))
+    }),
+  )
+  for (const [i, rows] of lanes.entries()) {
+    const lefts = new Set(rows.map((r) => Math.round(r.crit)))
+    const longest = Math.max(...rows.map((r) => r.nameLeft + r.nameText))
+    const gap = rows[0].crit - longest
+    check(`Pokémon ${i + 1}: a crit button on every move lane`, rows.length > 0 && rows.every((r) => r.critTag === 'BUTTON'), JSON.stringify(rows))
+    check(`Pokémon ${i + 1}: the crit buttons line up in one column`, lefts.size === 1, [...lefts].join(','))
+    check(`Pokémon ${i + 1}: that column starts a small gap past the longest name`, gap >= 4 && gap <= 16, `${gap}px`)
+    check(`Pokémon ${i + 1}: crit is a ghost button`, rows.every((r) => r.bg === 'rgba(0, 0, 0, 0)' && r.border === '0px'))
+  }
+  check('the move tiles no longer carry a crit toggle', await page.evaluate(() => ![...document.querySelectorAll('[data-testid="dcalc-p1-moves"] [data-ds="toggle"]')].some((t) => t.textContent.trim() === 'Crit')))
+  await page.click('[data-testid="dcalc-p1-result-0"]')
+  await page.click('[data-testid="dcalc-p1-crit-0"]')
+  const critDesc = await page.textContent('[data-testid="calc-damage-desc"]')
+  check('a crit button switches that move to a critical hit', (await page.getAttribute('[data-testid="dcalc-p1-crit-0"]', 'aria-pressed')) === 'true' && /critical hit/.test(critDesc), critDesc)
+  check('clicking crit does not move the selection', (await page.getAttribute('[data-testid="dcalc-p1-result-0"]', 'data-selected')) === 'true')
+  await page.click('[data-testid="dcalc-p1-crit-0"]')
+  check('and switches it back', !/critical hit/.test(await page.textContent('[data-testid="calc-damage-desc"]')))
+
+  const spritesBox = await box('[data-testid="dcalc-sprites"]')
+  const r1 = await box('[data-testid="dcalc-p1-results"]')
+  const r2 = await box('[data-testid="dcalc-p2-results"]')
+  check('the matchup artwork sits between the two move lists', r1.r <= spritesBox.l && spritesBox.r <= r2.l, JSON.stringify({ r1, spritesBox, r2 }))
+  check('it shows both Pokémon', await page.evaluate(() => ['1', '2'].every((n) => document.querySelector(`[data-testid="dcalc-p${n}-sprite"]`)?.getAttribute('src'))))
+
+  const pickOption = async (side, query, pattern) => {
+    await page.click(`[data-testid="dcalc-p${side}-species-input"]`)
+    await page.fill(`[data-testid="dcalc-p${side}-species-input"]`, query)
+    // The trainer sets arrive with the game files, a moment after the page.
+    await page
+      .waitForFunction(
+        ([s, src]) => [...document.querySelectorAll(`[data-testid="dcalc-p${s}-species-list"] .ds-search-option`)].some((o) => new RegExp(src).test(o.firstChild.textContent)),
+        [side, pattern.source],
+        { timeout: 30000 },
+      )
+      .catch(() => {})
+    const labels = await page.evaluate((s) => [...document.querySelectorAll(`[data-testid="dcalc-p${s}-species-list"] .ds-search-option`)].map((o) => o.firstChild.textContent), side)
+    const index = labels.findIndex((l) => pattern.test(l))
+    if (index >= 0) await page.locator(`[data-testid="dcalc-p${side}-species-list"] .ds-search-option`).nth(index).dispatchEvent('pointerdown')
+    else await page.keyboard.press('Escape')
+    return { labels, index }
+  }
+  const trainer = await pickOption(1, 'Candice', /^Abomasnow \(Leader Candice \| Pt\)$/)
+  check("the picker lists Platinum Candice's Abomasnow", trainer.index >= 0, trainer.labels.slice(0, 6).join(' / '))
+  const loaded = await page.evaluate(() => ({
+    input: document.querySelector('[data-testid="dcalc-p1-species-input"]').value,
+    level: document.querySelector('[data-testid="dcalc-p1-level"]').value,
+    move0: document.querySelector('[data-testid="dcalc-p1-move-0"]').value,
+    move1: document.querySelector('[data-testid="dcalc-p1-move-1"]').value,
+    iv: document.querySelector('[data-testid="dcalc-p1-iv-atk"]').value,
+    ev: document.querySelector('[data-testid="dcalc-p1-ev-atk"]').value,
+  }))
+  check('loading it sets level 42, Avalanche / Wood Hammer, IVs 30, no EVs', loaded.input === 'Abomasnow (Leader Candice | Pt)' && loaded.level === '42' && loaded.move0 === '419' && loaded.move1 === '452' && loaded.iv === '30' && loaded.ev === '0', JSON.stringify(loaded))
+  const grouped = await page.evaluate(() => {
+    const list = document.querySelector('[data-testid="dcalc-p1-species-list"]')
+    return list == null
+  })
+  check('the list closes after a pick', grouped)
+  await page.click('[data-testid="dcalc-p1-species-input"]')
+  await page.fill('[data-testid="dcalc-p1-species-input"]', 'Abomasnow')
+  const heads = await page.evaluate(() => [...document.querySelectorAll('[data-testid="dcalc-p1-species-list"] .ds-search-group')].map((g) => g.textContent))
+  const first = await page.evaluate(() => document.querySelector('[data-testid="dcalc-p1-species-list"] .ds-search-option span').textContent)
+  check('sets are grouped under their species, the bare species first', heads[0] === 'Abomasnow' && first === 'Abomasnow', `${heads} / ${first}`)
+  await page.keyboard.press('Escape')
+
+  await page.evaluate(async () => {
+    const store = await import('/pokeapp/src/modules/team-builder/store.ts')
+    store.createBuild({
+      generation: 4, speciesId: 445, pokemonId: 445, nickname: 'Chompy', gender: 'male', shiny: false,
+      level: 50, friendship: 255, itemId: null, abilityId: null, natureId: null,
+      moveIds: [89, null, null, null], effort: { attack: 252, speed: 252 },
+      individual: { hp: 31, attack: 31, defense: 31, 'special-attack': 31, 'special-defense': 31, speed: 31 },
+      tags: [], notes: '',
+    })
+  })
+  const build = await pickOption(2, 'Chompy', /^Garchomp \(Chompy \| Team Builder\)$/)
+  check('a Team Builder build is in the list', build.index >= 0, build.labels.slice(0, 6).join(' / '))
+  const loadedBuild = await page.evaluate(() => ({
+    level: document.querySelector('[data-testid="dcalc-p2-level"]').value,
+    ev: document.querySelector('[data-testid="dcalc-p2-ev-atk"]').value,
+    move0: document.querySelector('[data-testid="dcalc-p2-move-0"]').value,
+  }))
+  check('loading the build brings its level, EVs and moves', loadedBuild.level === '50' && loadedBuild.ev === '252' && loadedBuild.move0 === '89', JSON.stringify(loadedBuild))
+  await page.screenshot({ path: shot('damage-sets.png') })
+
+  await page.selectOption('[data-testid="dcalc-generation"]', '1')
+  await settle()
+  const gen1 = await pickOption(1, 'Brock', /^Onix \(Leader Brock \| (RB|Y)\)$/)
+  check("Gen 1 lists the Red/Blue and Yellow trainers", gen1.index >= 0 && gen1.labels.some((l) => /\| RB\)$/.test(l)) && gen1.labels.some((l) => /\| Y\)$/.test(l)), gen1.labels.slice(0, 6).join(' / '))
+  const dvs = await page.evaluate(() => ['atk', 'def', 'spe', 'spa'].map((s) => document.querySelector(`[data-testid="dcalc-p1-iv-${s}"]`).value))
+  check('a Gen 1 trainer mon loads the trainer DVs (9/8/8/8), no Stat Exp', JSON.stringify(dvs) === '["9","8","8","8"]' && (await page.inputValue('[data-testid="dcalc-p1-ev-atk"]')) === '0', JSON.stringify(dvs))
+  await page.selectOption('[data-testid="dcalc-generation"]', '4')
+  await settle()
+
+  const favicon = readFileSync(new URL('../public/favicon.svg', import.meta.url), 'utf8')
+  check("the app icon is pokecard's pokeball", favicon.includes('#ef5350') && favicon.includes('<circle'))
+
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   await page.screenshot({ path: shot('damage-dark.png') })
   await page.setViewportSize({ width: 390, height: 3000 })

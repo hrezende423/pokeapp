@@ -67,6 +67,11 @@ export interface SideState {
    * them in -- so there is never a frame of the previous species' moves.
    */
   moves: (number | null)[] | null
+  /**
+   * The set last loaded from the picker (damageSets.ts), so the field keeps
+   * naming it; null once the reader picks a bare species or changes era.
+   */
+  setKey?: string | null
   /** Per slot: forced critical hit, hit count, base power override. */
   crit: boolean[]
   hits: (number | null)[]
@@ -158,6 +163,7 @@ export function withSpecies(
     abilityOn: false,
     currentHp: null,
     moves: null,
+    setKey: null,
     remembered: { ...side.remembered, abilityId: null },
     crit: [false, false, false, false],
     hits: [null, null, null, null],
@@ -239,6 +245,7 @@ export function normalizeSide(side: SideState, gen: number, fallbackId: number):
     boosts,
     gender: gen >= 4 ? side.gender : 'N',
     moves,
+    setKey: null,
     remembered,
   }
 }

@@ -318,8 +318,52 @@
 .dcalc-results {
   grid-area: results;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'r1'
+    'sprites'
+    'r2';
   gap: var(--dcalc-gap) 18px;
+}
+.dcalc-results > .dcalc-move-results:nth-child(1) {
+  grid-area: r1;
+}
+.dcalc-results > .dcalc-move-results:nth-child(2) {
+  grid-area: r2;
+}
+/* Side by side once both lists fit with the matchup between them. */
+@container (min-width: 720px) {
+  .dcalc-results {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: 'r1 sprites r2';
+    column-gap: 24px;
+  }
+}
+
+/* The matchup: both Pokemon's artwork on one raised hairline tile, no shadow. */
+.dcalc-sprites {
+  grid-area: sprites;
+  align-self: end;
+  justify-self: center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px;
+  width: 260px;
+  height: 118px;
+  padding: 6px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+}
+.dcalc-sprite {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+/* Pokemon 1 turned to face Pokemon 2. */
+.dcalc-sprite[data-side='0'] {
+  transform: scaleX(-1);
 }
 
 .dcalc-result-area {
@@ -357,29 +401,26 @@
   min-width: 0;
 }
 
+/* One grid for the four rows, which subgrid into it: the crit column starts one
+   small gap past the longest move name, on every row alike. */
 .dcalc-move-result-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
 }
 
 .dcalc-move-result {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 150px) auto;
-  justify-content: start;
-  column-gap: 14px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 10px;
   align-items: baseline;
   padding: 3px 6px;
-  font: inherit;
   font-size: var(--font-size-body);
-  text-align: left;
   color: var(--text-primary);
-  background: transparent;
-  border: none;
   border-bottom: 1px solid var(--hairline);
-  border-radius: 0;
-  cursor: pointer;
 }
-.dcalc-move-result:not([data-selected='true']):hover {
+.dcalc-move-result:not([data-selected='true']):not(.dcalc-move-result-empty):hover {
   background: var(--surface-hover);
 }
 /* Selected is a tone-step, not a colour -- the same treatment as the tile. */
@@ -387,21 +428,74 @@
   background: var(--surface-raised);
   font-weight: var(--font-weight-bold);
 }
-.dcalc-move-result:focus-visible {
+.dcalc-move-result:has(.dcalc-move-result-name:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 .dcalc-move-result-name {
+  max-width: 190px;
+  padding: 0;
   overflow: hidden;
+  font: inherit;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+/* The name's button covers the whole lane, so a click anywhere on it selects. */
+button.dcalc-move-result-name::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+button.dcalc-move-result-name:focus-visible {
+  outline: none;
 }
 .dcalc-move-result-pct {
+  grid-column: 3;
   font-size: var(--font-size-caption);
 }
 .dcalc-move-result-empty {
-  cursor: default;
   color: var(--text-secondary);
+}
+.dcalc-move-result-empty .dcalc-move-result-name {
+  cursor: default;
+}
+
+/* Crit: a ghost on/off -- text only, secondary when off, the accent and bold when
+   on. Drawn over the lane's stretched button, so it takes its own clicks. */
+.dcalc-crit {
+  position: relative;
+  z-index: 1;
+  padding: 0 2px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.dcalc-crit:hover {
+  color: var(--text-primary);
+  opacity: 1;
+}
+.dcalc-crit[aria-pressed='true'] {
+  color: var(--accent);
+  font-weight: var(--font-weight-bold);
+  opacity: 1;
+}
+.dcalc-crit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  opacity: 1;
 }
 
 /* ---- the selected line */
@@ -502,9 +596,6 @@
 }
 .dcalc-tile-options .ds-field {
   width: 44px;
-}
-.dcalc-tile-options .ds-toggle {
-  padding-bottom: 3px;
 }
 
 /* ---- the field column */

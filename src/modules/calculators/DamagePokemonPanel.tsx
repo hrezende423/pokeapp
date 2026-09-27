@@ -22,7 +22,6 @@ import { Toggle } from '../../components/ds/Toggle'
 import { TypeLabel } from '../../components/ds/TypeLabel'
 import { useDraftNumber } from '../../components/ds/useDraftNumber'
 import { ToggleSwitch } from '../../components/ToggleSwitch'
-import { speciesEntries } from '../dex/entrySources'
 import {
   MAX_DV,
   MAX_EV,
@@ -46,7 +45,6 @@ import {
 import {
   MOVE_SLOT_COUNT,
   TOGGLED_ABILITIES,
-  formAvailable,
   holdableItems,
   isDamaging,
   toCalcPokemon,
@@ -54,6 +52,7 @@ import {
   withSpecies,
   type SideState,
 } from './damageCalcState'
+import type { SetCatalog } from './damageSets'
 import type { useGenerationLearnset } from './useGenerationLearnset'
 
 type Learnset = ReturnType<typeof useGenerationLearnset>
@@ -142,16 +141,6 @@ function natureLabel(n: {
   return `${n.display_name} (+${SHORT_STAT[n.increased_stat]} −${SHORT_STAT[n.decreased_stat ?? '']})`
 }
 
-function formLabel(speciesName: string, varietyName: string, speciesSlug: string): string {
-  if (!varietyName.startsWith(`${speciesSlug}-`)) return speciesName
-  const form = varietyName
-    .slice(speciesSlug.length + 1)
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join('-')
-  return `${speciesName}-${form}`
-}
-
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export function DamagePokemonPanel({
@@ -164,6 +153,7 @@ export function DamagePokemonPanel({
   onAnyMove,
   learnset,
   moves,
+  catalog,
 }: {
   /** 0 or 1: "Pokémon 1" / "Pokémon 2". */
   index: 0 | 1
@@ -176,6 +166,8 @@ export function DamagePokemonPanel({
   learnset: Learnset
   /** The four slots as calculated: the side's own, or the learnset defaults. */
   moves: (number | null)[]
+  /** Species and loadable sets for the picker (damageSets.ts). */
+  catalog: SetCatalog
 }) {
   const variety = varietyOf(side)
   const set = (patch: Partial<SideState>) => onChange({ ...side, ...patch })
@@ -183,21 +175,6 @@ export function DamagePokemonPanel({
   const testId = (s: string) => `dcalc-${role}-${s}`
 
   // ---------------------------------------------------------------- options
-  const speciesOptions = useMemo<SearchOption[]>(() => {
-    const out: SearchOption[] = []
-    for (const s of speciesEntries({ generation: gen, isAll: false })) {
-      for (const v of s.varieties) {
-        if (!formAvailable(v, gen)) continue
-        out.push({
-          value: `${s.id}:${v.name}`,
-          label: v.is_default ? s.display_name : formLabel(s.display_name, v.name, s.name),
-          hint: `#${String(s.id).padStart(3, '0')}`,
-        })
-      }
-    }
-    return out
-  }, [gen])
-
   const itemOptions = useMemo<SearchOption[]>(
     () => [
       { value: '', label: '(none)' },
@@ -299,12 +276,22 @@ export function DamagePokemonPanel({
       <CompactFieldStrip testId={testId('strip')}>
         <SearchSelect
           label="Pokémon"
-          options={speciesOptions}
-          value={`${side.speciesId}:${side.varietyName}`}
+          options={catalog.options}
+          value={
+            side.setKey && catalog.byKey.has(side.setKey)
+              ? side.setKey
+              : `${side.speciesId}:${side.varietyName}`
+          }
           onChange={(v) => {
+            const picked = catalog.byKey.get(v)
+            if (picked) {
+              onChange({ ...picked.apply(side, gen), setKey: picked.key })
+              return
+            }
             const [id, name] = v.split(':')
             onChange(withSpecies(side, Number(id), name, gen))
           }}
+          maxResults={200}
           testId={testId('species')}
         />
         <div className="ds-field dcalc-type-field" data-testid={testId('types')}>
@@ -586,7 +573,6 @@ function MovesGroup({
             gen={gen}
             moveId={moves[slot]}
             options={options}
-            crit={side.crit[slot]}
             hits={side.hits[slot]}
             power={side.power[slot]}
             skillLink={skillLink}
@@ -618,7 +604,6 @@ function MoveTile({
   gen,
   moveId,
   options,
-  crit,
   hits,
   power,
   skillLink,
@@ -629,7 +614,6 @@ function MoveTile({
   gen: number
   moveId: number | null
   options: Move[]
-  crit: boolean
   hits: number | null
   power: number | null
   skillLink: boolean
@@ -682,9 +666,8 @@ function MoveTile({
         data-testid={testId(`move-${slot}`)}
         onChange={(e) => onPatch({ move: e.target.value ? Number(e.target.value) : null })}
       />
-      {move && (
+      {move && (hitChoices || hasPower) && (
         <div className="dcalc-tile-options">
-          <Toggle on={crit} label="Crit" onChange={(next) => onPatch({ crit: next })} />
           {hitChoices && (
             <SelectField
               label="Hits"

@@ -193,6 +193,18 @@ export interface TrainerPartition {
   checks: Record<string, unknown>
 }
 
+/**
+ * "Youngster Tristan": class then name -- except where the class already ends in
+ * the name, which the games do for their Grunts ("Team Aqua Grunt" / "Grunt") and
+ * Diamond and Pearl for their Gym Leaders and Battleground regulars ("Leader
+ * Candice" / "Candice"), where the pair would read "Leader Candice Candice".
+ */
+export function trainerLabel(className: string, name: string | null): string {
+  if (!name) return className
+  if (className === name || className.endsWith(` ${name}`)) return className
+  return `${className} ${name}`
+}
+
 const cache = new Map<string, TrainerPartition>()
 const inflight = new Map<string, Promise<TrainerPartition>>()
 

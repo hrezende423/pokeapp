@@ -14,6 +14,7 @@ import {
   type Variety,
 } from '../../data'
 import { resolveMoveTypeNameForGeneration } from '../../data/moveEra'
+import { trainerLabel } from '../../data/trainers'
 import type {
   FacilityPokemon,
   FacilitySet,
@@ -300,7 +301,7 @@ function TrainerDetail({
                 {(() => {
                   const base = byId.get(t.rematch_of)
                   return base
-                    ? `${partition.classes[base.class_id]?.name ?? ''} ${base.name ?? ''}`.trim()
+                    ? trainerLabel(partition.classes[base.class_id]?.name ?? '', base.name)
                     : t.rematch_of
                 })()}
               </Fact>

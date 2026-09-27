@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react'
-import { getAbility, getMove, getType, resolveTypesForGeneration } from '../../data'
+import {
+  getAbility,
+  getMove,
+  getType,
+  resolveArtworkUrl,
+  resolveTypesForGeneration,
+} from '../../data'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
 import { SelectField } from '../../components/ds/SelectField'
@@ -19,6 +25,8 @@ import {
   type DualField,
   type SideState,
 } from './damageCalcState'
+import { setCatalog, speciesPickerOptions, useTrainerSetPartitions } from './damageSets'
+import { useTeamBuilderData } from '../team-builder/store'
 import { DamageFieldPanel } from './DamageFieldPanel'
 import { DamagePokemonPanel } from './DamagePokemonPanel'
 import { DamageResultView, MoveResultList, type MoveResult } from './DamageResultView'
@@ -51,6 +59,10 @@ import './calculators.css'
  *
  * MOVES DEFAULT TO THE LEARNSET, per Pokemon, with an "Any" switch for
  * hypotheticals.
+ *
+ * THE SPECIES PICKER IS ALSO A SET LIST (damageSets.ts): every in-game trainer's
+ * Pokemon in the era's games and the reader's Team Builder builds, one pick
+ * loading the whole set.
  */
 
 const OTHER = { 0: 1, 1: 0 } as const
@@ -83,6 +95,21 @@ export function DamageCalculatorPage() {
   const learn1 = useGenerationLearnset(sides[1].speciesId, varietyOf(sides[1]).pokemon_id, gen)
   const rows0 = learn0.state.status === 'ready' ? learn0.state.rows : null
   const rows1 = learn1.state.status === 'ready' ? learn1.state.rows : null
+
+  const partitions = useTrainerSetPartitions(gen)
+  const builds = useTeamBuilderData()
+  const catalog = useMemo(
+    () => setCatalog(speciesPickerOptions(gen), partitions, builds, gen),
+    [gen, partitions, builds],
+  )
+
+  const setCrit = (i: 0 | 1) => (slot: number, next: boolean) =>
+    setSides((s) => {
+      const side = s[i]
+      const crit = side.crit.map((c, k) => (k === slot ? next : c))
+      const updated = { ...side, crit }
+      return i === 0 ? [updated, s[1]] : [s[0], updated]
+    })
 
   const moves0 = useSideMoves(sides[0], rows0, gen)
   const moves1 = useSideMoves(sides[1], rows1, gen)
@@ -153,8 +180,15 @@ export function DamageCalculatorPage() {
                 results={results[i]}
                 selected={selected.side === i ? selected.slot : null}
                 onSelect={(slot) => setSelected({ side: i, slot })}
+                crit={sides[i].crit}
+                onCrit={setCrit(i)}
               />
             ))}
+            <div className="dcalc-sprites" data-testid="dcalc-sprites" aria-hidden>
+              {([0, 1] as const).map((i) => (
+                <SideSprite key={i} side={sides[i]} index={i} />
+              ))}
+            </div>
           </div>
 
           <div className="dcalc-result-area" data-layout="dcalc-result">
@@ -173,6 +207,7 @@ export function DamageCalculatorPage() {
               onAnyMove={(v) => setAnyMove((a) => (i === 0 ? [v, a[1]] : [a[0], v]))}
               learnset={i === 0 ? learn0 : learn1}
               moves={i === 0 ? moves0 : moves1}
+              catalog={catalog}
             />
           ))}
 
@@ -192,6 +227,33 @@ function useSideMoves(side: SideState, learnRows: number[] | null, gen: number) 
     const types = resolveTypesForGeneration(variety, gen).map((t) => getType(t.type_id)?.name ?? '')
     return defaultMoves(learnRows, gen, types)
   }, [side.moves, learnRows, gen, variety])
+}
+
+/**
+ * The Pokemon's artwork between the two move lists, as KinglerCalc shows the
+ * matchup: the animated artwork (female where the side is), or a form's own
+ * official artwork, which the animated set does not have. Pokemon 1 is mirrored
+ * so the two face each other.
+ */
+function SideSprite({ side, index }: { side: SideState; index: 0 | 1 }) {
+  const { species, variety } = toCalcPokemon(side)
+  const url = resolveArtworkUrl(species, variety, {
+    source: 'artwork',
+    shiny: false,
+    motion: variety.is_default ? 'animated' : 'static',
+    gender: side.gender === 'F' ? 'female' : 'male',
+  })
+  if (!url) return <span className="dcalc-sprite" />
+  return (
+    <img
+      key={url}
+      className="dcalc-sprite"
+      data-side={index}
+      src={url}
+      alt=""
+      data-testid={`dcalc-p${index + 1}-sprite`}
+    />
+  )
 }
 
 function displayName(side: SideState): string {

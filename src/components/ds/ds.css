@@ -1208,6 +1208,18 @@ span.ds-move-slot-label {
 .ds-search-option {
   cursor: pointer;
 }
+/* A group heading ("Abomasnow" over its sets): the section-label voice, not a row. */
+.ds-search-group {
+  padding: 7px 10px 2px;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.ds-search-group ~ .ds-search-option {
+  padding-left: 16px;
+}
 .ds-search-option[data-active='true'] {
   background: var(--surface-hover);
 }

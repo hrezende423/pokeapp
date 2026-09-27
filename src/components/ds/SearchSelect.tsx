@@ -5,6 +5,12 @@ export interface SearchOption {
   label: string
   /** Secondary text on the right of the row (a dex number, a type). */
   hint?: string
+  /**
+   * A heading the option sits under ("Abomasnow" over its sets). A heading row is
+   * drawn wherever the group changes between consecutive matches, so the caller
+   * keeps a group's options adjacent.
+   */
+  group?: string
 }
 
 /**
@@ -104,6 +110,8 @@ export function SearchSelect({
           spellCheck={false}
           placeholder={placeholder}
           value={open ? query : (selected?.label ?? '')}
+          // The field can be narrower than a long label ("Abomasnow (Leader Candice | Pt)").
+          title={selected?.label}
           data-testid={testId ? `${testId}-input` : undefined}
           onFocus={(e) => {
             setOpen(true)
@@ -149,7 +157,12 @@ export function SearchSelect({
             data-testid={testId ? `${testId}-list` : undefined}
           >
             {matches.length === 0 && <li className="ds-search-empty">No match</li>}
-            {matches.map((o, i) => (
+            {matches.map((o, i) => [
+              o.group != null && o.group !== matches[i - 1]?.group && (
+                <li key={`group:${o.group}:${i}`} role="presentation" className="ds-search-group">
+                  {o.group}
+                </li>
+              ),
               <li
                 key={o.value}
                 role="option"
@@ -165,8 +178,8 @@ export function SearchSelect({
               >
                 <span>{o.label}</span>
                 {o.hint && <span className="ds-search-hint">{o.hint}</span>}
-              </li>
-            ))}
+              </li>,
+            ])}
           </ul>
         )}
       </span>

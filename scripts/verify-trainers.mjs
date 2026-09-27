@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { startDevServer } from './lib/devServer.mjs'
 
-const PORT = 4193
+const PORT = 4201
 const DATA = new URL('../public/data/', import.meta.url)
 const read = (p) => JSON.parse(readFileSync(fileURLToPath(new URL(p, DATA)), 'utf8'))
 const GAMES = [
