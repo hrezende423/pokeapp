@@ -340,7 +340,7 @@
   }
 }
 
-/* The matchup: both Pokemon's artwork on one raised hairline tile, no shadow. */
+/* The matchup: both Pokemon's artwork straight on the page, no tile behind it. */
 .dcalc-sprites {
   grid-area: sprites;
   align-self: end;
@@ -352,9 +352,7 @@
   width: 260px;
   height: 118px;
   padding: 6px 12px;
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  border-radius: 6px;
+  background: transparent;
 }
 .dcalc-sprite {
   width: 96px;
