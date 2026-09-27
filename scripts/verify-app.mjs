@@ -551,7 +551,7 @@ try {
     const ctx = await browser.newContext({ colorScheme })
     const p = await ctx.newPage()
     await p.goto(APP_URL, { waitUntil: 'load' })
-    await p.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+    await p.waitForSelector('[data-testid="theme-switcher"]', { state: 'attached', timeout: 60000 })
     return { ctx, p }
   }
 
@@ -583,6 +583,8 @@ try {
   const { ctx: themeCtx, p: themePage } = await freshThemePage('light')
   const lightBg = (await themeState(themePage)).bg
 
+  // The switch lives in the account menu since 2026-09-27: open it first.
+  await themePage.click('[data-testid="account-toggle"]')
   await themePage.click('[data-testid="theme-dark"]')
   await themePage.waitForFunction(
     () => document.documentElement.dataset.theme === 'dark',
@@ -603,7 +605,7 @@ try {
   )
 
   await themePage.reload({ waitUntil: 'load' })
-  await themePage.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+  await themePage.waitForSelector('[data-testid="theme-switcher"]', { state: 'attached', timeout: 60000 })
   s = await themeState(themePage)
   log(`  after a real reload: ${JSON.stringify(s)}`)
   check('A RELOAD PRESERVES the explicit choice', s.attr === 'dark' && s.value === 'dark')
@@ -611,7 +613,7 @@ try {
 
   const secondTab = await themeCtx.newPage()
   await secondTab.goto(APP_URL, { waitUntil: 'load' })
-  await secondTab.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+  await secondTab.waitForSelector('[data-testid="theme-switcher"]', { state: 'attached', timeout: 60000 })
   const tabState = await themeState(secondTab)
   log(`  a new tab in the same profile: ${JSON.stringify(tabState)}`)
   check(
@@ -623,6 +625,8 @@ try {
   // ---- an OS change must not silently undo the user ----
   await themePage.emulateMedia({ colorScheme: 'dark' })
   await themePage.waitForTimeout(200)
+  if ((await themePage.getAttribute('[data-testid="account-toggle"]', 'aria-expanded')) !== 'true')
+    await themePage.click('[data-testid="account-toggle"]')
   await themePage.click('[data-testid="theme-light"]')
   await themePage.waitForFunction(
     () => document.documentElement.dataset.theme === 'light',
@@ -636,7 +640,7 @@ try {
   check('an OS change does NOT override an explicit choice', s.attr === 'light')
 
   await themePage.reload({ waitUntil: 'load' })
-  await themePage.waitForSelector('[data-testid="theme-switcher"]', { timeout: 60000 })
+  await themePage.waitForSelector('[data-testid="theme-switcher"]', { state: 'attached', timeout: 60000 })
   s = await themeState(themePage)
   log(`  explicit light on a dark OS, after reload: ${JSON.stringify(s)}`)
   check('explicit light beats a dark OS across a reload', s.attr === 'light' && s.value === 'light')

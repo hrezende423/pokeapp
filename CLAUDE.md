@@ -5,7 +5,8 @@ React + TypeScript + Vite. GitHub Pages + GitHub Actions CI/CD.
 **No backend the app depends on** — everything runs client-side, offline-first PWA.
 The one exception, by the owner's decision (2026-09-27): an OPTIONAL sign-in
 (GitHub, via Supabase project `pokeapp` / `assooegomidatlnwbepb`) that mirrors the
-Team Builder's localStorage document to one row per user (`team_builder_docs`,
+Team Builder's localStorage document to one row per user (`team_builder_docs`; the
+account menu's name and picture live in `profiles`, both
 RLS own-row only) so it follows the owner across devices. localStorage stays the
 primary copy; signed out, nothing changes. See `src/sync/`.
 

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
 import type { BootStats } from './data'
-import { ThemeSwitcher } from './components/ds/ThemeSwitcher'
 // The app shell itself now renders a design-system component, so the shell owns
 // the import rather than relying on Pokedex.tsx having pulled it in first.
 import './components/ds/ds.css'
@@ -102,8 +101,8 @@ function Shell() {
         */}
         <div className="app-bar-utils">
           <ControlsPanel />
+          {/* Rightmost: the account menu, which holds the Light/Dark switch. */}
           <AccountControl />
-          <ThemeSwitcher />
         </div>
       </div>
       {SHOW_DESIGN_SYSTEM ? <DesignSystemPage /> : <active.Component />}

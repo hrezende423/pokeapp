@@ -4337,12 +4337,21 @@ try {
 
   // ================================================ cloud sync, 2026-09-27
   hr('CLOUD SYNC: SIGN-IN CONTROL AND THE FIRST-SYNC MERGE')
+  await page.click('[data-testid="account-toggle"]')
   const signIn = await page.evaluate(() => {
-    const b = document.querySelector('[data-testid="account-sign-in"]')
-    const theme = document.querySelector('[data-testid="theme-switcher"], .ds-theme-switcher')
-    return b ? { text: b.textContent.trim(), leftOfTheme: theme ? b.getBoundingClientRect().right <= theme.getBoundingClientRect().left : true } : null
+    const bar = document.querySelector('.app-bar').getBoundingClientRect()
+    const t = document.querySelector('[data-testid="account-toggle"]')
+    const panel = document.querySelector('[data-testid="account-panel"]')
+    return {
+      trigger: t.textContent.trim(),
+      rightmost: Math.abs(bar.right - t.getBoundingClientRect().right) <= 2,
+      github: panel.querySelector('[data-testid="account-sign-in"]')?.textContent.trim(),
+      theme: panel.querySelector('[data-testid="theme-switcher"]') != null && getComputedStyle(panel).display !== 'none',
+      barTheme: document.querySelectorAll('.app-bar [data-testid="theme-switcher"]').length - (panel.querySelector('[data-testid="theme-switcher"]') ? 1 : 0),
+    }
   })
-  check('signed out, the app bar offers "Sign in", left of the theme switch', signIn?.text === 'Sign in' && signIn.leftOfTheme, JSON.stringify(signIn))
+  check('signed out, the bar\'s last item is "Sign in", opening GitHub sign-in and the theme switch', signIn.trigger === 'Sign in' && signIn.rightmost && signIn.github === 'Sign in with GitHub' && signIn.theme && signIn.barTheme === 0, JSON.stringify(signIn))
+  await page.click('[data-testid="account-toggle"]')
   const merged = await page.evaluate(async () => {
     const { mergeDocs } = await import('/pokeapp/src/sync/teamSync.ts')
     const b = (id) => ({ id, generation: 4, speciesId: 1, pokemonId: 1, nickname: id, gender: null, shiny: false, level: 50, friendship: 70, itemId: null, abilityId: null, natureId: null, moveIds: [null, null, null, null], effort: {}, individual: {}, tags: [], notes: '' })

@@ -35,9 +35,16 @@ export type SyncStatus = 'signed-out' | 'syncing' | 'synced' | 'offline' | 'erro
 
 export interface SyncState {
   status: SyncStatus
-  /** GitHub login, or the email when there is none. */
+  /** The display name: the reader's own (profiles), else the GitHub login. */
   user: string | null
+  /** The picture: the reader's own (profiles), else the GitHub avatar. */
   avatarUrl: string | null
+  /** What GitHub says, for "use my GitHub name / picture". */
+  githubName: string | null
+  githubAvatarUrl: string | null
+  /** Whether the reader has set their own name or picture. */
+  customName: boolean
+  customAvatar: boolean
   /** When the cloud copy last matched this device. */
   lastSynced: string | null
   error: string | null
@@ -74,7 +81,17 @@ function writeMeta(patch: Partial<SyncMeta>) {
 
 // ------------------------------------------------------------------ state
 
-let state: SyncState = { status: 'signed-out', user: null, avatarUrl: null, lastSynced: null, error: null }
+let state: SyncState = {
+  status: 'signed-out',
+  user: null,
+  avatarUrl: null,
+  githubName: null,
+  githubAvatarUrl: null,
+  customName: false,
+  customAvatar: false,
+  lastSynced: null,
+  error: null,
+}
 const listeners = new Set<() => void>()
 const set = (patch: Partial<SyncState>) => {
   state = { ...state, ...patch }
@@ -234,19 +251,83 @@ function schedulePush() {
   }, 800)
 }
 
+// --------------------------------------------------------------- profile
+
+interface Profile {
+  display_name: string | null
+  avatar: string | null
+}
+let profile: Profile = { display_name: null, avatar: null }
+
+function applyIdentity() {
+  set({
+    user: profile.display_name || state.githubName,
+    avatarUrl: profile.avatar || state.githubAvatarUrl,
+    customName: !!profile.display_name,
+    customAvatar: !!profile.avatar,
+  })
+}
+
+async function loadProfile() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('display_name, avatar')
+    .maybeSingle()
+  if (error) return
+  profile = { display_name: data?.display_name ?? null, avatar: data?.avatar ?? null }
+  applyIdentity()
+}
+
+/**
+ * Change the name and/or picture. `null` goes back to GitHub's. Saved to the
+ * account, so every device shows the same.
+ */
+export async function updateProfile(patch: Partial<Profile>): Promise<string | null> {
+  if (!session) return 'Not signed in'
+  const next = { ...profile, ...patch }
+  const { error } = await supabase.from('profiles').upsert({
+    user_id: session.user.id,
+    display_name: next.display_name?.trim() || null,
+    avatar: next.avatar || null,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) return error.message
+  profile = { display_name: next.display_name?.trim() || null, avatar: next.avatar || null }
+  applyIdentity()
+  return null
+}
+
 function applySession(next: Session | null) {
   const wasSignedIn = session != null
   session = next
   if (!next) {
-    set({ status: 'signed-out', user: null, avatarUrl: null, error: null })
+    profile = { display_name: null, avatar: null }
+    set({
+      status: 'signed-out',
+      user: null,
+      avatarUrl: null,
+      githubName: null,
+      githubAvatarUrl: null,
+      customName: false,
+      customAvatar: false,
+      error: null,
+    })
     return
   }
   const meta = next.user.user_metadata ?? {}
   set({
-    user: (meta.user_name as string) ?? (meta.preferred_username as string) ?? next.user.email ?? 'Signed in',
-    avatarUrl: (meta.avatar_url as string) ?? null,
+    githubName:
+      (meta.user_name as string) ??
+      (meta.preferred_username as string) ??
+      next.user.email ??
+      'Signed in',
+    githubAvatarUrl: (meta.avatar_url as string) ?? null,
   })
-  if (!wasSignedIn) sync()
+  applyIdentity()
+  if (!wasSignedIn) {
+    void loadProfile()
+    sync()
+  }
 }
 
 let started = false

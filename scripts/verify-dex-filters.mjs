@@ -368,9 +368,10 @@ try {
   await page.screenshot({ path: `${SHOTS}/dexf-pokedex-filters.png` })
 
   // -------------------------------------------------- the bar's own geometry
+  await page.click('[data-testid="account-toggle"]')
   const bar = await page.evaluate(() => {
     const barBox = document.querySelector('.app-bar').getBoundingClientRect()
-    const theme = document.querySelector('.ds-theme-switcher').getBoundingClientRect()
+    const theme = document.querySelector('[data-testid="account-toggle"]').getBoundingClientRect()
     const seg = document.querySelector('.ds-theme-segment')
     const probe = document.createElement('span')
     probe.style.cssText = `position:absolute;visibility:hidden;font:${getComputedStyle(seg).font}`
@@ -387,7 +388,8 @@ try {
     }
   })
   log(`  bar: ${JSON.stringify(bar)}`)
-  check('the theme switcher is flush with the bar edge', Math.abs(bar.themeRightInset) <= 2)
+  check('the account menu (with the theme switch inside) is flush with the bar edge', Math.abs(bar.themeRightInset) <= 2)
+  await page.click('[data-testid="account-toggle"]')
   check(
     'and each segment is the width of its word plus a 2px inset either side',
     bar.segWidth - bar.wordWidth <= 8,
@@ -401,14 +403,14 @@ try {
     That is the whole reason it is the LAST child of the cluster.
   */
   const themeRight = async () =>
-    page.$eval('.ds-theme-switcher', (e) => Math.round(e.getBoundingClientRect().right))
+    page.$eval('[data-testid="account-toggle"]', (e) => Math.round(e.getBoundingClientRect().right))
   const onPokedex = await themeRight()
   await goTo('naturedex')
   const onNaturedex = await themeRight()
   await goTo('breedingdex')
   const onBreedingdex = await themeRight()
   check(
-    'the theme switcher does not move between pages',
+    'the account menu does not move between pages',
     onPokedex === onNaturedex && onNaturedex === onBreedingdex,
     `${onPokedex} / ${onNaturedex} / ${onBreedingdex}`,
   )

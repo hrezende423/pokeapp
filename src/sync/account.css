@@ -1,15 +1,21 @@
-/* The app bar's account control (AccountControl.tsx). Text-only trigger; the
-   panel is the bar's own floating panel. */
+/* The app bar's account menu (AccountControl.tsx). Text-only trigger; the panel
+   is the bar's own floating panel. */
 
 .account-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
+.account-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .account-avatar {
-  width: 18px;
-  height: 18px;
+  flex: 0 0 auto;
   border-radius: 50%;
+  object-fit: cover;
 }
 .account-dot {
   width: 6px;
@@ -24,22 +30,88 @@
   background: var(--accent);
 }
 .account-panel {
-  width: 280px;
+  width: 300px;
+}
+
+.account-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.account-head-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
 }
 .account-who {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  overflow: hidden;
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.account-via {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+.account-edit {
+  font-size: var(--font-size-caption);
+}
+
 .account-status,
 .account-note,
 .account-error {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-size: var(--font-size-caption);
+  line-height: 1.4;
   color: var(--text-secondary);
+}
+.account-note-first {
+  margin-top: 0;
 }
 .account-error {
   color: var(--accent);
+}
+.account-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--text-primary);
+}
+
+/* The theme switch, now a row of this menu rather than the bar's last item. */
+.account-theme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.account-theme .app-controls-label {
+  margin: 0;
+}
+
+.account-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.account-pic-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: var(--font-size-caption);
+}
+.account-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+}
+.account-save {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
 }

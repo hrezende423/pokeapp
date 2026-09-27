@@ -1351,7 +1351,8 @@ try {
           if (!btn) return null
           const barBox = document.querySelector('.app-bar').getBoundingClientRect()
           const box = btn.getBoundingClientRect()
-          const themeBox = document.querySelector('.ds-theme-switcher')?.getBoundingClientRect()
+          // The account menu is the bar's last item now; it holds the theme switch.
+          const themeBox = document.querySelector('[data-testid="account-toggle"]')?.getBoundingClientRect()
           return {
             expanded: btn.getAttribute('aria-expanded'),
             label: btn.getAttribute('aria-label'),
@@ -1462,12 +1463,12 @@ try {
 
     // ITEM 4: the toggle, its icon, and where it sits.
     check(
-      '[' + theme + "] the theme switcher is the thing at the bar's right edge",
+      '[' + theme + "] the account menu (which holds the theme switch) is at the bar's right edge",
       shell.toggle != null && Math.abs(shell.toggle.themeRightInset) <= 2,
       shell.toggle ? shell.toggle.themeRightInset + 'px inset' : 'missing',
     )
     check(
-      '[' + theme + '] with the controls toggle immediately to its left',
+      '[' + theme + '] with the controls toggle to its left',
       shell.toggle?.leftOfTheme === true,
       shell.toggle?.rightInset + 'px from the bar edge',
     )
