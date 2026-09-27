@@ -36,6 +36,7 @@
     "report:type-scale": "node scripts/report-type-scale.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "@tabler/icons-react": "^3.46.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

@@ -9,10 +9,13 @@
  * store with one subscriber list means an edit anywhere re-renders all of them,
  * with no provider to thread through and no stale copy to reconcile.
  *
- * NO BACKEND, EVER (CLAUDE.md), so localStorage is the whole persistence story.
- * A corrupt or absent document reads as EMPTY_DATA rather than throwing: losing
- * saved teams is bad, but a module that will not render at all is worse, and the
- * user can always rebuild from an empty state.
+ * LOCALSTORAGE IS STILL THE PRIMARY COPY: every screen reads and writes it, and
+ * the module works offline and signed out exactly as it always has. Signing in
+ * (src/sync/teamSync.ts) adds a cloud copy that follows it -- `onLocalWrite` is
+ * how the sync hears about an edit, `replaceData` how it hands a newer cloud
+ * copy back. A corrupt or absent document reads as EMPTY_DATA rather than
+ * throwing: losing saved teams is bad, but a module that will not render at all
+ * is worse.
  */
 
 import { useSyncExternalStore } from 'react'
@@ -32,7 +35,7 @@ const KEY = 'pokeapp:team-builder:v1'
 let cache: TeamBuilderData | null = null
 const listeners = new Set<() => void>()
 
-function normalise(raw: unknown): TeamBuilderData {
+export function normalise(raw: unknown): TeamBuilderData {
   if (!raw || typeof raw !== 'object') return EMPTY_DATA
   const doc = raw as Partial<TeamBuilderData>
   const builds = Array.isArray(doc.builds) ? doc.builds : []
@@ -57,7 +60,9 @@ export function readData(): TeamBuilderData {
   return cache
 }
 
-function write(next: TeamBuilderData) {
+const writeListeners = new Set<(data: TeamBuilderData) => void>()
+
+function persist(next: TeamBuilderData) {
   cache = next
   try {
     localStorage.setItem(KEY, JSON.stringify(next))
@@ -65,6 +70,26 @@ function write(next: TeamBuilderData) {
     /* quota or a private window: the session still works, it just will not persist */
   }
   listeners.forEach((fn) => fn())
+}
+
+function write(next: TeamBuilderData) {
+  persist(next)
+  writeListeners.forEach((fn) => fn(next))
+}
+
+/** Called after every edit made in this tab -- NOT after `replaceData`. */
+export function onLocalWrite(fn: (data: TeamBuilderData) => void): () => void {
+  writeListeners.add(fn)
+  return () => writeListeners.delete(fn)
+}
+
+/**
+ * Put a whole document in place (the cloud copy, when it is newer). Every
+ * screen re-renders from it; the write listeners are NOT told, so the sync does
+ * not upload straight back what it has just downloaded.
+ */
+export function replaceData(next: TeamBuilderData) {
+  persist(normalise(next))
 }
 
 function subscribe(fn: () => void) {

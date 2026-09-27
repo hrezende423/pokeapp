@@ -4335,6 +4335,38 @@ try {
   const locked = await page.evaluate(() => document.querySelector('[data-testid="tb-generation"]')?.disabled ?? null)
   check("a team member's generation is locked to the team's game", locked === true, String(locked))
 
+  // ================================================ cloud sync, 2026-09-27
+  hr('CLOUD SYNC: SIGN-IN CONTROL AND THE FIRST-SYNC MERGE')
+  const signIn = await page.evaluate(() => {
+    const b = document.querySelector('[data-testid="account-sign-in"]')
+    const theme = document.querySelector('[data-testid="theme-switcher"], .ds-theme-switcher')
+    return b ? { text: b.textContent.trim(), leftOfTheme: theme ? b.getBoundingClientRect().right <= theme.getBoundingClientRect().left : true } : null
+  })
+  check('signed out, the app bar offers "Sign in", left of the theme switch', signIn?.text === 'Sign in' && signIn.leftOfTheme, JSON.stringify(signIn))
+  const merged = await page.evaluate(async () => {
+    const { mergeDocs } = await import('/pokeapp/src/sync/teamSync.ts')
+    const b = (id) => ({ id, generation: 4, speciesId: 1, pokemonId: 1, nickname: id, gender: null, shiny: false, level: 50, friendship: 70, itemId: null, abilityId: null, natureId: null, moveIds: [null, null, null, null], effort: {}, individual: {}, tags: [], notes: '' })
+    const cloud = { builds: [b('b1'), b('b2')], teams: [{ id: 't1', seq: 1, generation: 4, memberIds: ['b1', null, null, null, null, null], notes: '' }], nextBuildSeq: 3, nextTeamSeq: 2 }
+    const device = { builds: [b('b1')], teams: [{ id: 't1', seq: 1, generation: 4, memberIds: ['b1', null, null, null, null, null], notes: '' }], nextBuildSeq: 2, nextTeamSeq: 2 }
+    const m = mergeDocs(cloud, device)
+    return {
+      buildIds: m.builds.map((x) => x.id),
+      deviceNick: m.builds[2].nickname,
+      teamIds: m.teams.map((t) => t.id),
+      deviceTeamMember: m.teams[1].memberIds[0],
+      next: [m.nextBuildSeq, m.nextTeamSeq],
+    }
+  })
+  check(
+    "a first sync keeps both sides, renumbering the device's records after the cloud's",
+    JSON.stringify(merged.buildIds) === '["b1","b2","b3"]' &&
+      merged.deviceNick === 'b1' &&
+      JSON.stringify(merged.teamIds) === '["t1","t2"]' &&
+      merged.deviceTeamMember === 'b3' &&
+      JSON.stringify(merged.next) === '[4,3]',
+    JSON.stringify(merged),
+  )
+
   check('no console or page errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '))
 
   hr(failures.length ? `FAILED — ${failures.length} check(s)` : 'ALL CHECKS PASSED')

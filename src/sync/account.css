@@ -1,0 +1,45 @@
+/* The app bar's account control (AccountControl.tsx). Text-only trigger; the
+   panel is the bar's own floating panel. */
+
+.account-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.account-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+.account-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+.account-dot[data-status='synced'] {
+  background: #16c247;
+}
+.account-dot[data-status='error'] {
+  background: var(--accent);
+}
+.account-panel {
+  width: 280px;
+}
+.account-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+.account-status,
+.account-note,
+.account-error {
+  margin: 6px 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+.account-error {
+  color: var(--accent);
+}

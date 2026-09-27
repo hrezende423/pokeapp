@@ -10,6 +10,8 @@ import { ThemeSwitcher } from './components/ds/ThemeSwitcher'
 import './components/ds/ds.css'
 import { DesignSystemPage } from './modules/design-system/DesignSystemPage'
 import { DexQueryProvider } from './modules/dex/query/DexQueryProvider'
+import { AccountControl } from './sync/AccountControl'
+import { startTeamSync } from './sync/teamSync'
 import { ControlsPanel } from './modules/nav/ControlsPanel'
 import { NavMenu } from './modules/nav/NavMenu'
 import { NavProvider } from './modules/nav/NavProvider'
@@ -100,6 +102,7 @@ function Shell() {
         */}
         <div className="app-bar-utils">
           <ControlsPanel />
+          <AccountControl />
           <ThemeSwitcher />
         </div>
       </div>
@@ -114,7 +117,11 @@ export default function App() {
 
   useEffect(() => {
     initDataLayer()
-      .then(setBoot)
+      .then((stats) => {
+        setBoot(stats)
+        // The optional cloud sync of the Team Builder; idle until someone signs in.
+        startTeamSync()
+      })
       .catch((err: unknown) => setBootError(err instanceof Error ? err.message : String(err)))
   }, [])
 
