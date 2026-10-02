@@ -83,8 +83,8 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'pokeapp-version-group-data',
-              // 14 version groups x 2 files, with headroom for a build transition.
-              expiration: { maxEntries: 40 },
+              // 14 version groups x 2 files, the trainer and battle partitions (10 each), and headroom.
+              expiration: { maxEntries: 80 },
               cacheableResponse: { statuses: [200] },
             },
           },

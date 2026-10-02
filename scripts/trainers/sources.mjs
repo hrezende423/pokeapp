@@ -113,6 +113,44 @@ export const REPOS = {
   },
 }
 
+/**
+ * What scripts/build-battle-data.mjs reads on top of the trainer build's paths:
+ * the games' move tables, held-item attributes and trainer AI. Same pins, same
+ * clones -- one checkout per repo, so the two builds can never read different
+ * commits of the same game.
+ */
+export const BATTLE_PATHS = {
+  pokered: ['/data/moves/', '/data/battle/'],
+  pokeyellow: ['/data/moves/', '/data/battle/'],
+  pokegold: ['/data/moves/', '/data/items/', '/data/battle/ai/'],
+  pokecrystal: ['/data/moves/', '/data/items/', '/data/battle/ai/'],
+  pokeruby: [
+    '/data/battle_ai_scripts.s',
+    '/include/macros/battle_ai_script.inc',
+    '/src/battle_ai_script_commands.c',
+  ],
+  pokeemerald: [
+    '/data/battle_ai_scripts.s',
+    '/asm/macros/battle_ai_script.inc',
+    '/src/battle_ai_script_commands.c',
+  ],
+  pokefirered: [
+    '/data/battle_ai_scripts.s',
+    '/asm/macros/battle_ai_script.inc',
+    '/src/battle_ai_script_commands.c',
+  ],
+  pokediamond: ['/files/battle/tr_ai/'],
+  pokeplatinum: [
+    '/res/moves/',
+    '/res/items/data/',
+    '/res/prebuilt/battle/tr_ai/',
+    '/src/battle/trainer_ai/',
+    '/asm/macros/aicmd.inc',
+    '/include/data/scripts/',
+  ],
+  pokeheartgold: [],
+}
+
 const git = (cwd, ...args) => {
   const r = spawnSync('git', ['-c', 'core.longpaths=true', ...args], {
     cwd,
@@ -133,7 +171,8 @@ const git = (cwd, ...args) => {
 export function ensureSources(cacheRoot) {
   const out = {}
   mkdirSync(cacheRoot, { recursive: true })
-  for (const [name, { sha, paths }] of Object.entries(REPOS)) {
+  for (const [name, { sha, paths: own }] of Object.entries(REPOS)) {
+    const paths = [...own, ...(BATTLE_PATHS[name] ?? [])]
     const dir = join(cacheRoot, name)
     const stamp = join(dir, '.pokeapp-pin')
     const want = `${sha}\n${paths.join('\n')}`

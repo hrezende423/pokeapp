@@ -2,6 +2,7 @@ import { findCalculatorsPage, type CalculatorsPageId } from '../calculators/page
 import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
+import { findTeamMatchupPage, type TeamMatchupPageId } from '../team-matchup/pages'
 import {
   TYPE_COVERAGE_PAGES,
   findTypeCoveragePage,
@@ -32,7 +33,8 @@ import type { ComponentType } from 'react'
  * stubs (they have a real component). Keeping them separate is what lets findPage
  * resolve them without a stub fallback swallowing a real screen.
  */
-export type PageId = DexModuleId | TbPageId | TypeCoveragePageId | CalculatorsPageId | StubPageId
+export type PageId =
+  DexModuleId | TbPageId | TypeCoveragePageId | CalculatorsPageId | TeamMatchupPageId | StubPageId
 
 export interface NavEntry {
   /** The page this entry opens. */
@@ -115,7 +117,10 @@ export const NAV_TABS: readonly NavTab[] = [
         label: 'Calculators',
         children: [{ id: 'damage-calculator', label: 'Damage Calculator' }],
       },
-      ...stubs('compare-pokemon', 'battle-simulator', 'training-optimization', 'breeding-planner'),
+      /* Team Matchup graduated the Battle Simulator stub, in its place. */
+      ...stubs('compare-pokemon'),
+      { id: 'team-matchup', label: 'Team Matchup' },
+      ...stubs('training-optimization', 'breeding-planner'),
     ],
   },
 ]
@@ -147,6 +152,8 @@ export function findPage(id: PageId): ResolvedPage {
   if (tc) return { id: tc.id, label: tc.label, Component: tc.Component }
   const calc = findCalculatorsPage(id)
   if (calc) return { id: calc.id, label: calc.label, Component: calc.Component }
+  const tm = findTeamMatchupPage(id)
+  if (tm) return { id: tm.id, label: tm.label, Component: tm.Component }
   const stub = findStub(id)
   if (stub) return { id: stub.id, label: stub.label, Component: StubPage }
   // Not reachable through PageId; findPage is also the shell's fallback.

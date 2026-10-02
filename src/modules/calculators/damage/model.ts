@@ -65,6 +65,25 @@ export interface CalcPokemon {
   currentHp: number | null
   /** For Rivalry. 'N' for genderless or "don't care". */
   gender: 'M' | 'F' | 'N'
+  /**
+   * The PLAYER's badge boosts, which the reference calculator does not model
+   * (the Team Matchup page sets these; the Damage Calculator never does).
+   * Gen 1-2: the stat x9/8 after stages (pokered ApplyBadgeStatBoosts,
+   * pokecrystal BadgeStatBoosts), and Gen 2's +1/8 damage for a move whose type
+   * matches an owned badge (DoBadgeTypeBoosts). Gen 3: the stat x110/100 right
+   * after Huge Power (pokeemerald CalculateBaseDamage). Gen 4 has none.
+   */
+  badgeBoosts?: BadgeBoosts
+}
+
+export interface BadgeBoosts {
+  atk?: boolean
+  def?: boolean
+  spa?: boolean
+  spd?: boolean
+  spe?: boolean
+  /** Gen 2: move types whose damage the badges raise by 1/8. */
+  types?: string[]
 }
 
 export interface CalcMove {

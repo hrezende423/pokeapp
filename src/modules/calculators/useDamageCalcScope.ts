@@ -33,13 +33,14 @@ export interface DamageCalcScope {
 
 const LATEST = 'heartgold-soulsilver'
 
-export function useDamageCalcScope(): DamageCalcScope {
+export function useDamageCalcScope(initial?: string | null): DamageCalcScope {
   const app = useVersionGroup()
   const [games] = useState(() =>
     gameGroups().filter((g) => (CALC_GENERATIONS as readonly number[]).includes(g.generation)),
   )
   const [versionGroup, setVersionGroup] = useState<string>(() => {
-    const name = app.versionGroup?.name
+    // A prefill from another screen (damageCalcHandoff.ts) brings its own game.
+    const name = initial ?? app.versionGroup?.name
     return name && games.some((g) => g.options.some((o) => o.value === name)) ? name : LATEST
   })
   return {

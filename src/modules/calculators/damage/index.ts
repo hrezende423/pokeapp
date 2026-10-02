@@ -36,12 +36,20 @@ export function supportsGeneration(gen: number): boolean {
   return gen in MECHANICS
 }
 
+/**
+ * `opts.koText: false` leaves the "-- 20.5% chance to OHKO" clause off the
+ * description. That clause convolves every roll of every hit, which for a Gen 1-2
+ * five-hit move is most of the call's cost; a caller that computes its own KO
+ * chances (Team Matchup, battle/damage.ts) does not need it. The default is
+ * unchanged, so the reference fixtures see exactly what they always did.
+ */
 export function calculateDamage(
   gen: number,
   attackerIn: CalcPokemon,
   defenderIn: CalcPokemon,
   moveIn: CalcMove,
   fieldIn: CalcField,
+  opts: { koText?: boolean } = {},
 ): DamageResult {
   const mechanics = MECHANICS[gen]
   if (!mechanics) throw new Error(`No damage mechanics for generation ${gen}`)
@@ -58,7 +66,7 @@ export function calculateDamage(
     toPercent(range[1], result.defender.maxHp),
   ]
   const description = buildDescription(result.desc, result.attacker, result.defender)
-  const koText = range[1] > 0 ? koChanceText(gen, result) : ''
+  const koText = range[1] > 0 && opts.koText !== false ? koChanceText(gen, result) : ''
   const damageText = `${range[0]}-${range[1]} (${percent[0]} - ${percent[1]}%)`
   const fullText = koText
     ? `${description}: ${damageText} -- ${koText}`

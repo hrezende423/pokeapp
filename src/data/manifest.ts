@@ -39,8 +39,9 @@ export type EagerDataFile = (typeof EAGER_DATA_FILES)[number]
 
 /**
  * Subdirectories holding the per-version-group partitions (14 files each for
- * learnsets and encounters, 10 for trainers). Fetched
+ * learnsets and encounters, 10 each for trainers and battle -- the matchup
+ * engine's per-game move tables and AI, scripts/build-battle-data.mjs). Fetched
  * on demand and populated into the runtime cache on first request, never
  * precached at install time.
  */
-export const PARTITION_DIRS = ['learnsets', 'encounters', 'trainers'] as const
+export const PARTITION_DIRS = ['learnsets', 'encounters', 'trainers', 'battle'] as const

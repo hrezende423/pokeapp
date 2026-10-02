@@ -1901,14 +1901,14 @@ try {
   })
   log('  tools: ' + JSON.stringify(tools))
   check(
-    'Tools lists Calculators (with Damage Calculator under it) first, then the four stubs',
+    'Tools lists Calculators (with Damage Calculator under it) first, Team Matchup in place of the Battle Simulator stub, then the stubs',
     tools.visible &&
       JSON.stringify(tools.labels) ===
         JSON.stringify([
           'Calculators',
           'Damage Calculator',
           'Compare Pokemon',
-          'Battle Simulator',
+          'Team Matchup',
           'Training and Optimization',
           'Breeding Planner',
         ]),

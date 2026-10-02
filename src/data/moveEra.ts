@@ -90,6 +90,27 @@ export function resolveMoveTypeNameForGeneration(move: Move, generation: number)
 }
 
 /**
+ * `past_values` entries PokeAPI is missing, as era RULES (CLAUDE.md: "PokeAPI's
+ * past_ arrays are incomplete"). Found by Team Matchup's suite diffing every move's
+ * power against the disassemblies' move tables:
+ *   Luster Purge is 70 in Gen 3-4 (pokeemerald src/data/battle_moves.h, pokeplatinum
+ *   res/moves/luster_purge) and 95 now. Its twin Mist Ball carries exactly that
+ *   entry (70 until scarlet-violet); Luster Purge carries none, so it read 95.
+ */
+const MISSING_PAST_POWER: Record<string, Move['past_values']> = {
+  'luster-purge': [
+    {
+      accuracy: null,
+      effect_chance: null,
+      power: 70,
+      pp: null,
+      type_id: null,
+      version_group: 'scarlet-violet',
+    },
+  ],
+}
+
+/**
  * The POWER this move had in `generation` -- the same `past_values` rule as the
  * type above, read off the `power` field instead.
  *
@@ -102,7 +123,7 @@ export function resolveMoveTypeNameForGeneration(move: Move, generation: number)
  */
 export function resolveMovePowerForGeneration(move: Move, generation: number): number | null {
   let best: { generation: number; power: number } | null = null
-  for (const past of move.past_values) {
+  for (const past of [...move.past_values, ...(MISSING_PAST_POWER[move.name] ?? [])]) {
     if (past.power == null || past.version_group == null) continue
     const changedIn = generationOfChange(past.version_group)
     if (changedIn == null || changedIn <= generation) continue

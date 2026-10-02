@@ -14,10 +14,10 @@ export const STUB_PAGES = [
     registered in ../team-builder/pages.ts. Calculators graduated the same way --
     it is a real screen now, registered in ../calculators/pages.ts. This is the
     graduation the note above describes -- the entries left this list and the nav
-    resolves them from that registry instead.
+    resolves them from that registry instead. Battle Simulator graduated as Team
+    Matchup (../team-matchup/pages.ts).
   */
   { id: 'compare-pokemon', label: 'Compare Pokemon' },
-  { id: 'battle-simulator', label: 'Battle Simulator' },
   { id: 'training-optimization', label: 'Training and Optimization' },
   { id: 'breeding-planner', label: 'Breeding Planner' },
 ] as const

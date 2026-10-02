@@ -244,6 +244,8 @@ export function calculateAttackADV(
     at *= 2
     desc.attackerAbility = attacker.abilityName
   }
+  // The player's badge boost, right after Huge Power (pokeemerald CalculateBaseDamage).
+  if (gen === 3 && attacker.input.badgeBoosts?.[attackStat]) at = Math.floor((110 * at) / 100)
 
   const boostType = itemBoostType(attacker.item)
   if (
@@ -305,6 +307,7 @@ export function calculateDefenseADV(
   desc.defenseEVs = statDescriptionText(gen, defender, defenseStat)
 
   let df = defender.rawStats[defenseStat]
+  if (gen === 3 && defender.input.badgeBoosts?.[defenseStat]) df = Math.floor((110 * df) / 100)
 
   if (!isPhysical && hasItem(defender, 'soul-dew') && named(defender, 'latios', 'latias')) {
     df = Math.floor(df * 1.5)

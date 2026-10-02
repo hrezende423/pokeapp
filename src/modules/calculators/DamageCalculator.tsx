@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   getAbility,
   getMove,
@@ -31,6 +31,7 @@ import { DamageFieldPanel } from './DamageFieldPanel'
 import { DamagePokemonPanel } from './DamagePokemonPanel'
 import { DamageResultView, MoveResultList, type MoveResult } from './DamageResultView'
 import { useDamageCalcScope } from './useDamageCalcScope'
+import { clearDamageCalcPrefill, peekDamageCalcPrefill } from './damageCalcHandoff'
 import { generationOfGame } from '../version-group/games'
 import { useGenerationLearnset } from './useGenerationLearnset'
 import '../../components/ds/ds.css'
@@ -70,15 +71,21 @@ import './calculators.css'
 const OTHER = { 0: 1, 1: 0 } as const
 
 export function DamageCalculatorPage() {
-  const scope = useDamageCalcScope()
+  // Opened from another screen on a given matchup (Team Matchup's matrix, M3)?
+  const [prefill] = useState(peekDamageCalcPrefill)
+  useEffect(() => {
+    if (prefill) clearDamageCalcPrefill(prefill.id)
+  }, [prefill])
+  const scope = useDamageCalcScope(prefill?.versionGroup)
   const gen = scope.generation
 
-  const [sides, setSides] = useState<[SideState, SideState]>(() => [
-    newSide(DEFAULT_ATTACKER_ID, gen),
-    newSide(DEFAULT_DEFENDER_ID, gen),
-  ])
-  const [field, setField] = useState<DualField>(() => emptyDualField())
-  const [selected, setSelected] = useState<{ side: 0 | 1; slot: number }>({ side: 0, slot: 0 })
+  const [sides, setSides] = useState<[SideState, SideState]>(
+    () => prefill?.sides ?? [newSide(DEFAULT_ATTACKER_ID, gen), newSide(DEFAULT_DEFENDER_ID, gen)],
+  )
+  const [field, setField] = useState<DualField>(() => prefill?.field ?? emptyDualField())
+  const [selected, setSelected] = useState<{ side: 0 | 1; slot: number }>(
+    () => prefill?.selected ?? { side: 0, slot: 0 },
+  )
   const [anyMove, setAnyMove] = useState<[boolean, boolean]>([false, false])
 
   const setSide = (i: 0 | 1) => (next: SideState) =>

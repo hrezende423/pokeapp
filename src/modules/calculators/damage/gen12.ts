@@ -55,6 +55,15 @@ export function calculateRBYGSC(
   field: CalcField,
 ): MechanicsOutput {
   computeFinalStats(gen, attacker, defender, field)
+  // Badge boosts sit on the modified stat (after stages), capped at 999 -- and a
+  // crit that reads the unmodified stats below bypasses them, as in the games.
+  for (const p of [attacker, defender]) {
+    const b = p.input.badgeBoosts
+    if (!b) continue
+    for (const s of ['atk', 'def', 'spa', 'spd'] as const) {
+      if (b[s]) p.stats[s] = Math.min(999, p.stats[s] + Math.floor(p.stats[s] / 8))
+    }
+  }
 
   const desc: RawDesc = {
     attackerName: attacker.name,
@@ -214,6 +223,11 @@ export function calculateRBYGSC(
   ) {
     baseDamage = Math.floor(baseDamage / 2)
     desc.weather = w
+  }
+
+  // Gen 2 badge type boost: +1/8 (at least 1), after weather and before STAB.
+  if (gen === 2 && attacker.input.badgeBoosts?.types?.includes(move.type)) {
+    baseDamage = Math.min(0xffff, baseDamage + Math.max(1, Math.floor(baseDamage / 8)))
   }
 
   if (attacker.types.includes(move.type)) baseDamage = Math.floor(baseDamage * 1.5)

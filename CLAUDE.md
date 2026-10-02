@@ -94,7 +94,16 @@ disagrees with §1–§11, which were written before implementation.
   Same shape as Type Coverage: seeded once, then independent, one-way, generation
   only (legality is answered across all of a generation's games at once). It
   scopes the Damage TAB only — the other four calculator tabs still follow the
-  app. Do not add a fourth exception without asking.
+  app.
+- **Team Matchup has its OWN GAME selector — the FOURTH sanctioned exception**,
+  approved by the owner 2026-10-01 (`team-matchup/useMatchupScope.ts`). A matchup
+  is pinned to one GAME: the game decides the trainers, their AI, the badge boosts
+  and the send-out logic. Same shape as the Damage Calculator's: seeded once from
+  the app selection, then independent, one-way; it picks a game (the ten Gen 1–4
+  main-series games with a disassembly), not a generation. Unlike the
+  calculator it is seeded once per SESSION, not per visit: the M3 hand-off to
+  the Damage Calculator unmounts the page, and re-seeding on return dropped the
+  reader onto a game with no setup. Do not add a fifth exception without asking.
 - Sprites: GitHub Release assets in `hrezende423/pokeapp-sprites`,
   runtime-cached, NOT precached (648MB total, too large to bundle).
   `species-background-colors.json` lives in the same repo, fetched at
@@ -544,6 +553,65 @@ starts high. The IV / EV headers are ghost buttons that zero that side's spread.
   `components/ds/` (`FormParts`, `EvStatTable`, `MoveSlotTile`, `SearchSelect`).
   EV entry is the Build Form's slider + number box by decision, not §5's plain
   field. The Build Form does not use these yet — see deferred debt.
+
+## Team Matchup (Tools → Team Matchup)
+
+My team (a Team Building team) against a trainer's, every Pokémon against every
+Pokémon, and whole battles against the trainer's OWN AI. Graduated the Battle
+Simulator stub. Built 2026-10-01 to a requirement list (S1–S7, M1–M4, V1–V4,
+D1–D5, P1–P8, O1–O4, R1–R7); the IDs are in the code comments.
+
+- **Two layers.** `src/modules/battle/` is the ENGINE — pure, no React: the game
+  context (`game.ts`, every mechanic read off one object), spreads as RANGES
+  (`battler.ts`: any IV/EV may be a range; outputs are computed at the two corners
+  that bound them, never sampled), damage as a distribution (`damage.ts`, exact KO
+  convolution with crits, accuracy, multi-hit and residual), speed (`speed.ts`),
+  the turn engine (`engine/`), the AI per generation (`ai/`) and the analyses
+  (`analysis/`). `src/modules/team-matchup/` is only the screen. Heavy jobs (Monte
+  Carlo, search, gauntlet, scan, suggestions) run in a Web Worker
+  (`matchup.worker.ts`, one per hook; cancelling terminates it).
+- **Damage is the verified Showdown port** (`calculators/damage`), never
+  re-derived. `calculateDamage`'s optional `{ koText: false }` skips the
+  description's KO clause, which for a Gen 1–2 five-hit move was 280 ms of a 0.8 ms
+  call; the matchup computes its own KO maths. The default is unchanged.
+- **Battle data** (`npm run build:battle-data`, `scripts/build-battle-data.mjs`):
+  per-game move tables, held effects and AI from the same pinned disassemblies as
+  the trainers (BATTLE_PATHS in `trainers/sources.mjs`), written to
+  `public/data/battle/<vg>.json` (a PARTITION_DIR, runtime-cached). Gen 3 AI
+  scripts are assembled from each repo's own macros. **Gen 4 AI is decoded from
+  the shipped binary** (`tr_ai_seq.narc`): Platinum's `script.s` is NOT the shipped
+  AI (25 instructions differ); DP's binary is byte-identical to Platinum's; HGSS's
+  is not in its disassembly, so HGSS predictions (and DP/HGSS item use, assumed
+  Platinum's) are flagged LOW CONFIDENCE on screen. Rebuilds are byte-identical.
+- **The AI is the game's, bugs included**, transcribed per generation and named by
+  routine in the prediction's score breakdown (`Basic_CheckForImmunity -10`). A
+  prediction is a distribution: the AI's own random checks, sampled 300 times.
+  Facility AI flags come from the games' code (`sources.ts` facilityTrainerInfo).
+- **Nothing writes to Team Building.** "Use current" is read-only; "Customize"
+  edits an override in the matchup's own store (`pokeapp:team-matchup:v1`).
+  Scenarios snapshot a setup and carry link fields for Notes, Journal, the
+  Nuzlocke Tracker and the Collection, which do not exist yet (empty until then).
+- **Verdicts are coloured TEXT with a symbol and a word** (▲ Win, ◆ Trade,
+  ◐ Roll, ▼ Lose) in `--effect-super` / `--effect-resist` / `--stat-decrease` —
+  no fill, never colour alone. The batch scan's grid is the same: coloured numbers.
+- **`.tm .tm-section` exists to beat App.css's `.panel section` / `.panel h2`**
+  (MODULE-PATTERNS §10): without it every section opened on a border, a 2rem gap
+  and an uppercase tracked heading.
+- **Doubles are not simulated**: matrix, speed and damage are one-on-one, and a
+  double battle (Tate & Liza, or the format toggle) says so on screen.
+- **A matrix cell opens the Damage Calculator on that pair**
+  (`calculators/damageCalcHandoff.ts`: a one-shot prefill the calculator's state
+  initializers READ and an effect clears by id, so StrictMode's double call is
+  harmless).
+- `npm run verify:team-matchup` (port 4202): the engine through the matchup's
+  pipeline vs the Showdown fixture per generation (a crit, a multi-hit, a weather
+  case), chance constants vs the asm, a speed tie per generation, AI behaviour per
+  generation, the battle bundle vs the app's move records, a real fight per
+  generation through the screen, spreads / scenarios / format / custom / facility
+  / hand-off / sandbox, the worker analyses, design rules and both themes. Its
+  move diff found Luster Purge's missing `past_values` (now an era rule in
+  `moveEra.ts`), and its crit checks found Gen 2 Lucky Punch / Stick never firing
+  (the game compares the item id, not a held effect).
 
 ## Trainer Dex (Poképedia) and its bundle
 
