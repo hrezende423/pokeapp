@@ -9,7 +9,13 @@
  */
 
 import type { StatusId } from '../calculators/damage'
-import { aiSendOut, chooseOpponentAction, type AiChoice } from './ai'
+import {
+  aiSendOut,
+  aiSendOutDoubles,
+  chooseOpponentAction,
+  chooseOpponentActionsDoubles,
+  type AiChoice,
+} from './ai'
 import type { BattleData } from './battleData'
 import { gameMove } from './battleData'
 import type { BattlerSpec } from './battler'
@@ -19,11 +25,13 @@ import {
   engineDamage,
   resolveSwitch,
   resolveTurn,
+  resolveTurnDoubles,
   switchIn,
   usableMoveSlots,
   type Action,
   type LogLine,
 } from './engine/turn'
+import { doublesField, needsTarget, standingFoes, targetKind } from './engine/doubles'
 import {
   Rng,
   type ChanceEvent,
@@ -34,11 +42,18 @@ import {
 import {
   activeMon,
   aliveCount,
+  battlerOrder,
   emptySideState,
   initMon,
+  monAt,
+  partnerPos,
+  posKey,
+  standing,
   type BattleState,
   type CornerPick,
+  type Pos,
   type Side,
+  type Slot,
 } from './engine/state'
 import type { GameContext } from './game'
 
@@ -63,8 +78,12 @@ export interface NewBattleOptions {
   minePick?: CornerPick
   theirsPick?: CornerPick
   mineLead?: number
+  /** Doubles: my second lead (default: the next healthy Pokemon after the first). */
+  mineLead2?: number
   carry?: CarryOver
   field?: MatchField
+  /** A double battle (S6, Gen 3-4): two battlers a side. */
+  doubles?: boolean
 }
 
 export function newBattle(
@@ -127,10 +146,91 @@ export function newBattle(
   )
   const log: LogLine[] = []
   const src: ChanceSource = { rng: new Rng(1), policies: RANDOM_POLICIES, events: [], turn: 0 }
+  if (opts.doubles) {
+    // Doubles: each side's first two healthy Pokemon (mine: the chosen pair).
+    st.doubles = true
+    st.pendingSlots = []
+    const second = (mons: typeof mineMons, first: number, want?: number) => {
+      if (want != null && want !== first && mons[want] && !mons[want].fainted) return want
+      const i = mons.findIndex((m, k) => k !== first && !m.fainted)
+      return i >= 0 ? i : undefined
+    }
+    st.sides.mine.active2 = second(mineMons, lead, opts.mineLead2)
+    st.sides.theirs.active2 = second(theirMons, st.sides.theirs.active)
+    switchIn({ ctx, data, st, src, log }, 'theirs', st.sides.theirs.active, false, 0)
+    if (st.sides.theirs.active2 != null)
+      switchIn({ ctx, data, st, src, log }, 'theirs', st.sides.theirs.active2, false, 1)
+    switchIn({ ctx, data, st, src, log }, 'mine', st.sides.mine.active, false, 0)
+    if (st.sides.mine.active2 != null)
+      switchIn({ ctx, data, st, src, log }, 'mine', st.sides.mine.active2, false, 1)
+    return { state: st, log }
+  }
   // The leads "switch in" so entry abilities and hazards apply (opponent first, as the games send it first).
   switchIn({ ctx, data, st, src, log }, 'theirs', st.sides.theirs.active)
   switchIn({ ctx, data, st, src, log }, 'mine', st.sides.mine.active)
   return { state: st, log }
+}
+
+export interface DoublesStepResult {
+  state: BattleState
+  log: LogLine[]
+  /** The opponent's choice per slot (absent when forced). */
+  ai: { slot: Slot; choice: AiChoice }[]
+  events: ChanceEvent[]
+}
+
+/**
+ * One turn of a DOUBLE battle (S6): both of the opponent's battlers choose (or the
+ * reader forces them), every action resolves, and the opponent refills its emptied
+ * slots with its own replacement logic. My emptied slots stay pending for the caller.
+ */
+export function stepTurnDoubles(
+  ctx: GameContext,
+  data: BattleData,
+  st: BattleState,
+  mine: Partial<Record<Slot, Action>>,
+  policies: Policies,
+  rng: Rng,
+  aiRng: Rng,
+  forced: Partial<Record<Slot, Action>> = {},
+  /** Gen 3 refills mid-turn: who comes in on my side (default: the best matchup). */
+  mineRefill?: (st: BattleState, slot: Slot, reserved: number[]) => number,
+): DoublesStepResult {
+  const chosen = chooseOpponentActionsDoubles(ctx, data, st, aiRng).filter(
+    (c) => forced[c.slot] == null,
+  )
+  const actions = new Map<string, Action>()
+  for (const s of [0, 1] as Slot[]) {
+    const a = mine[s]
+    if (a) actions.set(posKey({ side: 'mine', slot: s }), a)
+    const f = forced[s] ?? chosen.find((c) => c.slot === s)?.choice.action
+    if (f) actions.set(posKey({ side: 'theirs', slot: s }), f)
+  }
+  const src: ChanceSource = { rng, policies, events: [], turn: st.turn }
+  const refill = (s: BattleState, p: Pos, reserved: number[]) =>
+    p.side === 'theirs'
+      ? aiSendOutDoubles(ctx, data, s, aiRng, p.slot, reserved)
+      : (mineRefill ?? ((x, slot, res) => bestReplacementDoubles(ctx, data, x, slot, res)))(
+          s,
+          p.slot,
+          reserved,
+        )
+  const r = resolveTurnDoubles(ctx, data, st, actions, src, refill)
+  let state = r.state
+  const log = [...r.log]
+  if (!state.winner) {
+    const reserved: number[] = []
+    for (const p of (state.pendingSlots ?? []).filter((q) => q.side === 'theirs')) {
+      const to = aiSendOutDoubles(ctx, data, state, aiRng, p.slot, reserved)
+      if (to >= 0) {
+        reserved.push(to)
+        const sw = resolveSwitch(ctx, data, state, 'theirs', to, src, p.slot)
+        state = sw.state
+        log.push(...sw.log)
+      }
+    }
+  }
+  return { state, log, ai: chosen, events: src.events }
 }
 
 export interface StepResult {
@@ -177,9 +277,10 @@ export function playerSwitch(
   to: number,
   policies: Policies,
   rng: Rng,
+  slot: Slot = 0,
 ): StepResult {
   const src: ChanceSource = { rng, policies, events: [], turn: st.turn }
-  const r = resolveSwitch(ctx, data, st, 'mine', to, src)
+  const r = resolveSwitch(ctx, data, st, 'mine', to, src, slot)
   return { state: r.state, log: r.log, ai: null, events: src.events }
 }
 
@@ -222,6 +323,131 @@ export const greedyPlayer: PlayerPolicy = (ctx, data, st) => {
     }
   }
   return { kind: 'move', slot: best }
+}
+
+/** Mean of a damage result's rolls (the whole move for a multi-hit). */
+function meanDamage(r: ReturnType<typeof engineDamage>): number {
+  if (!r || r.noDamageReason) return 0
+  const d = r.damage
+  if (typeof d === 'number') return d
+  if (Array.isArray(d[0]))
+    return (d as number[][])
+      .map((row) => row.reduce((s, x) => s + x, 0) / row.length)
+      .reduce((s, x) => s + x, 0)
+  const rolls = d as number[]
+  return rolls.reduce((s, x) => s + x, 0) / rolls.length
+}
+
+/**
+ * The greedy DOUBLES player: for each of my battlers, the move and target with
+ * the most expected damage as a share of the targets' remaining HP (a spread move
+ * counts every foe it hits, less what it does to my own partner).
+ */
+export function greedyDoubles(
+  ctx: GameContext,
+  data: BattleData,
+  st: BattleState,
+): Partial<Record<Slot, Action>> {
+  const out: Partial<Record<Slot, Action>> = {}
+  for (const slot of [0, 1] as Slot[]) {
+    const atk: Pos = { side: 'mine', slot }
+    if (!standing(st, atk)) continue
+    const a = monAt(st, atk)!
+    const slots = usableMoveSlots(ctx, data, st, 'mine', slot)
+    const foes = standingFoes(st, atk)
+    if (!slots.length || !foes.length) {
+      out[slot] = { kind: 'move', slot: 0, target: foes[0] }
+      continue
+    }
+    let best: Action = { kind: 'move', slot: slots[0], target: foes[0] }
+    let bestVal = -Infinity
+    const share = (moveId: number, def: Pos) => {
+      const d = monAt(st, def)!
+      const r = engineDamage(ctx, st, 'mine', moveId, false, null, false, {
+        attacker: a,
+        defender: d,
+        defenderSide: def.side,
+        doubles: doublesField(st, data, atk, def, moveId),
+      })
+      const acc = ((gameMove(data, moveId)?.a ?? 100) || 100) / 100
+      return Math.min(1, (meanDamage(r) * acc) / Math.max(1, d.hp))
+    }
+    for (const ms of slots) {
+      const id = a.spec.moves[ms]
+      const kind = targetKind(gameMove(data, id))
+      const damaging = (gameMove(data, id)?.p ?? 0) > 0
+      if (!damaging) {
+        if (bestVal < 0.01) {
+          bestVal = 0.01
+          best = { kind: 'move', slot: ms, target: foes[0] }
+        }
+        continue
+      }
+      if (kind === 'both-foes' || kind === 'all-adjacent') {
+        let v = foes.reduce((s, f) => s + share(id, f), 0)
+        const ally = partnerPos(atk)
+        if (kind === 'all-adjacent' && standing(st, ally)) v -= share(id, ally)
+        if (v > bestVal) {
+          bestVal = v
+          best = { kind: 'move', slot: ms, target: foes[0] }
+        }
+        continue
+      }
+      for (const f of needsTarget(data, id) ? foes : [foes[0]]) {
+        const v = share(id, f)
+        if (v > bestVal) {
+          bestVal = v
+          best = { kind: 'move', slot: ms, target: f }
+        }
+      }
+    }
+    out[slot] = best
+  }
+  return out
+}
+
+/** Doubles replacement policy: the bench Pokemon whose best move does the most to either foe. */
+export function bestReplacementDoubles(
+  ctx: GameContext,
+  data: BattleData,
+  st: BattleState,
+  slot: Slot,
+  reserved: number[] = [],
+): number {
+  const options = canSwitch(st, 'mine', slot).filter((i) => !reserved.includes(i))
+  if (!options.length) return -1
+  const foes = battlerOrder(st).filter((p) => p.side === 'theirs' && standing(st, p))
+  let best = options[0]
+  let bestVal = -1
+  for (const i of options) {
+    const m = st.sides.mine.mons[i]
+    let val = 0
+    for (const p of foes) {
+      const foe = monAt(st, p)!
+      for (const id of m.spec.moves) {
+        const md = analyzeMove({
+          ctx,
+          data,
+          attacker: m.spec,
+          defender: foe.spec,
+          moveId: id,
+          attackerSide: 'mine',
+          field: fieldOf(st),
+          atk: { status: m.status, boosts: {}, currentHp: m.hp, abilityOn: false },
+          def: { status: foe.status, boosts: {}, currentHp: foe.hp, abilityOn: false },
+          badges: new Set(st.badges),
+          fast: true,
+        })
+        if (md.status === 'ok') val = Math.max(val, md.expectedPct)
+      }
+    }
+    val *= m.hp / m.maxHp
+    if (val > bestVal) {
+      bestVal = val
+      best = i
+    }
+  }
+  return best
 }
 
 /** Replacement policy: the healthy Pokemon whose best move does the most to the opponent's active. */
@@ -317,7 +543,29 @@ export function runBattle(
       if (m.fainted && !before.sides.theirs.mons[i].fainted) theirsFainted.push(i)
     })
   }
-  while (!st.winner && st.turn < maxTurns) {
+  while (st.doubles && !st.winner && st.turn < maxTurns) {
+    // Doubles: refill my emptied slots, then both of mine act greedily.
+    const mine = (st.pendingSlots ?? []).filter((p) => p.side === 'mine')
+    if (mine.length) {
+      const reserved: number[] = []
+      for (const p of mine) {
+        const to = bestReplacementDoubles(ctx, data, st, p.slot, reserved)
+        if (to < 0) {
+          st = { ...st, pendingSlots: (st.pendingSlots ?? []).filter((q) => q !== p) }
+          continue
+        }
+        reserved.push(to)
+        st = playerSwitch(ctx, data, st, to, policies, rng, p.slot).state
+      }
+      continue
+    }
+    const before = st
+    const r = stepTurnDoubles(ctx, data, st, greedyDoubles(ctx, data, st), policies, rng, aiRng)
+    events.push(...r.events)
+    st = r.state
+    noteFaints(before, st)
+  }
+  while (!st.doubles && !st.winner && st.turn < maxTurns) {
     if (st.pendingSwitch.includes('mine')) {
       const to = bestReplacement(ctx, data, st)
       if (to < 0) break

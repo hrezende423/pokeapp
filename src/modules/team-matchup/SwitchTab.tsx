@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from 'react'
 import { getMove } from '../../data'
-import { predictAi, type AiPrediction } from '../battle/ai'
+import { predictAi, predictAiDoubles, type AiPrediction } from '../battle/ai'
 import { pivotOptions, setupWindows, switchInTable } from '../battle/analysis/switching'
 import { newBattle } from '../battle/session'
 import type { MatchupView } from './TeamMatchup'
@@ -26,11 +26,19 @@ export function SwitchTab({ view }: { view: MatchupView }) {
     const { state } = newBattle(ctx, data, resolved.mine, resolved.theirs, resolved.trainer, {
       badges: setup.badges,
       mineLead: resolved.mine.indexOf(mine),
-      field: setup.field,
+      mineLead2: setup.lead2,
+      field: resolved.field,
+      doubles: resolved.doubles,
     })
-    state.sides.theirs.active = resolved.theirs.indexOf(foe)
-    return predictAi(ctx, data, state, 300)
-  }, [ctx, data, resolved, mine, foe, setup.badges, setup.field])
+    const fi = resolved.theirs.indexOf(foe)
+    state.sides.theirs.active = fi
+    if (!resolved.doubles) return predictAi(ctx, data, state, 300)
+    // S6: the foe on the left beside the next of its party, against both of mine --
+    // the doubles routine weighs every target.
+    const partner = state.sides.theirs.mons.findIndex((m, i) => i !== fi && !m.fainted)
+    state.sides.theirs.active2 = partner >= 0 ? partner : undefined
+    return predictAiDoubles(ctx, data, state, 0, 300)
+  }, [ctx, data, resolved, mine, foe, setup.badges, setup.lead2])
 
   const inp = useMemo(
     () => ({
@@ -38,11 +46,11 @@ export function SwitchTab({ view }: { view: MatchupView }) {
       data,
       mine: resolved.mine,
       theirs: resolved.theirs,
-      field: setup.field,
+      field: resolved.field,
       badges,
       residual: true,
     }),
-    [ctx, data, resolved, setup.field, badges],
+    [ctx, data, resolved, badges],
   )
   const predicted = useMemo(() => {
     if (!prediction || !foe) return undefined

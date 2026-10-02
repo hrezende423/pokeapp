@@ -107,6 +107,32 @@ export function SetupTab({ view }: { view: MatchupView }) {
                   ))}
                 </select>
               </label>
+              {resolved.doubles && (
+                // S6: a double battle opens with two of mine.
+                <label className="tm-inline-field">
+                  <span>Second lead</span>
+                  <select
+                    className="tm-select"
+                    data-testid="tm-lead2"
+                    value={setup.lead2 ?? ''}
+                    onChange={(e) =>
+                      update((s) => ({
+                        ...s,
+                        lead2: e.target.value === '' ? undefined : Number(e.target.value),
+                      }))
+                    }
+                  >
+                    <option value="">The next one</option>
+                    {resolved.mine.map((m, i) =>
+                      i === setup.lead ? null : (
+                        <option key={m.key} value={i}>
+                          {m.label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+              )}
               <ol className="tm-roster" data-testid="tm-mine-roster">
                 {resolved.mine.map((m, i) => (
                   <RosterRow

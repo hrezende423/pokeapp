@@ -425,6 +425,8 @@ export function calculateBPModsDPP(
     desc.isCharge = true
   }
 
+  if (field.doubles?.helpingHand) basePower = Math.floor((basePower * 15) / 10)
+
   if (hasAbility(attacker, 'technician') && basePower <= 60) {
     basePower = Math.floor(basePower * 1.5)
     desc.attackerAbility = attacker.abilityName
@@ -629,15 +631,22 @@ function calculateFinalModsDPP(
   isCritical: boolean,
 ): number {
   const isPhysical = move.category === 'physical'
+  // Double battles (pokeplatinum BattleSystem_CalcBaseDamage); see CalcField.doubles.
+  const dbl = field.doubles
+  const twoDefenders = dbl != null && dbl.defenderSideAlive === 2
   if (!isCritical) {
     if (isPhysical && field.defenderSide.reflect) {
-      baseDamage = Math.floor(baseDamage * 0.5)
+      baseDamage = twoDefenders ? Math.floor((baseDamage * 2) / 3) : Math.floor(baseDamage * 0.5)
       desc.isReflect = true
     } else if (!isPhysical && field.defenderSide.lightScreen) {
-      baseDamage = Math.floor(baseDamage * 0.5)
+      baseDamage = twoDefenders ? Math.floor((baseDamage * 2) / 3) : Math.floor(baseDamage * 0.5)
       desc.isLightScreen = true
     }
   }
+  if (dbl && dbl.spread === 'both-foes' && twoDefenders)
+    baseDamage = Math.floor((baseDamage * 3) / 4)
+  if (dbl && dbl.spread === 'all-adjacent' && dbl.othersAlive >= 2)
+    baseDamage = Math.floor((baseDamage * 3) / 4)
 
   const w = field.weather
   if ((w === 'sun' && move.type === 'fire') || (w === 'rain' && move.type === 'water')) {

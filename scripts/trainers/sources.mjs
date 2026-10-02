@@ -133,6 +133,13 @@ export const BATTLE_PATHS = {
     '/data/battle_ai_scripts.s',
     '/asm/macros/battle_ai_script.inc',
     '/src/battle_ai_script_commands.c',
+    // Double battles (S6): damage, targeting, turn order, switching, effects.
+    '/src/pokemon.c',
+    '/src/battle_util.c',
+    '/src/battle_script_commands.c',
+    '/src/battle_ai_switch_items.c',
+    '/data/battle_scripts_1.s',
+    '/include/battle.h',
   ],
   pokefirered: [
     '/data/battle_ai_scripts.s',
@@ -147,6 +154,9 @@ export const BATTLE_PATHS = {
     '/src/battle/trainer_ai/',
     '/asm/macros/aicmd.inc',
     '/include/data/scripts/',
+    // Double battles (S6): the battle engine and the AI's doubles routines.
+    '/src/battle/',
+    '/include/battle/',
   ],
   pokeheartgold: [],
 }

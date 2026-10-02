@@ -17,7 +17,7 @@ import { hits, pct, prob, probRange } from './format'
 const STATUSES: StatusId[] = ['healthy', 'par', 'brn', 'psn', 'tox', 'slp', 'frz']
 
 export function DamageTab({ view }: { view: MatchupView }) {
-  const { ctx, data, resolved, setup, badges } = view
+  const { ctx, data, resolved, badges } = view
   const all = [...resolved.mine, ...resolved.theirs]
   const [atkKey, setAtkKey] = useState('')
   const [defKey, setDefKey] = useState('')
@@ -52,7 +52,7 @@ export function DamageTab({ view }: { view: MatchupView }) {
       defender,
       moveId: move,
       attackerSide: attacker.side,
-      field: setup.field,
+      field: resolved.field,
       atk: { status: 'healthy', boosts: {}, currentHp: null, abilityOn: false },
       def: { status: 'healthy', boosts: {}, currentHp: null, abilityOn: false },
       badges,
@@ -65,7 +65,7 @@ export function DamageTab({ view }: { view: MatchupView }) {
       defender,
       moveId: move,
       attackerSide: attacker.side,
-      field: setup.field,
+      field: resolved.field,
       atk: {
         status: atkStatus,
         boosts: boosts('atk', atkBoost, probe.category),
@@ -91,7 +91,7 @@ export function DamageTab({ view }: { view: MatchupView }) {
     attacker,
     defender,
     move,
-    setup.field,
+    resolved.field,
     atkStatus,
     defStatus,
     atkBoost,
@@ -106,11 +106,11 @@ export function DamageTab({ view }: { view: MatchupView }) {
 
   const solver = useMemo(() => {
     if (!attacker || !defender || !move || !result || result.status !== 'ok') return null
-    const inp = { ctx, data, field: setup.field, badges }
+    const inp = { ctx, data, field: resolved.field, badges }
     return attacker.side === 'mine'
       ? { kind: 'attack' as const, a: solveAttack(inp, attacker, defender, move, solverUses) }
       : { kind: 'bulk' as const, b: solveBulk(inp, defender, attacker, move, solverUses) }
-  }, [ctx, data, attacker, defender, move, result, setup.field, badges, solverUses])
+  }, [ctx, data, attacker, defender, move, result, resolved.field, badges, solverUses])
 
   if (!attacker || !defender) return <Note>Choose your team and an opponent in Setup.</Note>
   const unit = ctx.spreadModel === 'ev' ? 'EVs' : 'Stat Exp'

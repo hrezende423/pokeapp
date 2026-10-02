@@ -16,6 +16,7 @@ import {
 } from '../battle/battler'
 import { applyFormat } from '../battle/format'
 import type { GameContext } from '../battle/game'
+import type { MatchField } from '../battle/damage'
 import { point } from '../battle/range'
 import type { TrainerInfo } from '../battle/session'
 import {
@@ -39,6 +40,13 @@ export interface Resolved {
   trainer: TrainerInfo | null
   opponentTitle: string
   battle: 'single' | 'double' | 'tag'
+  /**
+   * S6: battles run two-on-two -- the trainer's own double / tag battle, or the
+   * Double format -- in Gen 3-4 (Gen 1-2 have none).
+   */
+  doubles: boolean
+  /** The field every tab computes on: Setup's field, plus the doubles flag. */
+  field: MatchField
   /** R6: a facility trainer's whole pool, each set with its chance of appearing. */
   pool: PoolEntry[] | null
   /** How many the facility draws from its pool per battle. */
@@ -162,7 +170,10 @@ export function resolveSetup(
         theirs = entries.map((e) => e.spec)
       } else {
         pool = entries
-        poolSize = Math.min(3, entries.length)
+        // FRONTIER_PARTY_SIZE 3 / FRONTIER_DOUBLES_PARTY_SIZE 4 (pokeemerald global.h);
+        // BT_SINGLES_PARTY_SIZE 3 / BT_DOUBLES_PARTY_SIZE 4 (pokeplatinum battle_tower.h).
+        const draws = setup.format.battle === 'double' && ctx.generation >= 3 ? 4 : 3
+        poolSize = Math.min(draws, entries.length)
         const picked = opp.picks
           .map((k) => entries.find((e) => e.setKey === k))
           .filter((e): e is PoolEntry => !!e)
@@ -189,10 +200,15 @@ export function resolveSetup(
     applyOverride(s, setup.theirs[i], setup.theirSpreadMode, setup.scenarioId),
   )
   // ---- format (S6)
-  const f = applyFormat(mine, theirs, {
-    ...setup.format,
-    battle: battle === 'single' ? setup.format.battle : 'double',
-  })
+  const wantsDoubles = battle !== 'single' || setup.format.battle === 'double'
+  const doubles = wantsDoubles && ctx.generation >= 3
+  if (wantsDoubles && !doubles)
+    limitations.push('Generations 1-2 have no double battles: fought as a single battle')
+  if (battle === 'tag')
+    limitations.push(
+      "Tag battle: your in-game partner's team is not in the data -- you play both of your slots",
+    )
+  const f = applyFormat(mine, theirs, { ...setup.format, battle: doubles ? 'double' : 'single' })
   if (f.limitation) limitations.push(f.limitation)
   return {
     team,
@@ -202,6 +218,8 @@ export function resolveSetup(
     trainer,
     opponentTitle,
     battle,
+    doubles,
+    field: { ...setup.field, doubles },
     pool,
     poolSize,
     notes: f.notes,

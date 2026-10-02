@@ -37,12 +37,12 @@ export function MatrixTab({ view }: { view: MatchupView }) {
             data,
             mine,
             theirs: resolved.theirs,
-            field: setup.field,
+            field: resolved.field,
             badges,
             residual: true,
           })
         : null,
-    [ctx, data, mine, resolved.theirs, setup.field, badges],
+    [ctx, data, mine, resolved.theirs, resolved.field, badges],
   )
   const suggest = useJob<Suggestion[]>()
 
@@ -119,7 +119,7 @@ export function MatrixTab({ view }: { view: MatchupView }) {
                               ctx,
                               m,
                               resolved.theirs[j],
-                              setup.field,
+                              resolved.field,
                               c.myBest?.moveId ?? null,
                               nav.setModule,
                             )
@@ -173,7 +173,12 @@ export function MatrixTab({ view }: { view: MatchupView }) {
               suggest.run({
                 kind: 'suggest',
                 vg: view.vg,
-                input: { mine, theirs: resolved.theirs, badges: setup.badges, field: setup.field },
+                input: {
+                  mine,
+                  theirs: resolved.theirs,
+                  badges: setup.badges,
+                  field: resolved.field,
+                },
               })
             }
           >

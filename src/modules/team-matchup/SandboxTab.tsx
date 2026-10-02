@@ -9,15 +9,38 @@
  *   earlier turn BRANCHES -- the old line stays, listed beside the new one.
  *   The opponent's send-out after a faint (P4) and its item use and switching
  *   (P5) are the AI's, as in the game.
+ *
+ *   A DOUBLE battle (S6) shows all four battlers; each of mine gets an action and,
+ *   for a single-target move, a target (a foe or the ally); each of theirs is the
+ *   AI's doubles routine or a forced action; emptied slots are refilled one by one.
  */
 
 import { useMemo, useState } from 'react'
 import { getMove } from '../../data'
-import { predictAi, actionLabel } from '../battle/ai'
+import { predictAi, predictAiDoubles, actionLabel, actionLabelAt } from '../battle/ai'
+import type { BattleData } from '../battle/battleData'
+import type { GameContext } from '../battle/game'
 import { canSwitch, usableMoveSlots, type Action, type LogLine } from '../battle/engine/turn'
 import { Rng, type EventPolicy, type Policies, type RollPolicy } from '../battle/engine/rng'
-import { activeMon, type BattleState, type CornerPick, type MonState } from '../battle/engine/state'
-import { newBattle, playerSwitch, stepTurn } from '../battle/session'
+import {
+  activeMon,
+  monAt,
+  partnerPos,
+  standing,
+  type BattleState,
+  type CornerPick,
+  type MonState,
+  type Pos,
+  type Slot,
+} from '../battle/engine/state'
+import { needsTarget, standingFoes } from '../battle/engine/doubles'
+import {
+  greedyDoubles,
+  newBattle,
+  playerSwitch,
+  stepTurn,
+  stepTurnDoubles,
+} from '../battle/session'
 import type { MatchupView } from './TeamMatchup'
 import { PredictionView } from './SwitchTab'
 import { Choice, Note, Section } from './parts'
@@ -55,9 +78,11 @@ export function SandboxTab({ view }: { view: MatchupView }) {
     resolved.mine.map((m) => m.key + m.level + m.levelOverride),
     resolved.theirs.map((t) => t.key),
     setup.lead,
+    setup.lead2,
+    resolved.doubles,
     minePick,
     theirsPick,
-    setup.field,
+    resolved.field,
     setup.badges,
   ])
   const fresh = useMemo(() => {
@@ -67,22 +92,34 @@ export function SandboxTab({ view }: { view: MatchupView }) {
       minePick,
       theirsPick,
       mineLead: setup.lead,
-      field: setup.field,
+      mineLead2: setup.lead2,
+      field: resolved.field,
+      doubles: resolved.doubles,
     })
     return {
       nodes: [{ id: 0, parent: null, state, log, label: 'Start' }],
       current: 0,
       key: startKey,
     }
-  }, [startKey, ctx, data, resolved, setup.badges, setup.lead, setup.field, minePick, theirsPick])
+  }, [startKey, ctx, data, resolved, setup.badges, setup.lead, setup.lead2, minePick, theirsPick])
   const t = tree && tree.key === startKey ? tree : fresh
   const node = t?.nodes.find((n) => n.id === t.current) ?? null
   const st = node?.state ?? null
   const prediction = useMemo(
     () =>
-      st && !st.winner && !st.pendingSwitch.length
+      st && !st.doubles && !st.winner && !st.pendingSwitch.length
         ? predictAi(ctx, data, st, 200, 0x5eed + st.turn)
         : null,
+    [ctx, data, st],
+  )
+  // Doubles: one prediction per opposing battler standing.
+  const predictions = useMemo(
+    () =>
+      st && st.doubles && !st.winner
+        ? ([0, 1] as Slot[])
+            .filter((s) => standing(st, { side: 'theirs', slot: s }))
+            .map((s) => ({ slot: s, p: predictAiDoubles(ctx, data, st, s, 200, 0x5eed + st.turn) }))
+        : [],
     [ctx, data, st],
   )
 
@@ -253,11 +290,49 @@ export function SandboxTab({ view }: { view: MatchupView }) {
           </span>
         }
       >
-        <div className="tm-sb-field" data-layout="tm-sb-field">
-          <MonPanel mon={mine} side="Yours" testId="tm-sb-mine" />
-          <MonPanel mon={foe} side="Theirs" testId="tm-sb-theirs" />
-        </div>
-        {!st.winner && mustReplace && (
+        {st.doubles ? (
+          <div className="tm-sb-field tm-sb-field-doubles" data-layout="tm-sb-field">
+            {([0, 1] as Slot[]).map((s) => {
+              const m = monAt(st, { side: 'mine', slot: s })
+              return m ? (
+                <MonPanel
+                  key={'m' + s}
+                  mon={m}
+                  side={s === 0 ? 'Yours, left' : 'Yours, right'}
+                  testId={'tm-sb-mine' + s}
+                />
+              ) : null
+            })}
+            {([0, 1] as Slot[]).map((s) => {
+              const m = monAt(st, { side: 'theirs', slot: s })
+              return m ? (
+                <MonPanel
+                  key={'t' + s}
+                  mon={m}
+                  side={s === 0 ? 'Theirs, left' : 'Theirs, right'}
+                  testId={'tm-sb-theirs' + s}
+                />
+              ) : null
+            })}
+          </div>
+        ) : (
+          <div className="tm-sb-field" data-layout="tm-sb-field">
+            <MonPanel mon={mine} side="Yours" testId="tm-sb-mine" />
+            <MonPanel mon={foe} side="Theirs" testId="tm-sb-theirs" />
+          </div>
+        )}
+        {st.doubles && (
+          <DoublesTurn
+            key={node.id}
+            ctx={ctx}
+            data={data}
+            st={st}
+            policies={policies}
+            seed={seed}
+            push={push}
+          />
+        )}
+        {!st.doubles && !st.winner && mustReplace && (
           <div className="tm-row" data-testid="tm-sb-replace">
             <span>Send out:</span>
             {canSwitch(st, 'mine').map((i) => (
@@ -267,7 +342,7 @@ export function SandboxTab({ view }: { view: MatchupView }) {
             ))}
           </div>
         )}
-        {!st.winner && !mustReplace && (
+        {!st.doubles && !st.winner && !mustReplace && (
           <>
             <div className="tm-row" data-testid="tm-sb-actions">
               {usableMoveSlots(ctx, data, st, 'mine').map((slot) => (
@@ -376,6 +451,205 @@ export function SandboxTab({ view }: { view: MatchupView }) {
       </Section>
 
       {prediction && <PredictionView prediction={prediction} testId="tm-sb-prediction" />}
+      {predictions.map(({ slot, p }) => (
+        <PredictionView key={slot} prediction={p} testId={'tm-sb-prediction-' + slot} />
+      ))}
+    </div>
+  )
+}
+
+/** An action as a select value: 'm2@theirs1' (a move at a target), 's4' (a switch). */
+function encode(a: Action): string {
+  if (a.kind === 'move') return 'm' + a.slot + (a.target ? '@' + a.target.side + a.target.slot : '')
+  if (a.kind === 'switch') return 's' + a.to
+  return 'n'
+}
+
+function decode(v: string): Action {
+  if (v.startsWith('s')) return { kind: 'switch', to: Number(v.slice(1)) }
+  if (v.startsWith('m')) {
+    const [slot, at] = v.slice(1).split('@')
+    const target: Pos | undefined = at
+      ? { side: at.startsWith('mine') ? 'mine' : 'theirs', slot: Number(at.slice(-1)) as Slot }
+      : undefined
+    return { kind: 'move', slot: Number(slot), target }
+  }
+  return { kind: 'none' }
+}
+
+/** What one battler can do this turn, for a select (each move at each target it can take). */
+function optionsFor(
+  ctx: GameContext,
+  data: BattleData,
+  st: BattleState,
+  side: 'mine' | 'theirs',
+  slot: Slot,
+): { value: string; label: string }[] {
+  const at: Pos = { side, slot }
+  const m = monAt(st, at)
+  if (!m || m.fainted) return []
+  const foes = standingFoes(st, at)
+  const ally = partnerPos(at)
+  const out: { value: string; label: string }[] = []
+  const usable =
+    side === 'mine' ? usableMoveSlots(ctx, data, st, side, slot) : m.spec.moves.map((_, i) => i)
+  for (const ms of usable) {
+    const id = m.spec.moves[ms]
+    if (!id) continue
+    const name = getMove(id)?.display_name ?? 'Move'
+    if (needsTarget(data, id)) {
+      const targets = [...foes, ...(standing(st, ally) ? [ally] : [])]
+      for (const t of targets) {
+        const tm = monAt(st, t)!
+        out.push({
+          value: encode({ kind: 'move', slot: ms, target: t }),
+          label: name + ' → ' + tm.spec.label + (t.side === side ? ' (ally)' : ''),
+        })
+      }
+    } else out.push({ value: encode({ kind: 'move', slot: ms, target: foes[0] }), label: name })
+  }
+  if (!out.length && side === 'mine')
+    out.push({ value: encode({ kind: 'move', slot: 0, target: foes[0] }), label: 'Struggle' })
+  for (const i of canSwitch(st, side, slot))
+    out.push({ value: 's' + i, label: 'Switch to ' + st.sides[side].mons[i].spec.label })
+  return out
+}
+
+/** S6: the controls for one turn of a double battle. */
+function DoublesTurn({
+  ctx,
+  data,
+  st,
+  policies,
+  seed,
+  push,
+}: {
+  ctx: GameContext
+  data: BattleData
+  st: BattleState
+  policies: Policies
+  seed: number
+  push: (state: BattleState, log: LogLine[], label: string) => void
+}) {
+  // Each of mine starts on the greedy suggestion; the reader changes what they like.
+  const [picks, setPicks] = useState<Partial<Record<Slot, string>>>(() => {
+    const g = greedyDoubles(ctx, data, st)
+    return { 0: g[0] ? encode(g[0]) : undefined, 1: g[1] ? encode(g[1]) : undefined }
+  })
+  const [forced, setForced] = useState<Record<Slot, string>>({ 0: 'ai', 1: 'ai' })
+  if (st.winner) return null
+  const pending = (st.pendingSlots ?? []).filter((p) => p.side === 'mine')
+  if (pending.length) {
+    const p = pending[0]
+    return (
+      <div className="tm-row" data-testid="tm-sb-replace">
+        <span>Send out on the {p.slot === 0 ? 'left' : 'right'}:</span>
+        {canSwitch(st, 'mine', p.slot).map((i) => (
+          <button
+            key={i}
+            type="button"
+            className="tm-link"
+            data-testid={'tm-sb-replace-' + i}
+            onClick={() => {
+              const r = playerSwitch(ctx, data, st, i, policies, new Rng(seed + st.turn), p.slot)
+              push(r.state, r.log, 'Send out ' + st.sides.mine.mons[i].spec.label)
+            }}
+          >
+            {st.sides.mine.mons[i].spec.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
+  const mineSlots = ([0, 1] as Slot[]).filter((s) => standing(st, { side: 'mine', slot: s }))
+  const theirSlots = ([0, 1] as Slot[]).filter((s) => standing(st, { side: 'theirs', slot: s }))
+  const run = () => {
+    const mine: Partial<Record<Slot, Action>> = {}
+    for (const s of mineSlots) {
+      const v = picks[s] ?? optionsFor(ctx, data, st, 'mine', s)[0]?.value
+      if (v) mine[s] = decode(v)
+    }
+    const force: Partial<Record<Slot, Action>> = {}
+    for (const s of theirSlots) if (forced[s] !== 'ai') force[s] = decode(forced[s])
+    const r = stepTurnDoubles(
+      ctx,
+      data,
+      st,
+      mine,
+      policies,
+      new Rng(seed * 7919 + st.turn),
+      new Rng(seed * 104729 + st.turn),
+      force,
+    )
+    const mineLabel = mineSlots
+      .map((s) => {
+        const a = mine[s]!
+        const m = monAt(st, { side: 'mine', slot: s })!
+        if (a.kind !== 'move') return m.spec.label + ': switch'
+        const t = a.target ? monAt(st, a.target) : undefined
+        const name = getMove(m.spec.moves[a.slot])?.display_name ?? 'Move'
+        return m.spec.label + ': ' + name + (t ? ' → ' + t.spec.label : '')
+      })
+      .join(', ')
+    const foeLabel = theirSlots
+      .map((s) => {
+        const a = force[s] ?? r.ai.find((x) => x.slot === s)?.choice.action
+        return a ? actionLabelAt(st, a, s) : ''
+      })
+      .filter(Boolean)
+      .join(', ')
+    push(
+      r.state,
+      r.log,
+      'T' + (st.turn + 1) + ': ' + mineLabel + (foeLabel ? ' / foe: ' + foeLabel : ''),
+    )
+  }
+  return (
+    <div className="tm-sb-doubles" data-testid="tm-sb-actions">
+      {mineSlots.map((s) => (
+        <label key={'m' + s} className="tm-inline-field">
+          <span>{monAt(st, { side: 'mine', slot: s })!.spec.label}</span>
+          <select
+            className="tm-select"
+            data-testid={'tm-sb-act-' + s}
+            value={picks[s] ?? ''}
+            onChange={(e) => setPicks({ ...picks, [s]: e.target.value })}
+          >
+            {optionsFor(ctx, data, st, 'mine', s).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+      {theirSlots.map((s) => (
+        <label key={'t' + s} className="tm-inline-field">
+          <span>{monAt(st, { side: 'theirs', slot: s })!.spec.label} does</span>
+          <select
+            className="tm-select"
+            data-testid={'tm-sb-forced-' + s}
+            value={forced[s]}
+            onChange={(e) => setForced({ ...forced, [s]: e.target.value })}
+          >
+            <option value="ai">What its AI picks</option>
+            {optionsFor(ctx, data, st, 'theirs', s).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+      {ctx.generation === 3 && (
+        <Note>
+          Generation 3 refills an emptied slot at once, mid-turn: one of yours that faints is
+          replaced by the best matchup there and then (Undo to play it differently).
+        </Note>
+      )}
+      <button type="button" className="tm-action" data-testid="tm-sb-go" onClick={run}>
+        Play turn {st.turn + 1}
+      </button>
     </div>
   )
 }

@@ -34,7 +34,7 @@ function modsFor(
 }
 
 export function SpeedTab({ view }: { view: MatchupView }) {
-  const { ctx, data, resolved, setup, badges } = view
+  const { ctx, data, resolved, badges } = view
   const [mods, setMods] = useState<Record<string, ModState>>({})
   const all = useMemo(() => [...resolved.mine, ...resolved.theirs], [resolved])
   const ladder = useMemo(
@@ -42,11 +42,11 @@ export function SpeedTab({ view }: { view: MatchupView }) {
       speedLadder(
         ctx,
         data,
-        all.map((spec) => ({ spec, mods: modsFor(mods, setup.field, spec.key, spec.side) })),
+        all.map((spec) => ({ spec, mods: modsFor(mods, resolved.field, spec.key, spec.side) })),
         badges,
-        setup.field.trickRoom,
+        resolved.field.trickRoom,
       ),
-    [ctx, data, all, badges, setup.field, mods],
+    [ctx, data, all, badges, resolved.field, mods],
   )
   const [mineKey, setMineKey] = useState<string>('')
   const [targetKey, setTargetKey] = useState<string>('')
@@ -59,13 +59,13 @@ export function SpeedTab({ view }: { view: MatchupView }) {
             ctx,
             data,
             me,
-            modsFor(mods, setup.field, me.key, 'mine'),
+            modsFor(mods, resolved.field, me.key, 'mine'),
             target,
-            modsFor(mods, setup.field, target.key, 'theirs'),
+            modsFor(mods, resolved.field, target.key, 'theirs'),
             badges,
           )
         : null,
-    [ctx, data, me, target, badges, mods, setup.field],
+    [ctx, data, me, target, badges, mods, resolved.field],
   )
   if (!all.length) return <Note>Choose your team and an opponent in Setup.</Note>
   const nameOf = (k: string) => all.find((s) => s.key === k)?.label ?? k
@@ -75,7 +75,7 @@ export function SpeedTab({ view }: { view: MatchupView }) {
     <div className="tm-speed-page" data-layout="tm-speed-page">
       <Section
         title={
-          setup.field.trickRoom && ctx.trickRoom
+          resolved.field.trickRoom && ctx.trickRoom
             ? 'Speed ladder — Trick Room: slowest moves first'
             : 'Speed ladder — fastest first'
         }

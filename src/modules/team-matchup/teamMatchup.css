@@ -629,6 +629,22 @@
 .tm-sb-mon:last-child {
   grid-area: theirs;
 }
+/* S6: a double battle -- my two on the left column, theirs on the right. */
+.tm-sb-field-doubles {
+  grid-template-areas: none;
+  grid-template-rows: auto auto;
+  grid-auto-flow: column;
+}
+.tm-sb-field-doubles .tm-sb-mon:first-child,
+.tm-sb-field-doubles .tm-sb-mon:last-child {
+  grid-area: auto;
+}
+.tm-sb-doubles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--tm-3) var(--tm-5);
+}
 .tm-log {
   margin: 0;
   padding: 0;

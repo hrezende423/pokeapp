@@ -24,7 +24,7 @@ export interface ScanTarget {
   order: number | null
   trainer: TrainerInfo
   theirs: BattlerSpec[]
-  /** Doubles / tag battles are simulated as singles; the row says so. */
+  /** Doubles and tag battles are fought two-on-two in Gen 3-4 (a tag battle's NPC partner is not in the data: I play both slots). */
   format: 'single' | 'double' | 'tag'
 }
 
@@ -57,12 +57,13 @@ export function batchScan(inp: ScanInput): ScanRow[] {
   const rows: ScanRow[] = []
   const field = inp.field ?? emptyMatchField()
   inp.targets.forEach((t, idx) => {
+    const doubles = t.format !== 'single' && inp.ctx.generation >= 3
     const m = computeMatrix({
       ctx: inp.ctx,
       data: inp.data,
       mine: inp.mine,
       theirs: t.theirs,
-      field,
+      field: { ...field, doubles },
       badges: new Set(inp.badges),
       residual: true,
     })
@@ -82,9 +83,10 @@ export function batchScan(inp: ScanInput): ScanRow[] {
             theirs: t.theirs,
             trainer: t.trainer,
             badges: inp.badges,
-            field,
+            field: { ...field, doubles },
             runs: inp.runs,
             seed: 7,
+            doubles,
           })
         : null
     const row: ScanRow = {

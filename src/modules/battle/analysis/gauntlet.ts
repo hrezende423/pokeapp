@@ -22,6 +22,8 @@ export interface GauntletStage {
   label: string
   trainer: TrainerInfo
   theirs: BattlerSpec[]
+  /** A double battle (S6): fought two-on-two. */
+  doubles?: boolean
 }
 
 export interface HealingBudget {
@@ -196,6 +198,7 @@ export function runGauntlet(inp: GauntletInput): GauntletResult {
           theirsPick: plan.theirs,
           carry,
           field: inp.field,
+          doubles: stage.doubles,
         })
         if (!carried) {
           carried = {

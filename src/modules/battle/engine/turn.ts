@@ -25,6 +25,7 @@ import {
   emptySide,
   type CalcField,
   type DamageResult,
+  type DoublesField,
 } from '../../calculators/damage'
 import type { BattleData } from '../battleData'
 import { gameMove, heldEffect } from '../battleData'
@@ -33,25 +34,38 @@ import { critChance, hitChance, hitCounts, quickClawChance } from '../chance'
 import { categoryOf, movePriority } from '../damage'
 import type { GameContext } from '../game'
 import { effectiveSpeed } from '../speed'
+import { doublesField, redirectSingle, spreadTargets, standingFoes, targetKind } from './doubles'
 import { moveSem, type MoveSem } from './moveSem'
 import { decide, pickRoll, type ChanceSource } from './rng'
 import {
   abilitySlugOf,
   activeMon,
   aliveCount,
+  battlerOrder,
   calcPokemonOf,
   cloneState,
   emptyVolatile,
   itemSlugOf,
+  monAt,
+  onField,
   other,
+  partnerPos,
+  posKey,
+  samePos,
+  slotIndex,
+  slotOfMon,
+  standing,
   type BattleState,
   type BoostKey,
   type MonState,
+  type Pos,
   type Side,
+  type Slot,
 } from './state'
 
 export type Action =
-  | { kind: 'move'; slot: number }
+  /** `target`: the battler a single-target move is aimed at (doubles; singles ignore it). */
+  | { kind: 'move'; slot: number; target?: Pos }
   | { kind: 'switch'; to: number }
   | { kind: 'item'; itemId: number }
   | { kind: 'none' }
@@ -91,6 +105,11 @@ interface Ctx {
   src: ChanceSource
   log: LogLine[]
   dealt: Record<Side, number>
+  /** Doubles: each battler's action this turn (Pursuit, Counter), by posKey. */
+  actions?: Map<string, Action>
+  /** Doubles: this turn's order of action and the battlers' speed order (Gen 4 spread order). */
+  turnOrder?: Pos[]
+  speedOrder?: Pos[]
 }
 
 const name = (m: MonState) => m.spec.label
@@ -119,7 +138,12 @@ function line(
   })
 }
 
-function calcField(c: Ctx, attacker: Side, defenderSwitching = false): CalcField {
+function calcField(
+  c: Ctx,
+  attacker: Side,
+  defenderSwitching = false,
+  dSide: Side = other(attacker),
+): CalcField {
   const s = c.st.sides
   const mk = (sd: Side) => ({
     ...emptySide(),
@@ -133,8 +157,20 @@ function calcField(c: Ctx, attacker: Side, defenderSwitching = false): CalcField
     weather: c.st.weather.kind,
     gravity: c.st.gravity > 0,
     attackerSide: mk(attacker),
-    defenderSide: mk(other(attacker)),
+    defenderSide: mk(dSide),
   }
+}
+
+/**
+ * Which two battlers a damage call is between, when they are not the two slot-0
+ * Pokemon (doubles: a slot-1 battler, or an ally hit by Earthquake), and the
+ * double-battle inputs of the formula.
+ */
+export interface DamageAt {
+  attacker: MonState
+  defender: MonState
+  defenderSide: Side
+  doubles?: DoublesField
 }
 
 /** The engine's damage for one hit (or the whole move when `hits` is set). */
@@ -146,19 +182,27 @@ export function engineDamage(
   isCrit: boolean,
   hits: number | null,
   defenderSwitching = false,
+  at?: DamageAt,
 ): DamageResult | null {
-  const a = activeMon(st, attackerSide)
-  const d = activeMon(st, other(attackerSide))
+  const a = at?.attacker ?? activeMon(st, attackerSide)
+  const d = at?.defender ?? activeMon(st, other(attackerSide))
   const move = getMove(moveId)
   if (!move) return null
   const c = { ctx, st } as Ctx
+  const field = calcField(
+    c,
+    attackerSide,
+    defenderSwitching,
+    at?.defenderSide ?? other(attackerSide),
+  )
+  if (at?.doubles) field.doubles = at.doubles
   try {
     return calculateDamage(
       ctx.generation,
       calcPokemonOf(ctx, st, a),
       calcPokemonOf(ctx, st, d),
       { move, isCrit, hits, powerOverride: null },
-      calcField(c, attackerSide, defenderSwitching),
+      field,
       { koText: false },
     )
   } catch {
@@ -175,11 +219,11 @@ function rollsOf(r: DamageResult, hit: number): number[] {
 
 // ----------------------------------------------------------------- order
 
-function actionPriority(c: Ctx, side: Side, a: Action): number {
+function actionPriority(c: Ctx, side: Side, a: Action, who?: MonState): number {
   if (a.kind === 'switch') return 7
   if (a.kind === 'item') return 6
   if (a.kind === 'move') {
-    const m = activeMon(c.st, side)
+    const m = who ?? activeMon(c.st, side)
     return movePriority(c.ctx, c.data, m.spec.moves[a.slot])
   }
   return -8
@@ -399,9 +443,32 @@ function checkFaint(c: Ctx, side: Side, m: MonState) {
   m.fainted = true
   m.status = 'healthy'
   line(c, 'faint', `${name(m)} fainted.`, side, m)
-  if (aliveCount(c.st.sides[side]) > 0 && !c.st.pendingSwitch.includes(side))
+  if (c.st.doubles) markPending(c, side, slotOfMon(c.st, side, m))
+  else if (aliveCount(c.st.sides[side]) > 0 && !c.st.pendingSwitch.includes(side))
     c.st.pendingSwitch.push(side)
   if (aliveCount(c.st.sides[side]) === 0) c.st.winner = other(side)
+}
+
+/** Can this side send someone into an empty slot (a living Pokemon off the field)? */
+function hasBench(st: BattleState, side: Side): boolean {
+  const sd = st.sides[side]
+  return sd.mons.some((x, i) => !x.fainted && !onField(sd, i))
+}
+
+/**
+ * A slot must be refilled before the next turn (a faint, U-turn, Baton Pass). In
+ * singles that is the side's pendingSwitch; in doubles the slot itself, and only
+ * when the side has someone left to send (else the slot stays empty).
+ */
+function markPending(c: Ctx, side: Side, slot: Slot) {
+  if (!c.st.doubles) {
+    if (!c.st.pendingSwitch.includes(side)) c.st.pendingSwitch.push(side)
+    return
+  }
+  if (!hasBench(c.st, side)) return
+  const pend = c.st.pendingSlots ?? (c.st.pendingSlots = [])
+  if (!pend.some((p) => p.side === side && p.slot === slot)) pend.push({ side, slot })
+  if (!c.st.pendingSwitch.includes(side)) c.st.pendingSwitch.push(side)
 }
 
 function damageTo(c: Ctx, side: Side, m: MonState, amount: number, text: string) {
@@ -425,10 +492,11 @@ export function switchIn(
   side: Side,
   to: number,
   batonPass = false,
+  slot: Slot = 0,
 ) {
   const c = c0 as Ctx
   const sd = c.st.sides[side]
-  const out = sd.mons[sd.active]
+  const out = sd.mons[slotIndex(sd, slot) ?? sd.active]
   const carried = batonPass
     ? {
         boosts: { ...out.boosts },
@@ -447,7 +515,8 @@ export function switchIn(
     out.toxic = 0
     if (abilitySlugOf(out) === 'natural-cure') out.status = 'healthy'
   }
-  sd.active = to
+  if (slot === 1) sd.active2 = to
+  else sd.active = to
   const m = sd.mons[to]
   m.volatile = emptyVolatile()
   if (carried) {
@@ -508,8 +577,12 @@ export function switchIn(
   )
     m.volatile.abilityRevealed = true
   if (!m.fainted && ab === 'intimidate') {
-    const foe = activeMon(c.st, other(side))
-    if (!foe.fainted) changeStats(c, foe, other(side), [{ stat: 'atk', delta: -1 }], true)
+    // Every opposing battler on the field (both foes in a double battle).
+    for (const p of battlerOrder(c.st)) {
+      if (p.side === side) continue
+      const foe = monAt(c.st, p)
+      if (foe && !foe.fainted) changeStats(c, foe, p.side, [{ stat: 'atk', delta: -1 }], true)
+    }
   }
   if (!m.fainted) {
     const weatherAbility: Record<string, 'rain' | 'sun' | 'sand' | 'hail'> = {
@@ -611,11 +684,21 @@ function canAct(c: Ctx, side: Side, m: MonState): boolean {
 }
 
 function executeMove(c: Ctx, side: Side, slot: number, foeAction: Action) {
+  runMoveAt(c, { side, slot: 0 }, slot, null, foeAction)
+}
+
+/**
+ * One battler uses one move. In a single battle the target is the other slot-0
+ * Pokemon; in a double battle it is worked out from the move's game target and the
+ * reader's (or the AI's) choice -- see doubles.ts -- and a spread move runs the
+ * accuracy, damage and effects below once per target.
+ */
+function runMoveAt(c: Ctx, atk: Pos, slot: number, chosen: Pos | null, foeAction: Action) {
   const { ctx, data } = c
   const gen = ctx.generation
-  const a = activeMon(c.st, side)
-  const dSide = other(side)
-  if (a.fainted) return
+  const side = atk.side
+  const a = monAt(c.st, atk)
+  if (!a || a.fainted) return
   let moveId = a.spec.moves[slot]
   if (a.volatile.rampage) moveId = a.volatile.rampage.moveId
   if (a.volatile.charging != null) moveId = a.volatile.charging
@@ -643,9 +726,24 @@ function executeMove(c: Ctx, side: Side, slot: number, foeAction: Action) {
   a.volatile.semiInvulnerable = null
   if (!wasCharging && !a.volatile.rampage && a.pp[slot] > 0) a.pp[slot] -= 1
   a.volatile.lastMove = moveId
-  const d = activeMon(c.st, dSide)
   if (!a.volatile.usedMoves.includes(moveId)) a.volatile.usedMoves.push(moveId)
   line(c, 'move', `${name(a)} used ${label}.`, side)
+
+  // ---- the two doubles-only moves (Gen 3 Cmd_trysethelpinghand / Follow Me's effect)
+  if (c.st.doubles && (sem.slug === 'helping-hand' || sem.slug === 'follow-me')) {
+    if (sem.slug === 'follow-me') {
+      c.st.followMe = { ...(c.st.followMe ?? {}), [side]: atk.slot }
+      line(c, 'status', `${name(a)} became the center of attention!`, side)
+      return
+    }
+    const ally = partnerPos(atk)
+    const hh = c.st.helpingHand ?? (c.st.helpingHand = [])
+    if (standing(c.st, ally) && !hh.some((p) => samePos(p, ally))) {
+      hh.push(ally)
+      line(c, 'status', `${name(a)} is ready to help ${name(monAt(c.st, ally)!)}!`, side)
+    } else line(c, 'info', 'But it failed!', side)
+    return
+  }
   if (sem.unsimulated && !sem.damaging) {
     line(c, 'warn', `${label}'s effect is not simulated (${sem.unsimulated}).`, side)
     return
@@ -669,85 +767,160 @@ function executeMove(c: Ctx, side: Side, slot: number, foeAction: Action) {
       sem.pivot === 'baton-pass' ||
       sem.curse)
   if (selfOnly) {
-    applySelfMove(c, side, a, sem, label)
+    applySelfMove(c, side, a, sem, label, atk.slot, chosen)
     return
   }
-  if (d.fainted) {
-    line(c, 'info', 'But there was no target...', side)
-    return
-  }
-  if (d.volatile.protecting) {
-    line(c, 'info', `${name(d)} protected itself.`, dSide)
-    return
-  }
-  // ---- accuracy
-  const semi = d.volatile.semiInvulnerable
-  if (semi) {
-    const hitsSemi =
-      semi === 'fly' || semi === 'bounce'
-        ? ['gust', 'twister', 'thunder', 'sky-uppercut'].includes(sem.slug)
-        : semi === 'dig'
-          ? ['earthquake', 'magnitude', 'fissure'].includes(sem.slug)
-          : semi === 'dive'
-            ? ['surf', 'whirlpool'].includes(sem.slug)
-            : false
-    if (!hitsSemi) {
-      line(c, 'miss', `${name(d)} avoided the attack.`, dSide)
-      return
-    }
-  }
+
+  // ---- who it hits
+  const targets = moveTargets(c, atk, moveId, chosen)
   const category = categoryOf(ctx, data, moveId)
-  const p = hitChance(ctx, data, {
-    moveId,
-    accStage: a.boosts.acc,
-    evaStage: d.boosts.eva,
-    weather: c.st.weather.kind,
-    attackerAbility: abilitySlugOf(a),
-    targetAbility: abilitySlugOf(d),
-    targetItemId: d.itemId,
-    physical: category === 'physical',
-    sureHit: a.volatile.xAccuracy || a.volatile.lockOn > 0,
-  })
-  if (sem.ohko) {
-    const lvlOk =
-      gen === 1 ? speedOf(c, a, side) >= speedOf(c, d, dSide) : a.spec.level >= d.spec.level
-    const pOhko = gen === 1 ? p : lvlOk ? Math.min(1, (30 + a.spec.level - d.spec.level) / 100) : 0
-    if (
-      !lvlOk ||
-      !decide(c.src, a.key, 'miss', `${label} hits`, pOhko, invert(c.src.policies.miss))
-    ) {
-      line(c, 'miss', `${name(a)}'s ${label} missed.`, side)
-      return
+  let last: MonState | null = null
+  let anyHit = false
+  if (!targets.length) line(c, 'info', 'But there was no target...', side)
+  for (const t of targets) {
+    if (a.fainted) break
+    const d = monAt(c.st, t)!
+    const dSide = t.side
+    last = d
+    if (d.fainted) {
+      line(c, 'info', 'But there was no target...', side)
+      continue
     }
-    damageTo(c, dSide, d, d.hp, `It's a one-hit KO!`)
-    return
-  }
-  if (p < 1 && decide(c.src, a.key, 'miss', `${label} misses`, 1 - p, c.src.policies.miss)) {
-    line(c, 'miss', `${name(a)}'s attack missed.`, side)
-    if ((sem.slug === 'jump-kick' || sem.slug === 'high-jump-kick') && gen >= 1) {
-      damageTo(
-        c,
-        side,
-        a,
-        gen === 1 ? 1 : Math.max(1, Math.floor(a.maxHp / 8)),
-        `${name(a)} kept going and crashed.`,
-      )
+    if (d.volatile.protecting) {
+      line(c, 'info', `${name(d)} protected itself.`, dSide)
+      continue
     }
-    if (sem.selfDestruct) damageTo(c, side, a, a.hp, `${name(a)} exploded.`)
-    return
+    // ---- accuracy
+    const semi = d.volatile.semiInvulnerable
+    if (semi) {
+      const hitsSemi =
+        semi === 'fly' || semi === 'bounce'
+          ? ['gust', 'twister', 'thunder', 'sky-uppercut'].includes(sem.slug)
+          : semi === 'dig'
+            ? ['earthquake', 'magnitude', 'fissure'].includes(sem.slug)
+            : semi === 'dive'
+              ? ['surf', 'whirlpool'].includes(sem.slug)
+              : false
+      if (!hitsSemi) {
+        line(c, 'miss', `${name(d)} avoided the attack.`, dSide)
+        continue
+      }
+    }
+    const p = hitChance(ctx, data, {
+      moveId,
+      accStage: a.boosts.acc,
+      evaStage: d.boosts.eva,
+      weather: c.st.weather.kind,
+      attackerAbility: abilitySlugOf(a),
+      targetAbility: abilitySlugOf(d),
+      targetItemId: d.itemId,
+      physical: category === 'physical',
+      sureHit: a.volatile.xAccuracy || a.volatile.lockOn > 0,
+    })
+    if (sem.ohko) {
+      const lvlOk =
+        gen === 1 ? speedOf(c, a, side) >= speedOf(c, d, dSide) : a.spec.level >= d.spec.level
+      const pOhko =
+        gen === 1 ? p : lvlOk ? Math.min(1, (30 + a.spec.level - d.spec.level) / 100) : 0
+      if (
+        !lvlOk ||
+        !decide(c.src, a.key, 'miss', `${label} hits`, pOhko, invert(c.src.policies.miss))
+      ) {
+        line(c, 'miss', `${name(a)}'s ${label} missed.`, side)
+        continue
+      }
+      damageTo(c, dSide, d, d.hp, `It's a one-hit KO!`)
+      anyHit = true
+      continue
+    }
+    if (p < 1 && decide(c.src, a.key, 'miss', `${label} misses`, 1 - p, c.src.policies.miss)) {
+      line(c, 'miss', `${name(a)}'s attack missed.`, side)
+      if ((sem.slug === 'jump-kick' || sem.slug === 'high-jump-kick') && gen >= 1) {
+        damageTo(
+          c,
+          side,
+          a,
+          gen === 1 ? 1 : Math.max(1, Math.floor(a.maxHp / 8)),
+          `${name(a)} kept going and crashed.`,
+        )
+      }
+      if (sem.selfDestruct && targets.length === 1)
+        damageTo(c, side, a, a.hp, `${name(a)} exploded.`)
+      continue
+    }
+    // ---- damage
+    let total = 0
+    if (sem.damaging) {
+      const tAction = c.actions?.get(posKey(t)) ?? foeAction
+      total = dealDamage(c, side, a, d, moveId, sem, category, label, tAction, dSide, atk, t)
+      if (total < 0) continue
+    }
+    anyHit = true
+    // ---- secondary / primary effects on the target
+    if (!d.fainted || sem.damaging === false)
+      applyFoeEffects(c, side, a, d, sem, label, total, dSide, atk.slot)
   }
-  // ---- damage
-  let total = 0
-  if (sem.damaging) {
-    total = dealDamage(c, side, a, d, moveId, sem, category, label, foeAction)
-    if (total < 0) return
+  // The user of Explosion / Self-Destruct faints once it has hit (singles, as
+  // before) -- or, in a double battle, once the move was used at all.
+  if (sem.selfDestruct && !a.fainted && (anyHit || (c.st.doubles && targets.length > 0)))
+    damageTo(
+      c,
+      side,
+      a,
+      a.hp,
+      anyHit ? `${name(a)} fainted from the blast.` : `${name(a)} exploded.`,
+    )
+  if (anyHit && last && sem.recharge && !last.fainted && !(gen === 1 && last.fainted))
+    a.volatile.recharging = true
+  if (anyHit && last && sem.recharge && gen === 1 && last.fainted) a.volatile.recharging = false
+}
+
+/**
+ * The battlers a move hits. Singles: the foe. Doubles: by the move's game target
+ * (doubles.ts), after Follow Me and the redirecting abilities.
+ */
+function moveTargets(c: Ctx, atk: Pos, moveId: number, chosen: Pos | null): Pos[] {
+  const st = c.st
+  const foeSlot0: Pos = { side: other(atk.side), slot: 0 }
+  if (!st.doubles) return [foeSlot0]
+  const gm = gameMove(c.data, moveId)
+  const kind = targetKind(gm)
+  const a = monAt(st, atk)!
+  const speedOrder = c.speedOrder ?? battlerOrder(st)
+  if (kind === 'both-foes' || kind === 'all-adjacent')
+    return spreadTargets(c.ctx, st, atk, kind, speedOrder)
+  if (kind === 'ally') {
+    const ally = partnerPos(atk)
+    return standing(st, ally) ? [ally] : []
   }
-  // ---- secondary / primary effects on the target
-  if (!d.fainted || sem.damaging === false) applyFoeEffects(c, side, a, d, sem, label, total)
-  if (sem.selfDestruct && !a.fainted)
-    damageTo(c, side, a, a.hp, `${name(a)} fainted from the blast.`)
-  if (sem.recharge && !d.fainted && !(gen === 1 && d.fainted)) a.volatile.recharging = true
-  if (sem.recharge && gen === 1 && d.fainted) a.volatile.recharging = false
+  if (kind === 'depends') {
+    // Counter / Mirror Coat / Bide: whoever last hit this battler with the right kind.
+    const by = a.volatile.counterDamage?.by
+    if (by && by.side !== atk.side && standing(st, by)) return [by]
+    const foes = standingFoes(st, atk)
+    return foes.length ? [foes[0]] : []
+  }
+  const first = standingFoes(st, atk)[0] ?? foeSlot0
+  let target = chosen ?? first
+  if (kind === 'random') {
+    const foes = standingFoes(st, atk)
+    if (!foes.length) return []
+    target =
+      foes.length > 1 && c.src.policies.status === 'random' ? foes[c.src.rng.int(2)] : foes[0]
+  }
+  const typeName = gm?.t ?? 'normal'
+  const t = redirectSingle(
+    c.ctx,
+    st,
+    atk,
+    target,
+    { type: typeName, kind: kind === 'random' ? 'random' : 'single' },
+    abilitySlugOf(a),
+    (p) => abilitySlugOf(monAt(st, p)!),
+    speedOrder,
+    c.turnOrder ?? battlerOrder(st),
+  )
+  return t ? [t] : []
 }
 
 const invert = (p: 'never' | 'always' | 'random') =>
@@ -763,10 +936,13 @@ function dealDamage(
   category: string,
   label: string,
   foeAction: Action,
+  dSide: Side = other(side),
+  atkPos?: Pos,
+  defPos?: Pos,
 ): number {
   const { ctx, data } = c
   const gen = ctx.generation
-  const dSide = other(side)
+  const by = atkPos
   // Fixed-damage moves.
   if (sem.fixed != null || sem.counter) {
     let dmg = 0
@@ -794,7 +970,7 @@ function dealDamage(
       line(c, 'info', `It doesn't affect ${name(d)}.`, dSide)
       return -1
     }
-    applyHit(c, dSide, d, dmg, label, category, moveId)
+    applyHit(c, dSide, d, dmg, label, category, moveId, by)
     return dmg
   }
   const ability = abilitySlugOf(a)
@@ -848,7 +1024,17 @@ function dealDamage(
     sem.slug,
   )
   const switching = foeAction.kind === 'switch'
-  const normal = engineDamage(ctx, c.st, side, moveId, false, hits, switching)
+  // Doubles: name both battlers and the formula's double-battle inputs.
+  const at: DamageAt | undefined =
+    c.st.doubles && atkPos && defPos
+      ? {
+          attacker: a,
+          defender: d,
+          defenderSide: dSide,
+          doubles: doublesField(c.st, data, atkPos, defPos, moveId),
+        }
+      : undefined
+  const normal = engineDamage(ctx, c.st, side, moveId, false, hits, switching, at)
   if (!normal) {
     line(c, 'warn', `${label}: damage not calculated.`, side)
     return -1
@@ -861,7 +1047,7 @@ function dealDamage(
     line(c, 'warn', `${label}: damage not calculated by the engine.`, side)
     return -1
   }
-  const crit = cc > 0 ? engineDamage(ctx, c.st, side, moveId, true, hits, switching) : null
+  const crit = cc > 0 ? engineDamage(ctx, c.st, side, moveId, true, hits, switching, at) : null
   let total = 0
   const critOnce =
     gen === 1 ? decide(c.src, a.key, 'crit', `${label} crits`, cc, c.src.policies.crit) : false
@@ -887,7 +1073,7 @@ function dealDamage(
       })
     }
     if (isCrit) line(c, 'crit', 'A critical hit!', side)
-    applyHit(c, dSide, d, dmg, label, categoryOf(ctx, data, moveId), moveId)
+    applyHit(c, dSide, d, dmg, label, categoryOf(ctx, data, moveId), moveId, by)
     total += dmg
   }
   if (hits > 1) line(c, 'info', `Hit ${hits} times.`, side)
@@ -944,6 +1130,7 @@ function applyHit(
   label: string,
   category: string,
   moveId: number,
+  by?: Pos,
 ) {
   // A substitute absorbs it.
   if (d.volatile.substituteHp > 0) {
@@ -970,6 +1157,7 @@ function applyHit(
   d.volatile.counterDamage = {
     amount: (d.volatile.counterDamage?.amount ?? 0) + Math.min(dmg, d.hp),
     category,
+    ...(by ? { by } : {}),
   }
   damageTo(
     c,
@@ -1006,8 +1194,9 @@ function applyFoeEffects(
   sem: MoveSem,
   label: string,
   dealt: number,
+  dSide: Side = other(side),
+  aSlot: Slot = 0,
 ) {
-  const dSide = other(side)
   const subBlocks = d.volatile.substituteHp > 0 && sem.damaging
   if (sem.ailment && !d.fainted) {
     const k = sem.ailment.kind
@@ -1065,17 +1254,18 @@ function applyFoeEffects(
       line(c, 'info', `${name(d)} evaded the seed.`, dSide)
     else {
       d.volatile.leechSeed = true
+      d.volatile.leechSeedSlot = aSlot
       line(c, 'status', `${name(d)} was seeded.`, dSide)
     }
   }
   if (sem.forceSwitch && !d.fainted) {
     const sd = c.st.sides[dSide]
     const choices = sd.mons
-      .map((m, i) => (m.fainted || i === sd.active ? -1 : i))
+      .map((m, i) => (m.fainted || onField(sd, i) ? -1 : i))
       .filter((i) => i >= 0)
     if (choices.length) {
       const pick = choices[c.src.policies.status === 'random' ? c.src.rng.int(choices.length) : 0]
-      switchIn(c, dSide, pick)
+      switchIn(c, dSide, pick, false, slotOfMon(c.st, dSide, d))
     } else line(c, 'info', 'But it failed!', side)
   }
   if (sem.trap && !d.fainted && !d.volatile.trapped)
@@ -1090,6 +1280,11 @@ function applyFoeEffects(
   if (sem.perishSong) {
     if (!a.volatile.perishSong) a.volatile.perishSong = 4
     if (!d.volatile.perishSong) d.volatile.perishSong = 4
+    // Doubles: every battler on the field hears it.
+    for (const q of c.st.doubles ? battlerOrder(c.st) : []) {
+      const m = monAt(c.st, q)
+      if (m && !m.fainted && !m.volatile.perishSong) m.volatile.perishSong = 4
+    }
     line(c, 'status', 'All Pokemon hearing the song will faint in three turns.', side)
   }
   if (sem.painSplit) {
@@ -1109,7 +1304,7 @@ function applyFoeEffects(
   }
   if (sem.pivot === 'u-turn' && !a.fainted && dealt > 0) {
     // The switch target is chosen by the caller (the reader, or the AI) -- flag it.
-    if (!c.st.pendingSwitch.includes(side)) c.st.pendingSwitch.push(side)
+    markPending(c, side, aSlot)
     line(c, 'switch', `${name(a)} went back.`, side)
   }
   if (d.fainted && dealt > 0 && d.volatile.destinyBond)
@@ -1118,7 +1313,15 @@ function applyFoeEffects(
     line(c, 'warn', `${label}'s extra effect is not simulated (${sem.unsimulated}).`, side)
 }
 
-function applySelfMove(c: Ctx, side: Side, a: MonState, sem: MoveSem, label: string) {
+function applySelfMove(
+  c: Ctx,
+  side: Side,
+  a: MonState,
+  sem: MoveSem,
+  label: string,
+  aSlot: Slot = 0,
+  chosen: Pos | null = null,
+) {
   const gen = c.ctx.generation
   const sd = c.st.sides[side]
   const foeSide = other(side)
@@ -1242,7 +1445,13 @@ function applySelfMove(c: Ctx, side: Side, a: MonState, sem: MoveSem, label: str
   }
   if (sem.curse) {
     if (typesOf(c.ctx, a).includes('ghost')) {
-      const foe = activeMon(c.st, foeSide)
+      // The chosen foe in doubles (the other one when it is gone), the foe in singles.
+      const pick = c.st.doubles
+        ? chosen && chosen.side === foeSide && standing(c.st, chosen)
+          ? chosen
+          : standingFoes(c.st, { side, slot: aSlot })[0]
+        : null
+      const foe = pick ? monAt(c.st, pick)! : activeMon(c.st, foeSide)
       a.hp = Math.max(0, a.hp - Math.floor(a.maxHp / 2))
       foe.volatile.cursed = true
       line(c, 'status', `${name(a)} cut its HP and laid a curse.`, side, a)
@@ -1262,8 +1471,10 @@ function applySelfMove(c: Ctx, side: Side, a: MonState, sem: MoveSem, label: str
     return
   }
   if (sem.haze) {
-    for (const s of ['mine', 'theirs'] as Side[]) {
-      const m = activeMon(c.st, s)
+    for (const q of battlerOrder(c.st)) {
+      const s = q.side
+      const m = monAt(c.st, q)
+      if (!m) continue
       m.boosts = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, acc: 0, eva: 0 }
       if (gen === 1 && s !== side) {
         if (m.status !== 'healthy' && m.status !== 'slp' && m.status !== 'frz') {
@@ -1295,8 +1506,9 @@ function applySelfMove(c: Ctx, side: Side, a: MonState, sem: MoveSem, label: str
     return
   }
   if (sem.pivot === 'baton-pass') {
-    if (aliveCount(sd) <= 1) return line(c, 'info', 'But it failed!', side)
-    if (!c.st.pendingSwitch.includes(side)) c.st.pendingSwitch.push(side)
+    if (c.st.doubles ? !hasBench(c.st, side) : aliveCount(sd) <= 1)
+      return line(c, 'info', 'But it failed!', side)
+    markPending(c, side, aSlot)
     ;(a.volatile as unknown as { batonPass?: boolean }).batonPass = true
     line(c, 'switch', `${name(a)} is passing its boosts.`, side)
     return
@@ -1339,9 +1551,10 @@ export function applyItem(
   c0: { ctx: GameContext; data: BattleData; st: BattleState; src: ChanceSource; log: LogLine[] },
   side: Side,
   itemId: number,
+  slot: Slot = 0,
 ) {
   const c = c0 as Ctx
-  const m = activeMon(c.st, side)
+  const m = monAt(c.st, { side, slot }) ?? activeMon(c.st, side)
   const sd = c.st.sides[side]
   const i = sd.bag.indexOf(itemId)
   if (i >= 0) sd.bag.splice(i, 1)
@@ -1389,13 +1602,15 @@ function endOfTurn(c: Ctx) {
   const gen = c.ctx.generation
   const r = c.ctx.residual
   const frac = (m: MonState, [n, d]: [number, number]) => Math.max(1, Math.floor((m.maxHp * n) / d))
-  const order: Side[] = ['mine', 'theirs']
+  // Every battler on the field, in battler order (player, foe; then the right slots).
+  const order = battlerOrder(c.st)
   // Weather damage.
   const w = c.st.weather.kind
   if (w === 'sand' || w === 'hail') {
-    for (const s of order) {
-      const m = activeMon(c.st, s)
-      if (m.fainted) continue
+    for (const q of order) {
+      const s = q.side
+      const m = monAt(c.st, q)
+      if (!m || m.fainted) continue
       const types = typesOf(c.ctx, m)
       const ab = abilitySlugOf(m)
       const immune =
@@ -1413,9 +1628,10 @@ function endOfTurn(c: Ctx) {
         )
     }
   }
-  for (const s of order) {
-    const m = activeMon(c.st, s)
-    if (m.fainted) continue
+  for (const q of order) {
+    const s = q.side
+    const m = monAt(c.st, q)
+    if (!m || m.fainted) continue
     const ab = abilitySlugOf(m)
     const held = heldEffect(c.data, m.itemId)?.h
     if (
@@ -1429,7 +1645,10 @@ function endOfTurn(c: Ctx) {
       m.volatile.itemRevealed = true
     }
     if (m.volatile.leechSeed && ab !== 'magic-guard') {
-      const foe = activeMon(c.st, other(s))
+      // The seed drains to whoever stands in the planter's place.
+      const foe =
+        monAt(c.st, { side: other(s), slot: m.volatile.leechSeedSlot ?? 0 }) ??
+        activeMon(c.st, other(s))
       let amt = frac(m, r.leechSeed)
       if (gen === 1 && m.status === 'tox')
         amt = Math.max(1, Math.floor((m.maxHp * Math.max(1, m.toxic)) / 16))
@@ -1476,7 +1695,7 @@ function endOfTurn(c: Ctx) {
     }
   }
   // Timers.
-  for (const s of order) {
+  for (const s of ['mine', 'theirs'] as Side[]) {
     const sd = c.st.sides[s]
     for (const k of [
       'reflect',
@@ -1492,7 +1711,10 @@ function endOfTurn(c: Ctx) {
           line(c, 'field', `${s === 'mine' ? 'Your' : "The foe's"} ${k} wore off.`, s)
       }
     }
-    const m = activeMon(c.st, s)
+  }
+  for (const q of order) {
+    const m = monAt(c.st, q)
+    if (!m) continue
     m.volatile.protecting = false
     m.volatile.turnsOut += 1
     m.volatile.firstTurn = false
@@ -1549,6 +1771,165 @@ export function resolveTurn(
   return { state: st, log: c.log, dealt: c.dealt }
 }
 
+// ------------------------------------------------------------ doubles turn
+
+/**
+ * The order four battlers act in, each generation's own way:
+ *   Gen 3 pokeemerald SetActionsAndBattlersTurnOrder: items and switches first, in
+ *     battler order; then the rest, sorted pairwise with GetWhoStrikesFirst (move
+ *     priority, then speed; a tie is a coin flip per comparison). Quick Claw is one
+ *     roll a turn for every holder (gRandomTurnNumber).
+ *   Gen 4 pokeplatinum BattleControllerPlayer_CalcTurnOrder: items and switches
+ *     first, then Fight; battlers that chose the SAME command are sorted pairwise
+ *     with BattleSystem_CompareBattlerSpeed (priority only between two Fights;
+ *     Quick Claw rolled per battler; Trick Room reverses speed).
+ */
+function orderDoubles(c: Ctx, acts: { p: Pos; a: Action }[]): Pos[] {
+  const gen = c.ctx.generation
+  const isFight = (a: Action) => a.kind === 'move' || a.kind === 'none'
+  const list = [...acts.filter((x) => !isFight(x.a)), ...acts.filter((x) => isFight(x.a))]
+  // Quick Claw, decided once this turn.
+  const claw = new Map<string, boolean>()
+  const qcOf = (p: Pos) => quickClawChance(c.ctx, c.data, monAt(c.st, p)!.itemId)
+  const holders = list.filter((x) => qcOf(x.p) > 0)
+  if (gen === 3 && holders.length) {
+    const qc = Math.max(...holders.map((x) => qcOf(x.p)))
+    const fired = decide(c.src, 'both', 'quick-claw', 'Quick Claw', qc, c.src.policies.status)
+    for (const x of holders) claw.set(posKey(x.p), fired)
+  } else
+    for (const x of holders) {
+      const m = monAt(c.st, x.p)!
+      const label = name(m) + "'s Quick Claw"
+      claw.set(
+        posKey(x.p),
+        decide(c.src, m.key, 'quick-claw', label, qcOf(x.p), c.src.policies.status),
+      )
+    }
+  const tr = c.ctx.trickRoom && c.st.trickRoom > 0
+  // True when the second battler goes before the first (the games' "swap").
+  const second = (x: { p: Pos; a: Action }, y: { p: Pos; a: Action }, usePriority: boolean) => {
+    const m1 = monAt(c.st, x.p)!
+    const m2 = monAt(c.st, y.p)!
+    if (usePriority) {
+      const p1 = actionPriority(c, x.p.side, x.a, m1)
+      const p2 = actionPriority(c, y.p.side, y.a, m2)
+      if (p1 !== p2) return p2 > p1
+    }
+    const q1 = claw.get(posKey(x.p)) ?? false
+    const q2 = claw.get(posKey(y.p)) ?? false
+    if (q1 !== q2) return q2
+    const s1 = speedOf(c, m1, x.p.side)
+    const s2 = speedOf(c, m2, y.p.side)
+    if (s1 === s2)
+      return decide(c.src, 'both', 'speed-tie', 'Speed tie at ' + s1, 0.5, c.src.policies.status)
+    return tr ? s1 > s2 : s1 < s2
+  }
+  for (let i = 0; i < list.length - 1; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const fi = isFight(list[i].a)
+      const fj = isFight(list[j].a)
+      const compare = gen === 3 ? fi && fj : fi === fj && list[i].a.kind === list[j].a.kind
+      if (compare && second(list[i], list[j], fi && fj)) {
+        const t = list[i]
+        list[i] = list[j]
+        list[j] = t
+      }
+    }
+  }
+  return list.map((x) => x.p)
+}
+
+/** The battlers on the field fastest first (Gen 4 spread moves hit in this order). */
+function speedOrderOf(c: Ctx): Pos[] {
+  const tr = c.ctx.trickRoom && c.st.trickRoom > 0
+  return battlerOrder(c.st)
+    .filter((p) => standing(c.st, p))
+    .map((p) => ({ p, s: speedOf(c, monAt(c.st, p)!, p.side) }))
+    .sort((x, y) => (tr ? x.s - y.s : y.s - x.s))
+    .map((x) => x.p)
+}
+
+/**
+ * Who fills an emptied slot, asked mid-turn in Gen 3 (see resolveTurnDoubles):
+ * returns a party index, or -1 to leave the slot empty.
+ */
+export type Refill = (st: BattleState, p: Pos, reserved: number[]) => number
+
+/**
+ * One turn of a DOUBLE battle (S6): every battler's action, keyed by posKey
+ * ('mine0', 'theirs1', ...). A move's `target` is the battler it is aimed at.
+ *
+ * WHEN AN EMPTIED SLOT IS REFILLED differs by generation, and both are the games':
+ *   Gen 3: every move script ends in Cmd_end -> HandleAction_TryFinish ->
+ *     HandleFaintedMonActions -> BattleScript_HandleFaintedMon, so the slot is
+ *     refilled right after the action that emptied it (`refill` chooses), and the
+ *     newcomer can be hit for the rest of the turn (it does not act).
+ *   Gen 4: BattleControllerPlayer_TurnEnd -> ReplaceFainted, at the end of the
+ *     turn; the slots stay in st.pendingSlots for the caller.
+ */
+export function resolveTurnDoubles(
+  ctx: GameContext,
+  data: BattleData,
+  state: BattleState,
+  actions: Map<string, Action>,
+  src: ChanceSource,
+  refill?: Refill,
+): TurnResult {
+  const st = cloneState(state)
+  st.turn += 1
+  src.turn = st.turn
+  const c: Ctx = { ctx, data, st, src, log: [], dealt: { mine: 0, theirs: 0 }, actions }
+  st.followMe = {}
+  st.helpingHand = []
+  const present = battlerOrder(st).filter((p) => standing(st, p))
+  for (const p of present) monAt(st, p)!.volatile.counterDamage = null
+  // Who acts from each place, as the turn starts: a Pokemon dragged in mid-turn does not act.
+  const who = new Map(present.map((p) => [posKey(p), monAt(st, p)!]))
+  const none: Action = { kind: 'none' }
+  const acts = present.map((p) => ({ p, a: actions.get(posKey(p)) ?? none }))
+  c.speedOrder = speedOrderOf(c)
+  const ord = orderDoubles(c, acts)
+  c.turnOrder = ord
+  for (const p of ord) {
+    if (st.winner) break
+    const act = actions.get(posKey(p)) ?? none
+    const m = monAt(st, p)
+    if (!m || m !== who.get(posKey(p)) || m.fainted) continue
+    if (act.kind === 'switch') {
+      const sd = st.sides[p.side]
+      // Two switches into the same Pokemon: the second is dropped.
+      if (sd.mons[act.to]?.fainted || onField(sd, act.to)) continue
+      switchIn(c, p.side, act.to, false, p.slot)
+    } else if (act.kind === 'item') applyItem(c, p.side, act.itemId, p.slot)
+    else if (act.kind === 'move') runMoveAt(c, p, act.slot, act.target ?? null, none)
+    if (ctx.generation === 3 && refill && !st.winner) refillNow(c, refill)
+  }
+  if (!st.winner) endOfTurn(c)
+  if (ctx.generation === 3 && refill && !st.winner) refillNow(c, refill)
+  st.followMe = undefined
+  st.helpingHand = undefined
+  return { state: st, log: c.log, dealt: c.dealt }
+}
+
+/** Gen 3: refill every emptied slot now, in battler order (HandleFaintedMonActions' loop). */
+function refillNow(c: Ctx, refill: Refill) {
+  const st = c.st
+  const reserved: number[] = []
+  for (const p of battlerOrder(st)) {
+    const pend = st.pendingSlots ?? []
+    if (!pend.some((q) => q.side === p.side && q.slot === p.slot)) continue
+    st.pendingSlots = pend.filter((q) => !(q.side === p.side && q.slot === p.slot))
+    if (!st.pendingSlots.some((q) => q.side === p.side))
+      st.pendingSwitch = st.pendingSwitch.filter((s) => s !== p.side)
+    const to = refill(st, p, reserved)
+    if (to < 0) continue
+    reserved.push(to)
+    const out = monAt(st, p)!
+    const baton = !!(out.volatile as unknown as { batonPass?: boolean }).batonPass
+    switchIn(c, p.side, to, baton && !out.fainted, p.slot)
+  }
+}
+
 /** Resolve a pending switch (a faint, U-turn, Baton Pass) for one side. */
 export function resolveSwitch(
   ctx: GameContext,
@@ -1557,13 +1938,18 @@ export function resolveSwitch(
   side: Side,
   to: number,
   src: ChanceSource,
+  slot: Slot = 0,
 ): TurnResult {
   const st = cloneState(state)
   const c: Ctx = { ctx, data, st, src, log: [], dealt: { mine: 0, theirs: 0 } }
-  const out = activeMon(st, side)
+  const out = monAt(st, { side, slot }) ?? activeMon(st, side)
   const baton = !!(out.volatile as unknown as { batonPass?: boolean }).batonPass
-  st.pendingSwitch = st.pendingSwitch.filter((s) => s !== side)
-  switchIn(c, side, to, baton && !out.fainted)
+  if (st.doubles) {
+    st.pendingSlots = (st.pendingSlots ?? []).filter((p) => !(p.side === side && p.slot === slot))
+    if (!st.pendingSlots.some((p) => p.side === side))
+      st.pendingSwitch = st.pendingSwitch.filter((s) => s !== side)
+  } else st.pendingSwitch = st.pendingSwitch.filter((s) => s !== side)
+  switchIn(c, side, to, baton && !out.fainted, slot)
   return { state: st, log: c.log, dealt: c.dealt }
 }
 
@@ -1573,8 +1959,9 @@ export function usableMoveSlots(
   data: BattleData,
   st: BattleState,
   side: Side,
+  slot: Slot = 0,
 ): number[] {
-  const m = activeMon(st, side)
+  const m = monAt(st, { side, slot }) ?? activeMon(st, side)
   const out: number[] = []
   m.spec.moves.forEach((id, i) => {
     if (!id) return
@@ -1593,12 +1980,14 @@ export function usableMoveSlots(
   return out
 }
 
-export function canSwitch(st: BattleState, side: Side): number[] {
+export function canSwitch(st: BattleState, side: Side, slot: Slot = 0): number[] {
   const sd = st.sides[side]
-  const m = sd.mons[sd.active]
-  if (!m.fainted && (m.volatile.meanLook || m.volatile.trapped) && !st.pendingSwitch.includes(side))
-    return []
-  return sd.mons.map((x, i) => (x.fainted || i === sd.active ? -1 : i)).filter((i) => i >= 0)
+  const m = sd.mons[slotIndex(sd, slot) ?? sd.active]
+  const pending = st.doubles
+    ? (st.pendingSlots ?? []).some((p) => p.side === side && p.slot === slot)
+    : st.pendingSwitch.includes(side)
+  if (!m.fainted && (m.volatile.meanLook || m.volatile.trapped) && !pending) return []
+  return sd.mons.map((x, i) => (x.fainted || onField(sd, i) ? -1 : i)).filter((i) => i >= 0)
 }
 
 export { itemSlugOf }

@@ -5,10 +5,11 @@
  *           above 50 at 50 (the Battle Tower / Frontier Level 50 rule).
  *   Items   the Item Clause: no two of MY Pokemon hold the same item; a
  *           duplicate is removed from the later one, and the change is named.
- *   Battle  'double' is the in-game double battle. The engine is singles --
- *           the matrix, speed ladder and damage are exact one-on-one, but the
- *           partner, spread-move reduction and targeting are NOT modelled, so a
- *           doubles matchup carries that as a stated limitation on every output.
+ *   Battle  'double' is the in-game double battle (Gen 3-4; Gen 1-2 have none).
+ *           Battles -- the sandbox, the Monte Carlo, the search, the gauntlet --
+ *           run two-on-two (engine/doubles.ts). The matrix, speed ladder and
+ *           damage tables stay one-on-one pairs, with a spread move at its
+ *           double-battle reduction as when both foes stand; a note says so.
  */
 
 import { getItem } from '../../data'
@@ -59,13 +60,9 @@ export function applyFormat(
       return { ...b, itemId: null }
     })
   }
-  return {
-    mine: m,
-    theirs: t,
-    notes,
-    limitation:
-      rules.battle === 'double'
-        ? 'Double battle: computed one-on-one; partners, spread-move reduction and targeting are not modelled'
-        : null,
-  }
+  if (rules.battle === 'double')
+    notes.push(
+      'Double battle: battles run two-on-two; the matrix, speed and damage tabs show pairs, spread moves at their doubles reduction',
+    )
+  return { mine: m, theirs: t, notes, limitation: null }
 }

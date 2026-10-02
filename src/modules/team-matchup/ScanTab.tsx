@@ -125,7 +125,14 @@ export function ScanTab({ view }: { view: MatchupView }) {
                         {r.label}
                       </button>
                       {r.format !== 'single' && (
-                        <span className="tm-muted"> ({r.format}, as singles)</span>
+                        <span className="tm-muted">
+                          {' '}
+                          (
+                          {ctx.generation >= 3
+                            ? `${r.format}, two-on-two`
+                            : `${r.format}, as singles`}
+                          )
+                        </span>
                       )}
                     </td>
                     <td className="tm-num tm-mono">{r.topLevel}</td>

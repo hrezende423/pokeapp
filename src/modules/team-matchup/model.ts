@@ -63,6 +63,8 @@ export interface MatchupSetup {
   mine: Record<string, MonOverride>
   /** Leading Pokemon (index into my team). */
   lead: number
+  /** S6: my second lead in a double battle (default: the next healthy Pokemon). */
+  lead2?: number
   opponent: OpponentRef | null
   theirSpreadMode: SpreadMode
   /** Keyed by party slot. */

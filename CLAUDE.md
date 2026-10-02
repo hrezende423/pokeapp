@@ -597,8 +597,23 @@ D1–D5, P1–P8, O1–O4, R1–R7); the IDs are in the code comments.
 - **`.tm .tm-section` exists to beat App.css's `.panel section` / `.panel h2`**
   (MODULE-PATTERNS §10): without it every section opened on a border, a 2rem gap
   and an uppercase tracked heading.
-- **Doubles are not simulated**: matrix, speed and damage are one-on-one, and a
-  double battle (Tate & Liza, or the format toggle) says so on screen.
+- **Double battles run two-on-two** (S6, Gen 3–4; Gen 1–2 have none) — a
+  trainer's own double/tag battle or the Double format. `engine/doubles.ts` holds
+  the rules, each from the games' code: targets from the per-game move table
+  (`tg`; Surf hits both foes in Gen 3, everyone adjacent in Gen 4), Follow Me,
+  Gen 3 vs Gen 4 Lightning Rod / Storm Drain, spread order (battler order Gen 3,
+  speed order Gen 4). The damage port takes an optional `CalcField.doubles` (Gen 3
+  screens `2*(d/3)` and MOVE_TARGET_BOTH halving; Gen 4 screens `d*2/3`, ×3/4
+  spreads; Helping Hand) that the Damage Calculator page never sets. Turn order
+  is each game's pairwise sort; an emptied slot is refilled AT ONCE in Gen 3
+  (`HandleAction_TryFinish`) and at TURN END in Gen 4 (`ReplaceFainted`). The AI
+  runs on VIEWS (`ai/view.ts`): Emerald and Platinum score every target incl. the
+  ally (≥ 100 only) with AI_DoubleBattle / TAG_STRATEGY forced on; Ruby and
+  FireRed pick a random foe and run the singles choice (no doubles routine).
+  Singles are untouched: the state's `active2`/`doubles` are absent and every
+  singles result is byte-identical to before. The matrix, speed and damage tabs
+  stay pairs, with spreads at their doubles reduction. A tag battle's NPC partner
+  is not in the data: I play both slots (stated on screen).
 - **A matrix cell opens the Damage Calculator on that pair**
   (`calculators/damageCalcHandoff.ts`: a one-shot prefill the calculator's state
   initializers READ and an effect clears by id, so StrictMode's double call is
@@ -608,7 +623,10 @@ D1–D5, P1–P8, O1–O4, R1–R7); the IDs are in the code comments.
   case), chance constants vs the asm, a speed tie per generation, AI behaviour per
   generation, the battle bundle vs the app's move records, a real fight per
   generation through the screen, spreads / scenarios / format / custom / facility
-  / hand-off / sandbox, the worker analyses, design rules and both themes. Its
+  / hand-off / sandbox, the worker analyses, double battles (the doubles damage
+  rules against a re-implementation of each game's formula, targeting, Follow Me,
+  Lightning Rod, Helping Hand, Intimidate, turn order, Gen 3 vs Gen 4 refill
+  timing, each game's doubles AI, and the screen), design rules and both themes. Its
   move diff found Luster Purge's missing `past_values` (now an era rule in
   `moveEra.ts`), and its crit checks found Gen 2 Lucky Punch / Stick never firing
   (the game compares the item id, not a held effect).

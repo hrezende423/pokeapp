@@ -349,15 +349,24 @@ function calculateFinalModsADV(
     desc.isBurned = true
   }
 
+  // A double battle's screen is 2 * (damage / 3) with two on the defender's side
+  // (pokeemerald CalculateBaseDamage); see CalcField.doubles.
+  const dbl = field.doubles
+  const twoDefenders = dbl != null && dbl.defenderSideAlive === 2
+  const screen = (d: number) => (twoDefenders ? 2 * Math.floor(d / 3) : Math.floor(d / 2))
   if (!isCritical) {
     if (isPhysical && field.defenderSide.reflect) {
-      baseDamage = Math.floor(baseDamage / 2)
+      baseDamage = screen(baseDamage)
       desc.isReflect = true
     } else if (!isPhysical && field.defenderSide.lightScreen) {
-      baseDamage = Math.floor(baseDamage / 2)
+      baseDamage = screen(baseDamage)
       desc.isLightScreen = true
     }
   }
+
+  // Moves hitting both targets do half damage in double battles (MOVE_TARGET_BOTH only:
+  // Earthquake, MOVE_TARGET_FOES_AND_ALLY, is not reduced in Gen 3).
+  if (twoDefenders && dbl.spread === 'both-foes') baseDamage = Math.floor(baseDamage / 2)
 
   const w = field.weather
   if ((w === 'sun' && move.type === 'fire') || (w === 'rain' && move.type === 'water')) {
@@ -397,6 +406,8 @@ function calculateFinalModsADV(
     baseDamage *= 2
     desc.isCharge = true
   }
+
+  if (field.doubles?.helpingHand) baseDamage = Math.floor((baseDamage * 15) / 10)
 
   if (attacker.types.includes(move.type)) baseDamage = Math.floor(baseDamage * 1.5)
   return baseDamage

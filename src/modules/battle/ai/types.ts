@@ -15,7 +15,7 @@
 import type { BattleData } from '../battleData'
 import type { Action } from '../engine/turn'
 import type { Rng } from '../engine/rng'
-import type { BattleState } from '../engine/state'
+import type { BattleState, Pos } from '../engine/state'
 import type { GameContext } from '../game'
 
 export interface Contribution {
@@ -39,6 +39,8 @@ export interface AiTrace {
   lowConfidence: string[]
   /** Scores: lower is better (Gen 1-2) or higher is better (Gen 3-4). */
   better: 'lower' | 'higher'
+  /** Doubles: each target the AI weighed, the best move's score on it, and that move. */
+  targets?: { target: Pos; points: number; slot: number }[]
 }
 
 export interface AiEnv {
@@ -46,6 +48,8 @@ export interface AiEnv {
   data: BattleData
   st: BattleState
   rng: Rng
+  /** Doubles: party slots the partner already chose to send in this turn (left out of every choice). */
+  reserved?: number[]
 }
 
 export interface AiChoice {

@@ -1027,8 +1027,8 @@ try {
   await page.click('[data-testid="tm-format-battle"] [data-value="double"]')
   await page.waitForTimeout(200)
   check(
-    'S6: a double battle carries its limitation',
-    /Double battle/.test(await page.textContent('[data-testid="tm-setup-opponent"]')),
+    'S6: the Double format says battles run two-on-two',
+    /Double battle: battles run two-on-two/.test(await page.textContent('[data-testid="tm-format"]')),
   )
   await page.click('[data-testid="tm-format-battle"] [data-value="single"]')
   // S5 custom team.
@@ -1071,8 +1071,9 @@ try {
   await page.click('[data-testid="tm-opp-kind"] [data-value="trainer"]')
   await pickTrainer('Tate')
   check(
-    'S6: an in-game double battle (Tate & Liza) is flagged',
-    /Double battle/.test(await page.textContent('[data-testid="tm-setup-opponent"]')),
+    'S6: an in-game double battle (Tate & Liza) is fought two-on-two, and says so',
+    /Double battle: battles run two-on-two/.test(await page.textContent('[data-testid="tm-format"]')) &&
+      (await page.$('[data-testid="tm-lead2"]')) !== null,
   )
   // M3 hand-off and R4.
   await page.selectOption('[data-testid="tm-game"]', 'platinum')
@@ -1189,7 +1190,508 @@ try {
   )
 
   // ------------------------------------------------------------------ 8
-  hr('8. DESIGN RULES, THEMES, CONSOLE')
+  hr("8. DOUBLE BATTLES (S6): the games' doubles rules, their AI, the screen")
+  const dbl = await page.evaluate(async () => {
+    const D = await import('/pokeapp/src/data/index.ts')
+    await D.initDataLayer()
+    const G = await import('/pokeapp/src/modules/battle/game.ts')
+    const BD = await import('/pokeapp/src/modules/battle/battleData.ts')
+    const R = await import('/pokeapp/src/modules/battle/range.ts')
+    const SES = await import('/pokeapp/src/modules/battle/session.ts')
+    const TURN = await import('/pokeapp/src/modules/battle/engine/turn.ts')
+    const RNG = await import('/pokeapp/src/modules/battle/engine/rng.ts')
+    const AI = await import('/pokeapp/src/modules/battle/ai/index.ts')
+    const mv = (n) => D.listMoves().find((m) => m.name === n).id
+    const abil = (n) => D.listAbilities().find((a) => a.name === n)?.id ?? null
+    const serious = D.listNatures().find((n) => n.name === 'serious').id
+    const KEYS = ['hp', 'attack', 'defense', 'special-attack', 'special-defense', 'speed']
+    // A Pokemon at Lv 50, IV 31, EV 0, a neutral nature: every stat the engine's own.
+    const mk = (side, i, species, moves, ability, level = 50) => {
+      const s = D.listSpecies().find((x) => x.name === species)
+      return {
+        key: `${side}:${i}`,
+        side,
+        source: 'custom',
+        label: s.display_name,
+        speciesId: s.id,
+        varietyName: species,
+        level,
+        spreadMode: 'current',
+        scenarioId: null,
+        spread: {
+          individual: Object.fromEntries(KEYS.map((k) => [k, R.point(31)])),
+          effort: Object.fromEntries(KEYS.map((k) => [k, R.point(0)])),
+          natureIds: [serious],
+          ceiling: false,
+        },
+        moves: moves.map(mv),
+        itemId: null,
+        abilityId: ability ? abil(ability) : null,
+        gender: 'N',
+      }
+    }
+    const env = async (vg) => ({ ctx: G.gameContext(vg), data: await BD.loadBattleData(vg) })
+    const battle = (e, mine, theirs, flags = []) =>
+      SES.newBattle(
+        e.ctx,
+        e.data,
+        mine,
+        theirs,
+        { classId: '', aiFlags: flags, versionGroup: e.ctx.versionGroup, bag: [] },
+        { badges: [], doubles: true },
+      ).state
+    const rollsOf = (r) => (typeof r.damage === 'number' ? [r.damage] : r.damage)
+    const out = {}
+
+    // ---- 1. The doubles damage formula against the games' code, re-implemented here.
+    // Machamp (no STAB) on Kangaskhan (neutral): Rock Slide / Earthquake, no item, no ability effect.
+    const formula = async (vg) => {
+      const e = await env(vg)
+      const A = mk('mine', 0, 'machamp', ['rock-slide', 'earthquake'], 'guts')
+      const K = mk('theirs', 0, 'kangaskhan', ['tackle'], 'early-bird')
+      const st = battle(
+        e,
+        [A, mk('mine', 1, 'kangaskhan', ['tackle'], 'early-bird')],
+        [K, mk('theirs', 1, 'kangaskhan', ['tackle'], 'early-bird')],
+      )
+      const a = st.sides.mine.mons[0]
+      const d = st.sides.theirs.mons[0]
+      const calc = (move, doubles, reflect = false) => {
+        const s = structuredClone(st)
+        s.sides.theirs.reflect = reflect ? 5 : 0
+        return rollsOf(
+          TURN.engineDamage(e.ctx, s, 'mine', mv(move), false, null, false, {
+            attacker: s.sides.mine.mons[0],
+            defender: s.sides.theirs.mons[0],
+            defenderSide: 'theirs',
+            doubles,
+          }),
+        )
+      }
+      // pokeemerald CalculateBaseDamage / pokeplatinum BattleSystem_CalcBaseDamage, physical, no crit:
+      // damage = atk * power * (2*L/5 + 2) / def / 50, [screen], [spread], + 2; then the 85..100 roll.
+      const base = (power, mod) => {
+        let x = Math.floor(
+          Math.floor((a.stats.atk * power * Math.floor((2 * 50) / 5 + 2)) / d.stats.def) / 50,
+        )
+        x = mod(x)
+        if (vg === 'emerald' && x === 0) x = 1
+        return x + 2
+      }
+      const rolls = (b) => Array.from({ length: 16 }, (_, k) => Math.floor((b * (85 + k)) / 100))
+      const eq = (x, y) => JSON.stringify(x) === JSON.stringify(y)
+      const D2 = (spread, others = 3) => ({ defenderSideAlive: 2, othersAlive: others, spread })
+      if (vg === 'emerald') {
+        return {
+          bothFoesHalved: eq(
+            calc('rock-slide', D2('both-foes')),
+            rolls(base(75, (x) => Math.floor(x / 2))),
+          ),
+          singlesUntouched: eq(calc('rock-slide', undefined), rolls(base(75, (x) => x))),
+          earthquakeFull: eq(calc('earthquake', D2('all-adjacent')), rolls(base(100, (x) => x))),
+          reflectTwoThirds: eq(
+            calc('rock-slide', D2('both-foes'), true),
+            rolls(base(75, (x) => Math.floor((2 * Math.floor(x / 3)) / 2))),
+          ),
+          oneDefenderNotHalved: eq(
+            calc('rock-slide', { defenderSideAlive: 1, othersAlive: 2, spread: 'both-foes' }),
+            rolls(base(75, (x) => x)),
+          ),
+        }
+      }
+      return {
+        bothFoes34: eq(
+          calc('rock-slide', D2('both-foes')),
+          rolls(base(75, (x) => Math.floor((x * 3) / 4))),
+        ),
+        allAdjacent34: eq(
+          calc('earthquake', D2('all-adjacent')),
+          rolls(base(100, (x) => Math.floor((x * 3) / 4))),
+        ),
+        allAdjacentAlone: eq(calc('earthquake', D2('all-adjacent', 1)), rolls(base(100, (x) => x))),
+        reflectTwoThirds: eq(
+          calc('rock-slide', D2('both-foes'), true),
+          rolls(base(75, (x) => Math.floor((Math.floor((x * 2) / 3) * 3) / 4))),
+        ),
+      }
+    }
+    out.g3 = await formula('emerald')
+    out.g4 = await formula('platinum')
+
+    // ---- 2. The engine: targets, redirection, partners, order, refills.
+    const turn = async (vg, mine, theirs, acts) => {
+      const e = await env(vg)
+      const st = battle(e, mine, theirs)
+      const m = new Map(Object.entries(acts))
+      const r = TURN.resolveTurnDoubles(e.ctx, e.data, st, m, {
+        rng: new RNG.Rng(1),
+        policies: RNG.DEFAULT_SANDBOX_POLICIES,
+        events: [],
+        turn: 0,
+      })
+      return { before: st, after: r.state, log: r.log.map((l) => l.text) }
+    }
+    const hpLost = (t, side, i) => t.before.sides[side].mons[i].hp - t.after.sides[side].mons[i].hp
+    const none = { kind: 'none' }
+    // Gen 3 Earthquake (MOVE_TARGET_FOES_AND_ALLY): both foes AND the ally, each at full damage.
+    const eq3 = await turn(
+      'emerald',
+      [mk('mine', 0, 'machamp', ['earthquake']), mk('mine', 1, 'kangaskhan', ['tackle'])],
+      [mk('theirs', 0, 'kangaskhan', ['tackle']), mk('theirs', 1, 'kangaskhan', ['tackle'])],
+      { mine0: { kind: 'move', slot: 0 }, mine1: none, theirs0: none, theirs1: none },
+    )
+    out.eq3 = {
+      ally: hpLost(eq3, 'mine', 1),
+      foe0: hpLost(eq3, 'theirs', 0),
+      foe1: hpLost(eq3, 'theirs', 1),
+    }
+    const eq4 = await turn(
+      'platinum',
+      [mk('mine', 0, 'machamp', ['earthquake']), mk('mine', 1, 'kangaskhan', ['tackle'])],
+      [mk('theirs', 0, 'kangaskhan', ['tackle']), mk('theirs', 1, 'kangaskhan', ['tackle'])],
+      { mine0: { kind: 'move', slot: 0 }, mine1: none, theirs0: none, theirs1: none },
+    )
+    out.eq4 = {
+      ally: hpLost(eq4, 'mine', 1),
+      foe0: hpLost(eq4, 'theirs', 0),
+      foe1: hpLost(eq4, 'theirs', 1),
+    }
+    // The same Earthquake one-on-one, at the same (mean) roll: Gen 3 equal, Gen 4 x3/4.
+    const single = async (vg) => {
+      const e = await env(vg)
+      const st = SES.newBattle(
+        e.ctx,
+        e.data,
+        [mk('mine', 0, 'machamp', ['earthquake'])],
+        [mk('theirs', 0, 'kangaskhan', ['tackle'])],
+        null,
+        { badges: [] },
+      ).state
+      const r = TURN.resolveTurn(
+        e.ctx,
+        e.data,
+        st,
+        { mine: { kind: 'move', slot: 0 }, theirs: none },
+        { rng: new RNG.Rng(1), policies: RNG.DEFAULT_SANDBOX_POLICIES, events: [], turn: 0 },
+      )
+      return st.sides.theirs.mons[0].hp - r.state.sides.theirs.mons[0].hp
+    }
+    out.eqSingle3 = await single('emerald')
+    out.eqSingle4 = await single('platinum')
+    // Follow Me draws a single-target move aimed at the other foe.
+    const fm = await turn(
+      'emerald',
+      [mk('mine', 0, 'machamp', ['cross-chop']), mk('mine', 1, 'kangaskhan', ['tackle'])],
+      [mk('theirs', 0, 'togepi', ['follow-me']), mk('theirs', 1, 'kangaskhan', ['tackle'])],
+      {
+        mine0: { kind: 'move', slot: 0, target: { side: 'theirs', slot: 1 } },
+        mine1: none,
+        theirs0: { kind: 'move', slot: 0 },
+        theirs1: none,
+      },
+    )
+    out.followMe = { togepi: hpLost(fm, 'theirs', 0), kangaskhan: hpLost(fm, 'theirs', 1) }
+    // Gen 3 Lightning Rod: an opposing holder draws an Electric move aimed at its partner.
+    const lr = await turn(
+      'emerald',
+      [mk('mine', 0, 'raichu', ['thunderbolt']), mk('mine', 1, 'kangaskhan', ['tackle'])],
+      [
+        mk('theirs', 0, 'manectric', ['tackle'], 'lightning-rod'),
+        mk('theirs', 1, 'kangaskhan', ['tackle']),
+      ],
+      {
+        mine0: { kind: 'move', slot: 0, target: { side: 'theirs', slot: 1 } },
+        mine1: none,
+        theirs0: none,
+        theirs1: none,
+      },
+    )
+    out.lightningRod = { manectric: hpLost(lr, 'theirs', 0), kangaskhan: hpLost(lr, 'theirs', 1) }
+    // Helping Hand: x1.5 on the partner's move this turn.
+    const hh = async (help) =>
+      hpLost(
+        await turn(
+          'emerald',
+          [
+            mk('mine', 0, 'machamp', ['karate-chop']),
+            mk('mine', 1, 'kangaskhan', ['helping-hand']),
+          ],
+          [mk('theirs', 0, 'snorlax', ['tackle']), mk('theirs', 1, 'kangaskhan', ['tackle'])],
+          {
+            mine0: { kind: 'move', slot: 0, target: { side: 'theirs', slot: 0 } },
+            mine1: help ? { kind: 'move', slot: 0 } : none,
+            theirs0: none,
+            theirs1: none,
+          },
+        ),
+        'theirs',
+        0,
+      )
+    out.helpingHand = { with: await hh(true), without: await hh(false) }
+    // Intimidate on entry: both foes.
+    {
+      const e = await env('emerald')
+      const st = battle(
+        e,
+        [
+          mk('mine', 0, 'gyarados', ['tackle'], 'intimidate'),
+          mk('mine', 1, 'kangaskhan', ['tackle']),
+        ],
+        [
+          mk('theirs', 0, 'machamp', ['tackle'], 'guts'),
+          mk('theirs', 1, 'snorlax', ['tackle'], 'immunity'),
+        ],
+      )
+      out.intimidate = st.sides.theirs.mons.map((m) => m.boosts.atk)
+    }
+    // Four battlers in speed order (no priority).
+    const order = await turn(
+      'emerald',
+      [mk('mine', 0, 'snorlax', ['tackle']), mk('mine', 1, 'jolteon', ['tackle'])],
+      [mk('theirs', 0, 'kangaskhan', ['tackle']), mk('theirs', 1, 'alakazam', ['tackle'])],
+      {
+        mine0: { kind: 'move', slot: 0, target: { side: 'theirs', slot: 0 } },
+        mine1: { kind: 'move', slot: 0, target: { side: 'theirs', slot: 0 } },
+        theirs0: { kind: 'move', slot: 0, target: { side: 'mine', slot: 0 } },
+        theirs1: { kind: 'move', slot: 0, target: { side: 'mine', slot: 0 } },
+      },
+    )
+    out.order = order.log.filter((l) => / used /.test(l)).map((l) => l.split(' used')[0])
+    // When an emptied slot is refilled: Gen 3 at once, Gen 4 at the end of the turn.
+    const refill = async (vg) => {
+      const e = await env(vg)
+      const st = battle(
+        e,
+        [
+          mk('mine', 0, 'alakazam', ['psychic'], null, 70),
+          mk('mine', 1, 'snorlax', ['tackle'], null, 50),
+        ],
+        [
+          mk('theirs', 0, 'machop', ['tackle'], null, 5),
+          mk('theirs', 1, 'slowpoke', ['tackle'], null, 50),
+          mk('theirs', 2, 'rattata', ['tackle'], null, 5),
+        ],
+      )
+      const r = SES.stepTurnDoubles(
+        e.ctx,
+        e.data,
+        st,
+        {
+          0: { kind: 'move', slot: 0, target: { side: 'theirs', slot: 0 } },
+          1: { kind: 'move', slot: 0, target: { side: 'theirs', slot: 1 } },
+        },
+        RNG.DEFAULT_SANDBOX_POLICIES,
+        new RNG.Rng(1),
+        new RNG.Rng(2),
+        { 0: none, 1: none },
+      )
+      const log = r.log.map((l) => l.text)
+      const sent = log.findIndex((l) => /Foe sent out Rattata/.test(l))
+      const lastUsed = log
+        .map((l, i) => (/ used /.test(l) ? i : -1))
+        .filter((i) => i >= 0)
+        .pop()
+      return { sent, lastUsed, log }
+    }
+    out.refill3 = await refill('emerald')
+    out.refill4 = await refill('platinum')
+
+    // ---- 3. The AI's doubles routines.
+    const predict = async (vg, mineSpecs, theirSpecs, flags) => {
+      const e = await env(vg)
+      const st = battle(e, mineSpecs, theirSpecs, flags)
+      return AI.predictAiDoubles(e.ctx, e.data, st, 0, 200)
+    }
+    const immune = (vg, flags) =>
+      predict(
+        vg,
+        [
+          mk('mine', 0, 'golem', ['tackle'], 'sturdy'),
+          mk('mine', 1, 'gyarados', ['tackle'], 'intimidate'),
+        ],
+        [
+          mk('theirs', 0, 'raichu', ['thunderbolt'], 'static'),
+          mk('theirs', 1, 'kangaskhan', ['tackle'], 'early-bird'),
+        ],
+        flags,
+      )
+    const odds = (p) => p.odds.map((o) => `${o.label} ${(o.p * 100).toFixed(0)}%`)
+    out.aiEmerald = odds(await immune('emerald', ['check_bad_move']))
+    out.aiRuby = odds(await immune('ruby-sapphire', ['check_bad_move']))
+    out.aiPlatinum = odds(await immune('platinum', ['basic']))
+    const eqAi = await predict(
+      'emerald',
+      [mk('mine', 0, 'kangaskhan', ['tackle']), mk('mine', 1, 'snorlax', ['tackle'])],
+      [
+        mk('theirs', 0, 'golem', ['earthquake', 'tackle'], 'sturdy'),
+        mk('theirs', 1, 'skarmory', ['peck'], 'keen-eye'),
+      ],
+      ['check_bad_move'],
+    )
+    out.aiEq = {
+      odds: odds(eqAi),
+      routines: eqAi.moves[0].contributions.map((c) => `${c.label} ${c.meanDelta}`),
+    }
+    return out
+  })
+  check(
+    'S6 Gen 3: MOVE_TARGET_BOTH halves with two defenders (pokeemerald CalculateBaseDamage)',
+    dbl.g3.bothFoesHalved,
+  )
+  check(
+    'S6 Gen 3: the single-battle formula is untouched without the doubles field',
+    dbl.g3.singlesUntouched,
+  )
+  check('S6 Gen 3: Earthquake (FOES_AND_ALLY) is not reduced', dbl.g3.earthquakeFull)
+  check('S6 Gen 3: Reflect is 2 * (damage / 3) with two defenders', dbl.g3.reflectTwoThirds)
+  check('S6 Gen 3: one defender standing: no halving', dbl.g3.oneDefenderNotHalved)
+  check(
+    'S6 Gen 4: RANGE_ADJACENT_OPPONENTS x3/4 with two defenders (BattleSystem_CalcBaseDamage)',
+    dbl.g4.bothFoes34,
+  )
+  check('S6 Gen 4: RANGE_ALL_ADJACENT x3/4 with two or more others standing', dbl.g4.allAdjacent34)
+  check(
+    'S6 Gen 4: RANGE_ALL_ADJACENT unreduced when only one other stands',
+    dbl.g4.allAdjacentAlone,
+  )
+  check('S6 Gen 4: Reflect is damage * 2 / 3 with two defenders', dbl.g4.reflectTwoThirds)
+  check(
+    'S6 Gen 3: Earthquake hits both foes and the ally, each at the single-battle damage',
+    dbl.eq3.ally > 0 && dbl.eq3.foe0 === dbl.eqSingle3 && dbl.eq3.foe1 === dbl.eqSingle3,
+    JSON.stringify({ ...dbl.eq3, single: dbl.eqSingle3 }),
+  )
+  check(
+    'S6 Gen 4: Earthquake hits all three at x3/4 of the single-battle damage',
+    dbl.eq4.ally > 0 &&
+      dbl.eq4.foe0 < dbl.eqSingle4 &&
+      Math.abs(dbl.eq4.foe0 - dbl.eqSingle4 * 0.75) <= 2,
+    JSON.stringify({ ...dbl.eq4, single: dbl.eqSingle4 }),
+  )
+  check(
+    'S6: Follow Me draws a move aimed at the other foe',
+    dbl.followMe.togepi > 0 && dbl.followMe.kangaskhan === 0,
+    JSON.stringify(dbl.followMe),
+  )
+  check(
+    'S6 Gen 3: an opposing Lightning Rod draws an Electric move aimed at its partner',
+    dbl.lightningRod.kangaskhan === 0,
+    JSON.stringify(dbl.lightningRod),
+  )
+  check(
+    "S6: Helping Hand raises the partner's damage by half",
+    Math.abs(dbl.helpingHand.with / dbl.helpingHand.without - 1.5) < 0.06,
+    JSON.stringify(dbl.helpingHand),
+  )
+  check(
+    'S6: Intimidate lowers both foes',
+    dbl.intimidate.every((x) => x === -1),
+    JSON.stringify(dbl.intimidate),
+  )
+  check(
+    'S6: four battlers act in speed order',
+    dbl.order.join(',') === 'Jolteon,Alakazam,Kangaskhan,Snorlax',
+    dbl.order.join(','),
+  )
+  check(
+    'S6 Gen 3: an emptied slot is refilled at once, before the turn goes on (HandleAction_TryFinish)',
+    dbl.refill3.sent >= 0 && dbl.refill3.sent < dbl.refill3.lastUsed,
+    `${dbl.refill3.sent} < ${dbl.refill3.lastUsed}`,
+  )
+  check(
+    'S6 Gen 4: an emptied slot is refilled at the end of the turn (BattleControllerPlayer_TurnEnd)',
+    dbl.refill4.sent > dbl.refill4.lastUsed,
+    `${dbl.refill4.sent} > ${dbl.refill4.lastUsed}`,
+  )
+  check(
+    'S6 AI Emerald: per-target scoring aims Thunderbolt away from the immune Golem',
+    dbl.aiEmerald.length === 1 && /Gyarados 100%/.test(dbl.aiEmerald[0]),
+    dbl.aiEmerald.join(' | '),
+  )
+  check(
+    'S6 AI Ruby: no doubles routine -- a random foe first, so the immune one is aimed at too',
+    dbl.aiRuby.some((x) => /Golem/.test(x)) && dbl.aiRuby.some((x) => /Gyarados/.test(x)),
+    dbl.aiRuby.join(' | '),
+  )
+  check(
+    'S6 AI Platinum: TrainerAI_MainDoubles aims away from the immune target',
+    dbl.aiPlatinum.length === 1 && /Gyarados 100%/.test(dbl.aiPlatinum[0]),
+    dbl.aiPlatinum.join(' | '),
+  )
+  check(
+    'S6 AI Emerald: AI_DoubleBattle runs in doubles (Earthquake beside a Flying partner)',
+    dbl.aiEq.routines.some((r) => /DoubleBattle/.test(r)),
+    dbl.aiEq.routines.join(' | '),
+  )
+  check(
+    'S6 AI: never aims a damaging move at its ally below 100 points',
+    ![...dbl.aiEmerald, ...dbl.aiPlatinum, ...dbl.aiEq.odds].some((x) => /\(ally\)/.test(x)),
+  )
+  // ---- 4. The screen.
+  await tab('Setup')
+  await page.selectOption('[data-testid="tm-game"]', 'emerald')
+  await page.waitForSelector('[data-testid="tm-team"]')
+  await page.selectOption('[data-testid="tm-team"]', 'fx-team-emerald')
+  await page.click('[data-testid="tm-opp-kind"] [data-value="trainer"]')
+  await pickTrainer('Tate')
+  await page.waitForSelector('[data-testid="tm-lead2"]')
+  check('S6: a double battle asks for a second lead', true)
+  await tab('Sandbox')
+  await page.waitForSelector('[data-testid="tm-sb-theirs1"]')
+  const panels = await page.$$('[data-testid="tm-panel-sandbox"] .tm-sb-mon')
+  check('S6: the sandbox shows all four battlers', panels.length === 4, String(panels.length))
+  check(
+    "S6: both of the opponent's battlers get a prediction",
+    (await page.$('[data-testid="tm-sb-prediction-0"]')) !== null &&
+      (await page.$('[data-testid="tm-sb-prediction-1"]')) !== null,
+  )
+  const choices = await page.$$eval('[data-testid="tm-sb-act-0"] option', (o) =>
+    o.map((x) => x.textContent),
+  )
+  check(
+    'S6: a single-target move offers each target, the ally included',
+    choices.some((c) => /→/.test(c)) && choices.some((c) => /\(ally\)/.test(c)),
+    choices.slice(0, 4).join(' | '),
+  )
+  await page.click('[data-testid="tm-sb-go"]')
+  await page.waitForFunction(() =>
+    /Turn 2|won|lost/.test(document.querySelector('[data-testid="tm-sb-turn"] h2').textContent),
+  )
+  const dlog = await page.$$eval('[data-testid="tm-sb-log"] li', (l) => l.map((x) => x.textContent))
+  check('S6: a doubles turn resolves through the screen', dlog.length > 6, `${dlog.length} lines`)
+  await page.screenshot({ path: shot('team-matchup-doubles-sandbox.png') })
+  await tab('Outcome')
+  await page.selectOption('[data-testid="tm-mc-runs"]', '100')
+  await page.click('[data-testid="tm-mc-run"]')
+  await page.waitForSelector('[data-testid="tm-mc-result-win"]')
+  check(
+    'S6: battles against Tate & Liza run two-on-two',
+    /%/.test(await page.textContent('[data-testid="tm-mc-result-win"]')),
+  )
+  await tab('Setup')
+  await page.selectOption('[data-testid="tm-game"]', 'red-blue')
+  await page.waitForSelector('[data-testid="tm-format-battle"]')
+  check(
+    'S6: Generation 1 offers no double battle',
+    (await page.getAttribute(
+      '[data-testid="tm-format-battle"] [data-value="double"]',
+      'disabled',
+    )) !== null ||
+      (await page.getAttribute(
+        '[data-testid="tm-format-battle"] [data-value="double"]',
+        'aria-disabled',
+      )) === 'true',
+  )
+  await page.selectOption('[data-testid="tm-game"]', 'platinum')
+  await page.waitForSelector('[data-testid="tm-format-battle"]')
+  await page.click('[data-testid="tm-format-battle"] [data-value="double"]')
+  await tab('Sandbox')
+  await page.waitForSelector('[data-testid="tm-sb-theirs1"]')
+  check('S6: the Double format turns a single trainer into a two-on-two battle (Platinum)', true)
+  await tab('Setup')
+  await page.click('[data-testid="tm-format-battle"] [data-value="single"]')
+
+  // ------------------------------------------------------------------ 9
+  hr('9. DESIGN RULES, THEMES, CONSOLE')
   const design = await page.evaluate(() => {
     const root = document.querySelector('[data-testid="team-matchup"]')
     const all = [root, ...root.querySelectorAll('*')]

@@ -19,6 +19,9 @@ export interface OutcomeJobInput {
   field?: MatchField
   carry?: CarryOver
   mineLead?: number
+  /** S6: a double battle, and my second lead. */
+  doubles?: boolean
+  mineLead2?: number
   runs: number
   seed?: number
   nuzlocke?: boolean

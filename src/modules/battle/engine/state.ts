@@ -24,6 +24,8 @@ export interface Volatile {
   flinch: boolean
   focusEnergy: boolean
   leechSeed: boolean
+  /** Doubles: the slot (on the other side) of the Pokemon that planted the seed; it drains to whoever stands there. */
+  leechSeedSlot?: Slot
   substituteHp: number
   protectChain: number
   protecting: boolean
@@ -65,7 +67,7 @@ export interface Volatile {
   lastMove: number
   lastDamageTaken: { amount: number; category: string; moveId: number } | null
   /** Damage taken THIS turn, for Counter / Mirror Coat (reset every turn). */
-  counterDamage: { amount: number; category: string } | null
+  counterDamage: { amount: number; category: string; by?: Pos } | null
   /** Turns since it came in (0 = the turn it entered). */
   turnsOut: number
   /** Gen 3+ "first turn" flag for Fake Out / AI. */
@@ -106,7 +108,13 @@ export interface MonState {
 
 export interface SideState {
   mons: MonState[]
+  /** The Pokemon in slot 0 (the only slot in a single battle). */
   active: number
+  /**
+   * Slot 1 in a DOUBLE battle (S6); absent in singles. A fainted Pokemon nobody
+   * replaced stays named here, fainted -- the game's "absent battler".
+   */
+  active2?: number
   reflect: number
   lightScreen: number
   safeguard: number
@@ -137,6 +145,69 @@ export interface BattleState {
   winner: Side | null
   /** Gen 1 wAILayer2Encouragement: the opponent's turns since its Pokemon came in. */
   aiLayer2: number
+  /** A double battle (S6, Gen 3-4): two battlers a side. Absent in singles. */
+  doubles?: boolean
+  /** Doubles: the slots that must be refilled before the next turn (a faint, U-turn, Baton Pass). */
+  pendingSlots?: Pos[]
+  /** Doubles: Follow Me's user this turn, per side (cleared at the end of the turn). */
+  followMe?: Partial<Record<Side, Slot>>
+  /** Doubles: battlers whose partner used Helping Hand this turn. */
+  helpingHand?: Pos[]
+}
+
+/** A battler's place: its side and its slot (0 left, 1 right; only 0 in singles). */
+export type Slot = 0 | 1
+export interface Pos {
+  side: Side
+  slot: Slot
+}
+
+export const posKey = (p: Pos) => `${p.side}${p.slot}`
+export const samePos = (a: Pos, b: Pos) => a.side === b.side && a.slot === b.slot
+export const partnerPos = (p: Pos): Pos => ({ side: p.side, slot: p.slot === 0 ? 1 : 0 })
+
+/** The party index in a slot (undefined: no such slot). */
+export function slotIndex(sd: SideState, slot: Slot): number | undefined {
+  return slot === 0 ? sd.active : sd.active2
+}
+
+/** Is party member i one of the Pokemon on the field? */
+export function onField(sd: SideState, i: number): boolean {
+  return i === sd.active || (sd.active2 != null && i === sd.active2)
+}
+
+/** The slots a side has: [0] in singles, [0, 1] in doubles. */
+export const slotsOf = (st: BattleState): Slot[] => (st.doubles ? [0, 1] : [0])
+
+export function monAt(st: BattleState, p: Pos): MonState | undefined {
+  const i = slotIndex(st.sides[p.side], p.slot)
+  return i == null ? undefined : st.sides[p.side].mons[i]
+}
+
+/** A battler stands in this place (present and not fainted). */
+export function standing(st: BattleState, p: Pos): boolean {
+  const m = monAt(st, p)
+  return !!m && !m.fainted
+}
+
+/** The slot a Pokemon on the field occupies (0 when it is not on the field). */
+export function slotOfMon(st: BattleState, side: Side, m: MonState): Slot {
+  const sd = st.sides[side]
+  return sd.active2 != null && sd.mons[sd.active2] === m ? 1 : 0
+}
+
+/**
+ * Every place on the field in the games' BATTLER ID order -- player left (0),
+ * opponent left (1), player right (2), opponent right (3) -- the order the game
+ * walks battlers in for turn order ties, spread targets and end-of-turn loops.
+ */
+export function battlerOrder(st: BattleState): Pos[] {
+  const out: Pos[] = [
+    { side: 'mine', slot: 0 },
+    { side: 'theirs', slot: 0 },
+  ]
+  if (st.doubles) out.push({ side: 'mine', slot: 1 }, { side: 'theirs', slot: 1 })
+  return out
 }
 
 export function emptyVolatile(): Volatile {

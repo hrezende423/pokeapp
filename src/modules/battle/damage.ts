@@ -49,12 +49,18 @@ import { critChance, hitChance, hitCounts, type HitCount } from './chance'
 import type { GameContext } from './game'
 import { getAbility } from '../../data'
 import type { Range } from './range'
+import { spreadOf } from './engine/doubles'
 
 /** The field as the matchup holds it: per SIDE, not per attacker. */
 export interface MatchField {
   weather: Weather | null
   gravity: boolean
   trickRoom: boolean
+  /**
+   * A double battle (S6, Gen 3-4): one-on-one figures take the doubles formula as
+   * when both foes stand -- a spread move reduced, screens at 2/3.
+   */
+  doubles?: boolean
   sides: {
     mine: SideConditions & { tailwind?: boolean; leechSeed?: boolean; luckyChant?: boolean }
     theirs: SideConditions & { tailwind?: boolean; leechSeed?: boolean; luckyChant?: boolean }
@@ -412,6 +418,8 @@ export function analyzeMove(q: DamageQuery): MoveDamage {
   }
   const p = plans(category)
   const field = calcFieldFor(q.field, q.attackerSide)
+  if (q.field.doubles && ctx.generation >= 3)
+    field.doubles = { defenderSideAlive: 2, othersAlive: 3, spread: spreadOf(gm) }
   const atkBadges = badgeBoostsFor(q.attacker, ctx, q.badges)
   const defBadges = badgeBoostsFor(q.defender, ctx, q.badges)
   const ability =

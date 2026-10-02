@@ -43,6 +43,8 @@ export function stageOf(
     key: t.id,
     label: trainerTitle(p, t),
     trainer: trainerInfo(t, ctx.versionGroup),
+    // S6: the trainer's own double (or tag) battle is fought two-on-two in Gen 3-4.
+    doubles: t.battle !== 'single' && ctx.generation >= 3,
     theirs: level50
       ? applyFormat([], specs, { level: 'level-50', itemClause: false, battle: 'single' }).theirs
       : specs,

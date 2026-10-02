@@ -36,6 +36,13 @@ import {
   activeMon,
   aliveCount,
   abilitySlugOf,
+  battlerOrder,
+  monAt,
+  onField,
+  samePos,
+  slotIndex,
+  type Pos,
+  type Slot,
   type BattleState,
   type MonState,
   type Side,
@@ -43,6 +50,7 @@ import {
 import { effectiveSpeed } from '../speed'
 import { quickClawChance } from '../chance'
 import type { AiChoice, AiEnv, AiTrace, Contribution } from './types'
+import { aiDamageAt, aiView, partners } from './view'
 
 /** Emerald's AI_SCRIPT_* bit order -- the names the trainer bundle decoded every game's flags with. */
 export const EMERALD_FLAGS = [
@@ -84,6 +92,10 @@ interface VM {
   st: BattleState
   user: MonState
   target: MonState
+  /** Doubles: AI_USER_PARTNER / AI_TARGET_PARTNER (null in singles), and if_target_is_ally. */
+  userPartner: MonState | null
+  targetPartner: MonState | null
+  targetIsAlly: boolean
   scores: number[]
   contrib: Contribution[][]
   slot: number
@@ -167,8 +179,17 @@ function sideStatus(st: BattleState, side: Side): number {
   return s
 }
 
-const battler = (vm: VM, b: number) => (b === AI_USER ? vm.user : vm.target)
-const sideOf = (b: number): Side => (b === AI_USER ? 'theirs' : 'mine')
+// BattleAI_GetWantedBattler: AI_TARGET 0, AI_USER 1, AI_TARGET_PARTNER 2, AI_USER_PARTNER 3.
+// In a single battle no script reaches a partner (only AI_DoubleBattle names one).
+const battler = (vm: VM, b: number): MonState =>
+  b === AI_USER
+    ? vm.user
+    : b === 3
+      ? (vm.userPartner ?? vm.target)
+      : b === 2
+        ? (vm.targetPartner ?? vm.target)
+        : vm.target
+const sideOf = (b: number): Side => (b === AI_USER || b === 3 ? 'theirs' : 'mine')
 
 /** TypeCalc on a 40 seed: STAB x1.5, then each defending type -- and the four remaps. */
 function aiEffectiveness(vm: VM, moveId: number): number {
@@ -192,7 +213,8 @@ function aiEffectiveness(vm: VM, moveId: number): number {
 
 /** AI_CalcDmg + TypeCalc for a move, at the simulated roll: the engine's roll index (rng - 85). */
 function aiDamage(vm: VM, moveId: number, rng: number): number {
-  const r = engineDamage(vm.env.ctx, vm.st, 'theirs', moveId, false, 1)
+  const at = aiDamageAt(vm.env, vm.st, 'theirs', moveId)
+  const r = engineDamage(vm.env.ctx, vm.st, 'theirs', moveId, false, 1, false, at)
   if (!r || r.noDamageReason) return 0
   const d = r.damage
   if (typeof d === 'number') return d
@@ -217,7 +239,8 @@ const IGNORED_POWER_EFFECTS = [
 
 function knownAbility(vm: VM, b: number): string {
   const m = battler(vm, b)
-  if (b === AI_USER) return abilitySlugOf(m)
+  // Cmd_get_ability: "The AI knows its own or partner's ability."
+  if (b === AI_USER || b === 3) return abilitySlugOf(m)
   const real = abilitySlugOf(m)
   if (['shadow-tag', 'magnet-pull', 'arena-trap'].includes(real)) return real
   if (m.volatile.abilityRevealed) return real
@@ -402,7 +425,8 @@ function step(vm: VM) {
       return next()
     case 0x2c: {
       const sd = vm.st.sides[sideOf(arg(0) as number)]
-      vm.funcResult = sd.mons.filter((m, i) => i !== sd.active && !m.fainted).length
+      // Cmd_count_usable_party_mons: both battlers on the field are left out in doubles.
+      vm.funcResult = sd.mons.filter((m, i) => !onField(sd, i) && !m.fainted).length
       return next()
     }
     case 0x2d:
@@ -464,10 +488,15 @@ function step(vm: VM) {
     case 0x40: {
       const who = arg(0) as number
       const move = arg(1) as number
+      // Cmd_if_has_move reads the partner's own moves (none when it has fainted);
+      // Cmd_if_doesnt_have_move reads the user's for both (UB kept).
+      const partner = vm.userPartner
       const has =
-        who === AI_USER || who === 3
-          ? user.spec.moves.includes(move)
-          : target.volatile.usedMoves.includes(move)
+        op === 0x3f && who === 3
+          ? !!partner && !partner.fainted && partner.spec.moves.includes(move)
+          : who === AI_USER || who === 3
+            ? user.spec.moves.includes(move)
+            : target.volatile.usedMoves.includes(move)
       return op === 0x3f ? cond(has, 2) : cond(!has, 2)
     }
     case 0x41:
@@ -565,7 +594,7 @@ function step(vm: VM) {
     case 0x5d:
       return cond(target.volatile.taunt === 0, 0)
     case 0x5e:
-      return cond(false, 0)
+      return cond(vm.targetIsAlly, 0)
     case 0x5f: {
       vm.funcResult = types(battler(vm, arg(0) as number)).includes(arg(1) as string) ? 1 : 0
       return next()
@@ -575,7 +604,7 @@ function step(vm: VM) {
       const want = arg(1) as string
       const m = battler(vm, who)
       let ab: string
-      if (who === AI_USER) ab = abilitySlugOf(m)
+      if (who === AI_USER || who === 3) ab = abilitySlugOf(m)
       else {
         const real = abilitySlugOf(m)
         const slots = resolveAbilitiesForGeneration(varietyOfSpec(m.spec), 3)
@@ -651,6 +680,7 @@ export function gen3MoveScores(env: AiEnv): {
     st,
     user,
     target,
+    ...partners(st),
     scores: moves.map((_, i) =>
       user.pp[i] > 0 && user.volatile.disable?.moveId !== moves[i] ? 100 : 0,
     ),
@@ -665,8 +695,13 @@ export function gen3MoveScores(env: AiEnv): {
     flee: false,
     label: '',
   }
-  const flags = st.trainer?.aiFlags ?? []
-  const bits = flags
+  // Emerald ORs AI_SCRIPT_DOUBLE_BATTLE into every double battle's flags
+  // (BattleAI_SetupAIData); Ruby and FireRed do not.
+  const flags = [
+    ...(st.trainer?.aiFlags ?? []),
+    ...(st.doubles && prog.quirk !== 'ruby-tie-order' ? ['double_battle'] : []),
+  ]
+  const bits = [...new Set(flags)]
     .map((f) => EMERALD_FLAGS.indexOf(f))
     .filter((b) => b >= 0)
     .sort((a, b) => a - b)
@@ -727,9 +762,13 @@ function shouldSwitch(env: AiEnv, trace: AiTrace): number | null {
   const sd = st.sides.theirs
   if (me.volatile.trapped || me.volatile.meanLook || me.volatile.ingrain) return null
   const oppAb = abilitySlugOf(opp)
-  if (oppAb === 'shadow-tag' || oppAb === 'arena-trap') return null
-  if (oppAb === 'magnet-pull' && types(me).includes('steel')) return null
-  const others = sd.mons.map((m, i) => ({ m, i })).filter((x) => x.i !== sd.active && !x.m.fainted)
+  // ABILITY_ON_OPPOSING_FIELD: either foe in a double battle.
+  const foeAbs = st.doubles ? foesOnField(st).map(abilitySlugOf) : [oppAb]
+  if (foeAbs.includes('shadow-tag') || foeAbs.includes('arena-trap')) return null
+  if (foeAbs.includes('magnet-pull') && types(me).includes('steel')) return null
+  const others = sd.mons
+    .map((m, i) => ({ m, i }))
+    .filter((x) => !onField(sd, x.i) && !reserved(env).includes(x.i) && !x.m.fainted)
   if (!others.length) return null
   // Perish Song at 0: switch to the most suitable.
   if (me.volatile.perishSong === 1) {
@@ -737,7 +776,8 @@ function shouldSwitch(env: AiEnv, trace: AiTrace): number | null {
     return -1
   }
   // Wonder Guard.
-  if (oppAb === 'wonder-guard' && !hasSeAgainst(env, me, opp, true)) {
+  // ShouldSwitchIfWonderGuard returns FALSE in a double battle.
+  if (!st.doubles && oppAb === 'wonder-guard' && !hasSeAgainst(env, me, opp, true)) {
     for (const { m, i } of others) {
       for (const id of m.spec.moves)
         if (id && aiTypeFlags(env, id, opp).se && env.rng.int(3) < 2) {
@@ -749,7 +789,7 @@ function shouldSwitch(env: AiEnv, trace: AiTrace): number | null {
   // Absorbing ability.
   const last = lastLanded(st)
   if (
-    !(hasSeAgainst(env, me, opp, true) && env.rng.int(3) !== 0) &&
+    !(hasSeAgainstOpponents(env, me, true) && env.rng.int(3) !== 0) &&
     last &&
     (gameMove(env.data, last)?.p ?? 0) > 0
   ) {
@@ -790,7 +830,7 @@ function shouldSwitch(env: AiEnv, trace: AiTrace): number | null {
       return -1
     }
   }
-  if (hasSeAgainst(env, me, opp, false)) return null
+  if (hasSeAgainstOpponents(env, me, false)) return null
   const raised = Object.values(me.boosts).reduce((s, v) => s + Math.max(0, v), 0)
   if (raised > 3) return null
   const f = findWithFlags(env, 'immune', 2) ?? findWithFlags(env, 'nve', 3)
@@ -809,7 +849,7 @@ function findWithFlags(env: AiEnv, flag: 'immune' | 'nve', modulo: number): numb
   const opp = activeMon(st, 'mine')
   for (let i = 0; i < sd.mons.length; i++) {
     const m = sd.mons[i]
-    if (m.fainted || i === sd.active) continue
+    if (m.fainted || onField(sd, i) || reserved(env).includes(i)) continue
     const fl = aiTypeFlags(env, last, m)
     if (!(flag === 'immune' ? fl.immune : fl.nve)) continue
     for (const id of m.spec.moves) {
@@ -873,10 +913,20 @@ function shouldUseItem(env: AiEnv, trace: AiTrace): Action | null {
 export function gen3SendOut(env: AiEnv): number {
   const st = env.st
   const sd = st.sides.theirs
-  const opp = activeMon(st, 'mine')
+  // Doubles: the foe is picked at random (Random() & BIT_FLANK), the other one when absent.
+  let opp = activeMon(st, 'mine')
+  if (st.doubles) {
+    const ms = st.sides.mine
+    const flank = [ms.active, ms.active2]
+    let pick = env.rng.int(2)
+    if (flank[pick] == null || ms.mons[flank[pick]!].fainted) pick ^= 1
+    opp = ms.mons[flank[pick] ?? ms.active]
+  }
   const oppTypes = types(opp)
   const invalid = new Set<number>()
-  sd.mons.forEach((m, i) => (m.fainted || i === sd.active) && invalid.add(i))
+  sd.mons.forEach(
+    (m, i) => (m.fainted || onField(sd, i) || reserved(env).includes(i)) && invalid.add(i),
+  )
   while (invalid.size < sd.mons.length) {
     let bestDmg = 0
     let best = -1
@@ -904,7 +954,7 @@ export function gen3SendOut(env: AiEnv): number {
   let best = -1
   const active = sd.mons[sd.active]
   sd.mons.forEach((m, i) => {
-    if (m.fainted || i === sd.active) return
+    if (m.fainted || onField(sd, i) || reserved(env).includes(i)) return
     for (const id of m.spec.moves) {
       const gm = gameMove(env.data, id)
       if (!gm || gm.p === 1) continue
@@ -917,7 +967,31 @@ export function gen3SendOut(env: AiEnv): number {
       }
     }
   })
-  return best >= 0 ? best : sd.mons.findIndex((m, i) => !m.fainted && i !== sd.active)
+  return best >= 0
+    ? best
+    : sd.mons.findIndex((m, i) => !m.fainted && !onField(sd, i) && !reserved(env).includes(i))
+}
+
+/** Party slots the partner already chose to send in this turn (monToSwitchIntoId). */
+const reserved = (env: AiEnv): number[] => env.reserved ?? []
+
+/** The player's battlers standing on the field (the view's target side). */
+function foesOnField(st: BattleState): MonState[] {
+  const sd = st.sides.mine
+  return [sd.active, sd.active2]
+    .filter((i): i is number => i != null && !sd.mons[i].fainted)
+    .map((i) => sd.mons[i])
+}
+
+/**
+ * HasSuperEffectiveMoveAgainstOpponents: the battler opposite, then -- in a
+ * double battle -- the opposite's partner, each only when present.
+ */
+function hasSeAgainstOpponents(env: AiEnv, me: MonState, noRng: boolean): boolean {
+  const st = env.st
+  if (!st.doubles) return hasSeAgainst(env, me, activeMon(st, 'mine'), noRng)
+  for (const opp of foesOnField(st)) if (hasSeAgainst(env, me, opp, noRng)) return true
+  return false
 }
 
 export function gen3Ai(env: AiEnv): AiChoice {
@@ -967,4 +1041,122 @@ export function gen3Ai(env: AiEnv): AiChoice {
   void getMove
   void getAbility
   return { action: { kind: 'move', slot }, trace }
+}
+
+// ------------------------------------------------------------------ doubles
+
+/**
+ * One AI battler's choice in a DOUBLE battle (S6).
+ *
+ * First AI_TrySwitchOrUseItem, judged against the battler opposite (its doubles
+ * branches are in shouldSwitch / gen3SendOut). Then the move and its target:
+ *   Emerald ChooseMoveOrAction_Doubles: the scripts run once per other battler as
+ *     the target (fresh scores and simulated rolls each time), the best move per
+ *     target keeps its score, the ALLY only when that score is 100 or more, and the
+ *     best-scoring target wins (ties at random).
+ *   Ruby / Sapphire / FireRed / LeafGreen have no doubles routine: the target is a
+ *     random foe (Random() & BIT_FLANK, the other when absent) and the single-battle
+ *     choice runs against it.
+ */
+export function gen3AiDoubles(env: AiEnv, slot: Slot): AiChoice {
+  const st = env.st
+  const prog = env.data.ai as Gen3Ai
+  const trace: AiTrace = { moves: [], pre: null, lowConfidence: [], better: 'higher' }
+  const pre = aiView(st, slot, { side: 'mine', slot })
+  const preEnv = { ...env, st: pre }
+  const sw = shouldSwitch(preEnv, trace)
+  if (sw != null) {
+    const to = sw >= 0 ? sw : gen3SendOut(preEnv)
+    if (to >= 0) {
+      if (trace.pre) trace.pre.to = to
+      return { action: { kind: 'switch', to }, trace }
+    }
+  } else {
+    const item = shouldUseItem(preEnv, trace)
+    if (item) return { action: item, trace }
+  }
+  const me = monAt(st, { side: 'theirs', slot })!
+  const u8 = (n: number) => n & 0xff
+  const emerald = prog.quirk === 'emerald-tie-order'
+  const pickMove = (scores: number[]) => {
+    const best: number[] = [0]
+    let top = u8(scores[0])
+    for (let j = 1; j < scores.length; j++) {
+      if (!me.spec.moves[j]) continue
+      if (emerald) {
+        if (top === scores[j]) best.push(j)
+        if (top < scores[j]) {
+          best.length = 0
+          best.push(j)
+          top = u8(scores[j])
+        }
+      } else {
+        if (top < scores[j]) {
+          best.length = 0
+          best.push(j)
+          top = u8(scores[j])
+        }
+        if (top === scores[j]) best.push(j)
+      }
+    }
+    return { slot: best[env.rng.int(best.length)], points: top }
+  }
+  const record = (scores: number[], contrib: Contribution[][]) => {
+    trace.moves = me.spec.moves.map((id, i) => ({
+      slot: i,
+      moveId: id,
+      score: scores[i],
+      contributions: contrib[i],
+    }))
+  }
+  if (!emerald) {
+    const ms = st.sides.mine
+    let flank: Slot = env.rng.int(2) === 0 ? 0 : 1
+    const absent = (s: Slot) => {
+      const i = slotIndex(ms, s)
+      return i == null || ms.mons[i].fainted
+    }
+    if (absent(flank)) flank = flank === 0 ? 1 : 0
+    const target: Pos = { side: 'mine', slot: flank }
+    const { scores, contrib } = gen3MoveScores({ ...env, st: aiView(st, slot, target) })
+    record(scores, contrib)
+    const pick = pickMove(scores)
+    trace.targets = [{ target, points: pick.points, slot: pick.slot }]
+    return { action: { kind: 'move', slot: pick.slot, target }, trace }
+  }
+  const self: Pos = { side: 'theirs', slot }
+  const options: {
+    target: Pos
+    points: number
+    slot: number
+    scores: number[]
+    contrib: Contribution[][]
+  }[] = []
+  for (const p of battlerOrder(st)) {
+    const m = monAt(st, p)
+    if (samePos(p, self) || !m || m.fainted) {
+      options.push({ target: p, points: -1, slot: -1, scores: [], contrib: [] })
+      continue
+    }
+    const { scores, contrib } = gen3MoveScores({ ...env, st: aiView(st, slot, p) })
+    const pick = pickMove(scores)
+    // "Don't use a move against ally if it has less than 100 points."
+    const points = p.side === 'theirs' && pick.points < 100 ? -1 : pick.points
+    options.push({ target: p, points, slot: pick.slot, scores, contrib })
+  }
+  let top = options[0].points
+  let tied: number[] = [0]
+  for (let i = 1; i < options.length; i++) {
+    if (top === options[i].points) tied.push(i)
+    if (top < options[i].points) {
+      top = options[i].points
+      tied = [i]
+    }
+  }
+  const chosen = options[tied[env.rng.int(tied.length)]]
+  record(chosen.scores, chosen.contrib)
+  trace.targets = options
+    .filter((o) => o.slot >= 0)
+    .map((o) => ({ target: o.target, points: o.points, slot: o.slot }))
+  return { action: { kind: 'move', slot: Math.max(0, chosen.slot), target: chosen.target }, trace }
 }

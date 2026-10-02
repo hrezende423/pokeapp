@@ -158,12 +158,12 @@ function Column({
             data,
             mine: resolved.mine,
             theirs: resolved.theirs,
-            field: setup.field,
+            field: resolved.field,
             badges,
             residual: true,
           })
         : null,
-    [ctx, data, resolved, setup.field, badges],
+    [ctx, data, resolved, badges],
   )
   const mc = useJob<McResult>()
   const counts = useMemo(() => {

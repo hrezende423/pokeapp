@@ -120,6 +120,34 @@ export interface CalcField {
   gravity: boolean
   attackerSide: SideConditions
   defenderSide: SideConditions
+  /**
+   * A DOUBLE BATTLE (Gen 3-4), set only by Team Matchup's engine; the Damage
+   * Calculator page never sets it, so its numbers are the singles ones. Absent =
+   * singles. What it changes is the games' own code, not the reference's:
+   *   Gen 3 pokeemerald CalculateBaseDamage: a screen is 2 * (damage / 3) instead
+   *     of damage / 2 when the defender's side has two battlers; a MOVE_TARGET_BOTH
+   *     move (Surf, Rock Slide) halves when the defender's side has two.
+   *   Gen 4 pokeplatinum BattleSystem_CalcBaseDamage: a screen is damage * 2 / 3
+   *     on the same condition; RANGE_ADJACENT_OPPONENTS x3/4 when the defender's
+   *     side has two; RANGE_ALL_ADJACENT x3/4 when two or more battlers other than
+   *     the defender stand (the attacker counts).
+   */
+  doubles?: DoublesField
+}
+
+export interface DoublesField {
+  /** Battlers standing on the defender's side (BATTLE_ALIVE_DEF_SIDE / CountAliveBattlers(TRUE)). */
+  defenderSideAlive: number
+  /** Battlers standing other than the defender (Gen 4 CountAliveBattlers(FALSE)). */
+  othersAlive: number
+  /** The move's range in the game's terms: 'both-foes' (MOVE_TARGET_BOTH / RANGE_ADJACENT_OPPONENTS), 'all-adjacent' (MOVE_TARGET_FOES_AND_ALLY / RANGE_ALL_ADJACENT), or 'single'. */
+  spread: 'both-foes' | 'all-adjacent' | 'single'
+  /**
+   * The attacker's partner used Helping Hand this turn: x15/10 on the damage right
+   * after Charge (Gen 3 Cmd_damagecalc), or on the move's power right after Charge
+   * (Gen 4 BattleSystem_CalcBaseDamage).
+   */
+  helpingHand?: boolean
 }
 
 /**

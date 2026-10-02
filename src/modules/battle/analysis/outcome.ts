@@ -22,17 +22,29 @@ import type { BattleData } from '../battleData'
 import type { BattlerSpec } from '../battler'
 import { canSwitch, usableMoveSlots, type Action } from '../engine/turn'
 import { DEFAULT_SANDBOX_POLICIES, RANDOM_POLICIES, Rng, type ChanceEvent } from '../engine/rng'
-import { activeMon, aliveCount, type BattleState, type CornerPick } from '../engine/state'
+import {
+  activeMon,
+  aliveCount,
+  monAt,
+  standing,
+  type BattleState,
+  type CornerPick,
+  type Slot,
+} from '../engine/state'
+import { needsTarget, standingFoes } from '../engine/doubles'
 import type { GameContext } from '../game'
 import { isPoint, type Range } from '../range'
-import { actionLabel, predictAi } from '../ai'
+import { actionLabel, actionLabelAt, predictAi, predictAiDoubles } from '../ai'
 import {
   bestReplacement,
+  bestReplacementDoubles,
+  greedyDoubles,
   greedyPlayer,
   newBattle,
   playerSwitch,
   runBattle,
   stepTurn,
+  stepTurnDoubles,
   type CarryOver,
   type PlayerPolicy,
   type TrainerInfo,
@@ -50,6 +62,9 @@ export interface OutcomeInput {
   field?: MatchField
   carry?: CarryOver
   mineLead?: number
+  /** A double battle (S6): two leads, two-on-two battles. */
+  doubles?: boolean
+  mineLead2?: number
   runs: number
   seed?: number
   maxTurns?: number
@@ -190,14 +205,19 @@ interface PlanStats {
   lossesToLuck: number
 }
 
-function initial(inp: OutcomeInput, plan: CornerPlan, lead?: number): BattleState {
+/** A lead: one Pokemon (singles) or a pair (doubles). */
+export type Lead = number | [number, number]
+
+function initial(inp: OutcomeInput, plan: CornerPlan, lead?: Lead): BattleState {
   return newBattle(inp.ctx, inp.data, inp.mine, inp.theirs, inp.trainer, {
     badges: inp.badges,
     minePick: plan.mine,
     theirsPick: plan.theirs,
-    mineLead: lead ?? inp.mineLead ?? 0,
+    mineLead: (Array.isArray(lead) ? lead[0] : lead) ?? inp.mineLead ?? 0,
+    mineLead2: Array.isArray(lead) ? lead[1] : inp.mineLead2,
     carry: inp.carry,
     field: inp.field,
+    doubles: inp.doubles,
   }).state
 }
 
@@ -227,7 +247,7 @@ function runPlan(
   plan: CornerPlan,
   runs: number,
   seed: number,
-  lead: number | undefined,
+  lead: Lead | undefined,
   tick: () => void,
 ): PlanStats {
   const fixed = inp.pool ? null : initial(inp, plan, lead)
@@ -296,7 +316,7 @@ function runPlan(
   return s
 }
 
-export function monteCarlo(inp: OutcomeInput, lead?: number): McResult {
+export function monteCarlo(inp: OutcomeInput, lead?: Lead): McResult {
   const plans = cornerPlans(inp)
   const runs = Math.max(1, inp.runs)
   const total = runs * plans.length
@@ -366,6 +386,8 @@ export function monteCarlo(inp: OutcomeInput, lead?: number): McResult {
 
 export interface LeadScore {
   index: number
+  /** Doubles: the second lead of the pair. */
+  index2?: number
   key: string
   label: string
   winRate: Range
@@ -393,6 +415,8 @@ export interface LineStep {
 export interface SearchResult {
   leads: LeadScore[]
   bestLead: number
+  /** Doubles: the second Pokemon of the best lead pair. */
+  bestLead2?: number
   line: LineStep[]
   /** The battle the line reached (by average rolls), and whether it was won. */
   lineOutcome: 'won' | 'lost' | 'open'
@@ -455,6 +479,7 @@ function rolloutScore(
 }
 
 export function searchLine(inp: OutcomeInput, opts: SearchOptions): SearchResult {
+  if (inp.doubles) return searchLineDoubles(inp, opts)
   const { ctx, data } = inp
   const nuzlocke = !!inp.nuzlocke
   const plan = cornerPlans(inp)[0]
@@ -551,4 +576,223 @@ export function searchLine(inp: OutcomeInput, opts: SearchOptions): SearchResult
           ? 'won'
           : 'open'
   return { leads, bestLead, line, lineOutcome, objective: nuzlocke ? 'no-faint' : 'win' }
+}
+
+// ------------------------------------------------------------ doubles search
+
+/** Everything one of my battlers can do this turn: each move at each foe it can aim at, each switch. */
+function doublesOptions(inp: OutcomeInput, st: BattleState, slot: Slot): Action[] {
+  const atk = { side: 'mine' as const, slot }
+  if (!standing(st, atk)) return []
+  const a = monAt(st, atk)!
+  const foes = standingFoes(st, atk)
+  const out: Action[] = []
+  for (const ms of usableMoveSlots(inp.ctx, inp.data, st, 'mine', slot)) {
+    const id = a.spec.moves[ms]
+    if (needsTarget(inp.data, id))
+      for (const f of foes) out.push({ kind: 'move', slot: ms, target: f })
+    else out.push({ kind: 'move', slot: ms, target: foes[0] })
+  }
+  if (!out.length) out.push({ kind: 'move', slot: 0, target: foes[0] })
+  for (const to of canSwitch(st, 'mine', slot)) out.push({ kind: 'switch', to })
+  return out
+}
+
+function myLabelAt(st: BattleState, a: Action, slot: Slot): string {
+  const m = monAt(st, { side: 'mine', slot })
+  if (!m) return 'Nothing'
+  if (a.kind === 'move') {
+    const name = getMove(m.spec.moves[a.slot])?.display_name ?? `Move ${a.slot + 1}`
+    const t = a.target ? monAt(st, a.target) : undefined
+    return t ? `${m.spec.label}: ${name} → ${t.spec.label}` : `${m.spec.label}: ${name}`
+  }
+  if (a.kind === 'switch')
+    return `${m.spec.label}: switch to ${st.sides.mine.mons[a.to]?.spec.label}`
+  return `${m.spec.label}: nothing`
+}
+
+function rolloutScoreDoubles(
+  inp: OutcomeInput,
+  st: BattleState,
+  acts: Partial<Record<Slot, Action>>,
+  rollouts: number,
+  seed: number,
+  nuzlocke: boolean,
+): number {
+  let score = 0
+  const faintedBefore = st.sides.mine.mons.filter((m) => m.fainted).length
+  for (let i = 0; i < rollouts; i++) {
+    const s = seed + i * 7907
+    const next = stepTurnDoubles(
+      inp.ctx,
+      inp.data,
+      st,
+      acts,
+      RANDOM_POLICIES,
+      new Rng(s),
+      new Rng(s ^ 0x51ed),
+    ).state
+    const o = next.winner
+      ? null
+      : runBattle(inp.ctx, inp.data, next, greedyPlayer, s + 1, inp.maxTurns ?? 120)
+    const winner = next.winner ?? o?.winner
+    const faints =
+      next.sides.mine.mons.filter((m) => m.fainted).length -
+      faintedBefore +
+      (o?.mineFainted.length ?? 0)
+    if (winner === 'mine' && (!nuzlocke || faints === 0)) score++
+    else if (winner === 'mine') score += 0.5
+  }
+  return score / rollouts
+}
+
+/**
+ * O1 in a double battle: the best lead PAIR, then a line -- each turn, one of my
+ * battlers at a time tries everything it can do (the other holding its best so
+ * far, starting from the greedy pair) with the same seeded rollouts.
+ */
+function searchLineDoubles(inp: OutcomeInput, opts: SearchOptions): SearchResult {
+  const { ctx, data } = inp
+  const nuzlocke = !!inp.nuzlocke
+  const plan = cornerPlans(inp)[0]
+  const alive = inp.mine.map((_, i) => i).filter((i) => inp.carry?.hpPct[i] !== 0)
+  const pairs: [number, number][] = []
+  for (let a = 0; a < alive.length; a++)
+    for (let b = a + 1; b < alive.length; b++) pairs.push([alive[a], alive[b]])
+  if (!pairs.length && alive.length) pairs.push([alive[0], alive[0]])
+  // The same battle budget as the singles lead search: fifteen pairs share what six leads get.
+  const leadRuns = Math.max(
+    12,
+    Math.round((opts.leadRuns * alive.length) / Math.max(1, pairs.length)),
+  )
+  const totalWork =
+    pairs.length * leadRuns * cornerPlans(inp).length + opts.depth * 16 * opts.rollouts
+  let done = 0
+  const progress = (n: number) => {
+    done += n
+    inp.onProgress?.(Math.min(done, totalWork), totalWork)
+  }
+  const leads: LeadScore[] = pairs.map(([i, j]) => {
+    const r = monteCarlo({ ...inp, runs: leadRuns, onProgress: undefined }, [i, j])
+    progress(leadRuns * r.plans.length)
+    return {
+      index: i,
+      index2: j,
+      key: `${inp.mine[i].key}+${inp.mine[j].key}`,
+      label: `${inp.mine[i].label} + ${inp.mine[j].label}`,
+      winRate: r.winRate,
+      zeroFaint: r.zeroFaint,
+      expectedFaints: r.expectedFaints,
+    }
+  })
+  const key = (l: LeadScore) =>
+    nuzlocke ? l.zeroFaint.min + l.zeroFaint.max : l.winRate.min + l.winRate.max
+  leads.sort((a, b) => key(b) - key(a))
+  const best = leads[0]
+  const bestLead = best?.index ?? 0
+  let st = initial(
+    inp.pool ? { ...inp, theirs: drawFromPool(inp.pool.specs, inp.pool.size, new Rng(0x77)) } : inp,
+    plan,
+    best ? [best.index, best.index2 ?? best.index] : undefined,
+  )
+  const line: LineStep[] = []
+  const lineRng = new Rng(0x11e)
+  for (let t = 0; t < opts.depth && !st.winner; t++) {
+    const pending = (st.pendingSlots ?? []).filter((p) => p.side === 'mine')
+    if (pending.length) {
+      const reserved: number[] = []
+      for (const p of pending) {
+        const to = bestReplacementDoubles(ctx, data, st, p.slot, reserved)
+        if (to < 0) continue
+        reserved.push(to)
+        st = playerSwitch(ctx, data, st, to, DEFAULT_SANDBOX_POLICIES, lineRng, p.slot).state
+      }
+      st = { ...st, pendingSlots: (st.pendingSlots ?? []).filter((p) => p.side !== 'mine') }
+    }
+    const acts = greedyDoubles(ctx, data, st)
+    const seed = (inp.seed ?? 1) + t * 31337
+    let lead: { a: Action; score: number }[] = []
+    for (const slot of [0, 1] as Slot[]) {
+      const options = doublesOptions(inp, st, slot)
+      if (!options.length) continue
+      const scored = options.map((a) => {
+        const sc = rolloutScoreDoubles(
+          inp,
+          st,
+          { ...acts, [slot]: a },
+          opts.rollouts,
+          seed,
+          nuzlocke,
+        )
+        progress(opts.rollouts)
+        return { a, score: sc }
+      })
+      scored.sort((x, y) => y.score - x.score)
+      acts[slot] = scored[0].a
+      if (slot === 0 || !lead.length) lead = scored
+    }
+    // The opponent's most likely action per battler (the line follows it).
+    const forced: Partial<Record<Slot, Action>> = {}
+    const foeLabels: string[] = []
+    let foeP = 1
+    const lows = new Set<string>()
+    for (const slot of [0, 1] as Slot[]) {
+      if (!standing(st, { side: 'theirs', slot })) continue
+      const pred = predictAiDoubles(ctx, data, st, slot, 60, 0xa1 + t)
+      pred.lowConfidence.forEach((x) => lows.add(x))
+      const top = pred.odds[0]
+      if (!top) continue
+      forced[slot] = top.action
+      foeLabels.push(actionLabelAt(st, top.action, slot))
+      foeP *= top.p
+    }
+    const before = st
+    st = stepTurnDoubles(
+      ctx,
+      data,
+      st,
+      acts,
+      DEFAULT_SANDBOX_POLICIES,
+      lineRng,
+      new Rng(0xa1 + t),
+      forced,
+    ).state
+    const m0 = before.sides.mine.mons[before.sides.mine.active]
+    const t0 = before.sides.theirs.mons[before.sides.theirs.active]
+    const mAfter = st.sides.mine.mons[before.sides.mine.active]
+    const tAfter = st.sides.theirs.mons[before.sides.theirs.active]
+    const labels = ([0, 1] as Slot[])
+      .filter((s) => acts[s])
+      .map((s) => myLabelAt(before, acts[s]!, s))
+    line.push({
+      turn: before.turn + 1,
+      mineKey: m0.key,
+      theirsKey: t0.key,
+      action: acts[0] ?? acts[1] ?? { kind: 'none' },
+      actionLabel: labels.join('; '),
+      score: lead[0]?.score ?? 0,
+      alternatives: lead
+        .slice(1, 5)
+        .map((s) => ({ label: myLabelAt(before, s.a, 0), score: s.score })),
+      expectedFoe: foeLabels.length ? { label: foeLabels.join('; '), p: foeP } : null,
+      hpAfter: { mine: (100 * mAfter.hp) / mAfter.maxHp, theirs: (100 * tAfter.hp) / tAfter.maxHp },
+      note: lows.size ? `Opponent prediction low confidence: ${[...lows].join('; ')}` : undefined,
+    })
+  }
+  const lineOutcome =
+    st.winner === 'mine'
+      ? 'won'
+      : st.winner === 'theirs'
+        ? 'lost'
+        : aliveCount(st.sides.theirs) === 0
+          ? 'won'
+          : 'open'
+  return {
+    leads,
+    bestLead,
+    bestLead2: best?.index2,
+    line,
+    lineOutcome,
+    objective: nuzlocke ? 'no-faint' : 'win',
+  }
 }
