@@ -355,7 +355,8 @@ export interface VersionGroup {
   order: number | null
   versions: (string | null)[]
   learnsets_path: string
-  encounters_path: string
+  /** Null for Gen 5+ groups: encounters stay Gen 1-4, so they have no file. */
+  encounters_path: string | null
   learnset_rows: number
   encounter_rows: number
 }

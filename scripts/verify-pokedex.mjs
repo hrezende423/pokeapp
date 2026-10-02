@@ -25,7 +25,7 @@
  * Usage: node scripts/verify-pokedex.mjs
  */
 
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
@@ -33,6 +33,13 @@ import { startPreviewServer } from './lib/devServer.mjs'
 const PORT = 4179
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
 const SHOTS = 'scripts/.verify-shots'
+
+// The selector offers every version group in the bundle, one optgroup per generation.
+const VERSION_GROUPS = Object.values(
+  JSON.parse(readFileSync('public/data/version-groups.json', 'utf8')),
+)
+const VG_COUNT = VERSION_GROUPS.length
+const GENERATION_COUNT = new Set(VERSION_GROUPS.map((vg) => vg.generation_id)).size
 
 const failures = []
 const log = (...a) => console.log(...a)
@@ -260,9 +267,17 @@ try {
     (o) => o.length,
   )
   log(`  options inside optgroups: ${groupedOptions} (+1 ungrouped "All")`)
-  check('selector offers all 14 version groups', groupedOptions === 14, `(${groupedOptions})`)
-  check('plus one ungrouped "All" option', optionCount === 15, `(${optionCount} total)`)
-  check('grouped by generation (4 optgroups)', optgroups.length === 4, `(${optgroups.length})`)
+  check(
+    `selector offers all ${VG_COUNT} version groups`,
+    groupedOptions === VG_COUNT,
+    `(${groupedOptions})`,
+  )
+  check('plus one ungrouped "All" option', optionCount === VG_COUNT + 1, `(${optionCount} total)`)
+  check(
+    `grouped by generation (${GENERATION_COUNT} optgroups)`,
+    optgroups.length === GENERATION_COUNT,
+    `(${optgroups.length})`,
+  )
 
   /*
     WHAT THE APP SELECTOR DRIVES ON THE NEW PAGE, and what it no longer does.
@@ -1002,12 +1017,20 @@ try {
       got.natural.every((n) => n === '128x128'),
       got.natural.join(','),
     )
+    /*
+      One size PER ROLE. The trade icon LEADS its row at the item size (ITEM_ICON),
+      as Rare Candy and the stone do; the painted conditions follow at COND_ICON.
+      Gen 1-4 never put both on one chart; under All, Feebas now has beauty AND
+      Gen 5's trade holding a Prism Scale, so the chart draws one of each.
+    */
+    const sizesFor = (lead) =>
+      new Set(got.boxes.filter((_, i) => (got.paintedKeys[i] === 'trade') === lead))
     check(
-      `  drawn at one consistent size, scaled to the chart`,
+      `  drawn at one consistent size per role, scaled to the chart`,
       got.boxes.length > 0 &&
-        new Set(got.boxes).size === 1 &&
-        got.boxes[0] >= 12 &&
-        got.boxes[0] <= 120,
+        sizesFor(false).size <= 1 &&
+        sizesFor(true).size <= 1 &&
+        got.boxes.every((b) => b >= 12 && b <= 120),
       `${got.boxes.join(',')}px`,
     )
     check(

@@ -1,5 +1,6 @@
 /**
- * Build-time data ingestion for the Gen 1-4 Pokémon data layer.
+ * Build-time data ingestion for the Pokémon data layer (dexes Gen 1-9; encounters,
+ * items and TMs Gen 1-4).
  *
  * Reads PokeAPI's static JSON snapshot (github.com/PokeAPI/api-data) from a local
  * cache and writes a normalized, reference-only bundle to /data. The live REST API
@@ -45,10 +46,16 @@ const OUT_DIR = join(ROOT, 'public', 'data')
 const SNAPSHOT_URL = 'https://codeload.github.com/PokeAPI/api-data/tar.gz/refs/heads/master'
 const SNAPSHOT_SUBTREE = 'api-data-master/data/api/v2'
 
-/** National dex cutoff: Bulbasaur (1) .. Arceus (493). */
-const MAX_SPECIES_ID = 493
-/** Generations in scope. */
-const MAX_GENERATION = 4
+/** National dex cutoff: Bulbasaur (1) .. Pecharunt (1025). */
+const MAX_SPECIES_ID = 1025
+/** Generations in scope: species, moves, abilities, version groups and learnsets. */
+const MAX_GENERATION = 9
+/**
+ * Generations the encounter, item, TM and held-item data stays at. Only the Poke,
+ * move and ability dexes were expanded to Gen 9; those modules are still Gen 1-4.
+ * Gen 5+ items reach the bundle only when a Gen 5+ evolution requires them.
+ */
+const LEGACY_MAX_GENERATION = 4
 
 const GENERATION_IDS: Record<string, number> = {
   'generation-i': 1,
@@ -353,22 +360,29 @@ async function main() {
 
   // -- Version groups / versions in scope ----------------------------------
   const allVersionGroups = await readAll('version-group')
-  const gen14VersionGroups = allVersionGroups.filter(
+  const scopeVersionGroups = allVersionGroups.filter(
     (vg) => (genId(vg.generation) ?? 99) <= MAX_GENERATION,
   )
-  const vgNames = new Set<string>(gen14VersionGroups.map((vg) => vg.name))
+  const vgNames = new Set<string>(scopeVersionGroups.map((vg) => vg.name))
   const versionNames = new Set<string>()
+  // The Gen 1-4 subset: encounters, items, TMs and held items only.
+  const legacyVgNames = new Set<string>()
+  const legacyVersionNames = new Set<string>()
   // Encounters are recorded per version, but partitioned per version group, so the
   // version -> version group mapping is needed when writing them out.
   const versionToVersionGroup = new Map<string, string>()
-  for (const vg of gen14VersionGroups) {
+  for (const vg of scopeVersionGroups) {
+    const legacy = (genId(vg.generation) ?? 99) <= LEGACY_MAX_GENERATION
+    if (legacy) legacyVgNames.add(vg.name)
     for (const v of vg.versions) {
       versionNames.add(v.name)
+      if (legacy) legacyVersionNames.add(v.name)
       versionToVersionGroup.set(v.name, vg.name)
     }
   }
   log(`scope: ${vgNames.size} version groups, ${versionNames.size} versions`)
   log(`  ${[...vgNames].sort().join(', ')}`)
+  log(`legacy scope: ${legacyVgNames.size} version groups, ${legacyVersionNames.size} versions`)
 
   // -- Species -------------------------------------------------------------
   const speciesIds = Array.from({ length: MAX_SPECIES_ID }, (_, i) => i + 1)
@@ -378,7 +392,7 @@ async function main() {
     throw new Error(`missing species in snapshot: ${missingSpecies.join(', ')}`)
   }
 
-  // -- Forms: decide which varieties belong to Gen 1-4 ---------------------
+  // -- Forms: decide which varieties are in scope ---------------------------
   // pokemon.game_indices is empty for every alternate form, so it cannot separate
   // Gen 3 Deoxys forms from Gen 6 cosplay Pikachu. pokemon-form.version_group is
   // the authoritative "form introduced here" marker, so use that instead.
@@ -539,7 +553,7 @@ async function main() {
       return vg != null && vgNames.has(vg)
     })
     prunedEvoDetails += node.evolution_details.length - detailsInScope.length
-    // A non-root node with no Gen 1-4 evolution method did not exist in Gen 1-4.
+    // A non-root node with no in-scope evolution method did not exist in scope.
     if (!isRoot && detailsInScope.length === 0) {
       prunedChainNodes++
       return null
@@ -569,8 +583,8 @@ async function main() {
   )
 
   // -- Moves ---------------------------------------------------------------
-  // Retained = referenced by a Gen 1-4 learnset or evolution requirement, UNION
-  // every move that exists in Gen 1-4 (generation <= 4), so the Movedex is complete
+  // Retained = referenced by an in-scope learnset or evolution requirement, UNION
+  // every move that exists in scope (generation <= MAX_GENERATION), so the Movedex is complete
   // rather than only covering moves something happens to learn.
   // Contest effects, loaded once and resolved onto each move below. Both endpoints
   // are tiny and fully enumerable, so they are read in full rather than per move.
@@ -624,7 +638,7 @@ async function main() {
     if (t != null) moveTypeIds.add(t)
   }
   log(
-    `moves: ${retainedMoveIds.size} retained (${movesByGeneration} generation<=4, ${movesByReferenceOnly} out-of-era but referenced)`,
+    `moves: ${retainedMoveIds.size} retained (${movesByGeneration} generation<=${MAX_GENERATION}, ${movesByReferenceOnly} out-of-era but referenced)`,
   )
 
   // -- Types ---------------------------------------------------------------
@@ -768,7 +782,7 @@ async function main() {
     (a: Json) => (a.generation_id ?? 99) <= MAX_GENERATION,
   ).length
   log(
-    `abilities: ${Object.keys(abilities).length} referenced (${abilitiesInEra} in-era, ${Object.keys(abilities).length - abilitiesInEra} assigned to Gen 1-4 species only in later games)`,
+    `abilities: ${Object.keys(abilities).length} referenced (${abilitiesInEra} in-era, ${Object.keys(abilities).length - abilitiesInEra} assigned to in-scope species only in later games)`,
   )
 
   // -- Egg groups ----------------------------------------------------------
@@ -818,7 +832,7 @@ async function main() {
     const p = pokemonRaw.get(pid)!
     for (const h of p.held_items ?? []) {
       const inScope = (h.version_details ?? []).some((vd: Json) =>
-        versionNames.has(refName(vd.version)!),
+        legacyVersionNames.has(refName(vd.version)!),
       )
       const id = refId(h.item)
       if (inScope && id != null) heldItemIds.add(id)
@@ -833,7 +847,7 @@ async function main() {
     for (const mref of movesById.get(id)!.machines ?? []) {
       const machine = machineById.get(refId(mref.machine)!)
       if (!machine) continue
-      if (!vgNames.has(refName(machine.version_group)!)) continue
+      if (!legacyVgNames.has(refName(machine.version_group)!)) continue
       const itemId = refId(machine.item)
       if (itemId != null) tmItemIds.add(itemId)
     }
@@ -844,7 +858,7 @@ async function main() {
   const retainedItemIds = new Set<number>()
   for (const it of allItems) {
     const inEra = (it.game_indices ?? []).some(
-      (gi: Json) => (genId(gi.generation) ?? 99) <= MAX_GENERATION,
+      (gi: Json) => (genId(gi.generation) ?? 99) <= LEGACY_MAX_GENERATION,
     )
     if (inEra || heldItemIds.has(it.id) || tmItemIds.has(it.id) || evoItemIds.has(it.id)) {
       retainedItemIds.add(it.id)
@@ -877,7 +891,7 @@ async function main() {
       effect: cleanText(eff?.effect),
       short_effect: cleanText(eff?.short_effect),
       prices: (it.prices ?? [])
-        .filter((p: Json) => vgNames.has(refName(p.version_group)!))
+        .filter((p: Json) => legacyVgNames.has(refName(p.version_group)!))
         .map((p: Json) => ({
           version_group: refName(p.version_group),
           currency: refName(p.currency),
@@ -894,7 +908,7 @@ async function main() {
         .filter(
           (m: Json) =>
             m.version_group &&
-            vgNames.has(m.version_group) &&
+            legacyVgNames.has(m.version_group) &&
             m.move_id != null &&
             retainedMoveIds.has(m.move_id),
         ),
@@ -1025,7 +1039,7 @@ async function main() {
         .filter(
           (x: Json) =>
             x.version_group &&
-            vgNames.has(x.version_group) &&
+            legacyVgNames.has(x.version_group) &&
             x.item_id != null &&
             retainedItemIds.has(x.item_id),
         ),
@@ -1076,7 +1090,7 @@ async function main() {
       if (locId == null) continue
       for (const vd of entry.version_details) {
         const version = refName(vd.version)
-        if (!version || !versionNames.has(version)) continue
+        if (!version || !legacyVersionNames.has(version)) continue
         for (const det of vd.encounter_details) {
           usedAreaIds.add(areaId)
           usedLocationIds.add(locId)
@@ -1210,7 +1224,7 @@ async function main() {
             .map((h: Json) => ({
               item_id: refId(h.item),
               versions: (h.version_details ?? [])
-                .filter((vd: Json) => versionNames.has(refName(vd.version)!))
+                .filter((vd: Json) => legacyVersionNames.has(refName(vd.version)!))
                 .map((vd: Json) => ({ version: refName(vd.version), rarity: vd.rarity })),
             }))
             .filter(
@@ -1285,14 +1299,14 @@ async function main() {
   // -- Partition the row-oriented files by version group -------------------
   // learnsets and encounters dwarf everything else, and no screen ever needs more
   // than one version group at a time. Split them so a consumer fetches one game's
-  // rows instead of all fourteen. Every in-scope version group gets a file even
-  // when it has no rows, so the index never points at a missing path.
+  // rows instead of all of them. Every in-scope version group gets a learnset file,
+  // and every Gen 1-4 one an encounter file, even when it has no rows, so the index
+  // never points at a missing path. Gen 5+ groups have no encounter file at all:
+  // their encounters_path is null.
   const learnsetsByVg = new Map<string, LearnRow[]>()
   const encountersByVg = new Map<string, EncounterRow[]>()
-  for (const name of vgNames) {
-    learnsetsByVg.set(name, [])
-    encountersByVg.set(name, [])
-  }
+  for (const name of vgNames) learnsetsByVg.set(name, [])
+  for (const name of legacyVgNames) encountersByVg.set(name, [])
   for (const row of learnsets) learnsetsByVg.get(row.version_group)!.push(row)
   for (const row of encounters) encountersByVg.get(row.version_group)!.push(row)
 
@@ -1304,7 +1318,8 @@ async function main() {
   // This is what the runtime loader will read to discover which partitions exist
   // and how much each one costs before fetching it.
   const versionGroups: Record<number, Json> = {}
-  for (const vg of gen14VersionGroups) {
+  for (const vg of scopeVersionGroups) {
+    const hasEncounters = legacyVgNames.has(vg.name)
     versionGroups[vg.id] = {
       id: vg.id,
       name: vg.name,
@@ -1312,9 +1327,9 @@ async function main() {
       order: vg.order ?? null,
       versions: vg.versions.map((v: NamedRef) => refName(v)),
       learnsets_path: partitionPath(LEARNSET_DIR, vg.name),
-      encounters_path: partitionPath(ENCOUNTER_DIR, vg.name),
+      encounters_path: hasEncounters ? partitionPath(ENCOUNTER_DIR, vg.name) : null,
       learnset_rows: learnsetsByVg.get(vg.name)!.length,
-      encounter_rows: encountersByVg.get(vg.name)!.length,
+      encounter_rows: encountersByVg.get(vg.name)?.length ?? 0,
     }
   }
   log(`partitions: ${learnsetsByVg.size} learnset files, ${encountersByVg.size} encounter files`)
@@ -1450,19 +1465,20 @@ async function main() {
     }
   }
   for (const row of encounters) {
-    if (!versionNames.has(row.version)) {
+    if (!legacyVersionNames.has(row.version)) {
       problems.push(`encounter row has out-of-scope version ${row.version}`)
       break
     }
   }
 
-  // Partition integrity: one file per in-scope version group, every row in the
-  // right file, and no row lost or duplicated by the split.
+  // Partition integrity: one learnset file per in-scope version group, one
+  // encounter file per Gen 1-4 group, every row in the right file, and no row lost
+  // or duplicated by the split.
   if (learnsetsByVg.size !== vgNames.size) {
     problems.push(`learnset partitions: ${learnsetsByVg.size}, expected ${vgNames.size}`)
   }
-  if (encountersByVg.size !== vgNames.size) {
-    problems.push(`encounter partitions: ${encountersByVg.size}, expected ${vgNames.size}`)
+  if (encountersByVg.size !== legacyVgNames.size) {
+    problems.push(`encounter partitions: ${encountersByVg.size}, expected ${legacyVgNames.size}`)
   }
   let learnsetPartitioned = 0
   for (const [vg, rows] of learnsetsByVg) {
@@ -1488,10 +1504,13 @@ async function main() {
       `encounter rows after split: ${encounterPartitioned}, expected ${encounters.length}`,
     )
   }
-  // The index must point only at files that were actually written.
+  // The index must point only at files that were actually written. A null
+  // encounters_path (Gen 5+) points at nothing and is skipped.
   for (const vg of Object.values(versionGroups) as Json[]) {
     if (!outputs[vg.learnsets_path]) problems.push(`index points at missing ${vg.learnsets_path}`)
-    if (!outputs[vg.encounters_path]) problems.push(`index points at missing ${vg.encounters_path}`)
+    if (vg.encounters_path != null && !outputs[vg.encounters_path]) {
+      problems.push(`index points at missing ${vg.encounters_path}`)
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -1544,6 +1563,7 @@ async function main() {
     scope: {
       max_species_id: MAX_SPECIES_ID,
       max_generation: MAX_GENERATION,
+      legacy_max_generation: LEGACY_MAX_GENERATION,
       version_groups: [...vgNames].sort(),
       versions: [...versionNames].sort(),
     },
@@ -1554,12 +1574,13 @@ async function main() {
     notes: [
       'Normalized: entities reference each other by id; nothing is embedded.',
       'Reverse indices (learned_by_pokemon, type.pokemon, ability.pokemon, egg_group.pokemon_species) are intentionally omitted as derivable.',
-      'types.damage_relations_by_generation resolves past_damage_relations for gens 1-4 and filters each list to types that existed in that generation.',
-      'species.varieties[].past_types / past_abilities / past_stats preserve Gen 1-4 accuracy where current-gen data differs.',
+      `types.damage_relations_by_generation resolves past_damage_relations for gens 1-${MAX_GENERATION} and filters each list to types that existed in that generation.`,
+      'species.varieties[].past_types / past_abilities / past_stats preserve older-generation accuracy where current-gen data differs.',
       'moves.past_values are kept verbatim; no resolution rule is inferred.',
       'learnsets carry pokemon_id alongside species_id so form-specific movesets are not collapsed.',
       'learnsets and encounters are partitioned per version group under learnsets/ and encounters/; version-groups.json indexes the paths and row counts. Every other file is a single eagerly-loaded document.',
-      'Fairy (type 18) is retained because current-gen species data references it; generation_id marks it out-of-era and it never appears in gen 1-4 relation blocks.',
+      `Species, moves, abilities, version groups and learnsets cover gens 1-${MAX_GENERATION}; encounters, items, TMs and held items stay at gens 1-${LEGACY_MAX_GENERATION} (encounters_path is null for later version groups). Later items are kept only when a later evolution requires them.`,
+      'Fairy (type 18, gen 6) and Stellar (type 19, gen 9) appear only in relation blocks for their own generation onward.',
     ],
   }
   // meta.json is written last because it reports on the other files, so its own
@@ -1606,6 +1627,7 @@ async function main() {
       (a, b) => (a.generation_id ?? 0) - (b.generation_id ?? 0) || (a.order ?? 0) - (b.order ?? 0),
     )) {
       const f = dir === LEARNSET_DIR ? vg.learnsets_path : vg.encounters_path
+      if (f == null) continue
       const rows = dir === LEARNSET_DIR ? vg.learnset_rows : vg.encounter_rows
       dr += sizes[f]
       dg += gzipSizes[f]

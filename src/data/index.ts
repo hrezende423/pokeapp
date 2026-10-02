@@ -72,6 +72,8 @@ export {
 } from './era'
 export type { Effectiveness, ResolvedAbility } from './era'
 
+export { chainForGeneration } from './evolutionEra'
+
 export {
   GENERATION_RANGES,
   LATEST_GENERATION,

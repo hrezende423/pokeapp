@@ -373,15 +373,17 @@ export function speciesColumns({
       label: 'Evo stage',
       width: '4.4rem',
       numeric: true,
-      sortValue: (row) => evolutionFacts(row.species).stage,
-      render: (row) => <span className="num">{evolutionFacts(row.species).stage ?? DASH}</span>,
+      sortValue: (row) => evolutionFacts(row.species, generation).stage,
+      render: (row) => (
+        <span className="num">{evolutionFacts(row.species, generation).stage ?? DASH}</span>
+      ),
     },
     {
       key: 'evolvesFrom',
       label: 'Evolves from',
       width: '5.6rem',
-      sortValue: (row) => evolutionFacts(row.species).evolvesFrom?.display_name ?? null,
-      render: (row) => evolutionFacts(row.species).evolvesFrom?.display_name ?? DASH,
+      sortValue: (row) => evolutionFacts(row.species, generation).evolvesFrom?.display_name ?? null,
+      render: (row) => evolutionFacts(row.species, generation).evolvesFrom?.display_name ?? DASH,
     },
     {
       // The other clamp, and by far the wider one: Eevee's seven evolutions with
@@ -391,11 +393,11 @@ export function speciesColumns({
       label: 'Evolves to',
       width: '20rem',
       sortValue: (row) =>
-        evolutionFacts(row.species)
+        evolutionFacts(row.species, generation)
           .evolvesTo.map((e) => e.species?.display_name ?? '')
           .join(', ') || null,
       render: (row) => {
-        const to = evolutionFacts(row.species).evolvesTo
+        const to = evolutionFacts(row.species, generation).evolvesTo
         if (to.length === 0) return DASH
         return to
           .map((e) => `${e.species?.display_name ?? '?'} (${e.condition || 'no condition'})`)
@@ -406,8 +408,8 @@ export function speciesColumns({
       key: 'hasFurther',
       label: 'Further evo',
       width: '5.25rem',
-      sortValue: (row) => flag(evolutionFacts(row.species).hasFurther),
-      render: (row) => flag(evolutionFacts(row.species).hasFurther),
+      sortValue: (row) => flag(evolutionFacts(row.species, generation).hasFurther),
+      render: (row) => flag(evolutionFacts(row.species, generation).hasFurther),
     },
   ]
 }

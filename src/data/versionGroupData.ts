@@ -84,7 +84,8 @@ function groupBySpecies<T extends { species_id: number }>(rows: T[]): Map<number
   return map
 }
 
-function pathFor(vgName: string, kind: PartitionKind): string {
+/** The partition's path, or null when the group has none (Gen 5+ encounters). */
+function pathFor(vgName: string, kind: PartitionKind): string | null {
   const vg = getVersionGroupByName(vgName)
   if (!vg) {
     throw new Error(
@@ -114,16 +115,28 @@ function loadPartition<T extends { species_id: number }>(
   const pending = store.inflight.get(versionGroup)
   if (pending) return pending
 
-  let path: string
+  let path: string | null
   try {
     path = pathFor(versionGroup, kind)
   } catch (err) {
     return Promise.reject(err instanceof Error ? err : new Error(String(err)))
   }
 
+  // No file for this group (Gen 5+ encounters): an empty partition, never a fetch.
+  if (path == null) {
+    const empty: Partition<T> = {
+      rows: [],
+      bySpecies: new Map(),
+      stats: { versionGroup, ms: 0, bytes: 0 },
+    }
+    store.cache.set(versionGroup, empty)
+    return Promise.resolve(empty)
+  }
+  const file = path
+
   const promise = (async () => {
     const started = performance.now()
-    const { rows, bytes } = await fetchRows<T>(path)
+    const { rows, bytes } = await fetchRows<T>(file)
     const partition: Partition<T> = {
       rows,
       bySpecies: groupBySpecies(rows),

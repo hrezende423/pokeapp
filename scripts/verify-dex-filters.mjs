@@ -58,7 +58,9 @@ const eggGroups = Object.values(bundle('egg-groups'))
 const types = Object.values(bundle('types'))
 
 /** Mirrors data/generations.ts: dex-id ranges, not a per-species lookup. */
-const genOfSpecies = (id) => (id <= 151 ? 1 : id <= 251 ? 2 : id <= 386 ? 3 : 4)
+// Last national-dex id of each generation, Gen 1-9 (src/data/generations.ts).
+const GEN_LAST_IDS = [151, 251, 386, 493, 649, 721, 809, 905, 1025]
+const genOfSpecies = (id) => GEN_LAST_IDS.findIndex((last) => id <= last) + 1
 const speciesUpTo = (g) => species.filter((sp) => genOfSpecies(sp.id) <= g)
 const defaultVariety = (sp) => sp.varieties.find((v) => v.is_default) ?? sp.varieties[0]
 
