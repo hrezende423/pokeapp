@@ -2345,14 +2345,14 @@
   flex: 0 0 auto;
   max-width: none;
   /*
-    THE TEXT STARTS WHERE THE WATERMARK DOES. The dex numeral is centred on the
-    card, so its left edge is 50% less half its own width. Measured in a browser:
-    "260" at 48px Martian Mono, 0.18em tracking, is 126.7px as a box -> 63px.
-    The ghost is untouched; only the facts block moves in to meet it.
+    TWO BLOCKS, CENTRED ON EACH OTHER. The art box and the facts block share one
+    axis: the facts block is as wide as its own widest line and sits in the
+    middle of the card. The text INSIDE it stays left-aligned.
   */
-  padding-left: calc(50% - 63px);
+  width: fit-content;
+  margin-inline: auto;
 }
-/* Type and category sit closer to the move name; a long name ellipsises. */
+/* Type and category sit closer to the move name. */
 .tb-team-viewer .tb-card-full .tb-card-moves {
   column-gap: 4px;
 }
