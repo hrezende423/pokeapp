@@ -48,8 +48,8 @@ import { TeamMetaFields, TeamTitle } from './ui/TeamTitle'
 import {
   deleteTeam,
   duplicateTeam,
+  removeTeamMember,
   reorderTeam,
-  setTeamMember,
   updateTeam,
   useTeamBuilderData,
 } from './store'
@@ -236,7 +236,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
               onRemove={() =>
                 prompt.confirm(
                   'Remove this member from the team?',
-                  () => setTeamMember(team.id, slot, null),
+                  () => removeTeamMember(team.id, slot),
                   {
                     body: 'The build itself stays in your Build Library.',
                     confirmLabel: 'Remove',

@@ -284,6 +284,18 @@ export function setTeamMember(teamId: string, slot: number, buildId: string | nu
   }))
 }
 
+/** Remove a member and close the gap: later members each move up one slot. */
+export function removeTeamMember(teamId: string, slot: number) {
+  update((data) => ({
+    ...data,
+    teams: data.teams.map((t) => {
+      if (t.id !== teamId) return t
+      const kept = t.memberIds.filter((m, i): m is string => i !== slot && m != null)
+      return { ...t, memberIds: padSlots(kept, TEAM_SIZE, null) }
+    }),
+  }))
+}
+
 /** Reorder within a team, preserving empty slots at the end. */
 export function reorderTeam(teamId: string, from: number, to: number) {
   update((data) => ({

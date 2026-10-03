@@ -107,10 +107,10 @@
       the card's own markup so the uppercase transform and the tracking are in
       the number.
 
-    264px covers both, which leaves the move name's `1fr` column about 158px
+    260px (the 259px id line, rounded up so subpixel text is not clipped) covers both, which leaves the move name's `1fr` column about 158px
     against the 112px it needs -- comfortably, as asked.
   */
-  --tb-slot-card: 264px;
+  --tb-slot-card: 260px;
   /* Tight leading again: seven lines of one fact each, and the page's
      inherited 26.1px would spend 183px of a grid row on them. 12px against
      10px text: tighter than the module's usual 17px because these seven lines
@@ -2344,6 +2344,17 @@
 .tb-team-viewer .tb-card-full .tb-card-facts {
   flex: 0 0 auto;
   max-width: none;
+  /*
+    THE TEXT STARTS WHERE THE WATERMARK DOES. The dex numeral is centred on the
+    card, so its left edge is 50% less half its own width. Measured in a browser:
+    "260" at 48px Martian Mono, 0.18em tracking, is 126.7px as a box -> 63px.
+    The ghost is untouched; only the facts block moves in to meet it.
+  */
+  padding-left: calc(50% - 63px);
+}
+/* Type and category sit closer to the move name; a long name ellipsises. */
+.tb-team-viewer .tb-card-full .tb-card-moves {
+  column-gap: 4px;
 }
 .tb-team-viewer .tb-card-full .tb-card-art {
   flex: 1 1 auto;
