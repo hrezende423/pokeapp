@@ -55,9 +55,9 @@ export default defineConfig({
         // an offline-first PWA that fetched its own font over the network would fall
         // back to the system stack the first time it opened offline.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}', EAGER_DATA_GLOB],
-        // species.json is the largest precached file at ~1.6 MiB; the Workbox default
-        // is 2 MiB, which would silently drop it if the bundle grew.
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        // species.json is the largest precached file at ~4.2 MiB with Gen 1-9; the
+        // Workbox default is 2 MiB, which would silently drop it if the bundle grew.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         navigateFallback: `${BASE}index.html`,
         navigateFallbackDenylist: [PARTITION_PATTERN],
         cleanupOutdatedCaches: true,
@@ -83,7 +83,8 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'pokeapp-version-group-data',
-              // 14 version groups x 2 files, the trainer and battle partitions (10 each), and headroom.
+              // 32 learnset and 14 encounter partitions, the trainer and battle partitions
+              // (10 each), and headroom.
               expiration: { maxEntries: 80 },
               cacheableResponse: { statuses: [200] },
             },

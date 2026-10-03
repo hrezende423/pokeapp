@@ -44,6 +44,9 @@ export interface SpriteOptions {
  */
 const UNSUFFIXED_MALE_SPECIES = new Set([198])
 
+/** Last generation with an animated release tag (`gen1`...`gen4`, #1-493). */
+const ANIMATED_MAX_GENERATION = 4
+
 /** Species that have a `-f` file (i.e. gendered artwork) but no `-m` file. */
 export function usesUnsuffixedMaleSprite(speciesId: number): boolean {
   return UNSUFFIXED_MALE_SPECIES.has(speciesId)
@@ -57,7 +60,8 @@ export function usesUnsuffixedMaleSprite(speciesId: number): boolean {
  */
 export function getSpriteUrl(id: number, options: SpriteOptions = {}): string | null {
   const generation = getGenerationForSpecies(id)
-  if (generation == null) return null
+  // The animated releases are gen1..gen4 only: the dexes reach Gen 9, the files do not.
+  if (generation == null || generation > ANIMATED_MAX_GENERATION) return null
 
   const { shiny = false, gender, hasGenderDifference = false } = options
   const paddedId = String(id).padStart(3, '0')

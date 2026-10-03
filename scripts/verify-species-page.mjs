@@ -24,7 +24,7 @@
  * Usage: node scripts/verify-species-page.mjs
  */
 
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { controls } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
@@ -34,6 +34,22 @@ const PORT = 4183
 const APP_URL = `http://localhost:${PORT}/pokeapp/`
 const ORIGIN = `http://localhost:${PORT}`
 const SHOTS = 'scripts/.verify-shots'
+
+// Generations in the bundle, for the two checks on Bulbasaur (#1) that depend on scope.
+const VERSION_GROUPS = Object.values(
+  JSON.parse(readFileSync('public/data/version-groups.json', 'utf8')),
+)
+const ALL_GENERATIONS = [...new Set(VERSION_GROUPS.map((vg) => vg.generation_id))].sort(
+  (a, b) => a - b,
+)
+const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
+const BULBASAUR_FLAVOR_GENERATIONS = (() => {
+  const species = JSON.parse(readFileSync('public/data/species.json', 'utf8'))
+  const versions = new Set(Object.keys(species[1].flavor_text))
+  return ALL_GENERATIONS.filter((g) =>
+    VERSION_GROUPS.some((vg) => vg.generation_id === g && vg.versions.some((v) => versions.has(v))),
+  )
+})()
 
 const failures = []
 const log = (...a) => console.log(...a)
@@ -585,8 +601,9 @@ try {
     gen4Scope.versionGroup,
   )
   check(
-    'all four generations offered for a Gen 1 species',
-    gen4Scope.generations.map((g) => g.gen).join(',') === '1,2,3,4',
+    'every generation in the bundle is offered for a Gen 1 species',
+    gen4Scope.generations.map((g) => g.gen).join(',') === ALL_GENERATIONS.join(','),
+    gen4Scope.generations.map((g) => g.gen).join(','),
   )
   check('exactly one generation active', gen4Scope.generations.filter((g) => g.active).length === 1)
   check(
@@ -723,7 +740,8 @@ try {
   )
   check(
     'they are grouped by generation, oldest first',
-    desc.genLabels.join(',') === 'GENERATION I,GENERATION II,GENERATION III,GENERATION IV',
+    desc.genLabels.join(',') ===
+      BULBASAUR_FLAVOR_GENERATIONS.map((g) => `GENERATION ${ROMAN[g]}`).join(','),
     desc.genLabels.join(','),
   )
   /* Bundle order, not Object.keys order: red before blue before yellow, and gold

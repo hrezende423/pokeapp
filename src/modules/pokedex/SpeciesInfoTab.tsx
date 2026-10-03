@@ -5,6 +5,7 @@ import {
   ABILITIES_INTRODUCED_IN_GENERATION,
   EFFORT_VALUES_INTRODUCED_IN_GENERATION,
   captureRatePercent,
+  chainForGeneration,
   genderRatio,
   getEggGroup,
   getEvolutionChain,
@@ -246,8 +247,12 @@ export function SpeciesInfoTab({
   const eggGroups = species.egg_group_ids
     .map((id) => getEggGroup(id))
     .filter((g): g is NonNullable<typeof g> => g != null)
-  const chain =
-    species.evolution_chain_id != null ? getEvolutionChain(species.evolution_chain_id) : undefined
+  // As the chain stood in this generation: no Sneasler under a Gen 4 selection.
+  const chain = useMemo(() => {
+    const raw =
+      species.evolution_chain_id != null ? getEvolutionChain(species.evolution_chain_id) : undefined
+    return raw ? chainForGeneration(raw, generation, species.id) : undefined
+  }, [species.evolution_chain_id, species.id, generation])
   const ev = evYield(stats)
   const steps = hatchSteps(species.hatch_counter)
 

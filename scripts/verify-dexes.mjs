@@ -90,6 +90,8 @@ function resolveAbilities(variety, generation) {
     const ov = pastBySlot.get(slot)
     const src = ov ? ov.entry : (variety.abilities.find((a) => a.slot === slot) ?? null)
     if (!src) continue
+    // No hidden slot before Gen 5 (era.ts HIDDEN_ABILITIES_INTRODUCED_IN_GENERATION).
+    if (src.is_hidden && generation < 5) continue
     const abl = abilitiesById[src.ability_id]
     if (!abl) continue
     if ((abl.generation_id ?? 99) > generation) continue
@@ -98,7 +100,9 @@ function resolveAbilities(variety, generation) {
   return out
 }
 
-const genOfSpecies = (id) => (id <= 151 ? 1 : id <= 251 ? 2 : id <= 386 ? 3 : 4)
+// Last national-dex id of each generation, Gen 1-9 (src/data/generations.ts).
+const GEN_LAST_IDS = [151, 251, 386, 493, 649, 721, 809, 905, 1025]
+const genOfSpecies = (id) => GEN_LAST_IDS.findIndex((last) => id <= last) + 1
 
 function expectedHolders(abilityName, generation) {
   const target = abilityByName[abilityName]
@@ -885,9 +889,22 @@ try {
   // ------------------------------------------------- "All" scope reconciliation
   hr('SCOPE UNDER "All" — which dexes really contain out-of-era entries')
   // The ingestion filter kept an item if it had a Gen 1-4 game_index OR was
-  // referenced by an in-scope species/move. This asserts what that actually
-  // produced, per entity, so an "All shows Gen 5+ rows" claim cannot be made
-  // about the wrong module again.
+  // referenced by an in-scope species/move/evolution. This asserts what that
+  // actually produced, per entity, so an "All shows Gen 5+ rows" claim cannot be
+  // made about the wrong module again. Items stay Gen 1-4; the only later ones
+  // are those a Gen 5+ evolution requires (Sachet, Galarica Cuff, ...).
+  const evoItemIds = new Set()
+  for (const c of Object.values(bundle('evolution-chains'))) {
+    if (c.baby_trigger_item_id != null) evoItemIds.add(c.baby_trigger_item_id)
+    const walk = (n) => {
+      for (const d of n.evolution_details) {
+        if (d.item_id != null) evoItemIds.add(d.item_id)
+        if (d.held_item_id != null) evoItemIds.add(d.held_item_id)
+      }
+      n.evolves_to.forEach(walk)
+    }
+    walk(c.chain)
+  }
   const itemsOutOfScope = items.filter((i) => !i.generation_ids.some((g) => g >= 1 && g <= 4))
   const abilitiesOutOfScope = abilities.filter((a) => (a.generation_id ?? 99) > 4)
   const berriesOutOfScope = berries.filter(
@@ -902,13 +919,13 @@ try {
   )
   log(`  natures    : ${natures.length} total, 0 out of scope (all Gen 3)`)
   check(
-    'NO item is Gen 5+-exclusive (the ingestion filter held)',
-    itemsOutOfScope.length === 0,
-    `(${itemsOutOfScope.length})`,
+    'every Gen 5+-exclusive item is one an evolution requires (the ingestion filter held)',
+    itemsOutOfScope.every((i) => evoItemIds.has(i.id)),
+    `(${itemsOutOfScope.length}: ${itemsOutOfScope.map((i) => i.name).join(', ')})`,
   )
   check(
-    'no item has a minimum generation >= 5',
-    items.every((i) => Math.min(...i.generation_ids) <= 4),
+    'no item has a minimum generation >= 5 unless an evolution requires it',
+    items.every((i) => Math.min(...i.generation_ids) <= 4 || evoItemIds.has(i.id)),
   )
   for (const known of ['eviolite', 'air-balloon', 'rocky-helmet']) {
     check(
@@ -923,112 +940,53 @@ try {
     `(${abilitiesOutOfScope.length}: gens ${[...new Set(abilitiesOutOfScope.map((a) => a.generation_id))].sort().join(',')})`,
   )
 
-  // Abilitydex clamps its LIST to abilities with a Gen 1-4 presence (123 of 161).
-  // The 38 later additions stay in the bundle for dangling-reference safety, so
-  // this asserts the list is clamped while the data is not.
-  const inScopeAbilities = abilities.filter((a) => (a.generation_id ?? 99) <= 4)
+  // The Abilitydex lists every ability that exists by the latest generation in
+  // scope. With the dexes at Gen 9 that is all of them: nothing is clamped, so the
+  // clamp caption (which only renders when something is hidden) must be absent.
   await selectGame('all')
   await page.waitForTimeout(200)
   await goTo('abilitydex')
   /*
     THE DESCRIPTIVE NOTE IS GONE, app-wide -- the "N of M abilities exist in
-    Generation G" line was part of the header block this pass removed. What it
-    said is still asserted, just from the count readout and the row list rather
-    than from a sentence about them, which is the stronger check anyway: the note
-    could have been right while the list was wrong.
-
-    One thing genuinely went away with it: the UI no longer TELLS the reader that
-    38 later abilities exist in the data but are not listed. The clamp is checked
-    below; the disclosure of it is not there to check.
+    Generation G" line was part of the header block a design pass removed. What it
+    said is asserted from the count readout and the row list instead.
   */
   const abilityAllCount = await countOf('abilitydex')
-  log(
-    `  Abilitydex under All: ${abilityAllCount} rows (in-scope ${inScopeAbilities.length} of ${abilities.length})`,
-  )
+  log(`  Abilitydex under All: ${abilityAllCount} rows (bundle has ${abilities.length})`)
   check(
-    'Abilitydex under All lists only the 123 in-scope abilities',
-    abilityAllCount === inScopeAbilities.length,
-    `(${abilityAllCount} vs ${inScopeAbilities.length})`,
-  )
-  check(
-    'it does NOT list all 161',
-    abilityAllCount !== abilities.length,
+    `Abilitydex under All lists all ${abilities.length} abilities`,
+    abilityAllCount === abilities.length,
     `(${abilityAllCount} vs ${abilities.length})`,
   )
-  // The count readout is the surviving statement of the clamped total.
   const abilityCountText = (await page.textContent('[data-testid="abilitydex-count"]')).trim()
   check(
-    'the count readout states the clamped total',
-    abilityCountText.startsWith(String(inScopeAbilities.length)),
+    'the count readout states the full total',
+    abilityCountText.startsWith(String(abilities.length)),
     abilityCountText,
   )
   check(
     'and no descriptive header sentence is left behind',
     (await page.$('[data-testid="abilitydex-note"]')) == null,
   )
-
-  /*
-    THE CLAMP IS DISCLOSED AGAIN, at the END of the list this time rather than in a
-    header block. What went away with the header paragraph was the only place the
-    UI admitted that 38 abilities exist in the data and are not listed; the clamp
-    was still checked, the disclosure of it was not there to check. It is now a
-    one-line caption after the last row.
-
-    Asserted three ways -- that it exists, that its number is the real hidden
-    count, and that it sits BELOW the last row rather than above the first, since
-    "at the end of the list" is the whole point of the placement.
-  */
-  const clampCaption = await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="abilitydex-clamp-caption"]')
-    if (!el) return null
-    const rows = document.querySelectorAll('[data-testid="abilitydex-rows"] .species-row')
-    const last = rows[rows.length - 1]
-    return {
-      text: el.textContent.trim(),
-      belowLastRow:
-        last != null && el.getBoundingClientRect().top >= last.getBoundingClientRect().bottom,
-      numericFace: getComputedStyle(el.querySelector('.num')).fontFamily,
-    }
-  })
-  log(`  clamp caption: ${JSON.stringify(clampCaption)}`)
-  check('the clamp is disclosed by a caption at the end of the list', clampCaption != null)
   check(
-    'and it states the real hidden count, not a literal',
-    (clampCaption?.text ?? '').includes(String(abilitiesOutOfScope.length)),
-    `${clampCaption?.text} (expected ${abilitiesOutOfScope.length})`,
-  )
-  check('placed after the last row, not before the first', clampCaption?.belowLastRow === true)
-  check(
-    'with its count in --font-numeric like every other number',
-    /Martian Mono/.test(clampCaption?.numericFace ?? ''),
-    clampCaption?.numericFace,
+    'no clamp caption: nothing is hidden from the list',
+    (await page.$('[data-testid="abilitydex-clamp-caption"]')) == null,
   )
 
-  // Every listed row must be in scope, and named Gen 5 abilities must be absent.
   const listedAbilities = await page.$$eval(
     '[data-testid="abilitydex-rows"] .species-name',
     (els) => els.map((e) => e.textContent.trim()),
   )
-  const outOfScopeNames = new Set(abilitiesOutOfScope.map((a) => a.display_name))
-  const leaked = listedAbilities.filter((n) => outOfScopeNames.has(n))
-  log(`  listed rows: ${listedAbilities.length}, out-of-era rows leaked: ${leaked.length}`)
-  check('no out-of-era ability appears in the list', leaked.length === 0, leaked.join(','))
+  log(`  listed rows: ${listedAbilities.length}`)
   for (const gen5 of ['Cursed Body', 'Contrary', 'Sheer Force', 'Multiscale']) {
-    check(`Gen 5 ability "${gen5}" is not listed`, !listedAbilities.includes(gen5))
+    check(`Gen 5 ability "${gen5}" is listed`, listedAbilities.includes(gen5))
   }
-  // ...but the data still has it, which is what the species view depends on.
-  for (const gen5 of ['Cursed Body', 'Contrary']) {
-    check(
-      `"${gen5}" is still present in the bundle (dangling-reference safety)`,
-      abilities.some((a) => a.display_name === gen5),
-    )
-  }
-  // A search for a hidden ability must come up empty rather than surfacing it.
+  // Searching for one finds it under All (verify-search covers the Gen 1-4 side).
   await toDexList('abilitydex')
   await fillDexSearch(page, 'abilitydex', 'cursed')
   await page.waitForTimeout(150)
   const cursedCount = await countOf('abilitydex')
-  check('searching for a hidden ability finds nothing', cursedCount === 0, `(${cursedCount})`)
+  check('searching "cursed" under All finds Cursed Body', cursedCount === 1, `(${cursedCount})`)
   await toDexList('abilitydex')
   await fillDexSearch(page, 'abilitydex', '')
 

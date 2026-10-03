@@ -173,7 +173,7 @@ export function versionLabel(name: string): string {
   return VERSION_NAMES[name] ?? titleCase(name)
 }
 
-export const ROMAN = ['0', 'I', 'II', 'III', 'IV'] as const
+export const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
 
 /** 'Generation IV', for the page's own generation labels. */
 export function generationLabel(generation: number): string {

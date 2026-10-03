@@ -9,7 +9,15 @@
  * about the same Eevee. The chart still renders it; it just no longer owns it.
  */
 
-import { getEvolutionChain, getItem, getLocation, getMove, getSpecies, getType } from '../../data'
+import {
+  chainForGeneration,
+  getEvolutionChain,
+  getItem,
+  getLocation,
+  getMove,
+  getSpecies,
+  getType,
+} from '../../data'
 import type { EvolutionDetail, EvolutionNode, Species } from '../../data'
 
 /**
@@ -116,10 +124,11 @@ function findNode(
   node: EvolutionNode,
   speciesId: number,
   depth: number,
-): { node: EvolutionNode; depth: number } | null {
-  if (node.species_id === speciesId) return { node, depth }
+  parent: EvolutionNode | null = null,
+): { node: EvolutionNode; depth: number; parent: EvolutionNode | null } | null {
+  if (node.species_id === speciesId) return { node, depth, parent }
   for (const child of node.evolves_to) {
-    const hit = findNode(child, speciesId, depth + 1)
+    const hit = findNode(child, speciesId, depth + 1, node)
     if (hit) return hit
   }
   return null
@@ -127,19 +136,21 @@ function findNode(
 
 /*
   MEMOISED FOR THE SESSION, because the Pokedex list view asks four times per row
-  and re-asks on every sort: 493 species x 4 columns is two thousand chain walks
+  and re-asks on every sort: 1025 species x 4 columns is four thousand chain walks
   to paint one screen, and a sort repeats them. The bundle is immutable once
   loaded -- evolution-chains.json is fetched at boot and never refetched -- so a
-  cache keyed by species id cannot go stale within a session, and a reload
-  rebuilds it.
+  cache keyed by generation and species id cannot go stale within a session, and
+  a reload rebuilds it.
 */
-const factsCache = new Map<number, EvolutionFacts>()
+const factsCache = new Map<string, EvolutionFacts>()
 
-export function evolutionFacts(species: Species): EvolutionFacts {
-  const cached = factsCache.get(species.id)
+/** The facts as of `generation`: the chain is read through chainForGeneration. */
+export function evolutionFacts(species: Species, generation: number): EvolutionFacts {
+  const key = `${generation}:${species.id}`
+  const cached = factsCache.get(key)
   if (cached) return cached
-  const facts = computeEvolutionFacts(species)
-  factsCache.set(species.id, facts)
+  const facts = computeEvolutionFacts(species, generation)
+  factsCache.set(key, facts)
   return facts
 }
 
@@ -148,18 +159,17 @@ export function __resetEvolutionFacts() {
   factsCache.clear()
 }
 
-function computeEvolutionFacts(species: Species): EvolutionFacts {
+function computeEvolutionFacts(species: Species, generation: number): EvolutionFacts {
   if (species.evolution_chain_id == null) return NO_EVOLUTION
-  const chain = getEvolutionChain(species.evolution_chain_id)
+  const raw = getEvolutionChain(species.evolution_chain_id)
+  const chain = raw ? chainForGeneration(raw, generation, species.id) : undefined
   if (!chain) return NO_EVOLUTION
   const hit = findNode(chain.chain, species.id, 1)
   if (!hit) return NO_EVOLUTION
   return {
     stage: hit.depth,
-    evolvesFrom:
-      species.evolves_from_species_id != null
-        ? getSpecies(species.evolves_from_species_id)
-        : undefined,
+    // The parent in THIS generation's chain: Pikachu evolves from nothing in Gen 1.
+    evolvesFrom: hit.parent ? getSpecies(hit.parent.species_id) : undefined,
     evolvesTo: hit.node.evolves_to.map((child) => ({
       species: getSpecies(child.species_id),
       /* A branch can carry several alternative requirements (Nincada's Shedinja

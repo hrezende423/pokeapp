@@ -39,6 +39,11 @@ export const GENERATION_RANGES: readonly GenerationRange[] = [
   { generation: 2, first: 152, last: 251, region: 'Johto' },
   { generation: 3, first: 252, last: 386, region: 'Hoenn' },
   { generation: 4, first: 387, last: 493, region: 'Sinnoh' },
+  { generation: 5, first: 494, last: 649, region: 'Unova' },
+  { generation: 6, first: 650, last: 721, region: 'Kalos' },
+  { generation: 7, first: 722, last: 809, region: 'Alola' },
+  { generation: 8, first: 810, last: 905, region: 'Galar' },
+  { generation: 9, first: 906, last: 1025, region: 'Paldea' },
 ] as const
 
 /**

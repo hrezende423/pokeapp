@@ -62,11 +62,9 @@ const moves = Object.values(bundle('moves'))
 const items = Object.values(bundle('items'))
 const abilities = Object.values(bundle('abilities'))
 
-const genOfSpecies = (id) => (id <= 151 ? 1 : id <= 251 ? 2 : id <= 386 ? 3 : 4)
-
-/** The Abilitydex list clamp: only abilities with a Gen 1-4 presence. */
-const abilitiesListed = abilities.filter((a) => (a.generation_id ?? 99) <= 4)
-const abilitiesHidden = abilities.filter((a) => (a.generation_id ?? 99) > 4)
+// Last national-dex id of each generation, Gen 1-9 (src/data/generations.ts).
+const GEN_LAST_IDS = [151, 251, 386, 493, 649, 721, 809, 905, 1025]
+const genOfSpecies = (id) => GEN_LAST_IDS.findIndex((last) => id <= last) + 1
 
 /** Entries each category is expected to offer, per selection ('all' or a gen). */
 function scopedEntries(key, sel) {
@@ -79,7 +77,8 @@ function scopedEntries(key, sel) {
     case 'items':
       return items.filter((i) => all || i.generation_ids.includes(sel)).map((i) => i.display_name)
     case 'abilities':
-      return abilitiesListed
+      // No list clamp any more: the dexes reach Gen 9, so every ability is listable.
+      return abilities
         .filter((a) => all || (a.generation_id ?? 99) <= sel)
         .map((a) => a.display_name)
     default:
@@ -125,12 +124,9 @@ log(
   `  bundle: ${species.length} species, ${moves.length} moves, ${items.length} items, ${abilities.length} abilities`,
 )
 log(
-  `  abilities the dex lists: ${abilitiesListed.length}; withheld (Gen 5+): ${abilitiesHidden.length}`,
-)
-log(
   `  Gen 3 leak probe: "${GEN3_ABILITY?.display_name}" generation_id=${GEN3_ABILITY?.generation_id}`,
 )
-log(`  clamp probe: "${CURSED?.display_name}" generation_id=${CURSED?.generation_id}`)
+log(`  Gen 5 era probe: "${CURSED?.display_name}" generation_id=${CURSED?.generation_id}`)
 check('the Gen 3 leak probe really is a Generation 3 ability', GEN3_ABILITY?.generation_id === 3)
 check(
   'Cursed Body is really in the bundle and really Gen 5',
@@ -492,7 +488,7 @@ try {
     )
   }
 
-  hr('LEAK PROOF B — "cursed" is empty in every in-scope selection, like the dex')
+  hr('LEAK PROOF B — "cursed" is empty before Gen 5 and found under All, like the dex')
   for (const g of GAMES) {
     await selectGame(g.vg)
     await setTerm('cursed')
@@ -501,13 +497,15 @@ try {
     log(
       `  ${String(g.vg).padEnd(21)} global: groups=${p.groupCount} total=${p.total} | Abilitydex own list: ${own}`,
     )
-    check(`no results for "cursed" under ${g.vg}`, p.total === 0 && p.groupCount === 0)
-    check(`the Abilitydex own search agrees under ${g.vg}`, own === 0)
+    if (g.sel === 'all') {
+      const grp = p.groups.find((x) => x.key === 'abilities')
+      check(`"cursed" finds Cursed Body under ${g.vg}`, grp?.total === 1 && own === 1)
+      check(`the hit is the real ability id ${CURSED.id}`, grp?.hits[0]?.id === CURSED.id)
+    } else {
+      check(`no results for "cursed" under ${g.vg}`, p.total === 0 && p.groupCount === 0)
+      check(`the Abilitydex own search agrees under ${g.vg}`, own === 0)
+    }
   }
-  check(
-    'and Cursed Body is still in the bundle, so those zeroes are the clamp',
-    abilities.some((a) => a.display_name === 'Cursed Body'),
-  )
   await setTerm('')
   await page.screenshot({ path: `${SHOTS}/search-leak.png` })
 

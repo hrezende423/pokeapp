@@ -1,6 +1,12 @@
 # pokeapp — project memory
 
-Personal build-to-learn Pokémon companion PWA. Gen 1–4 scope.
+Personal build-to-learn Pokémon companion PWA. Gen 1–4 scope, EXCEPT the
+Poké, move and ability dexes and their learnsets, which reach Gen 9 (#1–1025,
+32 version groups). Encounters, items, TMs and held items stay Gen 1–4
+(`LEGACY_MAX_GENERATION` in `build-data.ts`; Gen 5+ groups have a null
+`encounters_path`), and the only later items are the ones a later evolution
+needs. Evolution charts go through `chainForGeneration` (`data/evolutionEra.ts`),
+or a Gen 4 selection shows Sneasel evolving into Sneasler.
 React + TypeScript + Vite. GitHub Pages + GitHub Actions CI/CD.
 **No backend the app depends on** — everything runs client-side, offline-first PWA.
 The one exception, by the owner's decision (2026-09-27): an OPTIONAL sign-in
