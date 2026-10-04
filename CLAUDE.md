@@ -328,16 +328,20 @@ imperfections are already logged there deliberately.
   sprite group and the dex watermark stay centred on the CARD so the watermark's
   bleed is symmetrical.
 
-- **Team Building — Build Form's LAYOUT** (`.tb-form-*`, `.tb-identity*`,
-  `.tb-rail*` and `.tb-card-rail*` in `teamBuilder.css`). Frozen at the
-  right-rail density pass. Every number in it was measured against
-  something — the rail's 17px leading, the spread's 0.82 of the label
-  token, the 16px badge, the six cards ending level with the stat table's
-  Total row. Do not re-tune them as a drive-by, and do not "fix" the Gen 1
-  rail overhang; it is logged below as deliberate.
-
-  Its BEHAVIOUR was reopened after the freeze, on request, and rebuilt —
-  see "the unsaved member" below. The layout freeze still stands.
+- **Team Building — Build Form: the owner's nine changes** (2026-10-04, branch
+  `team-builder-v2`, pending review). A first, broader redesign was merged and
+  reverted the same day; this one applies ONLY the nine requested items and
+  leaves the rest of the screen as it was (native selects, label sizes, stat
+  table, identity panel). In short: no accent on the page; move type/category
+  abbreviations (NOR FIR WAT… / Phy Spe Sta, mono 11px); no ⓘ icons, the label
+  is the tooltip trigger (`ui/LabelTip`, `data-tip` + aria-describedby); EV Total
+  directly under the sliders with "⚠ N (over by X)"; "− value +" steppers
+  (`ui/NumberStepper`); regular-weight fields; underline focus on fields and a
+  ring on :focus-visible elsewhere; rail with 64px sprites and type-only
+  selection; one spacing variable `--fgap` (24 / Tight 16 / Roomy 32,
+  `?fgap=tight|roomy`). The old frozen layout notes (17px rail leading, rail
+  ending level with the Total row) no longer hold.
+  Its BEHAVIOUR (see "the unsaved member" below) is unchanged.
 
 ## Verification discipline
 
@@ -430,8 +434,6 @@ are the signed-off screens above, frozen as they are:
 - **Team Matchup defensive table** (Weak / Resist / Immune)
 - **Attacking coverage** (`OffencePanel`, `.tb-matchup`)
 - **Team Library card** (`--tb-compact-card`)
-- **Team Building — Build Form layout** (`.tb-form-*`, `.tb-identity*`,
-  `.tb-rail*`, `.tb-card-rail*`)
 
 Rules for working near them:
 - **Do not edit these files or their CSS** to migrate them.
@@ -1194,17 +1196,8 @@ Rules that must not be re-derived:
   Gen 3-4 both only REDIRECT the move and the holder still takes normal damage;
   the immunity arrives in Gen 5, which is outside this app's scope.
 
-- **The Build Form's rail ends 17px below the left column in Gen 1 only.** The
-  six rail cards are set so the band ends level with the stat table's Total row,
-  and it does in Gen 2-4. Gen 1's table has FIVE stat rows, not six, so the left
-  column is one 18px row shorter and the rail overhangs it by that much. The
-  cards are sized by leading and padding, both of which are era-independent and
-  should stay that way; the fix would be a rail height derived from the
-  identity column's measured height, which CSS cannot express here (the grid
-  row the rail spans is sized by the form column, not by that panel, and every
-  percentage-height trick either inflates the row or collapses the rail). Do
-  NOT hardcode a per-generation card height -- it would drift the moment the
-  leading changes. Nothing is clipped or unreachable either way.
+- ~~**The Build Form's rail ends 17px below the left column in Gen 1 only.**~~
+  **OBSOLETE**: the rail is no longer measured against the stat table.
 
 - **`.tb`'s `data-generation` is the APP's generation, not the open build's.**
   Opening a Gen 3 build while the app is set to Gen 4 gives a module wrapper
