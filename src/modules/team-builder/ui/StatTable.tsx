@@ -10,8 +10,8 @@
  *
  * THE BAR IS THE ONE SANCTIONED REVERSAL of "stats are a plain table" -- six
  * values on one scale where the spread is the fact. It is scoped to this block
- * and is not a licence for progress bars elsewhere. Its fill is `--accent`, which
- * is the fourth of that token's exactly four sanctioned uses (stat magnitude).
+ * and is not a licence for progress bars elsewhere. Its fill is NEUTRAL
+ * (`--color-data-fill`): accent is the active navbar item only (owner, item 1).
  *
  * ROWS COME FROM THE GENERATION, not from the data: Gen 1 renders five rows with
  * one unsplit Special, Gen 2-4 render six. `statKeysForGeneration` owns that.

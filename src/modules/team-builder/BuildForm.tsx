@@ -68,7 +68,7 @@ import {
   IconCheck,
   IconCopy,
   IconDeviceFloppy,
-  IconInfoCircle,
+  IconNotes,
   IconPlus,
   IconRotate,
   IconShieldHalf,
@@ -85,7 +85,8 @@ import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt, type PromptAction } from './ui/usePrompt'
 import { MemberCard } from './ui/MemberCard'
 import { MovesetCoverage, SpeciesMatchup } from './ui/TypeMatchup'
-import { InfoTip } from './ui/InfoTip'
+import { LabelTip } from './ui/LabelTip'
+import { NumberStepper } from './ui/NumberStepper'
 import { AddToTeamModal } from './ui/AddToTeamModal'
 import { StatTable } from './ui/StatTable'
 import { MoveSlots } from './ui/MoveSlots'
@@ -826,7 +827,7 @@ function BuildFormFields({
       onClick: () => commit({ done: !build.done }),
     },
     {
-      icon: <IconInfoCircle size={18} stroke={1.5} />,
+      icon: <IconNotes size={18} stroke={1.5} />,
       label: 'Build info',
       onClick: () => setInfo(true),
       testId: 'tb-form-info',
@@ -956,6 +957,9 @@ function BuildFormFields({
     <section
       className="tb-screen tb-build-form"
       data-testid="tb-build-form"
+      /* The one spacing control (owner's item 9): --fgap in teamBuilder.css.
+         `?fgap=tight|roomy` previews the other two settings. */
+      data-fgap={fgapSetting()}
       /* ABSENT UNTIL THE BUILD EXISTS, which is also how a reader of the DOM --
          or a test -- can tell an unsaved member from a saved one. */
       data-build-id={stored?.id}
@@ -1190,15 +1194,8 @@ function BuildFormFields({
             {generation >= 2 && (
               <Field
                 label="Item"
-                info={
-                  <InfoTip
-                    summary={itemEffectFor(build.itemId)}
-                    label={`${itemName(build.itemId)} info`}
-                    testId="tb-item-info"
-                  >
-                    <span className="tb-infotip-name">{itemName(build.itemId)}</span>
-                  </InfoTip>
-                }
+                tipTestId="tb-item-info"
+                tip={tipFor(itemName(build.itemId), itemEffectFor(build.itemId))}
               >
                 <select
                   className="tb-select"
@@ -1220,15 +1217,8 @@ function BuildFormFields({
             {generation >= 3 && (
               <Field
                 label="Ability"
-                info={
-                  <InfoTip
-                    summary={abilityEffectFor(build.abilityId)}
-                    label={`${abilityName(build.abilityId)} info`}
-                    testId="tb-ability-info"
-                  >
-                    <span className="tb-infotip-name">{abilityName(build.abilityId)}</span>
-                  </InfoTip>
-                }
+                tipTestId="tb-ability-info"
+                tip={tipFor(abilityName(build.abilityId), abilityEffectFor(build.abilityId))}
               >
                 <select
                   className="tb-select"
@@ -1286,32 +1276,24 @@ function BuildFormFields({
 
           <div className="tb-field-row" data-layout="field-row">
             <Field label="Level">
-              <input
-                type="number"
-                className="tb-number"
+              <NumberStepper
+                label="Level"
                 min={1}
                 max={100}
                 value={build.level}
-                data-testid="tb-level"
-                onChange={(e) =>
-                  commit({ level: Math.min(100, Math.max(1, Number(e.target.value) || 1)) })
-                }
+                testId="tb-level"
+                onChange={(level) => commit({ level })}
               />
             </Field>
             {generation >= 2 && (
               <Field label="Friendship">
-                <input
-                  type="number"
-                  className="tb-number"
+                <NumberStepper
+                  label="Friendship"
                   min={0}
                   max={255}
                   value={build.friendship}
-                  data-testid="tb-friendship"
-                  onChange={(e) =>
-                    commit({
-                      friendship: Math.min(255, Math.max(0, Number(e.target.value) || 0)),
-                    })
-                  }
+                  testId="tb-friendship"
+                  onChange={(friendship) => commit({ friendship })}
                 />
               </Field>
             )}
@@ -1713,20 +1695,38 @@ function BuildFormFields({
 function Field({
   label,
   children,
-  info,
+  tip,
+  tipTestId,
 }: {
   label: string
   children: React.ReactNode
-  /** An InfoTip, rendered after the label text. */
-  info?: React.ReactNode
+  /** Explanation shown when the LABEL is hovered or focused (no ⓘ icons). */
+  tip?: string | null
+  tipTestId?: string
 }) {
   return (
     <label className="tb-field">
       <span className="tb-field-label">
-        {label}
-        {info}
+        <LabelTip tip={tip ?? null} testId={tipTestId}>
+          {label}
+        </LabelTip>
       </span>
       {children}
     </label>
   )
+}
+
+/** A label tooltip's text: the chosen thing's name over its effect. */
+function tipFor(name: string, effect: string | null): string | null {
+  return effect ? `${name}\n${effect}` : null
+}
+
+/** `?fgap=tight|roomy` previews the other two spacing settings; default 24px. */
+function fgapSetting(): 'tight' | 'roomy' | undefined {
+  try {
+    const v = new URLSearchParams(window.location.search).get('fgap')
+    return v === 'tight' || v === 'roomy' ? v : undefined
+  } catch {
+    return undefined
+  }
 }
