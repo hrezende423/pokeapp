@@ -68,7 +68,7 @@ import {
   IconCheck,
   IconCopy,
   IconDeviceFloppy,
-  IconNotes,
+  IconInfoCircle,
   IconPlus,
   IconRotate,
   IconShieldHalf,
@@ -76,6 +76,7 @@ import {
   IconTrash,
   IconUsersPlus,
 } from '@tabler/icons-react'
+import { TypeLabel } from '../../components/ds/TypeLabel'
 import { listSpecies, resolveArtworkUrl } from '../../data'
 import { GhostButton, IconButton } from './ui/GhostButton'
 import { Dock } from './ui/Dock'
@@ -84,9 +85,7 @@ import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt, type PromptAction } from './ui/usePrompt'
 import { MemberCard } from './ui/MemberCard'
 import { MovesetCoverage, SpeciesMatchup } from './ui/TypeMatchup'
-import { LabelTip } from './ui/LabelTip'
-import { DsSelect } from './ui/DsSelect'
-import { NumberStepper } from './ui/NumberStepper'
+import { InfoTip } from './ui/InfoTip'
 import { AddToTeamModal } from './ui/AddToTeamModal'
 import { StatTable } from './ui/StatTable'
 import { MoveSlots } from './ui/MoveSlots'
@@ -791,7 +790,6 @@ function BuildFormFields({
   const abilityOptions = facts ? abilityOptionsFor(facts.variety, generation) : []
   const itemOptions = itemOptionsFor(generation)
   const natureOptions = natureOptionsFor(generation)
-  const speciesOptions = listSpecies().map((sp) => ({ value: String(sp.id), label: sp.display_name }))
   const hp = generation >= 2 ? hiddenPower(generation, build.individual) : null
 
   /* Gen 1 has no held items, so no badge -- not an empty one. */
@@ -828,7 +826,7 @@ function BuildFormFields({
       onClick: () => commit({ done: !build.done }),
     },
     {
-      icon: <IconNotes size={18} stroke={1.5} />,
+      icon: <IconInfoCircle size={18} stroke={1.5} />,
       label: 'Build info',
       onClick: () => setInfo(true),
       testId: 'tb-form-info',
@@ -958,11 +956,6 @@ function BuildFormFields({
     <section
       className="tb-screen tb-build-form"
       data-testid="tb-build-form"
-      /* The design system's compact tier (PRINCIPLES.md: reference / editing),
-         and the one spacing control this screen has -- see --fgap in
-         teamBuilder.css. `?fgap=tight|roomy` previews the other two settings. */
-      data-density="compact"
-      data-fgap={fgapSetting()}
       /* ABSENT UNTIL THE BUILD EXISTS, which is also how a reader of the DOM --
          or a test -- can tell an unsaved member from a saved one. */
       data-build-id={stored?.id}
@@ -1053,21 +1046,19 @@ function BuildFormFields({
               )}
             </span>
             {generation >= 3 && (
-              /* switch.md: track, then the label to its right, both one hit area. */
-              <label className="tb-shiny-dock">
+              <span className="tb-shiny-dock">
+                <span className="tb-field-label">Shiny</span>
                 <span className="tb-switch">
                   <input
                     type="checkbox"
-                    role="switch"
                     checked={build.shiny}
-                    aria-checked={build.shiny}
+                    aria-label="Shiny"
                     data-testid="tb-shiny"
                     onChange={(e) => commit({ shiny: e.target.checked })}
                   />
                   <span className="tb-switch-track" aria-hidden />
                 </span>
-                <span className="tb-switch-label">Shiny</span>
-              </label>
+              </span>
             )}
             {generation === 2 && (
               /* READ-ONLY in Gen 2: shininess there is a fact about the DV spread. */
@@ -1084,7 +1075,7 @@ function BuildFormFields({
             {facts?.types.map((type, i) => (
               <span key={type}>
                 {i > 0 && <span className="tb-type-sep">·</span>}
-                <TypeName type={type} />
+                <TypeLabel type={type} />
               </span>
             ))}
           </div>
@@ -1119,12 +1110,12 @@ function BuildFormFields({
           */}
           <div className="tb-field-row" data-layout="field-row">
             <Field label="Pokémon">
-              <DsSelect
-                value={String(build.speciesId)}
-                testId="tb-species"
-                options={speciesOptions}
-                onChange={(v) => {
-                  const speciesId = Number(v)
+              <select
+                className="tb-select"
+                value={build.speciesId}
+                data-testid="tb-species"
+                onChange={(e) => {
+                  const speciesId = Number(e.target.value)
                   /* A species change re-derives gender and ability: the old
                      values may be impossible for the new species. */
                   const fresh = newBuildInit(generation, speciesId)
@@ -1136,7 +1127,13 @@ function BuildFormFields({
                     moveIds: [null, null, null, null],
                   })
                 }}
-              />
+              >
+                {listSpecies().map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.display_name}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Nickname">
               <input
@@ -1172,18 +1169,20 @@ function BuildFormFields({
             */}
             <span className="tb-field-spacer" aria-hidden />
             <Field label="Generation">
-              <DsSelect
-                value={String(generation)}
-                testId="tb-generation"
+              <select
+                className="tb-select"
+                value={generation}
+                data-testid="tb-generation"
                 disabled={railTeam != null}
                 title={railTeam != null ? 'Set by the team’s game' : undefined}
-                options={[1, 2, 3, 4].map((g) => ({
-                  value: String(g),
-                  label: `Gen ${g}`,
-                  disabled: !speciesInGeneration(build.speciesId, g),
-                }))}
-                onChange={(v) => commit(buildInGeneration(build, Number(v)))}
-              />
+                onChange={(e) => commit(buildInGeneration(build, Number(e.target.value)))}
+              >
+                {[1, 2, 3, 4].map((g) => (
+                  <option key={g} value={g} disabled={!speciesInGeneration(build.speciesId, g)}>
+                    Gen {g}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
 
@@ -1191,105 +1190,157 @@ function BuildFormFields({
             {generation >= 2 && (
               <Field
                 label="Item"
-                tipTestId="tb-item-info"
-                tip={tipFor(itemName(build.itemId), itemEffectFor(build.itemId))}
+                info={
+                  <InfoTip
+                    summary={itemEffectFor(build.itemId)}
+                    label={`${itemName(build.itemId)} info`}
+                    testId="tb-item-info"
+                  >
+                    <span className="tb-infotip-name">{itemName(build.itemId)}</span>
+                  </InfoTip>
+                }
               >
-                <DsSelect
-                  value={build.itemId == null ? '' : String(build.itemId)}
-                  testId="tb-item"
-                  options={withNone(itemOptions)}
-                  onChange={(v) => commit({ itemId: v === '' ? null : Number(v) })}
-                />
+                <select
+                  className="tb-select"
+                  value={build.itemId ?? ''}
+                  data-testid="tb-item"
+                  onChange={(e) =>
+                    commit({ itemId: e.target.value === '' ? null : Number(e.target.value) })
+                  }
+                >
+                  <option value="">—</option>
+                  {itemOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
             )}
             {generation >= 3 && (
               <Field
                 label="Ability"
-                tipTestId="tb-ability-info"
-                tip={tipFor(abilityName(build.abilityId), abilityEffectFor(build.abilityId))}
+                info={
+                  <InfoTip
+                    summary={abilityEffectFor(build.abilityId)}
+                    label={`${abilityName(build.abilityId)} info`}
+                    testId="tb-ability-info"
+                  >
+                    <span className="tb-infotip-name">{abilityName(build.abilityId)}</span>
+                  </InfoTip>
+                }
               >
-                <DsSelect
-                  value={build.abilityId == null ? '' : String(build.abilityId)}
+                <select
+                  className="tb-select"
+                  value={build.abilityId ?? ''}
                   disabled={abilityOptions.length <= 1}
-                  testId="tb-ability"
-                  options={abilityOptions.map((o) => ({ value: String(o.value), label: o.label }))}
-                  onChange={(v) => commit({ abilityId: Number(v) })}
-                />
+                  data-testid="tb-ability"
+                  onChange={(e) => commit({ abilityId: Number(e.target.value) })}
+                >
+                  {abilityOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
             )}
             {generation >= 3 && (
               <Field label="Nature">
-                <DsSelect
-                  value={build.natureId == null ? '' : String(build.natureId)}
-                  testId="tb-nature"
-                  options={withNone(natureOptions)}
-                  onChange={(v) => commit({ natureId: v === '' ? null : Number(v) })}
-                />
+                <select
+                  className="tb-select"
+                  value={build.natureId ?? ''}
+                  data-testid="tb-nature"
+                  onChange={(e) =>
+                    commit({ natureId: e.target.value === '' ? null : Number(e.target.value) })
+                  }
+                >
+                  <option value="">—</option>
+                  {natureOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
             )}
             {/* Genderless: the field is ABSENT, not disabled and not dashed. */}
             {genderOptions && (
               <Field label="Gender">
-                <DsSelect
+                <select
+                  className="tb-select"
                   value={build.gender ?? ''}
                   disabled={genderOptions.length === 1}
-                  testId="tb-gender"
-                  options={genderOptions.map((g) => ({
-                    value: g,
-                    label: g === 'male' ? '♂ Male' : '♀ Female',
-                  }))}
-                  onChange={(v) => commit({ gender: v as 'male' | 'female' })}
-                />
+                  data-testid="tb-gender"
+                  onChange={(e) => commit({ gender: e.target.value as 'male' | 'female' })}
+                >
+                  {genderOptions.map((g) => (
+                    <option key={g} value={g}>
+                      {g === 'male' ? '♂ Male' : '♀ Female'}
+                    </option>
+                  ))}
+                </select>
               </Field>
             )}
           </div>
 
           <div className="tb-field-row" data-layout="field-row">
             <Field label="Level">
-              <NumberStepper
-                label="Level"
+              <input
+                type="number"
+                className="tb-number"
                 min={1}
                 max={100}
                 value={build.level}
-                testId="tb-level"
-                onChange={(level) => commit({ level })}
+                data-testid="tb-level"
+                onChange={(e) =>
+                  commit({ level: Math.min(100, Math.max(1, Number(e.target.value) || 1)) })
+                }
               />
             </Field>
             {generation >= 2 && (
               <Field label="Friendship">
-                <NumberStepper
-                  label="Friendship"
+                <input
+                  type="number"
+                  className="tb-number"
                   min={0}
                   max={255}
                   value={build.friendship}
-                  testId="tb-friendship"
-                  onChange={(friendship) => commit({ friendship })}
+                  data-testid="tb-friendship"
+                  onChange={(e) =>
+                    commit({
+                      friendship: Math.min(255, Math.max(0, Number(e.target.value) || 0)),
+                    })
+                  }
                 />
               </Field>
             )}
             {hp && (
               /*
-                READ-ONLY TEXT (input.md "read-only": no underline, still a value
-                row). Hidden Power is derived from the DV/IV spread -- you change
-                it by changing the spread below, never here. Mono, like every
-                derived number on the form; the type keeps its type colour, the
-                one fact the field exists to show.
+                DISABLED, NOT MERELY READ-ONLY. Hidden Power is derived from the
+                DV/IV spread -- you change it by changing the spread below, never
+                here -- so both fields carry the same dimmed, not-allowed
+                treatment the form's other unavailable controls do. The type
+                keeps its colour: it is still the era-correct answer, and
+                greying it out would hide the one fact the field exists to show.
               */
               <>
                 <Field label="HP Type">
                   <span
                     className="tb-readout"
-                    data-readonly="true"
+                    data-disabled="true"
+                    aria-disabled="true"
                     title="Derived from the IV spread"
                     data-testid="tb-hidden-power-type"
                   >
-                    <TypeName type={hp.type} />
+                    <TypeLabel type={hp.type} />
                   </span>
                 </Field>
                 <Field label="HP Power">
                   <span
                     className="tb-readout num"
-                    data-readonly="true"
+                    data-disabled="true"
+                    aria-disabled="true"
                     title="Derived from the IV spread"
                     data-testid="tb-hidden-power-value"
                   >
@@ -1662,62 +1713,20 @@ function BuildFormFields({
 function Field({
   label,
   children,
-  tip,
-  tipTestId,
+  info,
 }: {
   label: string
   children: React.ReactNode
-  /** Explanation shown when the LABEL is hovered or focused (no info icons). */
-  tip?: React.ReactNode | null
-  tipTestId?: string
+  /** An InfoTip, rendered after the label text. */
+  info?: React.ReactNode
 }) {
   return (
     <label className="tb-field">
       <span className="tb-field-label">
-        <LabelTip tip={tip ?? null} testId={tipTestId}>
-          {label}
-        </LabelTip>
+        {label}
+        {info}
       </span>
       {children}
     </label>
   )
-}
-
-/** A label tooltip's body: the chosen thing's name over its effect text. */
-function tipFor(name: string, effect: string | null): React.ReactNode | null {
-  if (!effect) return null
-  return (
-    <>
-      <span className="tb-tip-name">{name}</span>
-      <span className="tb-tip-text">{effect}</span>
-    </>
-  )
-}
-
-/** A list with the "nothing chosen" row on top. */
-function withNone(options: { value: number; label: string }[]) {
-  return [{ value: '', label: '—' }, ...options.map((o) => ({ value: String(o.value), label: o.label }))]
-}
-
-/**
- * A type name in its design-system text colour (type-label.md). The colour is
- * applied by `[data-type]` in teamBuilder.css from `--color-type-text-*`, so it
- * resolves per theme.
- */
-function TypeName({ type }: { type: string }) {
-  return (
-    <span className="tb-type-name" data-ds="type-label" data-type={type}>
-      {type === 'unknown' ? '???' : type}
-    </span>
-  )
-}
-
-/** `?fgap=tight|roomy` previews the other two spacing settings; default 24px. */
-function fgapSetting(): 'tight' | 'roomy' | undefined {
-  try {
-    const v = new URLSearchParams(window.location.search).get('fgap')
-    return v === 'tight' || v === 'roomy' ? v : undefined
-  } catch {
-    return undefined
-  }
 }

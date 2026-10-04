@@ -10,12 +10,8 @@
  *
  * THE BAR IS THE ONE SANCTIONED REVERSAL of "stats are a plain table" -- six
  * values on one scale where the spread is the fact. It is scoped to this block
- * and is not a licence for progress bars elsewhere. It is NEUTRAL (stat-bar.md):
- * `data.fill` on `data.track`, 8px, no ticks, no accent -- accent is wayfinding
- * only now.
- *
- * A NATURE'S EFFECT IS THE NUMBER IN status.up / status.down PLUS AN ARROW, never
- * the colour alone (redesign: "↑ / ↓ glyph").
+ * and is not a licence for progress bars elsewhere. Its fill is `--accent`, which
+ * is the fourth of that token's exactly four sanctioned uses (stat magnitude).
  *
  * ROWS COME FROM THE GENERATION, not from the data: Gen 1 renders five rows with
  * one unsplit Special, Gen 2-4 render six. `statKeysForGeneration` owns that.
@@ -80,30 +76,15 @@ export function StatTable({ build, facts }: { build: Build; facts: SpeciesFacts 
             </td>
             <td
               className="tb-stat-total num"
-              /* A raised or lowered stat is marked on the number itself, in the
-                 status colour AND with an arrow; neutral natures mark nothing. */
+              /* A raised or lowered stat is marked on the number itself; there is
+                 no separate arrow glyph, and neutral natures mark nothing. */
               data-mod={row.mod > 1 ? 'up' : row.mod < 1 ? 'down' : undefined}
               data-testid={`tb-stat-${row.key}-total`}
             >
-              {row.mod !== 1 && (
-                <span
-                  className="tb-stat-mod"
-                  aria-label={row.mod > 1 ? 'raised by nature' : 'lowered by nature'}
-                >
-                  {row.mod > 1 ? '↑' : '↓'}
-                </span>
-              )}
-              <span className="tb-stat-num">{row.total}</span>
+              {row.total}
             </td>
             <td className="tb-stat-bar-cell">
-              <span
-                className="tb-stat-bar"
-                role="meter"
-                aria-label={`${STAT_LABEL[row.key]} total`}
-                aria-valuemin={0}
-                aria-valuemax={BAR_MAX}
-                aria-valuenow={Math.min(row.total, BAR_MAX)}
-              >
+              <span className="tb-stat-bar" aria-hidden>
                 <span
                   className="tb-stat-bar-fill"
                   style={{ width: `${Math.min(100, (row.total / BAR_MAX) * 100)}%` }}

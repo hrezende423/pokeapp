@@ -4,10 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { DATA_DIR, EAGER_DATA_FILES, PARTITION_DIRS } from './src/data/manifest.ts'
 
 // Repo is served from https://<user>.github.io/pokeapp/, so every asset URL
-// must be prefixed with the repo name. BASE_PATH overrides it for a copy served
-// under another repo's name (the deploy workflow passes `/<repo name>/`, which
-// is '/pokeapp/' here -- e.g. a preview published from hrezende423/pokeapp-preview).
-const BASE = process.env.BASE_PATH ?? '/pokeapp/'
+// must be prefixed with the repo name.
+const BASE = '/pokeapp/'
 
 // Precache the eager bundle by name rather than with a `data/*.json` wildcard, so a
 // stray file landing in data/ can never be silently added to the install payload.

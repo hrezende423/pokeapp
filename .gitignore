@@ -8,8 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-# Vite output only; design-system/dist/tokens.css is a committed build artifact.
-/dist
+dist
 dist-ssr
 *.local
 

@@ -310,11 +310,10 @@
 
 :root {
   /* typography */
-  /* --font-body and --font-numeric are aliases of --font-family-sans (IBM Plex
-     Sans) and --font-family-mono (Martian Mono, then JetBrains Mono) in
-     design-system/dist/tokens.css. The @font-face rules above are the bundled
-     files those stacks resolve to. */
-  --font-body: var(--font-family-sans);
+  /* IBM Plex Sans is self-hosted — see the @font-face rules at the top of this
+     file and src/assets/fonts/. The fallback stack below is the previous
+     system-humanist pick, and now only applies if the bundled files fail. */
+  --font-body: 'IBM Plex Sans', -apple-system, 'Segoe UI', Roboto, sans-serif;
   /* JetBrains Mono is self-hosted too — see the @font-face rules at the top of
      this file. It leads the stack rather than trailing 'SF Mono', so the bundled
      face is what actually resolves everywhere; the rest are fallbacks only.
@@ -326,7 +325,7 @@
      behind it as a second self-hosted fallback, so if the first file ever fails
      the next one is still same-origin rather than a system font. Both are
      variable (wght 100-800), latin + latin-ext. */
-  --font-numeric: var(--font-family-mono);
+  --font-numeric: 'Martian Mono', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
   --font-size-display: 38px;
   --font-size-title: 20px;
