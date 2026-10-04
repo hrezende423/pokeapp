@@ -258,8 +258,20 @@ const decls = (css) =>
   )
 const handoffDecls = decls(handoffCss)
 const appDecls = decls(appCss)
-const changed = Object.keys(handoffDecls).filter(
-  (k) => canonical(appDecls[k]) !== canonical(handoffDecls[k]),
+/*
+  THE TWO FONT STACKS ARE ALIASES NOW, by the owner's decision (2026-10-04): the
+  old names point at the design system's family tokens in dist/tokens.css, which
+  carry the same IBM Plex Sans / Martian Mono stacks. Anything else differing
+  from the handoff copy is still a failure.
+*/
+const ALIASED = {
+  '--font-body': 'var(--font-family-sans)',
+  '--font-numeric': 'var(--font-family-mono)',
+}
+const changed = Object.keys(handoffDecls).filter((k) =>
+  k in ALIASED
+    ? canonical(appDecls[k]) !== canonical(ALIASED[k])
+    : canonical(appDecls[k]) !== canonical(handoffDecls[k]),
 )
 log(`  declarations changed from the handoff copy: ${changed.length ? changed.join(', ') : 'none'}`)
 check('no token value was altered', changed.length === 0, changed.join(','))
