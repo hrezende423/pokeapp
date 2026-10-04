@@ -17,7 +17,7 @@
  * SKIP-AWARE STEPPER over {2,3,6,7,10,11,14,15} -- a constrained continuous slider
  * would let a drag land on 4 and silently drop shininess.
  *
- * EVERY ROW IS `name | number box | slider`, and that Attack row is the ONLY one
+ * EVERY ROW IS `name | slider | number box`, and that Attack row is the ONLY one
  * that still carries -/+ buttons. They used to be on all of them; a typed number
  * box does the same job with one control instead of two, and the buttons stepped
  * by 4 while the box stepped by 1, so the two disagreed. The shiny-locked Attack
@@ -31,7 +31,6 @@
  *   IV sliders, 0-31, with no total, because IVs have no budget.
  */
 
-import { IconMinus, IconPlus } from '@tabler/icons-react'
 import { STAT_LABEL } from '../buildFacts'
 import { spreadStatKeys, statKeysForGeneration, type Build } from '../model'
 import {
@@ -94,20 +93,14 @@ export function SpreadControls({
         {effortKeys.map((key) => (
           <div className="tb-spread-row" key={key} data-stat={key}>
             <span className="tb-spread-name">{STAT_LABEL[key]}</span>
-            <input
-              type="number"
-              className="tb-number tb-spread-input"
-              min={0}
-              max={modern ? MAX_EV : MAX_STAT_EXP}
-              step={1}
-              value={build.effort[key] ?? 0}
-              data-testid={`tb-ev-${key}-value`}
-              onChange={(e) => setEffort(key, Number(e.target.value))}
-            />
+            {/* SLIDER, THEN ITS NUMBER (ev-iv-strip.md): the field is the exact,
+                typed path and sits right-aligned at the row's end. */}
             {modern ? (
               <Range
                 max={MAX_EV}
                 value={build.effort[key] ?? 0}
+                label={`${STAT_LABEL[key]} EV`}
+                unit="EVs"
                 testId={`tb-ev-${key}-slider`}
                 onChange={(next) => setEffort(key, next)}
               />
@@ -115,17 +108,36 @@ export function SpreadControls({
               /* No slider at all in Gen 1-2: see this file's header. */
               <span className="tb-spread-note">of {MAX_STAT_EXP}</span>
             )}
+            <input
+              type="number"
+              className="tb-number tb-spread-input"
+              inputMode="numeric"
+              min={0}
+              max={modern ? MAX_EV : MAX_STAT_EXP}
+              step={1}
+              value={build.effort[key] ?? 0}
+              aria-label={`${STAT_LABEL[key]} ${modern ? 'EV' : 'Stat Exp'}`}
+              aria-invalid={modern && total > MAX_EV_TOTAL ? true : undefined}
+              data-testid={`tb-ev-${key}-value`}
+              onChange={(e) => setEffort(key, Number(e.target.value))}
+            />
           </div>
         ))}
         {modern && (
-          <div className="tb-spread-total">
+          /*
+            DIRECTLY UNDER THE SLIDERS, no rule above it (redesign item 4). Over
+            the 510 budget it says so in words and a glyph as well as colour --
+            "⚠ 512 (over by 2)" -- never colour alone. The sliders clamp to the
+            budget, so only a build stored over it can reach that state.
+          */
+          <div className="tb-spread-total" aria-live="polite">
             <span className="tb-field-label">Total</span>
             <span
               className="tb-spread-value num"
               data-over={total > MAX_EV_TOTAL ? 'true' : undefined}
               data-testid="tb-ev-total"
             >
-              {total}
+              {total > MAX_EV_TOTAL ? `⚠ ${total} (over by ${total - MAX_EV_TOTAL})` : total}
             </span>
           </div>
         )}
@@ -194,17 +206,6 @@ export function SpreadControls({
               data-skip-aware={skipAware || undefined}
             >
               <span className="tb-spread-name">{STAT_LABEL[key]}</span>
-              <input
-                type="number"
-                className="tb-number tb-spread-input"
-                min={0}
-                max={modern ? MAX_IV : MAX_DV}
-                step={1}
-                value={value}
-                disabled={locked}
-                data-testid={`tb-iv-${key}-value`}
-                onChange={(e) => setIndividual(key, Number(e.target.value))}
-              />
               {/*
                 THE ONE SURVIVING STEPPER. Every other row lost its -/+ buttons to
                 the number box beside it, which does the same job with one control
@@ -222,9 +223,24 @@ export function SpreadControls({
               <Range
                 max={modern ? MAX_IV : MAX_DV}
                 value={value}
+                label={`${STAT_LABEL[key]} ${modern ? 'IV' : 'DV'}`}
+                unit={modern ? 'IVs' : 'DVs'}
                 disabled={locked || skipAware}
                 testId={`tb-iv-${key}-slider`}
                 onChange={(next) => setIndividual(key, next)}
+              />
+              <input
+                type="number"
+                className="tb-number tb-spread-input"
+                inputMode="numeric"
+                min={0}
+                max={modern ? MAX_IV : MAX_DV}
+                step={1}
+                value={value}
+                disabled={locked}
+                aria-label={`${STAT_LABEL[key]} ${modern ? 'IV' : 'DV'}`}
+                data-testid={`tb-iv-${key}-value`}
+                onChange={(e) => setIndividual(key, Number(e.target.value))}
               />
             </div>
           )
@@ -244,7 +260,8 @@ export function SpreadControls({
  * The spread slider.
  *
  * The FILLED PORTION IS DRAWN BY THIS COMPONENT, not by `accent-color`. The
- * design calls for a red run-up, a grey remainder and an oblong white thumb;
+ * design system asks for a neutral run-up (`data.fill`) on `data.track` and a
+ * filled oblong thumb (slider.md);
  * `accent-color` gives you a round thumb and one browser's idea of a track, and
  * only Firefox fills the run-up at all. So the percentage is handed to CSS as
  * `--fill` and the track is a gradient. See `.tb-range` in teamBuilder.css.
@@ -253,12 +270,16 @@ function Range({
   max,
   value,
   onChange,
+  label,
+  unit,
   testId,
   disabled = false,
 }: {
   max: number
   value: number
   onChange: (next: number) => void
+  label: string
+  unit: string
   testId?: string
   disabled?: boolean
 }) {
@@ -272,6 +293,8 @@ function Range({
       step={1}
       value={value}
       disabled={disabled}
+      aria-label={label}
+      aria-valuetext={`${value} ${unit}`}
       style={{ '--fill': `${pct}%` } as React.CSSProperties}
       data-testid={testId}
       onChange={(e) => onChange(Number(e.target.value))}
@@ -292,21 +315,23 @@ function Stepper({
     <span className="tb-stepper">
       <button
         type="button"
+        className="tb-stepper-btn"
         aria-label="Decrease"
         disabled={disabled}
         data-testid={testId ? `${testId}-minus` : undefined}
         onClick={() => onStep(-1)}
       >
-        <IconMinus size={13} stroke={1.5} />
+        −
       </button>
       <button
         type="button"
+        className="tb-stepper-btn"
         aria-label="Increase"
         disabled={disabled}
         data-testid={testId ? `${testId}-plus` : undefined}
         onClick={() => onStep(1)}
       >
-        <IconPlus size={13} stroke={1.5} />
+        +
       </button>
     </span>
   )
