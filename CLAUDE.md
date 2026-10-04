@@ -328,16 +328,28 @@ imperfections are already logged there deliberately.
   sprite group and the dex watermark stay centred on the CARD so the watermark's
   bleed is symmetrical.
 
-- **Team Building — Build Form's LAYOUT** (`.tb-form-*`, `.tb-identity*`,
-  `.tb-rail*` and `.tb-card-rail*` in `teamBuilder.css`). Frozen at the
-  right-rail density pass. Every number in it was measured against
-  something — the rail's 17px leading, the spread's 0.82 of the label
-  token, the 16px badge, the six cards ending level with the stat table's
-  Total row. Do not re-tune them as a drive-by, and do not "fix" the Gen 1
-  rail overhang; it is logged below as deliberate.
-
-  Its BEHAVIOUR was reopened after the freeze, on request, and rebuilt —
-  see "the unsaved member" below. The layout freeze still stands.
+- **Team Building — Build Form: REDESIGNED to the design system** (2026-10-04,
+  branch `team-builder-redesign`, unfrozen by the owner for that task; pending
+  review). The old frozen layout -- 17px rail leading, 0.82 spread ratio, rail
+  ending level with the Total row -- is gone. The screen now reads only
+  design-system tokens (the "BUILD FORM -- DESIGN SYSTEM" block at the end of
+  `teamBuilder.css`):
+  - no accent on the page; neutral sliders, stat bars and switch;
+  - one spacing control `--fgap` (24 / Tight 16 / Roomy 32, `data-fgap`,
+    previewable with `?fgap=tight|roomy`); section gaps 1.5x; label-to-field 4px;
+  - dropdowns are `ui/DsSelect` (select.md menu; >15 options get a filter).
+    It KEEPS a hidden native `<select>` carrying the `data-testid`, so suites'
+    `selectOption` still drive it, and on `pointer: coarse` that native select
+    is the control (spec: native picker on touch). Derived test ids are
+    PREFIXED (`trigger-tb-nature`), never suffixed, because suites select with
+    `[data-testid^="tb-move-select-"]`;
+  - Level / Friendship are `ui/NumberStepper` ("− value +");
+  - no ⓘ icons: `ui/LabelTip` makes the LABEL the tooltip trigger (tabindex 0,
+    aria-describedby); InfoTip.tsx is deleted;
+  - moves show type / category abbreviations (WTR, Phy) under the select, with
+    the era's category via the damage calc's `categoryFor`;
+  - narrow (container ≤900px): rails stack, 2 form columns, spreads stack.
+  The unsaved-member BEHAVIOUR below is unchanged.
 
 ## Verification discipline
 
@@ -430,8 +442,6 @@ are the signed-off screens above, frozen as they are:
 - **Team Matchup defensive table** (Weak / Resist / Immune)
 - **Attacking coverage** (`OffencePanel`, `.tb-matchup`)
 - **Team Library card** (`--tb-compact-card`)
-- **Team Building — Build Form layout** (`.tb-form-*`, `.tb-identity*`,
-  `.tb-rail*`, `.tb-card-rail*`)
 
 Rules for working near them:
 - **Do not edit these files or their CSS** to migrate them.
@@ -1194,17 +1204,9 @@ Rules that must not be re-derived:
   Gen 3-4 both only REDIRECT the move and the holder still takes normal damage;
   the immunity arrives in Gen 5, which is outside this app's scope.
 
-- **The Build Form's rail ends 17px below the left column in Gen 1 only.** The
-  six rail cards are set so the band ends level with the stat table's Total row,
-  and it does in Gen 2-4. Gen 1's table has FIVE stat rows, not six, so the left
-  column is one 18px row shorter and the rail overhangs it by that much. The
-  cards are sized by leading and padding, both of which are era-independent and
-  should stay that way; the fix would be a rail height derived from the
-  identity column's measured height, which CSS cannot express here (the grid
-  row the rail spans is sized by the form column, not by that panel, and every
-  percentage-height trick either inflates the row or collapses the rail). Do
-  NOT hardcode a per-generation card height -- it would drift the moment the
-  leading changes. Nothing is clipped or unreachable either way.
+- ~~**The Build Form's rail ends 17px below the left column in Gen 1 only.**~~
+  **OBSOLETE** with the redesign: the rail is no longer measured against the
+  stat table.
 
 - **`.tb`'s `data-generation` is the APP's generation, not the open build's.**
   Opening a Gen 3 build while the app is set to Gen 4 gives a module wrapper
