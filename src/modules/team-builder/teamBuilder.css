@@ -40,15 +40,6 @@
 .tb,
 .tb-popover {
   /*
-    Two slider colours the global tokens cannot supply.
-
-    --slider-track: the UNFILLED half. --surface-hover is #141414 in dark, the
-    same value as --surface, so a track painted with it disappears against the
-    page -- and "grey remainder" is the whole point of the control.
-    --slider-thumb-border: the thumb is white in both modes. On dark that needs
-    no outline; on light a white oblong on a pale track has no edge without one.
-  */
-  /*
     THE MODULE'S SPACING SCALE, and the reason it exists rather than reaching
     for --space-gap-*: that scale starts at 8px, which is the smallest gap a
     page of prose ever wants. A dense form wants 2, 4 and 6 constantly -- and
@@ -133,8 +124,6 @@
   */
   --tb-slot-mono: calc(var(--font-size-caption) * 0.82);
 
-  --slider-track: #e2e2e6;
-  --slider-thumb-border: #9b9ba1;
   /*
     DELIBERATELY THE SAME IN BOTH MODES, which is why it is declared once here
     and not redefined below. It fills a thing sitting ON the slider track or ON
@@ -144,12 +133,6 @@
   */
   --tb-on-accent: #ffffff;
 }
-[data-theme='dark'] .tb,
-[data-theme='dark'] .tb-popover {
-  --slider-track: #3a3a3e;
-  --slider-thumb-border: #ffffff;
-}
-
 /*
   THE `.panel section` BLEED, which is gotcha #1 in CLAUDE.md and has now bitten
   twice. App.css carries `.panel section { margin-top: 2rem; padding-top: 1.5rem;
@@ -1188,80 +1171,6 @@
   color: var(--accent);
 }
 
-/* ------------------------------------------------------------------- rail */
-
-/* The open action, now that the card itself is a wrapper holding it plus the
-   delete corner. Everything the card used to be, minus being a <button>. */
-.tb-card-rail-open {
-  display: flex;
-  gap: var(--tb-4);
-  align-items: center;
-  width: 100%;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-}
-.tb-card-rail {
-  display: flex;
-  align-items: center;
-  gap: var(--space-gap-sm);
-  width: 100%;
-  padding: var(--tb-3) 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--hairline);
-}
-.tb-card-rail:hover {
-  background: var(--surface-hover);
-}
-.tb-card-rail .tb-card-art {
-  flex: 0 0 38px;
-  height: 38px;
-}
-.tb-rail-lines {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.tb-rail-line {
-  font-size: var(--font-size-label);
-  /*
-    A FIXED LEADING, IN PIXELS, AND IT HAS TO BE PIXELS. These lines inherit an
-    absolute 26.1px from the page, which on an 11px label is a leading of 2.37
-    -- three of them made a 91px card, and six of those overran the column by
-    more than 160px. 17px is the tight setting a three-line label block wants.
-
-    Not a unitless multiplier: the third line is set smaller than the other two
-    (see .num below), and a multiplier would give it a shorter line box, so the
-    three rows of a card would no longer be evenly spaced.
-  */
-  line-height: 17px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/*
-  THE SPREAD IS SET SMALLER SO IT READS THE SAME SIZE. Martian Mono at a given
-  px is optically much larger than IBM Plex Sans at the same px, so the spread
-  line sat a size above the two label lines above it while nominally matching
-  them. Measured at 11px: sans has a 6px x-height, an 8px cap height and renders
-  "205HP/85SpA/132SpD" 115.1px wide; the mono needs 9px to land on 6 / 8 / 113.4
-  -- the same three numbers. 0.82 of the label token is that 9px, expressed
-  against the token so it still holds if the token moves.
-*/
-.tb-rail-line.num {
-  font-size: calc(var(--font-size-label) * 0.82);
-}
-
 /* ------------------------------------------------------------ build library */
 
 .tb-library-cell {
@@ -1337,124 +1246,6 @@
 
 /* ----------------------------------------------------------------- the form */
 
-/*
-  CAPPED, not fluid to the viewport. Three columns stretched across a 2560px
-  monitor put the Nature dropdown a hand's width from the Gender dropdown it
-  belongs beside, and left the identity panel a thin strip against a field of
-  nothing. The cap is the width the form is actually designed at; past it the
-  page gains margin, not column width.
-*/
-.tb-form-grid {
-  display: grid;
-  /*
-    THE HEADER IS A GRID AREA, which is what lets the other three columns start
-    at the navbar instead of below it. As a sibling above the grid it was a
-    full-width band -- 48px of it, holding one back control and otherwise empty
-    all the way across -- and every column paid for it. In column one it costs
-    only the identity panel, which was already the tallest column and had the
-    room. `main`, `dock` and `rail` span both rows and so begin at the top.
-
-    ROW GAP IS ZERO on purpose: the head row's own min-height is what reserves
-    the space, so the identity panel below it does not move when the header's
-    contents change. A row gap here would move it.
-  */
-  grid-template-areas:
-    'head  main dock rail'
-    'ident main dock rail';
-  /*
-    THE RAIL IS 192, NOT 168, AND IT COST NOTHING. A team member's card is a
-    38px sprite, a held-item badge overhanging its corner, and three lines of
-    text -- which at 168px left the text about 120px and the third line was
-    always ellipsed. The width came out of the two gaps flanking the dock
-    rather than out of `main`: 20 + 20 becomes 8 + 8, and the 24px freed goes
-    to the rail.
-
-    COLUMN ONE IS 222 FOR A 210 PANEL. `column-gap` is one value for all three
-    gaps, so tightening the dock's two would have tightened the identity
-    panel's as well. Padding the track instead (see .tb-identity's margin)
-    keeps that gap reading as 20 while the other two are 8, and leaves the
-    panel itself exactly the width it was.
-  */
-  grid-template-columns: 222px minmax(0, 1fr) 30px 192px;
-  grid-template-rows: auto 1fr;
-  column-gap: var(--tb-4);
-  row-gap: 0;
-  align-items: start;
-  max-width: 1180px;
-}
-.tb-build-form .tb-screen-head {
-  /*
-    A ROW, which only fits because the unsaved state is a single glyph now. As
-    the words "Unsaved changes" it could not sit beside the back control in a
-    210px column and had to stack under it. The min-height holds the row open at
-    the height it had as a full-width band, so the identity panel below keeps
-    its position whether or not there is anything unsaved to announce.
-  */
-  grid-area: head;
-  display: flex;
-  align-items: center;
-  gap: var(--tb-3);
-  min-height: 48px;
-  /* Matches .tb-identity below it, so the back control stays left-aligned with
-     the panel rather than with the track that now holds it. */
-  margin-right: 12px;
-  padding-bottom: 0;
-}
-.tb-identity {
-  /* The other 12px of column one's 20px gap -- see the grid above. The panel is
-     210px wide in a 222px track, so nothing inside it moved. */
-  margin-right: 12px;
-  grid-area: ident;
-}
-.tb-form-main {
-  grid-area: main;
-}
-.tb-form-dock-col {
-  grid-area: dock;
-}
-.tb-rail {
-  grid-area: rail;
-}
-
-/*
-  The dock's own column: a vertical strip between the form and the rail. It is a
-  grid column rather than something absolutely placed over the rail so it can
-  never overlap a member card, at any rail height.
-*/
-.tb-form-dock-col {
-  display: flex;
-  justify-content: flex-end;
-}
-.tb-form-dock-col .tb-dock {
-  flex-direction: column;
-  gap: var(--tb-2);
-}
-/* The separator before the destructive item is a rule across the strip when the
-   dock is vertical, not a bar beside it. */
-.tb-form-dock-col .tb-dock-sep {
-  width: 16px;
-  height: 1px;
-  margin: var(--tb-2) 0;
-}
-
-/*
-  A status, not a control -- this form has no Save button to press. The accent
-  is its second sanctioned use, a binary state indicator: there are unsaved
-  edits, or there are not.
-*/
-.tb-dirty-note {
-  display: inline-flex;
-  align-items: center;
-  color: var(--accent);
-}
-
-.tb-identity {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tb-1);
-  padding-right: var(--space-gap-md);
-  border-right: 1px solid var(--hairline);
-}
 /*
   A NAMED GRID, not six absolutely-positioned elements.
 
@@ -1634,78 +1425,22 @@
   height: 26px;
 }
 /*
-  THE SHINY SWITCH LIVES ON THE ARTWORK, bottom-left, because that is what it
-  acts on -- it repaints the sprite it sits on. As a labelled form row four
-  fields down it was a setting about the build; here it is a control on the
-  picture, and it costs the panel no vertical space at all.
+  THE MODULE'S GENERIC FIELD, still used by the modals, Team Viewer's title and
+  the Build Library's tags. The Build Form's own fields are the design-system
+  versions at the end of this file.
 */
-.tb-shiny-dock {
-  z-index: 3;
-  /* END/START, so growing the stage grows the 1fr spacer above this row and the
-     switch stays welded to the bottom-left corner rather than drifting. */
-  grid-area: shiny;
-  align-self: end;
-  justify-self: start;
-  display: flex;
-  align-items: center;
-  gap: var(--tb-3);
-}
-.tb-shiny-dock .tb-field-label {
-  font-size: var(--font-size-label);
-}
-.tb-types-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--tb-2);
-  padding-bottom: var(--tb-3);
-  border-bottom: 1px solid var(--hairline);
-}
-.tb-stats-block {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tb-1);
-  padding-top: var(--tb-1);
-}
-
-.tb-form-main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tb-3);
-}
-.tb-field-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-gap-lg);
-}
-/* FLUSH. A label belongs to the control under it, and a gap between the two
-   said they were two things. The label's leading is separation enough. */
 .tb-field {
   display: flex;
   flex-direction: column;
   gap: 0;
   min-width: 0;
 }
-/*
-  AN EXPLICIT LINE-HEIGHT, and it is the whole fix for "the labels are too tall".
-  :root sets `font: 18px/145%`, and a percentage line-height computes to a LENGTH
-  at that element -- 26.1px -- which then inherits down unchanged. So an 11px
-  label was sitting in a 26.1px box: more than twice its own text, with no
-  padding anywhere to explain it. Nothing about the label declared that height,
-  which is why it could not be found by reading the rule.
-*/
 .tb-field-label {
   font-size: var(--font-size-label);
   line-height: 1.35;
   letter-spacing: 0.1em;
   color: var(--text-secondary);
 }
-/*
-  ONE HEIGHT FOR EVERY CONTROL, declared rather than emergent. Left to their
-  intrinsic sizing these disagreed: a <select> came out 29px and an <input> 35px,
-  because the input inherited the root's 26.1px line-height and the select did
-  not. Two controls side by side in the same row, 6px apart in height, for a
-  reason visible in neither rule.
-*/
 .tb-select,
 .tb-input,
 .tb-number,
@@ -1737,446 +1472,7 @@
 .tb-number:disabled {
   opacity: var(--field-disabled-opacity);
 }
-.tb-readout {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tb-2);
-}
-/* Derived, so not editable. Carries the same underline as the fields beside it
-   -- it is one of the row, not a caption floating in it -- at the form's own
-   disabled opacity. */
-.tb-readout[data-disabled='true'] {
-  cursor: not-allowed;
-  border-bottom: 1px solid var(--border);
-  opacity: var(--field-disabled-opacity);
-}
 
-/* --------------------------------------------------------------- the switch */
-
-/*
-  A REAL CHECKBOX under a drawn track. Keeping the input means the label, the
-  keyboard and every test selector still work; `appearance: none` on the input
-  itself would leave us restyling a box, and this control is a switch.
-*/
-.tb-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  width: 38px;
-  height: 20px;
-  margin-top: 2px;
-}
-.tb-switch input {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  cursor: pointer;
-  opacity: 0;
-}
-.tb-switch-track {
-  position: absolute;
-  inset: 0;
-  background: var(--surface-hover);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  transition: background-color 120ms ease;
-}
-.tb-switch-track::after {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  content: '';
-  background: var(--text-secondary);
-  border-radius: 50%;
-  transition:
-    transform 120ms ease,
-    background-color 120ms ease;
-}
-/* On is a binary indicator, which is one of --accent's four sanctioned uses. */
-.tb-switch input:checked + .tb-switch-track {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.tb-switch input:checked + .tb-switch-track::after {
-  background: var(--tb-on-accent);
-  transform: translateX(18px);
-}
-.tb-switch input:focus-visible + .tb-switch-track {
-  outline: 2px solid var(--field-focus-border);
-  outline-offset: 2px;
-}
-
-/* ---------------------------------------------------------------- info tips */
-
-/*
-  HOVER AND FOCUS, NO JAVASCRIPT. See ui/InfoTip.tsx for why: ten of these on one
-  screen, each needing two timers and cleanup if it were stateful.
-*/
-.tb-infotip {
-  position: relative;
-  display: inline-flex;
-  margin-left: var(--tb-2);
-  vertical-align: middle;
-}
-.tb-infotip-trigger {
-  display: inline-flex;
-  align-items: center;
-  padding: 0;
-  color: var(--text-secondary);
-  cursor: help;
-  background: transparent;
-  border: none;
-}
-.tb-infotip-trigger:hover,
-.tb-infotip:focus-within .tb-infotip-trigger {
-  color: var(--accent);
-}
-/*
-  ABOVE THE FIELD, not below it. These sit on labels in a dense form, and a panel
-  opening downwards covers the control the label belongs to -- which is the one
-  thing the reader is looking at when they reach for the tip.
-*/
-.tb-infotip-panel {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: -8px;
-  z-index: 60;
-  display: none;
-  flex-direction: column;
-  gap: var(--tb-2);
-  width: max-content;
-  max-width: 280px;
-  padding: var(--tb-4) var(--tb-5);
-  font-size: var(--font-size-caption);
-  letter-spacing: 0;
-  color: var(--text-primary);
-  text-transform: none;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius-control) / 2);
-}
-.tb-infotip:hover .tb-infotip-panel,
-.tb-infotip:focus-within .tb-infotip-panel {
-  display: flex;
-}
-.tb-infotip-name {
-  font-weight: var(--font-weight-medium);
-}
-.tb-infotip-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tb-3) var(--tb-4);
-  align-items: baseline;
-  color: var(--text-secondary);
-}
-.tb-infotip-cat {
-  color: var(--text-secondary);
-}
-.tb-infotip-text {
-  color: var(--text-secondary);
-}
-
-/* ------------------------------------------------------------------- moves */
-
-.tb-moves {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-gap-lg);
-}
-.tb-move-slot {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-width: 0;
-}
-.tb-move-meta {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-height: 16px;
-  font-size: var(--font-size-caption);
-}
-.tb-warn {
-  grid-column: 1 / -1;
-  margin: 0;
-  font-size: var(--font-size-caption);
-  color: var(--accent);
-}
-
-/* ----------------------------------------------------------------- spreads */
-
-.tb-spreads {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-gap-xl);
-}
-.tb-spread-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tb-1);
-}
-.tb-spread-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-gap-sm);
-  padding-bottom: var(--tb-2);
-}
-.tb-spread-row {
-  display: grid;
-  grid-template-columns: 34px 52px minmax(0, 1fr);
-  gap: var(--tb-5);
-  align-items: center;
-}
-/* Gen 2's shiny-locked Attack DV is the one row that still carries a stepper --
-   see SpreadControls -- so it gets a fourth column instead of squeezing one in. */
-.tb-spread-row[data-skip-aware='true'] {
-  grid-template-columns: 34px 52px auto minmax(0, 1fr);
-}
-/*
-  THE SAME CONTROL AS LEVEL AND FRIENDSHIP -- `.tb-number`, `type="number"`,
-  `step="1"` -- so a spread value can be typed rather than only nudged, and so
-  the two halves of this form do not offer two different ways to enter a number.
-  It sits beside the stepper rather than replacing it: the stepper is for
-  nudging, the box is the fastest route to 252 or 31, and both write one field.
-*/
-.tb-spread-input {
-  font-size: var(--font-size-caption);
-}
-.tb-spread-row[data-locked='true'] {
-  opacity: var(--field-disabled-opacity);
-}
-.tb-spread-name {
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-}
-.tb-spread-value {
-  font-family: var(--font-numeric);
-  font-size: var(--font-size-caption);
-  text-align: right;
-}
-.tb-spread-value[data-over='true'] {
-  color: var(--accent);
-}
-.tb-spread-note {
-  margin: 0;
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-}
-.tb-spread-total {
-  display: flex;
-  align-items: center;
-  gap: var(--tb-4);
-  padding-top: var(--tb-2);
-  border-top: 1px solid var(--hairline);
-}
-
-.tb-stepper {
-  display: inline-flex;
-  gap: 1px;
-}
-.tb-stepper button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 18px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--border);
-}
-.tb-stepper button:hover:not(:disabled) {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-.tb-stepper button:disabled {
-  cursor: default;
-  opacity: var(--field-disabled-opacity);
-}
-
-/*
-  The one sanctioned use of a range input in this module, drawn by hand.
-
-  `accent-color` was doing none of what the design asks: it gives a round thumb,
-  and only Gecko fills the run-up to it. So the track is a two-stop gradient cut
-  at `--fill` (set inline from the value, see SpreadControls.Range) and both
-  engines' thumb pseudo-elements are styled to the same oblong.
-*/
-.tb-range {
-  width: 100%;
-  height: 16px;
-  appearance: none;
-  background: transparent;
-}
-.tb-range::-webkit-slider-runnable-track {
-  height: 4px;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0 var(--fill, 0%),
-    var(--slider-track) var(--fill, 0%) 100%
-  );
-  border: 1px solid var(--hairline);
-  border-radius: 2px;
-}
-.tb-range::-moz-range-track {
-  height: 4px;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0 var(--fill, 0%),
-    var(--slider-track) var(--fill, 0%) 100%
-  );
-  border: 1px solid var(--hairline);
-  border-radius: 2px;
-}
-/* An OBLONG LYING DOWN: wider than it is tall, so it reads as a grip sliding
-   ALONG the line rather than a bead threaded across it. */
-.tb-range::-webkit-slider-thumb {
-  width: 20px;
-  height: 11px;
-  margin-top: -4px;
-  appearance: none;
-  cursor: grab;
-  background: var(--tb-on-accent);
-  border: 1px solid var(--slider-thumb-border);
-  border-radius: 6px;
-}
-.tb-range::-moz-range-thumb {
-  width: 20px;
-  height: 11px;
-  cursor: grab;
-  background: var(--tb-on-accent);
-  border: 1px solid var(--slider-thumb-border);
-  border-radius: 6px;
-}
-.tb-range:focus-visible {
-  outline: none;
-}
-.tb-range:focus-visible::-webkit-slider-thumb {
-  border-color: var(--field-focus-border);
-}
-.tb-range:focus-visible::-moz-range-thumb {
-  border-color: var(--field-focus-border);
-}
-.tb-range:disabled {
-  cursor: not-allowed;
-  opacity: var(--field-disabled-opacity);
-}
-
-/* ------------------------------------------------------------- stat table */
-
-.tb-stats {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-caption);
-}
-.tb-stats th,
-.tb-stats td {
-  padding: 0 var(--tb-2);
-  line-height: 1.5;
-  border-bottom: 1px solid var(--hairline);
-}
-/*
-  SMALLER THAN THE ROWS IT LABELS, in the label size the rest of the form uses
-  for the same job. A column heading set at the data's own size competes with
-  the data; this is the one place in the table that is not a number.
-*/
-.tb-stat-head {
-  font-size: var(--font-size-label);
-  font-weight: var(--font-weight-regular);
-  letter-spacing: 0.1em;
-  color: var(--text-secondary);
-  text-align: right;
-}
-.tb-stats thead th:first-child {
-  text-align: left;
-}
-.tb-stats thead th {
-  padding-bottom: var(--tb-1);
-}
-.tb-stat-name {
-  font-weight: var(--font-weight-regular);
-  color: var(--text-secondary);
-  text-align: left;
-}
-.tb-stat-base,
-.tb-stat-total {
-  font-family: var(--font-numeric);
-  text-align: right;
-}
-.tb-stat-base {
-  color: var(--text-secondary);
-}
-.tb-stat-total[data-mod='up'] {
-  color: var(--stat-increase);
-}
-.tb-stat-total[data-mod='down'] {
-  color: var(--stat-decrease);
-}
-.tb-stat-bar-cell {
-  width: 45%;
-}
-.tb-stat-bar {
-  display: block;
-  height: 6px;
-  background: var(--surface-hover);
-}
-/* The fourth sanctioned use of --accent: stat magnitude. */
-.tb-stat-bar-fill {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-}
-.tb-stat-total-row th,
-.tb-stat-total-row td {
-  padding-top: var(--tb-1);
-  border-bottom: none;
-}
-/* The BST is a fact about the species, not about this build, so it is set like
-   the base column above it rather than like the computed total beside it. */
-.tb-stat-total-row .tb-stat-base {
-  color: var(--text-secondary);
-}
-
-/* -------------------------------------------------------------- right rail */
-
-.tb-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  /*
-    NO GAP. Every card carries a bottom hairline, so a gap between them left the
-    rules floating with 2px of nothing above each -- six separate cards rather
-    than one banded list, which is the hairline-band rule the data tables follow.
-    Butted together the hairlines read as the list's own rules. It also gives
-    the six cards back 10px, which is most of a text line.
-  */
-  gap: 0;
-  padding-left: var(--space-gap-md);
-  border-left: 1px solid var(--hairline);
-}
-.tb-rail[data-state='loose'] {
-  align-items: center;
-}
-/*
-  A HEADING NOW, so the padding is below it rather than above. Its leading is
-  the cards' own 17px: at the page's inherited 26.1px this one line was 34px
-  tall, which is half a card, and the rail has exactly the height of the
-  identity column beside it to spend.
-*/
-.tb-rail-team {
-  padding-bottom: var(--tb-5);
-  font-family: var(--font-numeric);
-  font-size: var(--font-size-label);
-  line-height: 17px;
-  color: var(--text-secondary);
-  text-align: center;
-}
 .tb-shared-note {
   position: absolute;
   right: var(--space-gap-xl);
@@ -2366,60 +1662,6 @@
   max-width: none;
 }
 
-/* The rail member that IS the form. Marked with the module's one indicator
-   colour rather than a box, and inert -- see MemberCard's rail branch. */
-/*
-  THE SLOT BEING EDITED IS OUTLINED, and `outline` is load-bearing rather than a
-  synonym for `border` here. Three reasons, all of them the same reason:
-
-  A BORDER WOULD MOVE THE CARD. It takes part in layout, so the ring appearing
-  would shift the whole rail by 2px and shift it back when the reader moved on.
-  The rail is measured against the stat table's Total row (see 8b); an outline
-  is drawn outside the box and changes nothing.
-
-  IT IS DECLARED ON EVERY CARD, transparent, and only its COLOUR changes -- so
-  the ring fades rather than snapping, which is the "smoothly outlined" part.
-  Transitioning `outline-width` from zero would grow it from the middle out.
-
-  AND IT IS NOT THE MODULE'S BANNED BOX. The no-outlined-buttons convention is
-  about controls that draw themselves as boxes; this is a selection state on the
-  one card out of six that the form is currently editing, which is precisely
-  what the reader needs to see and the one thing the rail could not say before.
-*/
-.tb-card-rail {
-  outline: 1px solid transparent;
-  outline-offset: -1px;
-  transition:
-    outline-color 140ms ease,
-    background-color 140ms ease;
-}
-.tb-card-rail[data-current='true'] {
-  background: var(--surface-hover);
-  outline-color: var(--text-secondary);
-}
-.tb-card-rail[data-current='true'] .tb-rail-line:first-child {
-  color: var(--text-primary);
-}
-/*
-  THE SELECTED SLOT BEFORE ANYTHING IS IN IT. Same ring, same marked
-  background, and deliberately NOT an "add member" button -- it is the slot the
-  member being built is going into, and offering to add another one there is
-  what used to abandon the member in progress.
-*/
-.tb-card-rail-blank .tb-rail-line:first-child {
-  color: var(--text-primary);
-}
-.tb-card-rail-blank .tb-card-frame {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tb-rail-blank-icon {
-  color: var(--text-secondary);
-}
-.tb-card-rail-open[data-inert='true'] {
-  cursor: default;
-}
 .tb-build-form-empty {
   display: flex;
   flex-direction: column;
@@ -2494,4 +1736,1077 @@
    the weight alone did nothing (owner, 2026-09-27). */
 .tb-card-gender {
   -webkit-text-stroke: 0.5px currentColor;
+}
+
+/* ==========================================================================
+   BUILD FORM -- DESIGN SYSTEM (team-builder redesign, 2026-10-04)
+
+   The Build Form follows design-system/ (PRINCIPLES.md, PATTERNS.md §4 and
+   components/*.md) and reads ONLY its semantic tokens from dist/tokens.css:
+   --color-*, --font-style-*, --font-weight-*, --space-*, --d-*. The module's
+   legacy scale (--tb-1..6, --text-primary, --accent) is not used below.
+
+   ACCENT IS NOT ON THIS PAGE. It belongs to the active navbar item, which is
+   outside this screen; sliders, stat bars, the switch and the selected rail
+   member are all neutral.
+
+   ONE SPACING CONTROL, --fgap: 24px by default, 16 Tight, 32 Roomy
+   (`data-fgap` on the section; `?fgap=tight|roomy` previews them). It sets the
+   form grid's row and column gaps and the rails' padding; section gaps are 1.5x
+   of it. The label-to-field gap is a fixed 4px. Everything else is on the
+   4/8/12/16/24/32 scale (--space-1..8).
+   ========================================================================== */
+
+.tb .tb-build-form {
+  --fgap: var(--space-6);
+  /*
+    NO DESIGN-SYSTEM STYLE AT 11PX. The redesign asks for the move abbreviations
+    and the rail's EV line in mono at 11px, and font.style.data is 12px. Declared
+    once here rather than per rule; a `font.style.data-sm` token in tokens.json
+    would replace it.
+  */
+  --bf-mono-sm: 11px;
+
+  container-type: inline-size;
+  padding: var(--space-2) var(--fgap) var(--fgap);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-style-body-line-height);
+  letter-spacing: var(--font-style-body-letter-spacing);
+  color: var(--color-text-default);
+}
+.tb .tb-build-form[data-fgap='tight'] {
+  --fgap: var(--space-4);
+}
+.tb .tb-build-form[data-fgap='roomy'] {
+  --fgap: var(--space-8);
+}
+
+/* ------------------------------------------------------------------ grid */
+
+.tb-form-grid {
+  display: grid;
+  grid-template-areas:
+    'head  main dock rail'
+    'ident main dock rail';
+  /* Identity panel, the form, the dock strip, the team rail. The rail is wider
+     than it was (248 vs 192) because its sprites are 64px now. */
+  grid-template-columns: 216px minmax(0, 1fr) auto 248px;
+  grid-template-rows: auto 1fr;
+  column-gap: var(--fgap);
+  row-gap: 0;
+  align-items: start;
+  max-width: 1280px;
+}
+.tb-build-form .tb-screen-head {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--space-12);
+  padding-bottom: 0;
+}
+.tb-identity {
+  grid-area: ident;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-right: var(--fgap);
+  border-right: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.tb-form-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fgap);
+  min-width: 0;
+}
+.tb-form-dock-col {
+  grid-area: dock;
+  display: flex;
+  justify-content: flex-end;
+}
+.tb-form-dock-col .tb-dock {
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.tb-form-dock-col .tb-dock-sep {
+  width: var(--space-4);
+  height: var(--border-width-thin);
+  margin: var(--space-1) 0;
+}
+.tb-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding-left: var(--fgap);
+  border-left: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.tb-rail[data-state='loose'] {
+  align-items: center;
+}
+
+/* -------------------------------------------- actions: ghost, never filled */
+
+/* button.md: semibold label, bold on hover and press, no background anywhere. */
+.tb-build-form .tb-ghost {
+  font-size: var(--font-style-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--font-style-label-letter-spacing);
+  color: var(--color-text-default);
+}
+.tb-build-form .tb-ghost[data-bare='true'] {
+  padding: var(--space-1) 0;
+  color: var(--color-text-default);
+}
+.tb-build-form .tb-ghost:hover:not(:disabled),
+.tb-build-form .tb-ghost:active:not(:disabled) {
+  font-weight: var(--font-weight-bold);
+  background: transparent;
+}
+.tb-build-form .tb-icon-btn {
+  color: var(--color-text-muted);
+}
+.tb-build-form .tb-icon-btn:hover,
+.tb-build-form .tb-icon-btn[data-active='true'] {
+  color: var(--color-text-default);
+  background: transparent;
+}
+.tb-build-form .tb-icon-btn[data-danger='true']:hover {
+  color: var(--color-action-danger);
+}
+.tb-build-form .tb-ghost[data-danger='true'] {
+  color: var(--color-action-danger);
+}
+/* A status, not a control: there are unsaved edits. Neutral, not accent. */
+.tb-build-form .tb-dirty-note {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-default);
+}
+
+/*
+  FOCUS. Text fields and dropdown triggers show focus as a thicker underline
+  (input.md); every other control -- buttons, the switch, slider thumbs, the
+  label tooltips -- gets the 2px ring, and only on :focus-visible, so a mouse
+  click never leaves a ring behind.
+*/
+.tb-build-form :is(button, [tabindex='0'], input[type='checkbox']):focus {
+  outline: none;
+}
+.tb-build-form :is(button:not(.tb-dselect-trigger), [tabindex='0']):focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--border-width-thick);
+}
+
+/* ------------------------------------------------------- identity panel */
+
+.tb-build-form .tb-identity .tb-card-ghost {
+  font-size: var(--font-style-display-size);
+  /* The only bold (700) text on the page. */
+  font-weight: var(--font-style-watermark-weight);
+  letter-spacing: var(--font-style-watermark-letter-spacing);
+  color: var(--color-text-watermark);
+  opacity: 1;
+}
+/* Readable, unlike the numeral: at caption size in the watermark tone the
+   kana vanished, which is the "katakana is missing" report this panel had
+   once already. text.disabled is the faintest tone that still reads. */
+.tb-build-form .tb-identity .tb-card-ghost-ja {
+  font-size: var(--font-style-caption-size);
+  letter-spacing: var(--font-tracking-caps);
+  color: var(--color-text-disabled);
+  opacity: 1;
+}
+.tb-build-form .tb-sprite-frame {
+  margin: var(--space-3) var(--space-1) var(--space-8) var(--space-6);
+  height: calc(100% - var(--space-12));
+}
+.tb-build-form .tb-held-item {
+  width: var(--space-8);
+  height: var(--space-8);
+}
+
+/* switch.md: track, label to the right, the whole row is the hit area. */
+.tb-shiny-dock {
+  z-index: 3;
+  grid-area: shiny;
+  align-self: end;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--d-field);
+  cursor: pointer;
+}
+.tb-switch-label {
+  font-size: var(--font-style-body-size);
+  color: var(--color-text-default);
+}
+.tb-switch {
+  --sw-w: 36px;
+  --sw-h: 20px;
+  --sw-thumb: 13px;
+  position: relative;
+  display: inline-flex;
+  width: var(--sw-w);
+  height: var(--sw-h);
+}
+.tb-switch input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+.tb-switch-track {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  background: transparent;
+  /* 1.5px in switch.md, between the two border-width tokens. */
+  border: calc((var(--border-width-thin) + var(--border-width-thick)) / 2) solid
+    var(--color-border-strong);
+  border-radius: var(--radius-full);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+.tb-switch-track::after {
+  position: absolute;
+  top: 50%;
+  left: calc((var(--sw-h) - var(--sw-thumb)) / 2 - var(--border-width-thin));
+  width: var(--sw-thumb);
+  height: var(--sw-thumb);
+  content: '';
+  background: var(--color-text-muted);
+  border-radius: var(--radius-full);
+  transform: translateY(-50%);
+  transition: transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+.tb-shiny-dock:hover .tb-switch-track {
+  border-color: var(--color-text-default);
+}
+.tb-switch input:checked + .tb-switch-track {
+  background: var(--color-text-default);
+  border-color: var(--color-text-default);
+}
+.tb-switch input:checked + .tb-switch-track::after {
+  background: var(--color-bg-canvas);
+  transform: translate(var(--space-4), -50%);
+}
+.tb-switch input:focus-visible + .tb-switch-track {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--border-width-thick);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-switch-track,
+  .tb-switch-track::after {
+    transition: none;
+  }
+}
+
+/* type-label.md: the name as label-caps text in its type colour, no fill. */
+.tb-types-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.tb-type-name {
+  font-size: var(--font-style-label-caps-size);
+  line-height: var(--font-style-label-caps-line-height);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+}
+.tb-build-form .tb-type-sep {
+  margin: 0 var(--space-1);
+  font-size: var(--font-style-label-caps-size);
+  color: var(--color-text-muted);
+}
+
+/* Type colours, per theme, from the design system. Covers the type names and
+   the three-letter move abbreviations alike. */
+.tb-build-form [data-type='normal'] { color: var(--color-type-text-normal); }
+.tb-build-form [data-type='fire'] { color: var(--color-type-text-fire); }
+.tb-build-form [data-type='water'] { color: var(--color-type-text-water); }
+.tb-build-form [data-type='electric'] { color: var(--color-type-text-electric); }
+.tb-build-form [data-type='grass'] { color: var(--color-type-text-grass); }
+.tb-build-form [data-type='ice'] { color: var(--color-type-text-ice); }
+.tb-build-form [data-type='fighting'] { color: var(--color-type-text-fighting); }
+.tb-build-form [data-type='poison'] { color: var(--color-type-text-poison); }
+.tb-build-form [data-type='ground'] { color: var(--color-type-text-ground); }
+.tb-build-form [data-type='flying'] { color: var(--color-type-text-flying); }
+.tb-build-form [data-type='psychic'] { color: var(--color-type-text-psychic); }
+.tb-build-form [data-type='bug'] { color: var(--color-type-text-bug); }
+.tb-build-form [data-type='rock'] { color: var(--color-type-text-rock); }
+.tb-build-form [data-type='ghost'] { color: var(--color-type-text-ghost); }
+.tb-build-form [data-type='dragon'] { color: var(--color-type-text-dragon); }
+.tb-build-form [data-type='dark'] { color: var(--color-type-text-dark); }
+.tb-build-form [data-type='steel'] { color: var(--color-type-text-steel); }
+.tb-build-form [data-type='fairy'] { color: var(--color-type-text-fairy); }
+.tb-build-form [data-type='unknown'] { color: var(--color-text-muted); }
+
+/* -------------------------------------------------------- stat table */
+
+/* stat-bar.md: label-caps name, mono value, neutral 8px bar, no ticks; the
+   Total row is the one separated by a hairline. */
+.tb-stats {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-style-data-size);
+  line-height: var(--font-style-data-line-height);
+}
+.tb-stats th,
+.tb-stats td {
+  padding: var(--space-1) var(--space-1);
+  border: none;
+}
+.tb-stat-head,
+.tb-stat-name {
+  font-size: var(--font-style-label-caps-size);
+  font-weight: var(--font-style-label-caps-weight);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+.tb-stats thead th {
+  padding-bottom: var(--space-1);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.tb-stats thead th:first-child,
+.tb-stat-name {
+  text-align: left;
+}
+.tb-stat-base,
+.tb-stat-total {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--font-style-data-letter-spacing);
+  text-align: right;
+  white-space: nowrap;
+}
+.tb-stat-base {
+  color: var(--color-text-muted);
+}
+.tb-stat-total {
+  color: var(--color-text-default);
+}
+.tb-stat-total[data-mod='up'] {
+  color: var(--color-status-up);
+}
+.tb-stat-total[data-mod='down'] {
+  color: var(--color-status-down);
+}
+.tb-stat-mod {
+  margin-right: var(--space-1);
+}
+.tb-stat-bar-cell {
+  width: 45%;
+}
+.tb-stat-bar {
+  display: block;
+  height: var(--size-bar-height);
+  background: var(--color-data-track);
+}
+.tb-stat-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-data-fill);
+}
+.tb-stat-total-row th,
+.tb-stat-total-row td {
+  border-top: var(--border-width-thin) solid var(--color-border-hairline);
+}
+
+/* ------------------------------------------------------------ fields */
+
+.tb-build-form .tb-field-row,
+.tb-moves {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--fgap);
+  row-gap: var(--fgap);
+}
+/* Section gaps are 1.5x: the form column's own gap plus half again. */
+.tb-moves,
+.tb-spreads {
+  margin-top: calc(var(--fgap) * 0.5);
+}
+.tb-build-form .tb-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Label to field: fixed. */
+  gap: var(--space-1);
+  min-width: 0;
+}
+/* input.md: the label is label-caps, muted, above the control. */
+.tb-build-form .tb-field-label {
+  font-size: var(--font-style-label-caps-size);
+  line-height: var(--font-style-label-caps-line-height);
+  font-weight: var(--font-style-label-caps-weight);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/*
+  TEXT-FIELD SHELL, shared by inputs, the dropdown trigger and the stepper's
+  value. Underline only; 1px border.strong, 1px text.default on hover, 2px
+  border.focus on focus; regular weight, always.
+*/
+.tb-build-form .tb-input,
+.tb-build-form .tb-number,
+.tb-dselect-trigger,
+.tb-stepper-value {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--d-field);
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-style-body-line-height);
+  letter-spacing: var(--font-style-body-letter-spacing);
+  color: var(--color-text-default);
+  background: transparent;
+  border: none;
+  border-bottom: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: 0;
+  outline: none;
+}
+.tb-build-form .tb-number,
+.tb-stepper-value {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-style-data-size);
+  letter-spacing: var(--font-style-data-letter-spacing);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  appearance: textfield;
+}
+.tb-build-form input[type='number']::-webkit-inner-spin-button,
+.tb-build-form input[type='number']::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+.tb-build-form .tb-input:hover:not(:disabled),
+.tb-build-form .tb-number:hover:not(:disabled),
+.tb-dselect-trigger:hover:not(:disabled),
+.tb-stepper-value:hover {
+  border-bottom-color: var(--color-text-default);
+}
+.tb-build-form .tb-input:focus,
+.tb-build-form .tb-number:focus,
+.tb-dselect-trigger:focus,
+.tb-dselect[data-open='true'] .tb-dselect-trigger,
+.tb-stepper-value:focus {
+  border-bottom: var(--border-width-thick) solid var(--color-border-focus);
+  outline: none;
+}
+.tb-build-form .tb-number[aria-invalid='true'] {
+  border-bottom: var(--border-width-thick) solid var(--color-action-danger);
+}
+/* Disabled: muted text, hairline underline, not-allowed. */
+.tb-build-form .tb-input:disabled,
+.tb-build-form .tb-number:disabled,
+.tb-dselect-trigger:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+  opacity: 1;
+}
+.tb-dselect-trigger:disabled .tb-dselect-chevron {
+  color: var(--color-text-disabled);
+}
+
+/* Read-only (input.md): a value row, no underline. Hidden Power is mono. */
+.tb-build-form .tb-readout {
+  display: inline-flex;
+  align-items: center;
+  height: var(--d-field);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-style-data-size);
+  letter-spacing: var(--font-style-data-letter-spacing);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-default);
+  border: none;
+  cursor: default;
+  opacity: 1;
+}
+.tb-build-form .tb-readout .tb-type-name {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-style-data-size);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: var(--font-style-data-letter-spacing);
+}
+
+/* -------------------------------------------------------- dropdown (select.md) */
+
+.tb-dselect {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.tb-dselect-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  text-align: left;
+  cursor: pointer;
+}
+.tb-dselect-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tb-dselect-chevron {
+  flex: none;
+  color: var(--color-text-muted);
+}
+/* The native select: the tests' handle and the touch picker. 1px and invisible
+   with a fine pointer; stretched over the trigger on touch, where tapping it
+   opens the platform picker (select.md, A11y). */
+.tb-dselect-native {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  .tb-dselect-native {
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+  }
+}
+.tb-dselect-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: var(--z-dropdown);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  width: max-content;
+  max-width: 320px;
+  padding: var(--space-1) 0;
+  background: var(--color-bg-surface);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+}
+.tb-dselect-filter {
+  box-sizing: border-box;
+  height: var(--d-field);
+  margin: 0 var(--space-3) var(--space-1);
+  padding: 0;
+  font: inherit;
+  font-size: var(--font-style-body-size);
+  color: var(--color-text-default);
+  background: transparent;
+  border: none;
+  border-bottom: var(--border-width-thin) solid var(--color-border-strong);
+  outline: none;
+}
+.tb-dselect-filter:focus {
+  border-bottom: var(--border-width-thick) solid var(--color-border-focus);
+}
+.tb-dselect-filter::placeholder {
+  color: var(--color-text-muted);
+}
+.tb-dselect-list {
+  max-height: calc(var(--d-field) * 8);
+  overflow-y: auto;
+  outline: none;
+}
+.tb-dselect-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: var(--d-field);
+  padding: 0 var(--space-3);
+  font-size: var(--font-style-body-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-default);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tb-dselect-option:hover,
+.tb-dselect-option[aria-selected='true'] {
+  font-weight: var(--font-weight-semibold);
+}
+.tb-dselect-option[data-active='true'] {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
+}
+.tb-dselect-option[aria-disabled='true'] {
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+.tb-dselect-empty {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+}
+
+/* ---------------------------------------- number stepper (input.md, 2026-10-04) */
+
+.tb-stepper {
+  display: inline-flex;
+  align-items: center;
+  height: var(--d-field);
+}
+.tb-stepper-value {
+  flex: 1 1 auto;
+  min-width: var(--space-8);
+  text-align: center;
+}
+.tb-stepper-btn {
+  flex: none;
+  width: var(--space-8);
+  height: var(--d-field);
+  padding: 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-h4-size);
+  font-weight: var(--font-weight-regular);
+  line-height: 1;
+  color: var(--color-text-default);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  touch-action: manipulation;
+  user-select: none;
+}
+.tb-stepper-btn:hover:not(:disabled),
+.tb-stepper-btn:active:not(:disabled),
+.tb-stepper-btn:focus-visible {
+  font-weight: var(--font-weight-bold);
+}
+.tb-stepper-btn:disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+@media (pointer: coarse) {
+  .tb-stepper-btn {
+    width: var(--space-12);
+  }
+}
+
+/* ------------------------------------------------- label tooltips (item 3) */
+
+.tb-labeltip {
+  position: relative;
+  display: inline-flex;
+}
+.tb-labeltip-trigger {
+  cursor: help;
+}
+.tb-labeltip-trigger:hover,
+.tb-labeltip-trigger:focus-visible {
+  color: var(--color-text-default);
+}
+.tb-labeltip-panel {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: var(--z-dropdown);
+  display: none;
+  flex-direction: column;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 280px;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-caption-size);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-style-caption-line-height);
+  letter-spacing: var(--font-style-caption-letter-spacing);
+  text-transform: none;
+  color: var(--color-text-default);
+  background: var(--color-bg-surface);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+.tb-labeltip:hover .tb-labeltip-panel,
+.tb-labeltip:focus-within .tb-labeltip-panel {
+  display: flex;
+}
+.tb-tip-name {
+  font-weight: var(--font-weight-semibold);
+}
+.tb-tip-key {
+  color: var(--color-text-default);
+}
+.tb-tip-facts,
+.tb-tip-text {
+  color: var(--color-text-muted);
+}
+.tb-tip-facts .num,
+.tb-tip-key .tb-move-abbr {
+  font-family: var(--font-family-mono);
+  font-size: var(--bf-mono-sm);
+}
+
+/* ------------------------------------------------------------- moves */
+
+.tb-move-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: var(--font-style-data-line-height);
+  font-family: var(--font-family-mono);
+  font-size: var(--bf-mono-sm);
+  line-height: var(--font-style-data-line-height);
+  letter-spacing: var(--font-style-data-letter-spacing);
+  color: var(--color-text-muted);
+}
+.tb-build-form .tb-move-cat {
+  color: var(--color-text-muted);
+}
+.tb-build-form .tb-move-event {
+  color: var(--color-text-muted);
+}
+.tb-build-form .tb-warn {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--font-style-caption-size);
+  color: var(--color-feedback-error-fg);
+}
+
+/* ------------------------------------------- spreads (ev-iv-strip.md, slider.md) */
+
+.tb-spreads {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fgap);
+}
+.tb-spread-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.tb-spread-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--d-field);
+}
+/* STAT · slider · number (56px, right-aligned). */
+.tb-spread-row {
+  display: grid;
+  grid-template-columns: var(--space-8) minmax(0, 1fr) 56px;
+  gap: var(--space-3);
+  align-items: center;
+  height: var(--d-row);
+}
+.tb-spread-row[data-skip-aware='true'] {
+  grid-template-columns: var(--space-8) auto minmax(0, 1fr) 56px;
+}
+.tb-spread-row[data-derived='true'] {
+  grid-template-columns: var(--space-8) 56px minmax(0, 1fr);
+}
+.tb-spread-row[data-locked='true'] .tb-spread-name {
+  color: var(--color-text-disabled);
+}
+.tb-spread-name {
+  font-size: var(--font-style-label-caps-size);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.tb-build-form .tb-spread-input {
+  height: var(--d-row);
+}
+.tb-spread-value {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-style-data-size);
+  letter-spacing: var(--font-style-data-letter-spacing);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-default);
+}
+.tb-spread-value[data-over='true'] {
+  color: var(--color-action-danger);
+}
+.tb-spread-note {
+  margin: 0;
+  font-size: var(--font-style-caption-size);
+  color: var(--color-text-muted);
+}
+/* Directly under the sliders: no rule, no extra band. */
+.tb-spread-total {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+
+/* The thin track and the filled oblong (slider.md, decided 2026-10-04). */
+.tb-range {
+  --track: 4px;
+  --thumb-w: 20px;
+  --thumb-h: 12px;
+  width: 100%;
+  height: var(--thumb-h);
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: grab;
+}
+.tb-range::-webkit-slider-runnable-track {
+  height: var(--track);
+  background: linear-gradient(
+    to right,
+    var(--color-data-fill) 0 var(--fill, 0%),
+    var(--color-data-track) var(--fill, 0%) 100%
+  );
+  border: none;
+  border-radius: var(--radius-full);
+}
+.tb-range::-moz-range-track {
+  height: var(--track);
+  background: var(--color-data-track);
+  border: none;
+  border-radius: var(--radius-full);
+}
+.tb-range::-moz-range-progress {
+  height: var(--track);
+  background: var(--color-data-fill);
+  border-radius: var(--radius-full);
+}
+.tb-range::-webkit-slider-thumb {
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  margin-top: calc((var(--track) - var(--thumb-h)) / 2);
+  appearance: none;
+  background: var(--color-text-default);
+  border: none;
+  border-radius: 6px;
+}
+.tb-range::-moz-range-thumb {
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  background: var(--color-text-default);
+  border: none;
+  border-radius: 6px;
+}
+.tb-range:focus,
+.tb-range:focus-visible {
+  outline: none;
+}
+.tb-range:focus-visible::-webkit-slider-thumb {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: 3px;
+}
+.tb-range:focus-visible::-moz-range-thumb {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: 3px;
+}
+.tb-range:active {
+  cursor: grabbing;
+}
+.tb-range:disabled {
+  cursor: not-allowed;
+}
+.tb-range:disabled::-webkit-slider-runnable-track {
+  background: var(--color-data-track);
+}
+.tb-range:disabled::-webkit-slider-thumb {
+  background: var(--color-text-disabled);
+}
+.tb-range:disabled::-moz-range-thumb {
+  background: var(--color-text-disabled);
+}
+
+/* ---------------------------------------------------------- team rail (item 8) */
+
+.tb-rail-team {
+  padding-bottom: var(--space-3);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-style-data-size);
+  line-height: var(--font-style-data-line-height);
+  letter-spacing: var(--font-style-data-letter-spacing);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.tb-card-rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.tb-card-rail-open {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+.tb-card-rail-open[data-inert='true'] {
+  cursor: default;
+}
+.tb-card-rail .tb-card-art {
+  flex: 0 0 64px;
+  height: 64px;
+}
+.tb-build-form .tb-card-rail .tb-held-item {
+  right: calc(var(--space-1) * -1);
+  bottom: 0;
+  width: var(--space-6);
+  height: var(--space-6);
+}
+.tb-rail-lines {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tb-rail-line {
+  font-size: var(--font-style-caption-size);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-style-caption-line-height);
+  letter-spacing: var(--font-style-caption-letter-spacing);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tb-rail-line.num {
+  font-family: var(--font-family-mono);
+  font-size: var(--bf-mono-sm);
+  letter-spacing: var(--font-style-data-letter-spacing);
+}
+/* The member open in the form: default text, semibold name. No box. */
+.tb-card-rail[data-current='true'] .tb-rail-line {
+  color: var(--color-text-default);
+}
+.tb-card-rail[data-current='true'] .tb-rail-line:first-child {
+  font-weight: var(--font-weight-semibold);
+}
+button.tb-card-rail-open:hover .tb-rail-line {
+  color: var(--color-text-default);
+}
+.tb-card-rail-blank .tb-card-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tb-rail-blank-icon {
+  color: var(--color-text-muted);
+}
+.tb-build-form .tb-shared-note {
+  font-size: var(--font-style-caption-size);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------- narrow: ≤900px container */
+
+@container (max-width: 900px) {
+  .tb-form-grid {
+    grid-template-areas:
+      'head'
+      'ident'
+      'main'
+      'dock'
+      'rail';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--fgap);
+  }
+  /* The portrait and its numbers side by side, so the stat bars do not run
+     the full width of a phone. */
+  .tb-identity {
+    display: grid;
+    grid-template-areas:
+      'art   stats'
+      'types stats';
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: var(--fgap);
+    padding-right: 0;
+    padding-bottom: var(--fgap);
+    border-right: none;
+    border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+  }
+  .tb-identity-art {
+    grid-area: art;
+  }
+  .tb-types-row {
+    grid-area: types;
+    align-self: start;
+  }
+  .tb-stats-block {
+    grid-area: stats;
+  }
+  .tb-build-form .tb-field-row,
+  .tb-moves {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* The empty cell that held Generation in the top-right corner. */
+  .tb-build-form .tb-field-spacer {
+    display: none;
+  }
+  .tb-spreads {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tb-form-dock-col {
+    justify-content: flex-start;
+  }
+  .tb-form-dock-col .tb-dock {
+    flex-direction: row;
+  }
+  .tb-form-dock-col .tb-dock-sep {
+    width: var(--border-width-thin);
+    height: var(--space-4);
+    margin: 0 var(--space-1);
+  }
+  .tb-rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    column-gap: var(--fgap);
+    padding-top: var(--fgap);
+    padding-left: 0;
+    border-top: var(--border-width-thin) solid var(--color-border-hairline);
+    border-left: none;
+  }
+  .tb-rail-team {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
 }
