@@ -98,10 +98,20 @@
       the card's own markup so the uppercase transform and the tracking are in
       the number.
 
-    260px (the 259px id line, rounded up so subpixel text is not clipped) covers both, which leaves the move name's `1fr` column about 158px
-    against the 112px it needs -- comfortably, as asked.
+    260px (the 259px id line, rounded up so subpixel text is not clipped) covers
+    both. The move name's room is NOT this width's job any more: the facts block
+    is `fit-content`, so its column is held open by --tb-move-name-min below.
   */
   --tb-slot-card: 260px;
+  /*
+    THE MOVE-NAME COLUMN'S FLOOR on a Team Display card, a measured constant: the
+    widest Gen 1-4 name with its prefix and event mark, "~ High Jump Kick*", is
+    97.6px at --tb-slot-mono, plus 12px of room (verify-team-builder "comfortably
+    fits"). Since the facts block became `fit-content` the column was exactly as
+    wide as the longest name ON THE CARD, so a card holding High Jump Kick had no
+    room at all -- 105.2px against 109.6px.
+  */
+  --tb-move-name-min: 110px;
   /* Tight leading again: seven lines of one fact each, and the page's
      inherited 26.1px would spend 183px of a grid row on them. 12px against
      10px text: tighter than the module's usual 17px because these seven lines
@@ -1650,6 +1660,7 @@
 }
 /* Type and category sit closer to the move name. */
 .tb-team-viewer .tb-card-full .tb-card-moves {
+  grid-template-columns: minmax(var(--tb-move-name-min), 1fr) max-content max-content;
   column-gap: 4px;
 }
 .tb-team-viewer .tb-card-full .tb-card-art {
