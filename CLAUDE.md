@@ -328,16 +328,20 @@ imperfections are already logged there deliberately.
   sprite group and the dex watermark stay centred on the CARD so the watermark's
   bleed is symmetrical.
 
-- **Team Building — Build Form's LAYOUT** (`.tb-form-*`, `.tb-identity*`,
-  `.tb-rail*` and `.tb-card-rail*` in `teamBuilder.css`). Frozen at the
-  right-rail density pass. Every number in it was measured against
-  something — the rail's 17px leading, the spread's 0.82 of the label
-  token, the 16px badge, the six cards ending level with the stat table's
-  Total row. Do not re-tune them as a drive-by, and do not "fix" the Gen 1
-  rail overhang; it is logged below as deliberate.
-
-  Its BEHAVIOUR was reopened after the freeze, on request, and rebuilt —
-  see "the unsaved member" below. The layout freeze still stands.
+- **Team Building — Build Form: the owner's nine changes** (2026-10-04, branch
+  `team-builder-v2`, pending review). A first, broader redesign was merged and
+  reverted the same day; this one applies ONLY the nine requested items and
+  leaves the rest of the screen as it was (native selects, label sizes, stat
+  table, identity panel). In short: no accent on the page; move type/category
+  abbreviations (NOR FIR WAT… / Phy Spe Sta, mono 11px); no ⓘ icons, the label
+  is the tooltip trigger (`ui/LabelTip`, `data-tip` + aria-describedby); EV Total
+  directly under the sliders with "⚠ N (over by X)"; "− value +" steppers
+  (`ui/NumberStepper`); regular-weight fields; underline focus on fields and a
+  ring on :focus-visible elsewhere; rail with 64px sprites and type-only
+  selection; one spacing variable `--fgap` (24 / Tight 16 / Roomy 32,
+  `?fgap=tight|roomy`). The old frozen layout notes (17px rail leading, rail
+  ending level with the Total row) no longer hold.
+  Its BEHAVIOUR (see "the unsaved member" below) is unchanged.
 
 ## Verification discipline
 
@@ -367,16 +371,19 @@ that isn't explicitly about design.)
 - **Base-stat bars are the one sanctioned reversal of "stats are a plain
   table".** Six values on one 0-255 scale where the spread is the fact.
   Scoped to that block; not a licence for progress bars anywhere else.
-- **`--accent` (red) has exactly four uses**: active tab/nav state,
-  binary state indicators, error/validation emphasis, and stat magnitude
-  (the filled portion of a base-stat bar on the species detail page).
-  The fourth was added during the Detail Page redo and deliberately
-  reverses an earlier "plain data table" decision, confirmed against the
-  real Figma prototype. Never decoration. App-wide, not namespaced.
-  The **gender-ratio bar's female share** is the second of those four, not
-  a fifth use — a gender split is a binary indicator, the same use that
-  covers caught/not-caught. Its male share is `--text-primary`, i.e. the
-  theme's version of "white", never a literal `#fff`.
+- **`--accent` (red) has exactly TWO uses**: the active nav item and the
+  selected tab — wayfinding, "you are here". **At most 2 accent elements per
+  screen.** Decided 2026-10-04 with the new design system
+  (`design-system/PRINCIPLES.md`), replacing the earlier four-use rule. The two
+  retired uses move to neutrals, via the design-system tokens:
+  - **emphasis** (binary state indicators such as caught/not-caught, and
+    error/validation emphasis) → `--color-text-default`;
+  - **lines** (the filled portion of a base-stat bar, the gender-ratio bar's
+    female share) → `--color-border-strong`. The male share and the track stay
+    neutral too, never a literal `#fff`.
+  Never decoration. App-wide, not namespaced. **Existing code still uses
+  `--accent` for the retired uses until each screen is migrated** — do not
+  "fix" one as a drive-by; migrate it with its screen.
 - **NOTHING gets a badge. No fill, no pill, no chip, anywhere.** "Type is
   data, not decoration" is now the whole rule rather than a rule with one
   exception: game names were badged for two passes, in a `--game-*` colour
@@ -391,13 +398,16 @@ that isn't explicitly about design.)
   `capitalize` and drops the tracking to 0.01em. Scoped, not global: the
   five pre-redesign dexes and the design-system reference page keep their
   own typography.
-- **`--font-numeric`** (Martian Mono primary, JetBrains Mono fallback,
-  both self-hosted) for tabular/functional numbers only (stat tables, EV
-  inputs, dex numbers in lists) — must lead the font stack, or a system
-  font silently wins (happened once already).
-- **`--font-body`** (IBM Plex Sans, self-hosted variable font) for
-  everything else, including decorative display numbers. This is now the
-  actual app-wide default, not just a per-component opt-in.
+- **Fonts: IBM Plex Sans for text, Martian Mono for values** (Manrope was tried
+  on 2026-10-04 and reverted the same day: it draws ~9% larger than Plex at the
+  same px, which broke the Team Display's levelled cap heights). The design
+  system's `--font-family-sans` / `--font-family-mono` carry these stacks
+  (source `design-system/tokens.json` -> `dist/tokens.css`, never hand-edit the
+  dist) and the old names are ALIASES of them in `src/design-tokens.css`:
+  `--font-body` = `var(--font-family-sans)`, `--font-numeric` =
+  `var(--font-family-mono)`. New code uses the design-system names.
+  Self-hosted, no CDN; the font must lead the stack, or a system font silently
+  wins (happened once already). Mono is for tabular/functional numbers only.
   **Roman AND italic faces are bundled** — four `@font-face` blocks, two
   subsets x two styles. The italic was missing for months and the failure
   was invisible: `font-style: italic` fell back to the Roman and Chrome
@@ -412,6 +422,30 @@ that isn't explicitly about design.)
 - Old (pre-redesign) modules — Itemdex, Abilitydex, Naturedex, Berrydex,
   Movedex — keep their own layout/components/colors untouched, but now
   inherit the app-wide Plex Sans default like everything else.
+
+## Excluded from migration
+
+The migration to the new design system (`design-system/`, tokens in
+`dist/tokens.css`) **does not touch these screens**. Decided 2026-10-04. They
+are the signed-off screens above, frozen as they are:
+
+- **Team Display** (`.tb-team-viewer`, the member cards and their sprite sizing)
+- **Coverage panels** (`Popover` placement, `.tb-popover`, `--tb-*` scale)
+- **Team Matchup defensive table** (Weak / Resist / Immune)
+- **Attacking coverage** (`OffencePanel`, `.tb-matchup`)
+- **Team Library card** (`--tb-compact-card`)
+
+Rules for working near them:
+- **Do not edit these files or their CSS** to migrate them.
+- **A shared component a frozen screen uses must not change in place.** If the
+  migration needs it different, add a NEW version beside it (e.g.
+  `FooV2`) used by migrated screens, and leave the old one for the frozen ones.
+- **Global values still reach them.** Any global token or font change lands on
+  these screens without editing them, and their measured constants
+  (`--tb-compact-card` 127px, `--tb-slot-card` 264px, the cap-height levelling)
+  were measured with Plex Sans and Martian Mono. Re-run
+  `npm run verify:team-builder` after any global change rather than assuming
+  they still hold (a Manrope trial failed 3 checks there).
 
 ## Type Coverage (Poképedia)
 
@@ -1162,17 +1196,8 @@ Rules that must not be re-derived:
   Gen 3-4 both only REDIRECT the move and the holder still takes normal damage;
   the immunity arrives in Gen 5, which is outside this app's scope.
 
-- **The Build Form's rail ends 17px below the left column in Gen 1 only.** The
-  six rail cards are set so the band ends level with the stat table's Total row,
-  and it does in Gen 2-4. Gen 1's table has FIVE stat rows, not six, so the left
-  column is one 18px row shorter and the rail overhangs it by that much. The
-  cards are sized by leading and padding, both of which are era-independent and
-  should stay that way; the fix would be a rail height derived from the
-  identity column's measured height, which CSS cannot express here (the grid
-  row the rail spans is sized by the form column, not by that panel, and every
-  percentage-height trick either inflates the row or collapses the rail). Do
-  NOT hardcode a per-generation card height -- it would drift the moment the
-  leading changes. Nothing is clipped or unreachable either way.
+- ~~**The Build Form's rail ends 17px below the left column in Gen 1 only.**~~
+  **OBSOLETE**: the rail is no longer measured against the stat table.
 
 - **`.tb`'s `data-generation` is the APP's generation, not the open build's.**
   Opening a Gen 3 build while the app is set to Gen 4 gives a module wrapper
@@ -1214,3 +1239,11 @@ Rules that must not be re-derived:
   throws (`Cannot read properties of null (reading 'color')`) — so the static
   scans after it (ports, shadows) do not currently run. Needs a decision on the
   Tools order before either the nav or the assertion changes.
+## Design system (design-system/)
+Source of truth: `design-system/`. Read `PRINCIPLES.md` and `PATTERNS.md` first, then the spec in `components/<name>.md` before building or changing any UI component.
+- Never hardcode colors, font sizes, weights, spacing or radii. Use CSS variables from `design-system/dist/tokens.css` (`var(--color-text-default)`, `var(--font-style-body-size)`, `var(--d-row)`…). Components use semantic tokens only, never primitives (`--color-accent-600` etc. are off limits in components).
+- Theme: `data-theme="light|dark"` on `<html>`; density: `data-density="airy|default|compact"` on the page root.
+- Rules that are easy to break: no hover backgrounds anywhere; no underlined text; ghost buttons only; underline text fields only; accent red = active nav item and selected tab only (max 2 per screen); color a type by its name text, not a chip; no ticks on stat bars; headings and UPPERCASE labels are regular weight.
+- Do not edit `dist/tokens.css` by hand. Change `tokens.json`, run `python3 design-system/scripts/build-tokens.py` then `python3 design-system/scripts/check-contrast.py` (must show `fails: 0`).
+- A design change = update the matching `components/*.md` + CHANGELOG entry in the same commit.
+- `design-system/preview.html` is a visual reference for every component and state (open it in a browser).

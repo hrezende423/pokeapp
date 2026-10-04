@@ -19,7 +19,7 @@
      resolves regardless of stylesheet import order. */
   --sans: var(--font-body);
   --heading: var(--font-body);
-  --mono: ui-monospace, Consolas, monospace;
+  --mono: var(--font-family-mono);
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;

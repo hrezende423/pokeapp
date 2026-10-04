@@ -31,7 +31,6 @@
  *   IV sliders, 0-31, with no total, because IVs have no budget.
  */
 
-import { IconMinus, IconPlus } from '@tabler/icons-react'
 import { STAT_LABEL } from '../buildFacts'
 import { spreadStatKeys, statKeysForGeneration, type Build } from '../model'
 import {
@@ -118,14 +117,20 @@ export function SpreadControls({
           </div>
         ))}
         {modern && (
-          <div className="tb-spread-total">
+          /*
+            DIRECTLY UNDER THE SLIDERS, no rule above it (owner's item 4). Over
+            the 510 budget it says so in words and a glyph as well as colour --
+            "⚠ 512 (over by 2)" -- never colour alone. The sliders clamp to the
+            budget, so only a build stored over it can reach that state.
+          */
+          <div className="tb-spread-total" aria-live="polite">
             <span className="tb-field-label">Total</span>
             <span
               className="tb-spread-value num"
               data-over={total > MAX_EV_TOTAL ? 'true' : undefined}
               data-testid="tb-ev-total"
             >
-              {total}
+              {total > MAX_EV_TOTAL ? `⚠ ${total} (over by ${total - MAX_EV_TOTAL})` : total}
             </span>
           </div>
         )}
@@ -244,7 +249,8 @@ export function SpreadControls({
  * The spread slider.
  *
  * The FILLED PORTION IS DRAWN BY THIS COMPONENT, not by `accent-color`. The
- * design calls for a red run-up, a grey remainder and an oblong white thumb;
+ * design calls for a neutral run-up (owner's item 1: no accent), a grey
+ * remainder and an oblong white thumb;
  * `accent-color` gives you a round thumb and one browser's idea of a track, and
  * only Firefox fills the run-up at all. So the percentage is handed to CSS as
  * `--fill` and the track is a gradient. See `.tb-range` in teamBuilder.css.
@@ -292,21 +298,23 @@ function Stepper({
     <span className="tb-stepper">
       <button
         type="button"
+        className="tb-stepper-btn"
         aria-label="Decrease"
         disabled={disabled}
         data-testid={testId ? `${testId}-minus` : undefined}
         onClick={() => onStep(-1)}
       >
-        <IconMinus size={13} stroke={1.5} />
+        −
       </button>
       <button
         type="button"
+        className="tb-stepper-btn"
         aria-label="Increase"
         disabled={disabled}
         data-testid={testId ? `${testId}-plus` : undefined}
         onClick={() => onStep(1)}
       >
-        <IconPlus size={13} stroke={1.5} />
+        +
       </button>
     </span>
   )

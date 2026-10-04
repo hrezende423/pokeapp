@@ -1310,32 +1310,50 @@ try {
     natures.slice(1, 4).join(' | '),
   )
 
-  // ---- info tips exist and carry real facts
-  const tip = await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="tb-move-info-0"] .tb-infotip-panel')
-    return el ? el.textContent.replace(/\s+/g, ' ').trim() : null
+  // ---- label tooltips (owner's item 3): no ⓘ icons; the LABEL is the focusable
+  //      trigger, the text in data-tip and in its aria-describedby target
+  const tipInfo = await page.evaluate(() => {
+    const t = document.querySelector('[data-testid="tb-move-info-0"]')
+    const d = t && document.getElementById(t.getAttribute('aria-describedby'))
+    return t
+      ? {
+          tip: t.dataset.tip.replace(/\s+/g, ' '),
+          tabIndex: t.tabIndex,
+          described: d?.textContent === t.dataset.tip,
+          hidden: getComputedStyle(t, '::after').display,
+          icons: document.querySelectorAll(
+            '[data-testid="tb-build-form"] .tabler-icon-info-circle, .tb-infotip',
+          ).length,
+        }
+      : null
   })
-  log(`  move tip: ${tip}`)
+  log(`  move tip: ${tipInfo?.tip}`)
   check(
     "the move tooltip carries the selected move's power, PP and accuracy",
-    tip != null &&
-      /Razor Leaf/.test(tip) &&
-      /Power 55/.test(tip) &&
-      /PP 25/.test(tip) &&
-      /Acc 95%/.test(tip),
-    tip ?? 'absent',
+    tipInfo != null &&
+      /Razor Leaf/.test(tipInfo.tip) &&
+      /Power 55/.test(tipInfo.tip) &&
+      /PP 25/.test(tipInfo.tip) &&
+      /Acc 95%/.test(tipInfo.tip),
+    tipInfo?.tip ?? 'absent',
   )
   check(
-    'and the item and ability fields have one too',
+    'and the item and ability labels have one too',
     (await page.$$('[data-testid="tb-item-info"]')).length === 1 &&
       (await page.$$('[data-testid="tb-ability-info"]')).length === 1,
   )
-  const tipHidden = await page.evaluate(
-    () =>
-      getComputedStyle(document.querySelector('[data-testid="tb-move-info-0"] .tb-infotip-panel'))
-        .display,
+  check('the tooltip is hidden until hovered', tipInfo?.hidden === 'none', tipInfo?.hidden)
+  check(
+    'the label itself is the trigger: tabindex 0, aria-describedby carries the text, no ⓘ icons',
+    tipInfo?.tabIndex === 0 && tipInfo.described && tipInfo.icons === 0,
+    JSON.stringify(tipInfo && { t: tipInfo.tabIndex, d: tipInfo.described, i: tipInfo.icons }),
   )
-  check('the tooltip is hidden until hovered', tipHidden === 'none', tipHidden)
+  await page.focus('[data-testid="tb-move-info-0"]')
+  const tipOnFocus = await page.evaluate(
+    () => getComputedStyle(document.querySelector('[data-testid="tb-move-info-0"]'), '::after').display,
+  )
+  check('and keyboard focus opens it, the same as hover', tipOnFocus !== 'none', tipOnFocus)
+  await page.keyboard.press('Escape')
 
   // ---- the rail delete offers three answers, and each does what it says
   await goTo('my-teams')
@@ -1495,6 +1513,8 @@ try {
       railBottom: round(rail.getBoundingClientRect().bottom),
       lastCardBottom: round(cards.at(-1).getBoundingClientRect().bottom),
       totalRowBottom: round(total.getBoundingClientRect().bottom),
+      art: round(cards[3].querySelector('.tb-card-art').getBoundingClientRect().height),
+      families: lines.map((l) => getComputedStyle(l).fontFamily.split(',')[0].replace(/['"]/g, '')),
       badge: {
         w: round(hb.width),
         h: round(hb.height),
@@ -1554,10 +1574,17 @@ try {
     density.labelFirst && density.railBottom === density.lastCardBottom,
     `label first: ${density.labelFirst}, rail bottom ${density.railBottom} vs last card ${density.lastCardBottom}`,
   )
+  /* REDESIGN item 8 replaced "six cards end level with the Total row": the
+     sprites are 64px now, so the rail is a list in its own right rather than a
+     band measured against the identity column. */
   check(
-    "six cards end level with the stat table's Total row",
-    Math.abs(density.lastCardBottom - density.totalRowBottom) <= 4,
-    `${density.lastCardBottom} vs ${density.totalRowBottom}`,
+    'rail sprites are 64px, the text 12px and the EV line mono at 11px',
+    density.art === 64 &&
+      density.fontSizes[0] === '12px' &&
+      density.fontSizes[1] === '12px' &&
+      density.fontSizes[2] === '11px' &&
+      density.families[2] === 'Martian Mono',
+    `art ${density.art}, ${density.fontSizes.join('/')} ${density.families[2]}`,
   )
   check(
     'the stat block carries no "Stats" title over the header row that already says Stat',
@@ -1585,6 +1612,9 @@ try {
     columns.rail <= columns.main,
     `rail ${columns.rail} vs main ${columns.main}`,
   )
+  /* The redesign's larger rail and 24px rhythm make the FORM taller than a
+     720px window, so the page may scroll there; what must still hold is that
+     the whole team is visible without scrolling. */
   const shortViewport = await (async () => {
     const before = page.viewportSize()
     await page.setViewportSize({ width: 1600, height: 720 })
@@ -1605,8 +1635,8 @@ try {
     return out
   })()
   check(
-    'and on a 720px window all six cards are on screen with nothing to scroll',
-    shortViewport.overflow === 0 && shortViewport.lastVisible,
+    'and on a 720px window all six cards are on screen',
+    shortViewport.lastVisible,
     `overflow ${shortViewport.overflow}, last card visible ${shortViewport.lastVisible}`,
   )
 
@@ -3060,40 +3090,46 @@ try {
   await page.waitForTimeout(400)
 
   /*
-    ---- the selected slot is OUTLINED, and it has to be an outline
+    ---- the selected slot is marked by TYPE, not by a box (redesign item 8)
 
-    A border takes part in layout, so the ring appearing would shift the whole
-    rail -- which is measured against the stat table's Total row in 8b. The
-    outline is declared on every card, transparent, and only its colour
-    changes, which is also what lets it fade rather than snap.
+    The outline it used to carry is gone: the member open in the form is set in
+    text.default with a semibold first line, every other member is muted, and no
+    card draws an outline, a border box or a background.
   */
   const rings = await page.evaluate(() =>
     [...document.querySelectorAll('.tb-card-rail')].map((c) => {
       const cs = getComputedStyle(c)
+      const first = c.querySelector('.tb-rail-line')
+      const fcs = first ? getComputedStyle(first) : null
       return {
         current: c.dataset.current === 'true',
-        width: cs.outlineWidth,
-        transparent: /rgba\(0, 0, 0, 0\)|transparent/.test(cs.outlineColor),
-        transitions: cs.transitionProperty,
+        outline: cs.outlineStyle,
+        background: cs.backgroundColor,
         border: cs.borderTopWidth,
+        weight: fcs?.fontWeight,
+        color: fcs?.color,
       }
     }),
   )
   const marked = rings.filter((r) => r.current)
   const plain = rings.filter((r) => !r.current)
   check(
-    'the slot being edited is the only one with a visible ring, and every card reserves the same width',
-    marked.length === 1 &&
-      !marked[0].transparent &&
-      plain.length === 5 &&
-      plain.every((r) => r.transparent) &&
-      rings.every((r) => r.width === marked[0].width),
-    `marked=${JSON.stringify(marked)} widths=${[...new Set(rings.map((r) => r.width))].join('/')}`,
+    'no rail card draws an outline, a box or a background -- the selected one included',
+    rings.every(
+      (r) =>
+        r.outline === 'none' &&
+        r.border === '0px' &&
+        /rgba\(0, 0, 0, 0\)|transparent/.test(r.background),
+    ),
+    JSON.stringify(rings.map((r) => [r.outline, r.border, r.background])),
   )
   check(
-    'and it fades in rather than snapping, without a border that would move the rail',
-    marked[0].transitions.includes('outline-color') && rings.every((r) => r.border === '0px'),
-    `${marked[0].transitions} | border ${marked[0].border}`,
+    'the selected member is semibold in the default text colour, every other one regular and muted',
+    marked.length === 1 &&
+      marked[0].weight === '600' &&
+      plain.length === 5 &&
+      plain.every((r) => r.weight === '400' && r.color !== marked[0].color),
+    JSON.stringify(rings.map((r) => [r.current, r.weight, r.color])),
   )
 
   // =====================================================================
