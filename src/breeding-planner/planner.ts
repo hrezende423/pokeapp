@@ -233,6 +233,19 @@ export function hatchlingFor(game: Game, line: Line, moveId: number): Species {
   return holders.includes(line.root) ? line.root : (holders[0] ?? line.root)
 }
 
+/** The member that actually stands in the daycare: Pikachu, never the Undiscovered Pichu. */
+export const fatherOf = (line: Line): Species => line.fathers[0] ?? line.root
+
+/**
+ * The source's father: the learner itself when it can breed, otherwise the first
+ * breedable member it evolves into (Pichu learns it, the Pikachu it becomes breeds).
+ */
+export function sourceFather(k: Knower, line: Line): Species {
+  if (line.fathers.includes(k.species)) return k.species
+  const from = line.members.indexOf(k.species)
+  return line.fathers.find((f) => line.members.indexOf(f) > from) ?? fatherOf(line)
+}
+
 const HOW_RANK = { level: 0, machine: 1, tutor: 2, sketch: 3 } as const
 
 export function howRank(how: How): number {

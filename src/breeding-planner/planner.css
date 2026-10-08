@@ -502,9 +502,6 @@ button {
 .bp-section-head button:hover .bp-section-summary {
   font-weight: var(--font-weight-semibold);
 }
-.bp-section.is-open .bp-section-summary {
-  font-weight: var(--font-weight-semibold);
-}
 .bp-chevron {
   color: var(--color-text-muted);
   transition: transform var(--motion-duration-fast) var(--motion-easing-standard);
@@ -537,4 +534,97 @@ button {
 }
 .bp-step > .bp-caps {
   color: var(--color-text-muted);
+}
+
+/* ---------- chain drawing (evolution-chart vocabulary, see chainArt.ts) ---------- */
+
+.bp-chain {
+  display: grid;
+  row-gap: var(--space-2);
+  padding: var(--space-4) 0 var(--space-2);
+  border-bottom: 1px solid var(--color-border-hairline);
+}
+.bp-chain .bp-section-head button {
+  border-bottom: 0;
+  min-height: var(--d-field);
+}
+
+/* Narrow screens scroll the drawing sideways rather than shrinking it past legible. */
+.bp-art-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* 1 raw unit = at most 1px, so a two-stage chain does not blow up to the column. */
+.bp-art {
+  position: relative;
+  width: 100%;
+  max-width: calc(var(--bp-art-w) * 1px);
+  min-width: calc(var(--bp-art-w) * 0.62px);
+}
+
+.bp-art-node {
+  position: absolute;
+  z-index: 2;
+}
+.bp-art-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The wedge: light band widening to the head, three darker chevrons on it. */
+.bp-art-arrow {
+  position: absolute;
+  overflow: visible;
+  color: var(--color-text-muted);
+  z-index: 1;
+}
+.bp-art-wedge {
+  opacity: 0.3;
+}
+.bp-art-chevron {
+  fill: currentColor;
+  opacity: 0.45;
+}
+
+.bp-art-cond,
+.bp-art-label {
+  position: absolute;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  row-gap: 2px;
+  white-space: nowrap;
+  z-index: 3;
+  font-size: var(--font-style-caption-size);
+  line-height: var(--font-style-caption-line-height);
+}
+.bp-art-cond {
+  transform: translate(-50%, -50%);
+}
+.bp-art-cond-row,
+.bp-art-sub {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-1);
+}
+.bp-art-cond-row {
+  font-size: var(--font-style-label-caps-size);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+}
+.bp-art-cond-sub {
+  color: var(--color-text-muted);
+}
+.bp-art-name {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Item sprites are 30px game icons: nearest-neighbour, like the evolution chart. */
+.bp-art-icon {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+  flex: none;
 }

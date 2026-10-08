@@ -28,10 +28,13 @@ import {
   breedingGames,
   breedingsFor,
   eggMovesOf,
+  fatherOf,
   hatchlingFor,
   loadGame,
   planMove,
+  sourceFather,
 } from './planner'
+import { renderChainArt } from './chainArt'
 import type { Chain, EggMove, Game, How, Knower, Line, Plan } from './planner'
 
 interface State {
@@ -107,19 +110,6 @@ function howText(how: How): string {
     case 'sketch':
       return 'Sketches it (needs to see it used)'
   }
-}
-
-/** The member that actually stands in the daycare: Pikachu, never the Undiscovered Pichu. */
-const fatherOf = (line: Line): Species => line.fathers[0] ?? line.root
-
-/**
- * The source's father: the learner itself when it can breed, otherwise the first
- * breedable member it evolves into (Pichu learns it, the Pikachu it becomes breeds).
- */
-function sourceFather(k: Knower, line: Line): Species {
-  if (line.fathers.includes(k.species)) return k.species
-  const from = line.members.indexOf(k.species)
-  return line.fathers.find((f) => line.members.indexOf(f) > from) ?? fatherOf(line)
 }
 
 function knowerText(k: Knower, line: Line): string {
@@ -246,21 +236,24 @@ function renderStep(g: Game, c: Chain, i: number, moveId: number, moveName: stri
     </li>`
 }
 
-function renderChain(g: Game, c: Chain, n: number, open: boolean, moveId: number, moveName: string): string {
+function renderChain(g: Game, c: Chain, n: number, moveId: number, moveName: string): string {
   const steps = c.lines
     .slice(0, -1)
     .map((_, i) => renderStep(g, c, i, moveId, moveName, i === c.lines.length - 2))
     .join('')
+  const breedings = c.lines.length - 1
   return `
-    <section class="bp-section${open ? ' is-open' : ''}">
+    <section class="bp-section bp-chain" aria-label="Chain ${n + 1}: ${chainSummary(g, c, moveId)}">
+      <p class="bp-caps bp-muted">Chain ${n + 1} · ${breedings} breeding${breedings === 1 ? '' : 's'}</p>
+      ${renderChainArt(g, c, moveId, String(n))}
       <h4 class="bp-section-head">
-        <button type="button" aria-expanded="${open}" data-chain="${n}">
-          <span class="bp-caps">Chain ${n + 1}</span>
-          <span class="bp-section-summary">${chainSummary(g, c, moveId)}</span>
+        <button type="button" aria-expanded="false" data-chain="${n}">
+          <span class="bp-caps">Steps</span>
+          <span class="bp-section-summary bp-muted">Father, mother and egg for each breeding</span>
           ${CHEVRON}
         </button>
       </h4>
-      <ol class="bp-steps" ${open ? '' : 'hidden'}>${steps}</ol>
+      <ol class="bp-steps" hidden>${steps}</ol>
     </section>`
 }
 
@@ -318,7 +311,7 @@ function renderPlan(g: Game, line: Line, target: Species, entry: MoveEntry | und
         ['Fewest breedings', `<span class="bp-mono">${plan.breedings}</span>`],
         ['Chains', `<span class="bp-mono">${plan.chainCount}</span>`],
       ])}
-      <div class="bp-chain-list">${shown.map((c, i) => renderChain(g, c, i, i === 0, entry.egg.moveId, moveName)).join('')}</div>
+      <div class="bp-chain-list">${shown.map((c, i) => renderChain(g, c, i, entry.egg.moveId, moveName)).join('')}</div>
       ${capped}${more}`
   }
 
