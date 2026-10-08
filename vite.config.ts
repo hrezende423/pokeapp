@@ -22,6 +22,17 @@ const PARTITION_PATTERN = new RegExp(`/${DATA_DIR}/(${PARTITION_DIRS.join('|')})
 // https://vite.dev/config/
 export default defineConfig({
   base: BASE,
+  build: {
+    rollupOptions: {
+      // breeding-planner.html is a standalone page outside the app shell. As a
+      // build input its HTML lands in dist and the precache, so the service
+      // worker serves it instead of falling back to the app's index.html.
+      input: {
+        main: 'index.html',
+        breedingPlanner: 'breeding-planner.html',
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

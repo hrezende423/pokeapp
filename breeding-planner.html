@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Plan the chain of fathers that passes an egg move down to a Pokémon, Gen 2–4." />
+    <title>Breeding chain planner</title>
+  </head>
+  <body>
+    <div class="bp" data-density="compact" data-layout="page">
+      <header class="bp-head" data-layout="head">
+        <p class="bp-caps bp-muted">pokeapp · standalone preview</p>
+        <h1 class="bp-title">Breeding chain planner</h1>
+        <p class="bp-lede">
+          Find the shortest line of fathers that carries an egg move down to your Pokémon. In Gen 2–4
+          an egg move passes from the father only, so each breeding needs a male that already knows it.
+        </p>
+      </header>
+
+      <div class="bp-controls" data-layout="controls">
+        <label class="bp-field">
+          <span class="bp-caps bp-muted">Game</span>
+          <span class="bp-select">
+            <select id="bp-game"></select>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6l6 -6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </span>
+        </label>
+        <div class="bp-field">
+          <label class="bp-caps bp-muted" for="bp-species">Pokémon</label>
+          <input
+            id="bp-species"
+            class="bp-input"
+            list="bp-species-options"
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="bp-species-error"
+          />
+          <datalist id="bp-species-options"></datalist>
+          <p id="bp-species-error" class="bp-error" aria-live="polite"></p>
+        </div>
+        <div class="bp-field bp-field-switch">
+          <button id="bp-sketch" type="button" role="switch" aria-checked="false" class="bp-switch">
+            <span class="bp-switch-track" aria-hidden="true"><span class="bp-switch-thumb"></span></span>
+            <span>Smeargle may Sketch</span>
+          </button>
+        </div>
+      </div>
+
+      <p id="bp-status" class="bp-status" role="status"></p>
+
+      <main id="bp-body" class="bp-body" data-layout="body">
+        <aside id="bp-identity" class="bp-identity" aria-label="Pokémon"></aside>
+        <section id="bp-moves" class="bp-moves" aria-label="Egg moves"></section>
+        <section id="bp-plan" class="bp-plan" aria-label="Chain"></section>
+      </main>
+
+      <footer class="bp-foot">
+        <p class="bp-muted bp-small">
+          Data from PokéAPI through the pokeapp bundle. A detached preview, not linked from the app.
+          <a class="bp-link" href="./">Open pokeapp</a>
+        </p>
+      </footer>
+    </div>
+    <script type="module" src="/src/breeding-planner/main.ts"></script>
+  </body>
+</html>
