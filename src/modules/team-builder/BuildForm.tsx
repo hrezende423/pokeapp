@@ -789,7 +789,7 @@ function BuildFormFields({
 
   const genderOptions = facts ? genderOptionsFor(facts.species) : null
   const abilityOptions = facts ? abilityOptionsFor(facts.variety, generation) : []
-  const itemOptions = itemOptionsFor(generation)
+  const itemOptions = itemOptionsFor(generation, build.itemId)
   const natureOptions = natureOptionsFor(generation)
   const hp = generation >= 2 ? hiddenPower(generation, build.individual) : null
 
@@ -1403,19 +1403,11 @@ function BuildFormFields({
           data-layout="rail"
           data-testid="tb-rail"
           data-state={railTeam ? 'attached' : 'loose'}
+          /* NO HEADING (owner, 2026-10-07): the team's "#006" above the cards
+             cost the sixth card its place on screen. The id stays on the rail as
+             data, for the suites, and is not drawn. */
+          data-team={railTeam ? teamUiId(data, railTeam.id) : undefined}
         >
-          {/*
-            THE TEAM'S ID HEADS THE RAIL, it does not trail it. Under the last
-            card it was the one thing hanging below the left column, so the two
-            columns ended 34px apart however tightly the cards were set. At the
-            top it is what Team Viewer already shows an ID as -- a heading -- and
-            the band of cards now ends level with the stat table's Total row.
-          */}
-          {railTeam && (
-            <span className="tb-rail-team num" data-testid="tb-rail-team">
-              {teamUiId(data, railTeam.id)}
-            </span>
-          )}
           {/*
             THE WHOLE TEAM, INCLUDING THE ONE OPEN IN THE FORM. The rail used to
             filter the current build out, which meant the reader could not see

@@ -17,12 +17,14 @@
  * SKIP-AWARE STEPPER over {2,3,6,7,10,11,14,15} -- a constrained continuous slider
  * would let a drag land on 4 and silently drop shininess.
  *
- * EVERY ROW IS `name | number box | slider`, and that Attack row is the ONLY one
- * that still carries -/+ buttons. They used to be on all of them; a typed number
- * box does the same job with one control instead of two, and the buttons stepped
- * by 4 while the box stepped by 1, so the two disagreed. The shiny-locked Attack
- * DV survives because its legal values are a set, not a range: "next" is not
- * "+1" there, and no number box or slider can say so.
+ * EVERY ROW IS `name | − value + | slider`, the design system's stepper
+ * (ui/NumberStepper, the one Level and Friendship use), with its signs drawn ONLY
+ * while the row is hovered or has focus (owner, 2026-10-07) -- their room is kept
+ * when hidden, so nothing moves when they appear. They step by 1, the same as the
+ * typed box and the arrow keys; an earlier set stepped by 4 and disagreed with
+ * the box. The shiny-locked Attack DV keeps its signs always on, because its
+ * legal values are a set, not a range: "next" is not "+1" there, and only the
+ * signs can say so.
  *
  * GEN 3-4 -- "EV" and "IV":
  *   EV sliders, 0-252 each, with a running total HARD-CAPPED at 510. The cap is
@@ -32,6 +34,7 @@
  */
 
 import { STAT_LABEL } from '../buildFacts'
+import { NumberStepper } from './NumberStepper'
 import { spreadStatKeys, statKeysForGeneration, type Build } from '../model'
 import {
   MAX_DV,
@@ -80,6 +83,18 @@ export function SpreadControls({
     onEffort({ ...build.effort, [key]: clamp(value, 0, MAX_STAT_EXP) })
   }
 
+  /* How high this stat's EV can go: 252, or what the 510 budget leaves. Never
+     below the stored value, so a build saved over budget is not clamped by
+     merely being shown. Gen 1-2 Stat Exp has no shared budget. */
+  const effortRoom = (key: StatKey) => {
+    if (!modern) return MAX_STAT_EXP
+    const value = build.effort[key] ?? 0
+    const others = effortKeys
+      .filter((k) => k !== key)
+      .reduce((sum, k) => sum + (build.effort[k] ?? 0), 0)
+    return Math.max(value, Math.min(MAX_EV, MAX_EV_TOTAL - others))
+  }
+
   const setIndividual = (key: StatKey, value: number) => {
     onIndividual({ ...build.individual, [key]: clamp(value, 0, modern ? MAX_IV : MAX_DV) })
   }
@@ -93,15 +108,17 @@ export function SpreadControls({
         {effortKeys.map((key) => (
           <div className="tb-spread-row" key={key} data-stat={key}>
             <span className="tb-spread-name">{STAT_LABEL[key]}</span>
-            <input
-              type="number"
-              className="tb-number tb-spread-input"
+            <NumberStepper
+              className="tb-spread-stepper"
+              label={`${STAT_LABEL[key]} ${modern ? 'EV' : 'Stat Exp'}`}
               min={0}
-              max={modern ? MAX_EV : MAX_STAT_EXP}
-              step={1}
+              /* The budget left, not 252: "+" goes dead at 510 instead of
+                 offering a step the clamp would swallow. */
+              max={effortRoom(key)}
               value={build.effort[key] ?? 0}
-              data-testid={`tb-ev-${key}-value`}
-              onChange={(e) => setEffort(key, Number(e.target.value))}
+              testId={`tb-ev-${key}-value`}
+              buttonTestId={`tb-ev-${key}`}
+              onChange={(next) => setEffort(key, next)}
             />
             {modern ? (
               <Range
@@ -199,31 +216,23 @@ export function SpreadControls({
               data-skip-aware={skipAware || undefined}
             >
               <span className="tb-spread-name">{STAT_LABEL[key]}</span>
-              <input
-                type="number"
-                className="tb-number tb-spread-input"
+              {/*
+                Under the Gen 2 shiny lock the legal Attack DVs are
+                {2,3,6,7,10,11,14,15}, so "next value" is not "value + 1": the
+                signs step the set in order, and are always drawn on that row.
+              */}
+              <NumberStepper
+                className="tb-spread-stepper"
+                label={`${STAT_LABEL[key]} ${modern ? 'IV' : 'DV'}`}
                 min={0}
                 max={modern ? MAX_IV : MAX_DV}
-                step={1}
                 value={value}
                 disabled={locked}
-                data-testid={`tb-iv-${key}-value`}
-                onChange={(e) => setIndividual(key, Number(e.target.value))}
+                next={skipAware ? nextShinyAttackDv : undefined}
+                testId={`tb-iv-${key}-value`}
+                buttonTestId={`tb-iv-${key}`}
+                onChange={(next) => setIndividual(key, next)}
               />
-              {/*
-                THE ONE SURVIVING STEPPER. Every other row lost its -/+ buttons to
-                the number box beside it, which does the same job with one control
-                instead of two. This row cannot: under the Gen 2 shiny lock the
-                legal Attack DVs are {2,3,6,7,10,11,14,15}, so "next value" is not
-                "value + 1" and neither a typed number nor a dragged slider can
-                express it. Stepping the set in order is the only honest control.
-              */}
-              {skipAware && (
-                <Stepper
-                  onStep={(dir) => setIndividual(key, nextShinyAttackDv(value, dir))}
-                  testId={`tb-iv-${key}`}
-                />
-              )}
               <Range
                 max={modern ? MAX_IV : MAX_DV}
                 value={value}
@@ -282,41 +291,6 @@ function Range({
       data-testid={testId}
       onChange={(e) => onChange(Number(e.target.value))}
     />
-  )
-}
-
-function Stepper({
-  onStep,
-  testId,
-  disabled = false,
-}: {
-  onStep: (direction: 1 | -1) => void
-  testId?: string
-  disabled?: boolean
-}) {
-  return (
-    <span className="tb-stepper">
-      <button
-        type="button"
-        className="tb-stepper-btn"
-        aria-label="Decrease"
-        disabled={disabled}
-        data-testid={testId ? `${testId}-minus` : undefined}
-        onClick={() => onStep(-1)}
-      >
-        −
-      </button>
-      <button
-        type="button"
-        className="tb-stepper-btn"
-        aria-label="Increase"
-        disabled={disabled}
-        data-testid={testId ? `${testId}-plus` : undefined}
-        onClick={() => onStep(1)}
-      >
-        +
-      </button>
-    </span>
   )
 }
 

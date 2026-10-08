@@ -6,7 +6,15 @@
   align-items: center;
   gap: 6px;
 }
+/*
+  THE NAME CARRIES THE TRIGGER'S BASELINE. An inline-flex box takes its baseline
+  from its first item, which is the avatar -- and an <img>'s baseline is its
+  bottom edge, so the whole trigger sat that image on the bar's text baseline,
+  4px above Search/Filter beside it. A baseline-aligned item wins that, and the
+  name is the same 18px tall as the avatar, so nothing moves inside the trigger.
+*/
 .account-name {
+  align-self: baseline;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;

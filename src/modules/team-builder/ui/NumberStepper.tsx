@@ -12,6 +12,9 @@
  * pointer path and the keyboard path are kept apart -- pointerdown steps, a click
  * only steps when it came from the keyboard (`detail === 0`) -- or every mouse
  * press would step twice.
+ *
+ * `next` REPLACES "+1" where the legal values are a set, not a range: the Gen 2
+ * shiny-locked Attack DV steps {2,3,6,7,10,11,14,15} (see SpreadControls).
  */
 
 import { useEffect, useRef } from 'react'
@@ -25,15 +28,26 @@ export function NumberStepper({
   max,
   onChange,
   testId,
+  buttonTestId = testId,
   label,
+  next,
+  disabled = false,
+  className,
 }: {
   value: number
   min: number
   max: number
   onChange: (next: number) => void
+  /** On the typed field. */
   testId?: string
+  /** Prefix of the two buttons' ids (`-minus` / `-plus`); defaults to `testId`. */
+  buttonTestId?: string
   /** Accessible name for the two buttons ("Level" -> "Decrease Level"). */
   label: string
+  /** The value one step from `from`; defaults to `from + dir`. */
+  next?: (from: number, dir: 1 | -1) => number
+  disabled?: boolean
+  className?: string
 }) {
   const latest = useRef(value)
   useEffect(() => {
@@ -49,9 +63,9 @@ export function NumberStepper({
   useEffect(() => stop, [])
 
   const step = (dir: 1 | -1) => {
-    const next = clamp(latest.current + dir)
-    latest.current = next
-    onChange(next)
+    const to = clamp(next ? next(latest.current, dir) : latest.current + dir)
+    latest.current = to
+    onChange(to)
   }
   const start = (dir: 1 | -1) => {
     step(dir)
@@ -67,8 +81,8 @@ export function NumberStepper({
       type="button"
       className="tb-stepper-btn"
       aria-label={`${dir < 0 ? 'Decrease' : 'Increase'} ${label}`}
-      disabled={dir < 0 ? value <= min : value >= max}
-      data-testid={testId ? `${testId}-${dir < 0 ? 'minus' : 'plus'}` : undefined}
+      disabled={disabled || (dir < 0 ? value <= min : value >= max)}
+      data-testid={buttonTestId ? `${buttonTestId}-${dir < 0 ? 'minus' : 'plus'}` : undefined}
       onPointerDown={(e) => {
         if (e.button !== 0) return
         e.preventDefault()
@@ -86,7 +100,7 @@ export function NumberStepper({
   )
 
   return (
-    <span className="tb-stepper" role="group" aria-label={label}>
+    <span className={className ? `tb-stepper ${className}` : 'tb-stepper'} role="group" aria-label={label}>
       {sign(-1)}
       <input
         type="number"
@@ -95,6 +109,7 @@ export function NumberStepper({
         min={min}
         max={max}
         value={value}
+        disabled={disabled}
         aria-label={label}
         data-testid={testId}
         onChange={(e) => onChange(clamp(Number(e.target.value) || min))}

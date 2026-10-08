@@ -39,7 +39,7 @@ import {
   typeEffectivenessAgainst,
   typesInGeneration,
 } from '../../data'
-import type { Species, StatEntry, Variety } from '../../data'
+import type { Item, Species, StatEntry, Variety } from '../../data'
 import { itemArtworkUrl, itemIconUrl } from '../../data/itemArtwork'
 import { resolveMoveTypeNameForGeneration } from '../../data/moveEra'
 import type { Build, Gender } from './model'
@@ -169,10 +169,61 @@ export function natureOptionsFor(generation: number): Option[] {
     .sort((a, b) => a.label.localeCompare(b.label))
 }
 
-/** Items that actually exist in this generation -- not the whole bag. */
-export function itemOptionsFor(generation: number): Option[] {
+/**
+ * Item categories whose items DO something when held in battle. Everything else
+ * in the bag -- medicine, balls, key items, TMs, mail, evolution stones, contest
+ * scarves, and the "training" items whose effect lands after the battle (Exp.
+ * Share, Lucky Egg, Amulet Coin, Soothe Bell, Cleanse Tag) -- is left out.
+ * The power items and Macho Brace stay: they halve the holder's Speed in battle.
+ */
+const BATTLE_HELD_CATEGORIES = new Set([
+  'held-items',
+  'choice',
+  'type-enhancement',
+  'bad-held-items',
+  'plates',
+  'species-specific',
+  'effort-training',
+  'type-protection',
+  'in-a-pinch',
+  'medicine',
+  'picky-healing',
+  'other',
+])
+
+/**
+ * Held-in-battle items filed under a category that is otherwise not. Everstone
+ * has no battle effect at all: it is kept on the owner's request as the "holds
+ * nothing useful" choice (2026-10-07).
+ */
+const BATTLE_HELD_EXTRAS = new Set(['berry-juice', 'everstone'])
+
+function hasBattleHeldEffect(item: Item, generation: number): boolean {
+  /* Gen 2 only: Dragon Scale is that generation's Dragon booster (Dragon Fang
+     did nothing there, a bug) -- see calculators/damage/gen12.ts. */
+  if (item.name === 'dragon-scale') return generation === 2
+  if (BATTLE_HELD_EXTRAS.has(item.name)) return true
+  /* `medicine` and `other` are also MEDICINE-POCKET categories (Potion, Full
+     Heal), so they count only for berries. */
+  if (item.category === 'medicine' || item.category === 'other') return item.pocket === 'berries'
+  return item.category != null && BATTLE_HELD_CATEGORIES.has(item.category)
+}
+
+/**
+ * Items that exist in this generation AND have a held effect in battle.
+ *
+ * `keepId` is the build's current item: a build saved before this filter may
+ * hold one it removes (Antidote, Air Mail), and a <select> whose value matches
+ * no option draws its first option -- it would read "—" while the build still
+ * holds the item. So that one stays listed until it is changed.
+ */
+export function itemOptionsFor(generation: number, keepId: number | null = null): Option[] {
   return listItems()
-    .filter((item) => itemExistsInGeneration(item, generation))
+    .filter(
+      (item) =>
+        itemExistsInGeneration(item, generation) &&
+        (item.id === keepId || hasBattleHeldEffect(item, generation)),
+    )
     .map((item) => ({ value: item.id, label: item.display_name }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }

@@ -1210,7 +1210,9 @@
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2) 0;
+  /* 6px, not 8: six cards are then 462px, inside both the window and the form
+     column beside them (owner, 2026-10-07: the slots must fit the page). */
+  padding: var(--tb-3) 0;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -1235,7 +1237,10 @@
 .tb-rail-line {
   /* Owner's item 8: 12px text, muted unless it is the member being edited. */
   font-size: var(--font-style-caption-size);
-  font-weight: var(--font-weight-regular);
+  /* LIGHT (owner, 2026-10-07): "regular, or light where already regular" --
+     every line was regular but the edited member's name, which was semibold
+     and is now the one regular line on the rail. */
+  font-weight: var(--bf-weight-light);
   /*
     A FIXED LEADING, IN PIXELS, AND IT HAS TO BE PIXELS. These lines inherit an
     absolute 26.1px from the page, which on an 11px label is a leading of 2.37
@@ -1665,11 +1670,12 @@
   padding-top: var(--space-1);
 }
 
-/* --fgap is the row and column gap of the form grid (owner's item 9). */
+/* Rows are --frow apart, half of --fgap, so the whole form fits the window
+   (owner, 2026-10-07). Columns keep --fgap. */
 .tb-form-main {
   display: flex;
   flex-direction: column;
-  gap: var(--fgap);
+  gap: var(--frow);
 }
 .tb-field-row {
   display: grid;
@@ -1857,12 +1863,12 @@
 
 /* ------------------------------------------------------------------- moves */
 
-/* A section: 1.5x --fgap above it (the form column's gap plus half again). */
+/* The same --frow above it as every other row: the extra half-gap a section
+   used to carry is what pushed the spreads off the bottom of the window. */
 .tb-moves {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--fgap);
-  margin-top: calc(var(--fgap) * 0.5);
+  gap: var(--frow) var(--fgap);
 }
 .tb-move-slot {
   display: flex;
@@ -1914,12 +1920,10 @@
 
 /* ----------------------------------------------------------------- spreads */
 
-/* A section: 1.5x --fgap above it. */
 .tb-spreads {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fgap);
-  margin-top: calc(var(--fgap) * 0.5);
 }
 .tb-spread-col {
   display: flex;
@@ -1933,26 +1937,40 @@
   gap: var(--space-2);
   padding-bottom: var(--space-1);
 }
+/*
+  name | − value + | slider. The middle column is a fixed width -- two 24px signs
+  and the 52px value box -- so the derived Gen 1-2 HP DV, which has no signs,
+  still lines its number up with the rows below it.
+*/
 .tb-spread-row {
   display: grid;
-  grid-template-columns: 34px 52px minmax(0, 1fr);
+  grid-template-columns: 34px calc(var(--space-6) * 2 + 52px) minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
 }
-/* Gen 2's shiny-locked Attack DV is the one row that still carries a stepper --
-   see SpreadControls -- so it gets a fourth column instead of squeezing one in. */
-.tb-spread-row[data-skip-aware='true'] {
-  grid-template-columns: 34px 52px auto minmax(0, 1fr);
-}
 /*
-  THE SAME CONTROL AS LEVEL AND FRIENDSHIP -- `.tb-number`, `type="number"`,
-  `step="1"` -- so a spread value can be typed rather than only nudged, and so
-  the two halves of this form do not offer two different ways to enter a number.
-  It sits beside the stepper rather than replacing it: the stepper is for
-  nudging, the box is the fastest route to 252 or 31, and both write one field.
+  THE SAME CONTROL AS LEVEL AND FRIENDSHIP (ui/NumberStepper), at the spread's
+  caption size. Its signs are drawn only while the row is hovered or holds focus
+  (owner, 2026-10-07). `visibility`, not `display`: the room stays, so nothing
+  in the row shifts when they appear, and a hidden sign is not a Tab stop --
+  Up/Down on the focused value still step it, and focusing it reveals both.
+  The Gen 2 shiny-locked Attack DV always shows them: there they are the only
+  control that can step its set of legal values.
 */
-.tb-spread-input {
+.tb-spread-stepper .tb-stepper-value {
+  flex: 0 0 52px;
   font-size: var(--font-size-caption);
+}
+.tb-spread-row .tb-stepper-btn {
+  visibility: hidden;
+}
+.tb-spread-row:hover .tb-stepper-btn,
+.tb-spread-row:focus-within .tb-stepper-btn,
+.tb-spread-row[data-skip-aware='true'] .tb-stepper-btn {
+  visibility: visible;
+}
+.tb-spread-row[data-derived='true'] .tb-spread-value {
+  text-align: center;
 }
 .tb-spread-row[data-locked='true'] {
   opacity: var(--field-disabled-opacity);
@@ -2126,11 +2144,16 @@
   border-collapse: collapse;
   font-size: var(--font-size-caption);
 }
+/*
+  NO HAIRLINES BETWEEN ROWS, and the rows twice as far apart (owner, 2026-10-07):
+  the 4px above and below each row is what doubles the space between two rows'
+  digits (9px -> 16px at this 10px size). With no per-row border the
+  hairline-band rule has nothing to say here.
+*/
 .tb-stats th,
 .tb-stats td {
-  padding: 0 var(--space-1);
+  padding: var(--tb-2) var(--space-1);
   line-height: 1.5;
-  border-bottom: 1px solid var(--hairline);
 }
 /*
   SMALLER THAN THE ROWS IT LABELS, in the label size the rest of the form uses
@@ -2172,10 +2195,10 @@
 .tb-stat-bar-cell {
   width: 45%;
 }
+/* No track: only the stat's own run is drawn (owner, 2026-10-07). */
 .tb-stat-bar {
   display: block;
   height: 6px;
-  background: var(--color-data-track);
 }
 /* Neutral, not accent: accent is the active navbar item only (owner's item 1). */
 .tb-stat-bar-fill {
@@ -2186,7 +2209,6 @@
 .tb-stat-total-row th,
 .tb-stat-total-row td {
   padding-top: var(--space-1);
-  border-bottom: none;
 }
 /* The BST is a fact about the species, not about this build, so it is set like
    the base column above it rather than like the computed total beside it. */
@@ -2213,20 +2235,6 @@
 }
 .tb-rail[data-state='loose'] {
   align-items: center;
-}
-/*
-  A HEADING NOW, so the padding is below it rather than above. Its leading is
-  the cards' own 17px: at the page's inherited 26.1px this one line was 34px
-  tall, which is half a card, and the rail has exactly the height of the
-  identity column beside it to spend.
-*/
-.tb-rail-team {
-  padding-bottom: var(--space-3);
-  font-family: var(--font-numeric);
-  font-size: var(--font-size-label);
-  line-height: 17px;
-  color: var(--text-secondary);
-  text-align: center;
 }
 .tb-shared-note {
   position: absolute;
@@ -2419,14 +2427,14 @@
 
 /*
   THE MEMBER BEING EDITED IS MARKED BY TYPE, NOT BY A BOX (owner's item 8): its
-  lines in the default text colour and its name semibold, every other member
-  muted. No outline, no background.
+  lines in the default text colour and its name regular against everyone
+  else's light, every other member muted. No outline, no background.
 */
 .tb-card-rail[data-current='true'] .tb-rail-line {
   color: var(--color-text-default);
 }
 .tb-card-rail[data-current='true'] .tb-rail-line:first-child {
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
 }
 /*
   THE SELECTED SLOT BEFORE ANYTHING IS IN IT. Same ring, same marked
@@ -2533,16 +2541,24 @@
 /*
   ONE SPACING CONTROL (item 9): --fgap, 24px by default, 16 Tight, 32 Roomy
   (`data-fgap` on the section; `?fgap=tight|roomy` previews them). It is the form
-  grid's row and column gap and the rails' padding; section gaps are 1.5x of
-  it; label to field is a fixed 4px; everything else is on the 4/8/12/16/24/32
-  scale (--space-1..8).
+  grid's column gap and the rails' padding; the ROW gap is --frow, half of it,
+  for every row including the moves and the spreads (owner, 2026-10-07: the
+  form must fit the window); label to field is a fixed 4px; everything else is
+  on the 4/8/12/16/24/32 scale (--space-1..8).
 */
 .tb .tb-build-form {
   --fgap: var(--space-6);
   /* No design-system style is 11px (data is 12): items 2 and 8 ask for mono at
      11px, so it is declared once here. */
   --bf-mono-sm: 11px;
-  padding: var(--space-2) var(--fgap) var(--fgap);
+  /* The form's ROW gap: half of --fgap, so Tight and Roomy still move it. */
+  --frow: calc(var(--fgap) / 2);
+  /* The design system has no light weight; the rail asks for one (owner,
+     2026-10-07). Both faces are variable fonts, so 300 is a real cut. */
+  --bf-weight-light: 300;
+  /* The foot is --space-2, not --fgap: it is trailing space in a scroller, and
+     at a 612px window it was the difference between fitting and not. */
+  padding: var(--space-2) var(--fgap) var(--space-2);
 }
 .tb .tb-build-form[data-fgap='tight'] {
   --fgap: var(--space-4);

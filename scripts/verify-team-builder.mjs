@@ -1489,7 +1489,6 @@ try {
     const round = (n) => +n.toFixed(1)
     const cards = [...document.querySelectorAll('.tb-card-rail')]
     const rail = document.querySelector('[data-layout="rail"]')
-    const label = document.querySelector('.tb-rail-team')
     const total = document.querySelector('.tb-stat-total-row')
     const lines = [...cards[3].querySelectorAll('.tb-rail-line')]
     /* Cap height, measured -- the only way to compare a mono against a sans.
@@ -1509,7 +1508,8 @@ try {
       lineBoxes: lines.map((l) => round(l.getBoundingClientRect().height)),
       fontSizes: lines.map((l) => getComputedStyle(l).fontSize),
       caps: lines.map(capOf),
-      labelFirst: rail.firstElementChild === label,
+      firstIsCard: rail.firstElementChild === cards[0],
+      teamId: rail.dataset.team ?? null,
       railBottom: round(rail.getBoundingClientRect().bottom),
       lastCardBottom: round(cards.at(-1).getBoundingClientRect().bottom),
       totalRowBottom: round(total.getBoundingClientRect().bottom),
@@ -1569,10 +1569,12 @@ try {
     Math.abs(density.badge.dx) <= 6 && Math.abs(density.badge.dy) <= 6,
     `dx=${density.badge.dx} dy=${density.badge.dy}`,
   )
+  /* Owner, 2026-10-07: no heading at all -- the first card starts the rail, and
+     the team's id is kept as data rather than drawn. */
   check(
-    "the team's id HEADS the rail rather than trailing the last card",
-    density.labelFirst && density.railBottom === density.lastCardBottom,
-    `label first: ${density.labelFirst}, rail bottom ${density.railBottom} vs last card ${density.lastCardBottom}`,
+    "the rail has NO heading: it starts with the first card and ends with the last",
+    density.firstIsCard && density.teamId === '#001' && density.railBottom === density.lastCardBottom,
+    `first is card: ${density.firstIsCard}, data-team ${density.teamId}, rail bottom ${density.railBottom} vs last card ${density.lastCardBottom}`,
   )
   /* REDESIGN item 8 replaced "six cards end level with the Total row": the
      sprites are 64px now, so the rail is a list in its own right rather than a
@@ -2697,7 +2699,7 @@ try {
     return {
       saved: form?.dataset.saved,
       slot: form?.dataset.slot,
-      railTeam: document.querySelector('[data-testid="tb-rail-team"]')?.textContent.trim(),
+      railTeam: document.querySelector('[data-testid="tb-rail"]')?.dataset.team,
       selectedSlot: document.querySelectorAll('[data-testid="tb-rail-current-empty"]').length,
       addButtons: document.querySelectorAll('[data-testid="tb-rail-add"]').length,
     }
@@ -3093,7 +3095,8 @@ try {
     ---- the selected slot is marked by TYPE, not by a box (redesign item 8)
 
     The outline it used to carry is gone: the member open in the form is set in
-    text.default with a semibold first line, every other member is muted, and no
+    text.default with a regular first line against everyone else's light (owner,
+    2026-10-07), every other member is muted, and no
     card draws an outline, a border box or a background.
   */
   const rings = await page.evaluate(() =>
@@ -3124,11 +3127,11 @@ try {
     JSON.stringify(rings.map((r) => [r.outline, r.border, r.background])),
   )
   check(
-    'the selected member is semibold in the default text colour, every other one regular and muted',
+    'the selected member is regular in the default text colour, every other one light and muted',
     marked.length === 1 &&
-      marked[0].weight === '600' &&
+      marked[0].weight === '400' &&
       plain.length === 5 &&
-      plain.every((r) => r.weight === '400' && r.color !== marked[0].color),
+      plain.every((r) => r.weight === '300' && r.color !== marked[0].color),
     JSON.stringify(rings.map((r) => [r.current, r.weight, r.color])),
   )
 
