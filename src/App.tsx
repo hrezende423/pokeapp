@@ -1,5 +1,6 @@
 import { IconArrowLeft, IconInfoCircle } from '@tabler/icons-react'
 import { LayoutOverlay } from './components/LayoutOverlay'
+import { usePhoneLayout } from './components/usePhoneLayout'
 import { useEffect, useState } from 'react'
 import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
@@ -12,6 +13,7 @@ import { DexQueryProvider } from './modules/dex/query/DexQueryProvider'
 import { AccountControl } from './sync/AccountControl'
 import { startTeamSync } from './sync/teamSync'
 import { ControlsPanel } from './modules/nav/ControlsPanel'
+import { MobileNav } from './modules/nav/MobileNav'
 import { NavMenu } from './modules/nav/NavMenu'
 import { NavProvider } from './modules/nav/NavProvider'
 import { useNav } from './modules/nav/navContext'
@@ -41,6 +43,7 @@ const kib = (bytes: number) => `${(bytes / 1024).toFixed(1)} KiB`
 function Shell() {
   const nav = useNav()
   const active = findPage(nav.moduleId)
+  const phone = usePhoneLayout()
 
   return (
     <>
@@ -103,6 +106,12 @@ function Shell() {
           <ControlsPanel />
           {/* Rightmost: the account menu, which holds the Light/Dark switch. */}
           <AccountControl />
+          {/*
+            PHONE ONLY, and rendered rather than hidden: on a desktop the bar's DOM
+            is exactly what it was. On a phone the three nav groups are hidden by
+            mobile.css and this one button opens all of them -- see MobileNav.
+          */}
+          {phone && <MobileNav activeId={active.id} onSelect={nav.setModule} />}
         </div>
       </div>
       {SHOW_DESIGN_SYSTEM ? <DesignSystemPage /> : <active.Component />}

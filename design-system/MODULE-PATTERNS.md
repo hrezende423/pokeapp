@@ -329,3 +329,32 @@ should:
   against the space from `left` to the container's right edge — the transform
   moves the box after layout and cannot widen it. Use `width: max-content` with a
   `max-width` cap.
+
+---
+
+## 11. The phone
+
+Every phone-only rule lives in **`src/mobile.css`**, inside one
+`@media (max-width: 640px)` (`PHONE_QUERY` in `components/usePhoneLayout.ts`).
+A new module adds its phone rules there, under its own heading, not beside its
+desktop CSS: three of the screens it had to reach are signed off, and one place
+that says what a phone sees is worth more than locality.
+
+- **Layout only, never a feature.** Tracks collapse to one column, side-by-side
+  panes stack, and a table that does not fit scrolls sideways inside its own box
+  (`overflow-x: auto` on a wrapper) with its first column `position: sticky`.
+  A column that does not fit is scrolled to, never dropped.
+- **No new element where CSS will do.** `display: contents` on a wrapper lets its
+  children take a parent grid's areas — the app bar and the species page are
+  rearranged that way with no change to their JSX. The menu button is the one
+  phone-only element, rendered only while `usePhoneLayout()` is true so the
+  desktop DOM the suites assert is unchanged.
+- **Hover-revealed controls must show on touch** (`@media (hover: none)`), or a
+  finger cannot find them.
+- **Import order is the cascade**: `mobile.css` loads last, after every static
+  module stylesheet. A lazy module's CSS loads after it, so rules for one need an
+  extra class (`.panel .tm ...`).
+- **`npm run verify:mobile`** drives every screen at 390px and 360px through the
+  phone menu and fails on anything past the edge of the window that no scroller
+  can bring back. Add a new screen to its sweep.
+

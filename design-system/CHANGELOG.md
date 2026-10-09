@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.2 — 2026-10-08 (non-breaking)
+- Phone layout (≤640px), all in `src/mobile.css` so nothing wider changes: nav becomes one menu button and a full-screen sheet (`components/nav.md`); the bar's panels drop full-width; wide tables scroll inside their own box with the first column frozen; side-by-side panes stack; hover-revealed controls show on touch; no new tokens
 ## 2.1.1 — 2026-10-04 (non-breaking)
 - `font.family.sans` is IBM Plex Sans again (Manrope reverted: it breaks the Team Display's cap-height levelling); `font.family.mono` leads with Martian Mono, JetBrains Mono as fallback
 ## 2.1.0 — 2026-10-04 (non-breaking)

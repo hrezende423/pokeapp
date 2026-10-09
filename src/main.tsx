@@ -11,6 +11,10 @@ import './design-tokens.css'
 import './theme.ts'
 import './pwa.ts'
 import App from './App.tsx'
+// LAST, after App and therefore after every module's stylesheet: the phone layer
+// overrides them at equal specificity. Every rule in it is inside the phone
+// media query, so nothing above 640px changes. See src/mobile.css.
+import './mobile.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

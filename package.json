@@ -32,6 +32,7 @@
     "verify:trainers": "node scripts/verify-trainers.mjs",
     "verify:team-matchup": "node scripts/verify-team-matchup.mjs",
     "verify:scroll-nav": "node scripts/verify-scroll-nav.mjs",
+    "verify:mobile": "node scripts/verify-mobile.mjs",
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
     "audit:supplement": "node scripts/audit-supplement.mjs",
     "audit:white-sprites": "node scripts/audit-white-sprites.mjs",

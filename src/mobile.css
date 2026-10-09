@@ -1,0 +1,728 @@
+/*
+  ============================================================================
+  THE PHONE LAYER -- every rule that exists only for a phone held upright.
+
+  ONE FILE, ONE QUERY, NOTHING ABOVE IT. Every rule below sits inside
+  `@media (max-width: 640px)` (PHONE_QUERY in components/usePhoneLayout.ts), so a
+  window wider than a phone renders exactly what it rendered before this file
+  existed: the desktop layout, the signed-off screens and their measured
+  constants are untouched by construction rather than by care.
+
+  WHY NOT BESIDE EACH MODULE, the way module CSS usually lives: three of the
+  screens that most needed a phone layout are signed off (the Build Form, the
+  Team Display, the Team Library card), and their stylesheets are frozen. A phone
+  layer has to reach them without editing them, and once it does that for three
+  screens, splitting the rest across eight files would leave a reader no single
+  place that says what a phone sees.
+
+  IMPORTED LAST (main.tsx, after App), so a rule here wins against a module rule
+  of equal specificity. The one lazy-loaded module, Team Matchup, injects its
+  stylesheet later than this one -- its rules below start with `.panel` so they
+  win on specificity instead of order.
+
+  WHAT A PHONE CHANGES, and what it never does. Layout only: tracks collapse to
+  one column, side-by-side panes stack, wide tables scroll sideways inside their
+  own box, and touch targets reach 44px where the design system asks for it
+  (PRINCIPLES.md, "Compact tier on touch"). No feature is hidden, renamed or
+  dropped -- a column that does not fit is scrolled to, never removed.
+  `npm run verify:mobile` drives every screen at 390px and 360px and asserts
+  that nothing runs past the edge of the window.
+  ============================================================================
+*/
+
+@media (max-width: 640px) {
+  /* ------------------------------------------------------------ the shell */
+
+  /*
+    16px gutters, the phone convention, against 1.25rem on a desktop -- every
+    pixel of a 360px screen is content width -- and the side borders #root draws
+    for a centred desktop column go, since a phone is the column.
+  */
+  #root {
+    border-inline: 0;
+  }
+
+  .panel {
+    padding: 0 1rem;
+  }
+
+  .app-footer {
+    padding: 0.35rem 0;
+  }
+
+  /*
+    THE APP BAR, TWO ROWS: the brand, the account and the menu button on top,
+    the page's own controls (Grid/List, Sort, Search/Filter) underneath. The two
+    wrappers that group them on a desktop step aside (`display: contents`) so
+    their children can be ordered into those rows from here, without moving a
+    single element in App.tsx.
+  */
+  .app-bar {
+    position: relative;
+    gap: 0 var(--space-gap-md);
+    padding-bottom: 0;
+  }
+
+  .app-bar-nav,
+  .app-bar-utils {
+    display: contents;
+  }
+
+  /* The three hover groups; the menu button replaces them. See MobileNav.tsx. */
+  .app-nav {
+    display: none;
+  }
+
+  /*
+    TWO 44px ROWS, the design system's touch floor (PRINCIPLES.md: on touch,
+    raise the row, never shrink the hit area). Every control in the bar is at
+    least that tall, so each row is, and no target overlaps one in the other
+    row -- a hit area grown by negative margins instead would have let the
+    controls row, painted later, steal the bottom of the menu button. The back
+    arrow is 44px wide too; its side margins hand back all but its 18px, so the
+    brand does not move.
+  */
+  .app-bar-back {
+    order: 1;
+    width: 44px;
+    height: 44px;
+    margin: 0 -13px;
+  }
+
+  .app-controls-toggle,
+  .app-controls-cluster .toggle {
+    min-height: 44px;
+  }
+
+  .app-brand {
+    order: 2;
+  }
+
+  .app-controls.account {
+    order: 3;
+    margin-left: auto;
+  }
+
+  .mobile-nav-toggle {
+    order: 4;
+  }
+
+  .app-controls-cluster {
+    order: 5;
+    flex: 1 0 100%;
+    justify-content: flex-end;
+  }
+
+  /* Signed in, the avatar and the sync dot say who; the name would push the
+     menu button off a 360px bar. It stays in the panel, and as the label. */
+  .account-name {
+    display: none;
+  }
+
+  /*
+    THE BAR'S PANELS DROP AS SHEETS, the full width of the bar. On a desktop
+    each hangs off its own trigger at 300-320px, right-aligned -- on a phone that
+    put the Search/Filter panel 9px past the left edge of the screen and the Sort
+    panel 104px past it. Static triggers hand the containing block to the bar
+    (position: relative above), so `left: 0; right: 0` is the bar's width.
+  */
+  .app-controls {
+    position: static;
+  }
+
+  .app-controls-panel,
+  .account-panel {
+    left: 0;
+    right: 0;
+    top: 100%;
+    width: auto;
+    max-width: none;
+    max-height: calc(100svh - 9rem);
+  }
+
+  /* ---------------------------------------------------- the species page */
+
+  /*
+    THE SAME FRAME, A PHONE-SIZED UNIT. The page is drawn in raw Figma units
+    (pokedex.css): --dp-u is 1/1860 of the page, so on a 390px phone every label
+    on the Info tab came out at 3.8px. Two redefinitions fix the whole page,
+    because every length there is one of these two units:
+
+      --dp-u   layout. 1/1115 of the width -- the frame's INFO column, which is
+               what a phone shows full-width -- rather than 1/1860 of the frame.
+      --dp-t   type and rhythm. Anchored to the design system's body size, so
+               body text is the 14px it is everywhere else in the app and every
+               other raw size keeps its ratio to it: labels 12px, captions 10px,
+               the name 31px. A unit tied to the screen width would put a 320px
+               phone's labels at 10px and a 430px one's at 14px.
+  */
+  .species-page-inner {
+    --dp-u: calc(100cqw / 1115);
+    --dp-t: calc(var(--font-style-body-size) / 30);
+    padding-left: 0;
+  }
+
+  /*
+    IDENTITY BESIDE THE NAME, CONTENT UNDERNEATH. Stacked, the 737 x 1031 hero
+    column took 450px of an 844px phone before a single fact, and it is pinned --
+    it does not scroll -- so the Info tab was left a 170px window. Here the hero
+    shrinks to the left 45% and the banner (name, genus, types) sits beside it:
+    the identity block stays pinned, as the page intends, and the scroller gets
+    the rest of the screen.
+
+    `display: contents` on the right-hand column lets its three children -- the
+    banner, the tabs and the scroller -- take named areas in this one grid, with
+    no change to SpeciesDetailPage.
+  */
+  .species-page-cols {
+    grid-template-columns: 45% minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'hero banner'
+      'subnav subnav'
+      'scroll scroll';
+    column-gap: var(--space-gap-md);
+  }
+
+  .species-page-right {
+    display: contents;
+  }
+
+  .species-page-pinned {
+    grid-area: hero;
+  }
+
+  .species-hero {
+    max-width: none;
+  }
+
+  /*
+    THE HERO'S WORDS AT A READABLE SIZE. Its type is in its own column's units,
+    which at 45% of a phone put the katakana and the official romanisation --
+    shown nowhere else on the page -- at 7px. Half as large again still fits the
+    widest of all 1,025 at 360px, measured: "Walking Wake" at 106px and
+    "Tetsunotsutsumi" at 120px, in a 138px column. The ghost numeral and the
+    artwork keep the frame's sizes.
+  */
+  .species-hero-kana,
+  .species-hero-names,
+  .species-hero-region {
+    --ht: calc(var(--hu) * var(--dp-s, 1) * 1.5);
+  }
+
+  .species-banner {
+    grid-area: banner;
+    align-self: center;
+    padding-top: 0;
+  }
+
+  /* The name at title size: the banner's column is 171px on a 360px phone,
+     and "Walking Wake" at display size is wider than that. */
+  .species-banner h2.species-banner-name {
+    font-size: var(--font-size-title);
+    overflow-wrap: anywhere;
+  }
+
+  .species-banner-genus {
+    font-size: var(--font-size-label);
+  }
+
+  .species-page-subnav {
+    grid-area: subnav;
+    justify-content: flex-start;
+    margin-top: var(--space-gap-sm);
+  }
+
+  .species-page-right > .scroll-area-outer {
+    grid-area: scroll;
+  }
+
+  .species-page-scroll {
+    padding-right: 0;
+  }
+
+  /* ----------------------------------------------------- wide tables, dexes */
+
+  /*
+    A TABLE WIDER THAN THE PHONE SCROLLS SIDEWAYS INSIDE ITS OWN BOX -- that part
+    was already true (`.data-table-wrap`, `.nature-matrix-wrap`) -- and its first
+    column now stays put while it does. Swiped left, the Movedex was a page of
+    numbers with no move name beside them; frozen, every row keeps its label. The
+    cell needs the page's own ground, or the columns sliding under it show
+    through.
+  */
+  .data-table-wrap > .data-table th:first-child,
+  .data-table-wrap > .data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
+  }
+
+  /* THE POKEDEX LIST VIEW scrolls sideways on its ScrollArea, not on the
+     table's own wrap -- the wrap is as wide as the table there. A wrap that is
+     still a scroll container captures the sticky cell and pins it to nothing,
+     so on that one table the wrap stops being one and the name column holds
+     against the section that actually scrolls. */
+  .species-list-table .data-table-wrap {
+    overflow-x: visible;
+  }
+
+  /* The Movedex's name column is 15rem, sized for a desktop row. On a phone
+     that is two thirds of the screen for the name alone. Every one of the 485
+     Gen 1-4 move names fits 10rem (measured); a longer later name ellipsizes,
+     as an overlong one already does on a desktop. (The width is the colgroup's
+     inline style, hence !important.) */
+  [data-testid='dex-movedex'] .data-table-sized col:first-child {
+    width: 10rem !important;
+  }
+
+  /*
+    THE NATURE MATRIX FITS. Twenty-five natures in a 5 x 5 grid is a table you
+    read across and down at once, and at the desktop's 12px cell padding it ran
+    120px past the edge of a 390px phone. Tighter cells and the label size bring all six
+    columns on screen; the wrap still scrolls if a narrower phone needs it.
+  */
+  .nature-matrix th {
+    padding: 6px 4px;
+  }
+
+  .nature-cell-btn {
+    padding: 10px 4px;
+    font-size: var(--font-size-label);
+  }
+
+  .nature-matrix {
+    width: 100%;
+  }
+
+  /* A column's arrow under its stat rather than beside it, so the header is as
+     narrow as the word -- the header was what set each column's width. */
+  .nature-matrix thead .stat-direction {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  /*
+    THE TRAINER DEX'S PARTY GOES UNDER THE NAME. Six 32px sprites are 202px,
+    more than the 45% a ledger row allows its meta on a phone, so the fifth and
+    sixth were clipped off the row. As a third line they get the full width.
+  */
+  .ledger-list .species-row:has(.trainer-strip) {
+    flex-wrap: wrap;
+  }
+
+  .ledger-list .species-row:has(.trainer-strip) .row-main {
+    flex: 1 1 calc(100% - 2rem);
+  }
+
+  .ledger-list .row-meta:has(.trainer-strip) {
+    order: 3;
+    flex: 1 0 100%;
+    max-width: none;
+    text-align: left;
+  }
+
+  /* --------------------------------------------------------- team building */
+
+  /* The screens' 32px side padding sits inside the panel's own 16px gutter;
+     on a phone that was 96px of a 390px screen spent on margins. */
+  .tb .tb-screen {
+    padding-inline: 0;
+  }
+
+  /*
+    THE TEAM LIBRARY: THE TEAM'S NAME ON TOP, ITS SIX MEMBERS UNDER IT. Side by
+    side, the members' lane was what remained after the name block and the
+    chevron, and six cards in it were crushed to slivers.
+    Below the name the lane has the full width, and the cards keep their measured
+    127px (`--tb-compact-card`) and scroll sideways rather than shrinking.
+  */
+  .tb-team-row {
+    flex-wrap: wrap;
+    row-gap: var(--space-gap-sm);
+  }
+
+  .tb-team-row-lead {
+    flex: 1 1 auto;
+  }
+
+  .tb-team-members {
+    order: 3;
+    flex: 1 0 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .tb-team-members .tb-card-compact {
+    flex: 0 0 var(--tb-compact-card);
+  }
+
+  /*
+    THE BUILD FORM, ONE COLUMN. Four tracks -- identity, form, dock, rail --
+    take 566px before the form's own column gets any, so on a phone the form's
+    labels overprinted each other. Stacked, in the order a reader uses them:
+    back, the team's members (which one is open, and the way to the others),
+    the portrait and its stats, the actions, then the fields.
+  */
+  .tb .tb-build-form {
+    --fgap: var(--space-4);
+    padding-inline: 0;
+  }
+
+  .tb-form-grid {
+    grid-template-areas:
+      'head'
+      'rail'
+      'ident'
+      'dock'
+      'main';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-gap-md);
+  }
+
+  .tb-build-form .tb-screen-head {
+    min-height: 0;
+  }
+
+  .tb-identity {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  /* The rail as a strip: the team's members side by side, scrolled sideways,
+     each card the width of a phone's half rather than of the desktop column. */
+  .tb-rail {
+    flex-direction: row;
+    gap: var(--space-gap-sm);
+    padding-left: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border-left: 0;
+  }
+
+  .tb-rail > * {
+    flex: 0 0 11rem;
+    min-width: 0;
+  }
+
+  /* "Used by 2 teams" sat absolutely in the form's bottom-right corner, which on
+     a phone is on top of the last IV row. In flow, after the fields. */
+  .tb-shared-note {
+    position: static;
+    display: block;
+    margin-top: var(--space-gap-md);
+    text-align: right;
+  }
+
+  /* The dock lies down: a row of actions under the portrait, not a strip. */
+  .tb-form-dock-col {
+    justify-content: flex-start;
+  }
+
+  .tb-form-dock-col .tb-dock {
+    flex-direction: row;
+  }
+
+  .tb-form-dock-col .tb-dock-sep {
+    width: 1px;
+    height: 16px;
+    margin: 0 6px;
+  }
+
+  /* Two fields to a row, not four; two move slots; one spread column. */
+  .tb-field-row,
+  .tb-moves {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tb-spreads {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /*
+    THE TEAM DISPLAY, ONE CARD TO A ROW. On a desktop it sizes six cards into
+    the window -- three fixed 260px columns, two rows dividing the height, the
+    sprite taking whatever the text leaves. A phone has room for one 260px card
+    across, so the cards stack and scroll, each with a fixed portrait rather than
+    a share of a height that six of them could never fit in. The header (back,
+    number, name, actions) runs across the top instead of down the left.
+  */
+  .tb-team-viewer {
+    flex-direction: column;
+    gap: var(--space-gap-md);
+  }
+
+  .tb-team-viewer .tb-screen-head {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .tb-team-viewer .tb-screen-head .tb-dock {
+    flex-direction: row;
+  }
+
+  .tb-team-viewer .tb-screen-head .tb-dock-sep {
+    width: 1px;
+    height: 16px;
+    margin: 0 6px;
+  }
+
+  .tb-team-viewer .tb-slot-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .tb-team-viewer .tb-card-open {
+    height: auto;
+  }
+
+  .tb-team-viewer .tb-card-full .tb-card-art {
+    flex: 0 0 auto;
+    height: 180px;
+    min-height: 0;
+  }
+
+  /*
+    HOVER-REVEALED CONTROLS ARE ALWAYS SHOWN ON A TOUCH SCREEN. A finger has no
+    hover: the card corners (remove, coverage), each team's menu, the screen's
+    dock and the spread steppers were all invisible until something happened to
+    be tapped, and a control nobody can see is a control nobody uses. Scoped to
+    touch as well as width, so a narrowed desktop window keeps the reveal.
+  */
+  @media (hover: none) {
+    .tb-corner,
+    .tb-dock,
+    .tb-kebab .tb-icon-btn {
+      opacity: 1;
+    }
+
+    .tb-spread-row .tb-stepper-btn {
+      visibility: visible;
+    }
+
+    /* And big enough to hit: the module's icon buttons are 26px, drawn for a
+       pointer. 40px rather than 44, butted together, so the Build Form's
+       eight-action dock still fits one row of a 390px phone (333px); it wraps
+       on a narrower one rather than running off the edge. */
+    .tb-icon-btn {
+      width: 40px;
+      height: 40px;
+    }
+
+    .tb-form-dock-col .tb-dock {
+      flex-wrap: wrap;
+      gap: 0;
+    }
+  }
+
+  /*
+    THE TAB STRIPS ARE 44px TALL ON A TOUCH SCREEN -- species page, Type
+    Coverage, the calculators, Team Matchup. The word and its underline stay at
+    the foot of the box, so the strip reads the same and only the target grows.
+  */
+  @media (hover: none) {
+    .ds-tab {
+      display: inline-flex;
+      align-items: flex-end;
+      min-height: 44px;
+    }
+  }
+
+  /* ------------------------------------------------- tools and type coverage */
+
+  /* Each of these pads its own 20px inside the panel's 16px gutter. On a phone
+     the panel's gutter is the margin and the module takes the width. Two
+     classes, because Team Matchup's stylesheet is lazy and loads after this one. */
+  .panel .tc,
+  .panel .calc,
+  .panel .tm {
+    padding-inline: 0;
+  }
+
+  /* The calculators' title above their four tabs, not squeezed beside them --
+     beside them, "Catch Rate" broke over two lines. */
+  .calc-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-gap-sm);
+  }
+
+  /* Team Matchup's name on one line beside the game it is pinned to. */
+  .panel .tm .tm-title {
+    white-space: nowrap;
+  }
+
+  /*
+    TEAM MATCHUP HAS TEN TABS, AND A PHONE SHOWED FIVE. The strip scrolled
+    sideways, but its scrollbar is hidden like every other in the app and the
+    fifth tab ended flush with the edge -- nothing said Sandbox, Outcome,
+    Gauntlet, Scan and Compare existed. Wrapped onto a second line, all ten are
+    on screen.
+  */
+  .panel .tm .tm-tabs .ds-tabs {
+    flex-wrap: wrap;
+    row-gap: var(--tm-3);
+  }
+
+  /*
+    TEAM MATCHUP'S TABLES SCROLL SIDEWAYS, ONE LINE PER CELL. Squeezed into a
+    phone they wrapped every cell to a word per line -- the speed ladder ran
+    50px past the screen anyway, and the switch-in table turned six rows into a
+    column of fragments. Each table is its own sideways scroller here (the
+    matrix and the scan grid already were), its cells stay on one line, and the
+    first column -- the Pokemon each row is about -- stays put while the rest
+    slide under it.
+  */
+  .panel .tm .tm-table {
+    display: block;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .panel .tm .tm-table th,
+  .panel .tm .tm-table td {
+    white-space: nowrap;
+  }
+
+  .panel .tm .tm-table th:first-child,
+  .panel .tm .tm-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
+  }
+
+  /*
+    iOS ZOOMS THE PAGE INTO ANY FIELD WHOSE TEXT IS UNDER 16px, and leaves it
+    zoomed after the keyboard closes -- a viewport-locked app is then wider than
+    the screen until the reader pinches back out. Every field in the app sets its
+    own size (10-14px), so this has to outrank all of them, hence !important.
+    `-webkit-touch-callout` exists only in iOS WebKit, so Android and desktop
+    browsers, which do not zoom, keep the designed sizes.
+  */
+  @supports (-webkit-touch-callout: none) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* -------------------------------------------------------- the menu sheet */
+
+  /* 44px, the touch floor; the right margin lets the glyph sit on the bar's
+     edge like the controls under it rather than 11px inside it. */
+  .mobile-nav-toggle {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 -11px 0 0;
+    padding: 0;
+    color: var(--text-primary);
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .mobile-nav-toggle:focus-visible {
+    outline: var(--field-focus-border-width) solid var(--field-focus-border);
+    outline-offset: -4px;
+  }
+
+  /*
+    The whole screen, on --surface-raised: it floats over the page, and the
+    tone step is the system's only elevation (no shadow). z-index 50 clears the
+    bar's own panels (30) and the boot readout (40); the layout overlay (9999)
+    still paints over it.
+  */
+  .mobile-nav {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 1rem 1rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    font-family: var(--font-body);
+    text-align: left;
+    background: var(--surface-raised);
+  }
+
+  .mobile-nav-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 32px;
+    padding-bottom: var(--space-gap-sm);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .mobile-nav-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-gap-lg);
+    padding-top: var(--space-gap-lg);
+  }
+
+  /* A group heading is a small caps label, regular weight (PRINCIPLES.md).
+     Two classes, because `.panel h2` (App.css) outranks one. */
+  .mobile-nav .mobile-nav-heading {
+    margin: 0 0 var(--space-gap-sm);
+    font-family: var(--font-body);
+    font-size: var(--font-size-label);
+    font-weight: var(--font-weight-regular);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  /*
+    TWO COLUMNS OF 44px TARGETS. Nineteen destinations in one column is a sheet
+    that scrolls on a 640px-tall phone; two columns put all of them on one
+    screen, and 44px is the design system's touch floor.
+  */
+  .mobile-nav-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-gap-md);
+  }
+
+  /* Ghost, hairline-separated rows; no hover fill anywhere in the system. */
+  .mobile-nav-item {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0;
+    font-family: var(--font-body);
+    font-size: var(--font-size-body);
+    text-align: left;
+    color: var(--text-primary);
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--hairline);
+    cursor: pointer;
+  }
+
+  /* A nested page (Damage Calculator under Calculators) is still its own row;
+     the muted tone says it belongs to the one before it. */
+  .mobile-nav-item[data-depth] {
+    color: var(--text-secondary);
+  }
+
+  /* "You are here": the accent's sanctioned job, with the weight the nav spec
+     pairs it with so colour is never the only cue. */
+  .mobile-nav-item[aria-current='page'] {
+    color: var(--accent);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .mobile-nav-item:focus-visible {
+    outline: var(--field-focus-border-width) solid var(--field-focus-border);
+    outline-offset: -2px;
+  }
+}
