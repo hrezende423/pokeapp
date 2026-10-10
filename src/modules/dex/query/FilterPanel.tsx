@@ -1,4 +1,4 @@
-import { IconRestore } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronUp, IconRotate } from '@tabler/icons-react'
 import { useState, type ReactNode } from 'react'
 import { SelectField } from '../../../components/ds/SelectField'
 import { TextField } from '../../../components/ds/TextField'
@@ -32,7 +32,8 @@ import type { DexQuery } from './useDexQuery'
  *
  *   name search              always first, always visible
  *   the page's primary filter(s)
- *   More filters             a nested disclosure, collapsed by default
+ *   (chevron)                "More filters", a nested disclosure, collapsed by
+ *                            default -- a down/up chevron, not words
  *   Clear all filters        one action at the bottom
  *
  * and one reset icon per section, clearing only that section. The icon is
@@ -80,9 +81,15 @@ export function FilterPanel<T>({
             // The accent marks a binary state, the same use the two outer
             // triggers make of it: something is hidden in here and it is on.
             data-filters-active={more.some((s) => query.sectionIsActive(s.id))}
+            aria-label={moreOpen ? 'Fewer filters' : 'More filters'}
+            title={moreOpen ? 'Fewer filters' : 'More filters'}
             onClick={() => setMoreOpen((v) => !v)}
           >
-            More filters
+            {moreOpen ? (
+              <IconChevronUp size={16} stroke={1.5} aria-hidden focusable="false" />
+            ) : (
+              <IconChevronDown size={16} stroke={1.5} aria-hidden focusable="false" />
+            )}
           </button>
           <div
             className="dex-filter-more-panel"
@@ -139,7 +146,7 @@ function Section<T>({
           disabled={!active}
           onClick={() => query.resetSection(section.id)}
         >
-          <IconRestore size={14} stroke={1.5} aria-hidden focusable="false" />
+          <IconRotate size={14} stroke={1.5} aria-hidden focusable="false" />
         </button>
       </div>
       {filters.map((filter) => (

@@ -37,7 +37,6 @@ import {
   breedingdexSections,
   itemdexSections,
   movedexSections,
-  naturedexSections,
   trainerdexSections,
 } from './registries'
 import { useDexQuery } from './useDexQuery'
@@ -175,7 +174,10 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       case 'naturedex':
         // No sort fields: the page is a 5x5 matrix whose axes are the two stats,
         // so a cell's position is its meaning and there is nothing to re-order.
-        return erase('naturedex', natureEntries(scope), naturedexSections(), [], null)
+        // No filters either (owner, 2026-10-10): the matrix is the whole set at a
+        // glance, so the bar's Sort/Filter menu is disabled here.
+        // `naturedexSections` stays in registries.ts to wire back in.
+        return erase('naturedex', natureEntries(scope), [], [], null)
       case 'breedingdex':
         return erase('breedingdex', eggGroupEntries(scope), breedingdexSections(), [], null)
       case 'trainerdex':

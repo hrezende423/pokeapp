@@ -175,17 +175,13 @@ try {
     await page.click('[data-testid="controls-toggle"]')
     await page.waitForSelector('[data-testid="global-search"]', { state: 'visible', timeout: 15000 })
   }
+  /* ONE MENU since 2026-10-10: Sort is a part of the Sort/Filter panel. */
   const openSort = async () => {
-    if (await panelOpen('dex-sort')) return
-    await park()
-    await page.click('[data-testid="dex-sort-toggle"]')
+    await openFilters()
     await page.waitForTimeout(140)
   }
   const closeMenus = async () => {
-    for (const [box, trigger] of [
-      ['app-controls', 'controls-toggle'],
-      ['dex-sort', 'dex-sort-toggle'],
-    ]) {
+    for (const [box, trigger] of [['app-controls', 'controls-toggle']]) {
       if ((await page.$(`[data-testid="${box}"]`)) == null) continue
       /* A disabled trigger cannot close its panel -- and it must never have one
          open, which is what the app guarantees and section 4 asserts. */
@@ -250,7 +246,7 @@ try {
   }
 
   // ==================================================================
-  hr('1 — ONE CONTROL PAIR, IN THE BAR, ON EVERY POKEPEDIA PAGE')
+  hr('1 — ONE SORT/FILTER MENU, IN THE BAR, ON EVERY POKEPEDIA PAGE')
 
   const DEXES = [
     'pokedex',
@@ -263,9 +259,19 @@ try {
   ]
   // The Itemdex and Abilitydex are tables since 2026-10-10: their headers sort.
   const WITH_SORT = ['pokedex', 'berrydex']
+  // The Naturedex's matrix has nothing to sort or filter (owner, 2026-10-10).
+  const MENU_DISABLED = ['naturedex']
 
   for (const dex of DEXES) {
     await goTo(dex)
+    if (MENU_DISABLED.includes(dex)) {
+      check(
+        `[${dex}] the Sort/Filter trigger is there but disabled`,
+        (await page.$eval('[data-testid="controls-toggle"]', (e) => e.disabled)) === true,
+      )
+      check(`[${dex}] and its menu holds no part`, (await page.$('.app-controls-part')) === null)
+      continue
+    }
     check(
       `[${dex}] no control row of its own above the list`,
       (await page.$(`[data-testid="${dex}-controls-toggle"]`)) === null &&
@@ -284,9 +290,9 @@ try {
       (await page.$(`[data-testid="${searchId}"]`)) != null &&
         (await page.isVisible(`[data-testid="${searchId}"]`)) === false,
     )
-    const hasSort = (await page.$('[data-testid="dex-sort-toggle"]')) != null
+    const hasSort = (await page.$('[data-testid="controls-part-sort"]')) != null
     check(
-      `[${dex}] a Sort trigger exists exactly when the page declares sort fields`,
+      `[${dex}] the menu has a Sort part exactly when the page declares sort fields`,
       hasSort === WITH_SORT.includes(dex),
       hasSort ? 'present' : 'absent',
     )
@@ -295,8 +301,8 @@ try {
 
   await goTo('pokedex')
   check(
-    'the trigger reads "Search/Filter", which suits every page it now serves',
-    (await page.textContent('[data-testid="controls-toggle"]')).trim() === 'Search/Filter',
+    'the trigger reads "Sort/Filter": view, sort and filters are one menu',
+    (await page.textContent('[data-testid="controls-toggle"]')).trim() === 'Sort/Filter',
   )
 
   // -------------------------------------------------- open / close behaviour
@@ -313,16 +319,43 @@ try {
   check('a press anywhere outside closes it', (await panelOpen('app-controls')) === false)
 
   await openFilters()
-  await page.click('[data-testid="dex-sort-toggle"]')
-  await page.waitForTimeout(160)
-  check(
-    'opening Sort closes the filter menu',
-    (await panelOpen('dex-sort')) === true && (await panelOpen('app-controls')) === false,
+  const parts = await page.$$eval('[data-testid="controls-panel"] .app-controls-part', (els) =>
+    els.map((e) => ({
+      part: e.dataset.part,
+      ruled: getComputedStyle(e).borderTopWidth !== '0px',
+    })),
   )
-  await clickOutside()
-  check('and an outside press closes Sort too', (await panelOpen('dex-sort')) === false)
-
-  await openFilters()
+  check(
+    'the menu is three parts in order: View mode, Sort, Search/Filter',
+    parts.map((p) => p.part).join(',') === 'view,sort,filter',
+    parts.map((p) => p.part).join(','),
+  )
+  check(
+    'with a hairline between parts and none above the first',
+    parts.map((p) => p.ruled).join(',') === 'false,true,true',
+    parts.map((p) => p.ruled).join(','),
+  )
+  const innerRules = await page.$$eval(
+    [
+      '.app-controls-field',
+      '.dex-filter-section',
+      '.dex-filter-more-panel',
+      '.app-controls-reset',
+    ]
+      .map((c) => '[data-testid="controls-panel"] ' + c)
+      .join(', '),
+    (els) =>
+      els.filter((e) => {
+        const cs = getComputedStyle(e)
+        return [cs.borderTopWidth, cs.borderBottomWidth, cs.borderLeftWidth].some((w) => w !== '0px')
+      }).length,
+  )
+  check('and no other rule inside the menu', innerRules === 0, `${innerRules} ruled blocks`)
+  check(
+    '"More filters" is a chevron, not words',
+    (await page.textContent('[data-testid="dex-filter-more-toggle"]')).trim() === '' &&
+      (await page.$('[data-testid="dex-filter-more-toggle"] svg')) != null,
+  )
   check(
     '"More filters" is collapsed by default',
     (await page.$eval('[data-testid="dex-filter-more"]', (el) => el.dataset.open)) === 'false' &&
@@ -418,7 +451,7 @@ try {
   )
 
   // ==================================================================
-  hr('2 — THE GRID/LIST SWITCH: in the bar, on the Pokedex browse page only')
+  hr('2 — THE GRID/LIST SWITCH: in the menu, on the Pokedex browse page only')
   for (const dex of ['movedex', 'itemdex', 'naturedex']) {
     await goTo(dex)
     check(
@@ -429,22 +462,12 @@ try {
   await goTo('pokedex')
   await selectGame('heartgold-soulsilver')
   await goTo('pokedex')
+  await openFilters()
   check(
-    '[pokedex] the view switch is in the bar',
-    await page.isVisible('[data-testid="toggle-species-view"]'),
+    '[pokedex] the view switch is in the menu, in its View mode part',
+    await page.isVisible('[data-testid="controls-part-view"] [data-testid="toggle-species-view"]'),
   )
-  const switchPos = await page.evaluate(() => {
-    const view = document
-      .querySelector('[data-testid="toggle-species-view"]')
-      .getBoundingClientRect()
-    const sort = document.querySelector('[data-testid="dex-sort-toggle"]').getBoundingClientRect()
-    return { leftOfSort: view.right <= sort.left }
-  })
-  check('to the LEFT of the Sort trigger', switchPos.leftOfSort)
-  check(
-    'and it is not inside the Sort menu any more',
-    (await page.$('[data-testid="dex-sort-panel"] [data-testid="toggle-species-view"]')) === null,
-  )
+  await closeMenus()
 
   await page.click('[data-testid="species-open-1"]')
   await page.waitForSelector('[data-testid="species-page"]', { timeout: 20000 })
@@ -557,6 +580,7 @@ try {
 
   // ==================================================================
   hr('4 — POKEDEX LIST VIEW: one fact per column, and a bar for the rest')
+  await openFilters()
   await page.click('[data-testid="toggle-species-view"]')
   await page.waitForTimeout(400)
   await closeMenus()
@@ -790,11 +814,13 @@ try {
   check('and "further evolutions" is answered', bulbaRow[41] === 'Yes', bulbaRow[41])
   await page.screenshot({ path: `${SHOTS}/dexf-pokedex-list.png` })
 
+  await openFilters()
   check(
-    'the Sort trigger is disabled here -- the column headers are the control',
-    await page.$eval('[data-testid="dex-sort-toggle"]', (e) => e.disabled),
+    'the Sort part points to the column headers here -- they are the control',
+    (await page.$('[data-testid="controls-sort-disabled"]')) != null &&
+      (await page.$('[data-testid="dex-sort-fields"]')) === null,
   )
-  check('and no Sort panel is left open under it', (await panelOpen('dex-sort')) === false)
+  await closeMenus()
   await page.click('[data-testid="species-sort-stat-speed"]')
   await page.waitForTimeout(250)
   const listSpeed = await page.$$eval(
@@ -810,6 +836,7 @@ try {
     listSpeedValues.slice(0, 8).join(','),
   )
   // Back to the grid for the sections that follow.
+  await openFilters()
   await page.click('[data-testid="toggle-species-view"]')
   await page.waitForTimeout(300)
   await closeMenus()
@@ -1004,18 +1031,10 @@ try {
   await closeMenus()
   check('cleared', (await countOf('berrydex')) === berryAll)
 
+  // The Naturedex has no filters since 2026-10-10 -- section 1 asserts the
+  // disabled trigger, and the matrix shows all 25 natures.
   await goTo('naturedex')
-  await openMore()
-  await page.selectOption('[data-testid="dex-filter-increased"]', 'attack')
-  await page.waitForTimeout(180)
-  const attackNatures = await countOf('naturedex')
-  check(
-    'Naturedex: raised-stat matches the bundle',
-    attackNatures === natures.filter((n) => n.increased_stat === 'attack').length,
-    `(${attackNatures})`,
-  )
-  await clearAll()
-  await closeMenus()
+  check('Naturedex: all natures, unfiltered', (await countOf('naturedex')) === natures.length)
 
   await goTo('movedex')
   const moveAll = await countOf('movedex')

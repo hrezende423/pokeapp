@@ -4291,7 +4291,7 @@ try {
   await page.click('[data-testid="controls-toggle"]')
   await page.fill('[data-testid="tb-builds-search"]', 'chomp')
   await page.waitForTimeout(200)
-  check('the Search/Filter menu searches builds by nickname or species', JSON.stringify(await cardIds()) === '["b5"]', JSON.stringify(await cardIds()))
+  check('the Sort/Filter menu searches builds by nickname or species', JSON.stringify(await cardIds()) === '["b5"]', JSON.stringify(await cardIds()))
   await page.fill('[data-testid="tb-builds-search"]', '')
   await page.selectOption('[data-testid="dex-filter-move"]', String(moveId.eq))
   await page.waitForTimeout(200)
@@ -4304,7 +4304,7 @@ try {
   await page.click('[data-testid="controls-reset-top"]')
   await page.keyboard.press('Escape')
   await page.mouse.click(5, 900)
-  await page.click('[data-testid="dex-sort-toggle"]')
+  await page.click('[data-testid="controls-toggle"]') // Sort is a part of the one Sort/Filter menu
   const sortKeys = await page.$$eval('[data-testid^="dex-sortfield-"]', (els) => els.map((e) => e.dataset.testid.replace('dex-sortfield-', '')))
   check('builds sort by numbers and names only -- no type, move or ability sort', ['species', 'level', 'bst', 'speed'].every((k) => sortKeys.includes(k)) && !sortKeys.some((k) => /type|move|ability/.test(k)), sortKeys.join(','))
   await page.click('[data-testid="dex-sortfield-species"]')

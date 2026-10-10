@@ -562,26 +562,59 @@ async function main() {
     const token = parseFloat(
       getComputedStyle(document.querySelector('.tc')).getPropertyValue('--font-size-label'),
     )
+    const seg = document.querySelector('.tc-segment')
+    const selected = getComputedStyle(document.querySelector('.tc-segment[data-active="true"]'))
+    const tab = getComputedStyle(document.querySelector('.tc-subnav .ds-tab[aria-selected="true"]'))
     return {
       labelToken: token,
       controlLabel: px('.tc-control-label'),
       segment: px('.tc-segment'),
+      tab: px('.tc-subnav .ds-tab'),
       filter: px('.tc-filter'),
+      segmentFill: getComputedStyle(seg.parentElement).backgroundColor,
+      selectedColour: selected.color,
+      selectedWeight: selected.fontWeight,
+      accent: (() => {
+        const probe = document.createElement('span')
+        probe.style.color = 'var(--accent)'
+        document.querySelector('.tc').appendChild(probe)
+        const c = getComputedStyle(probe).color
+        probe.remove()
+        return c
+      })(),
+      tabUnderline: tab.borderBottomColor,
     }
   })
   check(
     7,
-    'every control is set below the page label token',
-    sizes.controlLabel < sizes.labelToken &&
-      sizes.segment < sizes.labelToken &&
-      sizes.filter < sizes.labelToken,
+    'the rail labels and the type filter are set below the page label token',
+    sizes.controlLabel < sizes.labelToken && sizes.filter < sizes.labelToken,
     JSON.stringify(sizes),
   )
   check(
     7,
-    'and the three controls share one size, so they read as one surface',
-    sizes.controlLabel === sizes.segment && sizes.segment === sizes.filter,
-    `${sizes.controlLabel}/${sizes.segment}/${sizes.filter}`,
+    'and share one size, so they read as one surface',
+    sizes.controlLabel === sizes.filter,
+    `${sizes.controlLabel}/${sizes.filter}`,
+  )
+  /* The toggles are text labels in the tab strip's style (owner, 2026-10-10). */
+  check(
+    7,
+    'the toggles are text labels at the tab strip size, with no pill behind them',
+    sizes.segment === sizes.tab && sizes.segmentFill === 'rgba(0, 0, 0, 0)',
+    `${sizes.segment}/${sizes.tab} fill ${sizes.segmentFill}`,
+  )
+  check(
+    7,
+    'a selected toggle is bold and NOT the accent -- both accent uses are spent',
+    Number(sizes.selectedWeight) >= 700 && sizes.selectedColour !== sizes.accent,
+    `${sizes.selectedWeight} ${sizes.selectedColour}`,
+  )
+  check(
+    7,
+    'and the selected tab has no underline on this page',
+    sizes.tabUnderline === 'rgba(0, 0, 0, 0)',
+    sizes.tabUnderline,
   )
 
   // ---------------------------------------------------------- 8. Type filter

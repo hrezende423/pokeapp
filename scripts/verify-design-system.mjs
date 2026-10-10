@@ -1484,8 +1484,8 @@ try {
       shell.toggle?.rightInset + 'px from the bar edge',
     )
     check(
-      '[' + theme + '] it is a text-only ghost button reading "Search/Filter"',
-      shell.toggle?.text === 'Search/Filter' && shell.toggle.svgCount === 0,
+      '[' + theme + '] it is a text-only ghost button reading "Sort/Filter"',
+      shell.toggle?.text === 'Sort/Filter' && shell.toggle.svgCount === 0,
       JSON.stringify(shell.toggle),
     )
     check(
@@ -1649,8 +1649,9 @@ try {
     )
     check('[' + theme + '] all of them inside the revealed panel', opened.insidePanel)
     check(
-      '[' + theme + '] the panel is --surface-raised with a hairline border and no shadow',
-      opened.background === hexToRgb(want['--surface-raised']) &&
+      // Every navbar menu is the app's base colour since 2026-10-10 (owner).
+      '[' + theme + '] the panel is --surface with a hairline border and no shadow',
+      opened.background === hexToRgb(want['--surface']) &&
         opened.border === '1px ' + hexToRgb(want['--hairline']) &&
         opened.shadow === 'none',
       opened.background + ' / ' + opened.border + ' / ' + opened.shadow,
@@ -1789,8 +1790,9 @@ try {
     hovered.items.join(','),
   )
   check(
-    'the panel is --surface-raised, hairline border, no shadow',
-    hovered.background === hexToRgb(EXPECTED.light['--surface-raised']) &&
+    // Every navbar menu is the app's base colour since 2026-10-10 (owner).
+    'the panel is --surface, hairline border, no shadow',
+    hovered.background === hexToRgb(EXPECTED.light['--surface']) &&
       hovered.border === '1px ' + hexToRgb(EXPECTED.light['--hairline']) &&
       hovered.shadow === 'none',
     hovered.background + ' / ' + hovered.border + ' / ' + hovered.shadow,

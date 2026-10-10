@@ -40,11 +40,17 @@
     toggles widen it, and at x=1327 on the other three, so the one control that
     appears on all four tabs moved by 47px as you switched between them.
 
-    132px is measured against the widest thing in it: the Combinations segmented
-    control, two segments at `calc(var(--tc-control-size) * 5.4)` plus the track's
-    own 3px padding either side.
+    132px was measured against the segmented pill the toggles used to be; the
+    text-label toggles that replaced it are narrower, so it still holds them.
   */
   --tc-rail: 132px;
+
+  /*
+    THE TOGGLES ARE SET AS THE TAB STRIP IS (owner, 2026-10-10): text labels at
+    the ds Tabs' own size, which ds.css draws at a literal 13px with no token.
+    Hosted here once so the two cannot be edited apart in this module.
+  */
+  --tc-tab-size: 13px;
 
   /*
     THE ROW HIGHLIGHT, HOSTED AS A TOKEN so the two themes differ in one place
@@ -75,7 +81,9 @@
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  padding: var(--space-gap-md) var(--space-gap-lg) 0;
+  /* No top padding: the gap under the app bar is the bar's own margin, one
+     value for every page (see .app-bar). */
+  padding: 0 var(--space-gap-lg) 0;
   line-height: var(--tc-line);
 }
 
@@ -183,6 +191,13 @@
   min-width: 0;
 }
 
+/* No underline under the selected tab here (owner, 2026-10-10): the accent
+   text and the weight say which one it is. Scoped to this page -- the species
+   page shares the ds Tabs and keeps its underline. */
+.tc-subnav .ds-tab[aria-selected='true'] {
+  border-bottom-color: transparent;
+}
+
 .tc-axis-note {
   font-size: var(--tc-control-size);
   color: var(--text-secondary);
@@ -207,9 +222,13 @@
   line-height: var(--tc-line);
 }
 
-/* ------------------------------------------------------- segmented control */
-/* The theme switcher's pill, and the species scope segments: a --hairline track
-   with the selected segment lifted one tone step. No accent, no shadow. */
+/* ------------------------------------------------------- toggle labels */
+/*
+  TEXT LABELS IN THE TAB STRIP'S STYLE, not a pill (owner, 2026-10-10): no
+  track, no fill, the tabs' size and spacing. Selected is --text-primary in
+  bold, NOT the tabs' accent -- the accent is the active nav item and the
+  selected tab only, at most two per screen, and this page already spends both.
+*/
 
 /* In the rail the label sits ABOVE its control, so a stack of four of them
    reads as four rows rather than four ragged inline pairs. */
@@ -221,33 +240,36 @@
 
 .tc-segments {
   display: inline-flex;
-  gap: 0;
-  padding: 3px;
-  background: var(--hairline);
-  border-radius: 10px;
+  gap: var(--space-gap-lg);
 }
 
 .tc-segment {
-  padding: var(--tc-2) var(--tc-4);
+  display: inline-flex;
+  flex-direction: column;
+  padding: 0;
   font: inherit;
-  font-size: var(--tc-control-size);
+  font-size: var(--tc-tab-size);
   font-weight: var(--font-weight-regular);
-  line-height: 1;
+  line-height: var(--tc-line);
   color: var(--text-secondary);
   background: none;
   border: none;
-  border-radius: var(--radius-control);
   cursor: pointer;
-  /* Both segments reserve the bold metrics, so selecting one does not shift the
-     other sideways -- without this the pill jiggles on every switch. Sized off
-     the control token so it follows if that changes. */
-  min-width: calc(var(--tc-control-size) * 5.4);
+}
+
+/* Each label reserves its own BOLD width, so selecting one does not shift the
+   other sideways: an invisible bold copy of the text sets the box. */
+.tc-segment::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: var(--font-weight-bold);
 }
 
 .tc-segment[data-active='true'] {
   color: var(--text-primary);
   font-weight: var(--font-weight-bold);
-  background: var(--surface-raised);
   cursor: default;
 }
 
@@ -978,8 +1000,8 @@ table.tc-against-table td.tc-against-enemy {
     align-items: baseline;
   }
 
-  /* And the track itself wraps, so even a very narrow phone can reach the last
-     option instead of it sitting outside a box that does not scroll. */
+  /* And the labels wrap, so even a very narrow phone can reach the last option
+     instead of it sitting outside a box that does not scroll. */
   .tc-segments {
     flex-wrap: wrap;
   }

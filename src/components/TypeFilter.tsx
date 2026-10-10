@@ -13,8 +13,8 @@ interface Props {
 }
 
 /**
- * The type filter: one button per type, filled with that type's own colour when
- * selected, plus an "Any" button that clears the selection.
+ * The type filter: one text button per type, in that type's own colour, bold
+ * when selected, plus an "Any" button that clears the selection.
  *
  * Extracted from the Pokedex species list so the Movedex uses the *same*
  * component rather than a second implementation that could drift in colours,
@@ -61,12 +61,11 @@ export function TypeFilter({
             data-color={color}
             aria-pressed={on}
             className={on ? 'tf tf-on' : 'tf'}
-            // A selected button becomes its type's own colour -- the TEXT, not a
-            // fill. "Type is data, not decoration" is the whole rule now, and
-            // this control was the last thing in the app still drawing a chip.
-            // The palette is unchanged: typeColors.ts, the single cited table
-            // shared with every type label.
-            style={on ? { color } : undefined}
+            // Every type name is drawn in its own colour, on or off (owner,
+            // 2026-10-10) -- the TEXT, never a fill: "type is data, not
+            // decoration". Selection is carried by weight, bold over regular.
+            // The palette is typeColors.ts, the one table every type label uses.
+            style={{ color }}
             onClick={() => toggle(type.id)}
           >
             {type.name}

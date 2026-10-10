@@ -327,6 +327,8 @@ const NATURE_STAT_LABELS: Record<string, string> = {
 
 const isNeutralNature = (n: Nature) => n.increased_stat == null || n.decreased_stat == null
 
+/* NOT WIRED (owner, 2026-10-10): the Naturedex has no Sort/Filter menu. Kept so
+   restoring it is one line in DexQueryProvider. */
 export function naturedexSections(): FilterSection<Nature>[] {
   /*
     HP IS ABSENT FROM BOTH STAT LISTS because no nature has ever affected it --

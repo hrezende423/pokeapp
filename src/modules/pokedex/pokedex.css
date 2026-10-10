@@ -1357,6 +1357,13 @@
   justify-content: space-between;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--hairline);
+  /*
+    THE GAP BETWEEN THE BAR AND EVERY PAGE'S TITLE, in one place (owner,
+    2026-10-10). The dexes started flush under the hairline while Type Coverage,
+    the calculators and Team Matchup each padded their own top by 14px; those
+    paddings are gone and this margin is the one value all of them share.
+  */
+  margin-bottom: var(--space-gap-lg);
   background: var(--surface);
   font-family: var(--font-body);
   text-align: left;
@@ -1518,7 +1525,9 @@
   left: -12px;
   min-width: 168px;
   padding: 0;
-  background: var(--surface-raised);
+  /* The app's own base colour, not the raised tone (owner, 2026-10-10, every
+     navbar menu): the hairline border is what separates it from the page. */
+  background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-control);
 }
@@ -1751,7 +1760,8 @@
      floating panel exactly as it does to a module root. */
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
-  background: var(--surface-raised);
+  /* --surface, like the nav dropdowns: see .nav-dropdown. */
+  background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-control);
 }
@@ -3033,16 +3043,45 @@
   margin-bottom: 0;
 }
 
-/* The reset row at the head of the filter menu: one action, no heading. */
+/*
+  THE SORT/FILTER MENU'S THREE PARTS -- View mode, Sort, Search/Filter -- and the
+  only hairlines inside the panel are the ones BETWEEN them (owner, 2026-10-10).
+  Inside a part, rows are spaced and never ruled, so the three parts read as
+  three. Text fields keep their own underline: that is the field, not a rule.
+*/
+.dex-menu .app-controls-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+  padding: var(--dex-menu-band) var(--space-gap-md) var(--space-gap-sm);
+}
+
+.dex-menu .app-controls-part + .app-controls-part {
+  border-top: 1px solid var(--hairline);
+  padding-top: var(--space-gap-sm);
+}
+
+.dex-menu .app-controls-part .app-controls-field {
+  padding: 0;
+  border-top: none;
+}
+
+/*
+  The reset row at the head of the menu: one action, no heading, no icon -- and
+  STICKY, so it stays at the top of the panel while the filters scroll under it.
+  It needs the panel's own background to do that, or the rows show through.
+*/
 .app-controls-reset {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
+  padding: var(--dex-menu-band) var(--space-gap-md) 0;
+  background: var(--surface);
 }
 
 .app-controls-reset .dex-filter-clear {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   font-size: var(--font-size-caption);
 }
 
@@ -3199,10 +3238,9 @@
   display: none;
   flex-direction: column;
   gap: var(--space-gap-sm);
-  /* Indented behind its own hairline so the fold reads as contained by the
-     toggle above it rather than as a continuation of the panel. */
+  /* Indented so the fold reads as contained by the chevron above it. No
+     hairline: the menu keeps its rules for the borders between its parts. */
   padding-left: var(--space-gap-sm);
-  border-left: 1px solid var(--hairline);
 }
 
 .dex-filter-more[data-open='true'] .dex-filter-more-panel {
@@ -3210,14 +3248,20 @@
 }
 
 /*
-  BOLD, and it is the only bold thing in either menu. "More filters" is not a
-  label among the labels -- it is the control that reveals the other two thirds of
-  the panel, and at --font-size-caption in a column of same-sized text it read as
-  one more section heading. Weight is the one axis available: the menu is
-  deliberately one type size throughout, and --accent is spoken for.
+  A DOWN/UP CHEVRON, not the words "More filters" (owner, 2026-10-10). The glyph
+  is the state: down while folded, up while open. Its accessible name still
+  says what it does.
 */
 .dex-filter-more-toggle {
-  font-weight: var(--font-weight-bold);
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+.dex-filter-more-toggle:hover {
+  color: var(--text-primary);
 }
 
 .dex-filter-more-toggle[data-filters-active='true'] {

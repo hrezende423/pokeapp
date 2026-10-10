@@ -20,7 +20,9 @@
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  padding: var(--space-gap-md) var(--space-gap-lg) 0;
+  /* No top padding: the gap under the app bar is the bar's own margin, one
+     value for every page (see .app-bar). */
+  padding: 0 var(--space-gap-lg) 0;
 }
 
 .calc-head {

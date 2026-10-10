@@ -1,4 +1,11 @@
 # Changelog
+## 2.1.5 — 2026-10-10 (non-breaking)
+- App bar: Grid/List, Sort and Search/Filter merge into one text trigger, "Sort/Filter", whose panel has three parts (View mode · Sort · Search/Filter) with hairlines only between them; disabled on pages with nothing to sort or filter (Naturedex, Type Coverage, Build Form, calculators, Team Matchup)
+- Every navbar menu (nav dropdowns, Sort/Filter, account) is `--surface`, not `--surface-raised`
+- Filter menu: "Reset filters" sticky at the top, no icon; section resets use the plain rotate glyph (no centre dot); "More filters" is a down/up chevron
+- Type filter: every type name in its own colour, regular; selected adds bold
+- Type Coverage: no underline under the selected tab; the Matrix toggles are text labels at the tab size, selected = bold `--text-primary`
+- One gap under the app bar for every page (`--space-gap-lg` margin); the 14px top padding of Type Coverage, Calculators and Team Matchup is gone
 ## 2.1.4 — 2026-10-10 (non-breaking)
 - Species grid card: the four text lines evenly spaced (12.5px baseline-to-cap); `#0001` at the BST number's size
 - Itemdex, Abilitydex (with an Ability # column), Breeding dex and Trainer Dex are sortable data tables like the Movedex; their bar Sort menu is gone
