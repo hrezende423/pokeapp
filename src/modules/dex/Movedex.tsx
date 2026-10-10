@@ -1,6 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
 import { DataTable, type Column } from '../../components/DataTable'
-import { KeyValueList } from '../../components/ds/KeyValueList'
 import { TypeLabel } from '../../components/ds/TypeLabel'
 import { getType, listVersionGroups } from '../../data'
 import { fixedDamage } from '../../data/moveDamage'
@@ -11,7 +10,6 @@ import { useGameInGeneration } from '../version-group/gameInGeneration'
 import { versionGroupLabel } from '../pokedex/speciesFacts'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { DexPageShell } from './DexPageShell'
-import { EditorialGroup } from './EditorialDetail'
 import { EntityDetailPage, type SpeciesSection } from './EntityDetailPage'
 import { moveEntries } from './entrySources'
 import {
@@ -85,12 +83,12 @@ function accuracyCell(move: Move) {
 }
 
 /**
- * The learner lists, grouped by how each species learns the move.
+ * The learner grid, grouped by how each species learns the move.
  *
  * A species that learns a move both by level-up and by TM appears in both
- * groups: the question each group answers is "how", and both answers are
- * true. Level-up rows carry the level as a trailing value; the other three
- * groups need none, since the heading already says everything.
+ * sections: the question each section answers is "how", and both answers are
+ * true. Level-up cards carry the level as a corner badge; the other three
+ * sections need none, since the label already says everything.
  *
  * Generation-aware for free -- the hook reads the selected version group's own
  * learnset partition, so changing the game re-derives which methods exist. Under
@@ -138,13 +136,9 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
   const excluded = learners.length - shownIds.size
 
   /*
-    IDENTITY: the type in its own colour, the category in grey uppercase. The
-    category has no colour of its own -- colour is for types only -- so it reads
-    as a label, and the middot between them is the system's separator.
-
-    THE STRIP: Power / Accuracy / PP as label-over-value pairs, emphasised by
-    size rather than weight. Each test id sits on the value cell alone, so a
-    check compares "40", never "Power 40".
+    Each span holds ONLY its value, with the labels and separators outside them:
+    a readout whose test id covers "· Power 40" cannot be compared to the bundle
+    without unpicking the prose first.
   */
   const meta = (
     <>
@@ -153,29 +147,21 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
           <TypeLabel type={getType(move.type_id)?.name ?? ''} />
         </span>
       )}
-      <span className="dex-ed-sep" aria-hidden>
-        ·
-      </span>
-      <span className="dex-ed-caps" data-testid="movedex-category">
-        {titleCase(move.damage_class)}
+      {' · '}
+      <span data-testid="movedex-category">{titleCase(move.damage_class)}</span>
+      {' · Power '}
+      <span data-testid="movedex-power">{powerCell(move)}</span>
+      {' · Accuracy '}
+      <span data-testid="movedex-accuracy">{accuracyCell(move)}</span>
+      {' · PP '}
+      <span data-testid="movedex-pp" className="num">
+        {move.pp ?? '—'}
       </span>
     </>
   )
-  const strip = [
-    { label: 'Power', value: powerCell(move), testId: 'movedex-power' },
-    { label: 'Accuracy', value: accuracyCell(move), testId: 'movedex-accuracy' },
-    { label: 'PP', value: <span className="num">{move.pp ?? '—'}</span>, testId: 'movedex-pp' },
-  ]
 
   return (
     <EntityDetailPage
-      variant="editorial"
-      // The ghost is the move's power, the one number that orients a reader on
-      // a damaging move. A status or variable-damage move has none to show, so
-      // it gets no ghost rather than a ghost dash. The strip carries it as text.
-      ghost={move.power != null ? String(move.power) : null}
-      strip={strip}
-      stripTestId="movedex-strip"
       testId="movedex-detail"
       entryId={move.id}
       onBack={onBack}
@@ -254,27 +240,24 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
   )
 }
 
-/**
- * One group of secondary facts: a small uppercase heading over key-value rows.
- * A group with nothing to say is not rendered, heading included.
- */
-function FactGroup({
-  label,
+/** Label/value rows on hairlines, the Itemdex's treatment. Nothing in a box. */
+function FactRows({
   testId,
   rows,
-  children,
 }: {
-  label: string
   testId: string
   rows: { label: string; value: ReactNode }[]
-  children?: ReactNode
 }) {
   if (rows.length === 0) return null
   return (
-    <EditorialGroup label={label}>
-      {children}
-      <KeyValueList items={rows} testId={testId} />
-    </EditorialGroup>
+    <ul className="fact-rows" data-testid={testId}>
+      {rows.map((row) => (
+        <li key={row.label}>
+          <span className="fact-label">{row.label}</span>
+          <span className="fact-value">{row.value}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -361,23 +344,24 @@ function MoveFactBlocks({ move, versionGroup }: { move: Move; versionGroup: stri
 
   return (
     <>
-      <FactGroup label="Details" testId="movedex-facts" rows={basics} />
-      <FactGroup
-        label="In battle"
+      <FactRows testId="movedex-facts" rows={basics} />
+      <FactRows
         testId="movedex-meta"
         rows={metaRows.map((r) => ({ label: r.label, value: r.value }))}
       />
-      <FactGroup label="Contests" testId="movedex-contest" rows={contest} />
-      <FactGroup
-        label="History"
-        testId="movedex-past"
-        rows={pastRows.map((r) => ({ label: r.label, value: r.value }))}
-      >
-        <p className="dex-ed-note" data-testid="movedex-past-caption">
-          Each row gives the value it had before that game; the figures above are the ones in force
-          in the selected generation.
-        </p>
-      </FactGroup>
+      <FactRows testId="movedex-contest" rows={contest} />
+      {pastRows.length > 0 && (
+        <>
+          <p className="list-caption" data-testid="movedex-past-caption">
+            How this move changed. Each row gives the value it had before that game; the
+            figures above are the ones in force in the selected generation.
+          </p>
+          <FactRows
+            testId="movedex-past"
+            rows={pastRows.map((r) => ({ label: r.label, value: r.value }))}
+          />
+        </>
+      )}
     </>
   )
 }

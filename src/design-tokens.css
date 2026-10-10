@@ -214,37 +214,44 @@
 
   /* type-indicator colors — text only, never a fill/background.
 
-     ALIASES OF THE DESIGN SYSTEM'S TYPE INK (owner, 2026-10-10). These were the
-     community palette darkened to exactly 4:1, which left 12 of 17 types under
-     the 4.5:1 a 9-11px label needs, and had no Fairy at all -- so a Gen 6+ move
-     like Moonblast drew its type in grey. design-system/tokens.json carries a
-     verified set (color.type-text: 4.60-5.68:1 on the light canvas, >=5.25:1 on
-     the dark one, Fairy included), and these names now point at it.
+     THE COMMUNITY PALETTE, which replaced the muted custom one everywhere. Its
+     raw hexes are used unchanged wherever they are legible; 12 of the 17 are
+     not, in light mode, because that palette was drawn for type-chart FILLS
+     with text on top rather than for coloured text on a near-white surface.
+     Measured against #fafafa, unmodified: Electric 1.43:1, Ice 1.53:1, Ground
+     1.69:1, Steel 1.86:1, Grass 1.98:1, Bug 2.11:1, Rock 2.48:1, Flying 2.54:1,
+     Fire 2.57:1, Normal 2.36:1, Water 2.94:1, Psychic 2.98:1 — all far under
+     the >=4:1 floor this project already adopted, and Electric at 1.43:1 is
+     effectively invisible.
 
-     THE INK PRIMITIVES, NOT --color-type-text-*, and on purpose: that alias is
-     declared on :root only, so it cannot follow a data-theme set on a wrapper
-     (the design-system page renders light and dark side by side that way). Each
-     block here names its own mode's ink, which is exactly what
-     --color-type-text-* resolves to at the root, and also right inside a
-     themed wrapper. Change a colour in tokens.json, never here. */
-  --type-normal: var(--color-type-ink-normal-light);
-  --type-fire: var(--color-type-ink-fire-light);
-  --type-water: var(--color-type-ink-water-light);
-  --type-electric: var(--color-type-ink-electric-light);
-  --type-grass: var(--color-type-ink-grass-light);
-  --type-ice: var(--color-type-ink-ice-light);
-  --type-fighting: var(--color-type-ink-fighting-light);
-  --type-poison: var(--color-type-ink-poison-light);
-  --type-ground: var(--color-type-ink-ground-light);
-  --type-flying: var(--color-type-ink-flying-light);
-  --type-psychic: var(--color-type-ink-psychic-light);
-  --type-bug: var(--color-type-ink-bug-light);
-  --type-rock: var(--color-type-ink-rock-light);
-  --type-ghost: var(--color-type-ink-ghost-light);
-  --type-dragon: var(--color-type-ink-dragon-light);
-  --type-dark: var(--color-type-ink-dark-light);
-  --type-steel: var(--color-type-ink-steel-light);
-  --type-fairy: var(--color-type-ink-fairy-light);
+     So each of those 12 is the community hue mixed toward black until it reaches
+     exactly 4:1 — the mirror of the computed lightening already applied to the
+     dark mode set (type-color-community-dark-mode-override), same method, same
+     floor, opposite direction. Scaling all three channels equally preserves the
+     hue exactly, so Electric is still the community yellow and Ice still the
+     community cyan, only dark enough to read.
+
+     The remaining 5 — Fighting, Poison, Ghost, Dragon, Dark — are the community
+     values untouched, and they are precisely the 5 that needed a dark-mode lift.
+     Mid-dark saturated colours work on white and fail on black; bright pastels
+     do the reverse. */
+  --type-normal: #7e7e5a;
+  --type-fire: #bd6526;
+  --type-water: #587acb;
+  --type-electric: #927a1c;
+  --type-grass: #538a37;
+  --type-ice: #5c8383;
+  --type-fighting: #c03028;
+  --type-poison: #a040a0;
+  --type-ground: #8f7a42;
+  --type-flying: #8370bb;
+  --type-psychic: #d34b74;
+  --type-bug: #778317;
+  --type-rock: #8e7b2b;
+  --type-ghost: #705898;
+  --type-dragon: #7038f8;
+  --type-dark: #705848;
+  --type-steel: #7b7b8b;
 }
 
 [data-theme='dark'] {
@@ -275,25 +282,30 @@
   --mini-badge-fill: rgba(255, 255, 255, 0.08);
   --mini-badge-text: #b5b5ba;
 
-  /* Dark-mode type ink; see the light block above for why these are aliases. */
-  --type-normal: var(--color-type-ink-normal-dark);
-  --type-fire: var(--color-type-ink-fire-dark);
-  --type-water: var(--color-type-ink-water-dark);
-  --type-electric: var(--color-type-ink-electric-dark);
-  --type-grass: var(--color-type-ink-grass-dark);
-  --type-ice: var(--color-type-ink-ice-dark);
-  --type-fighting: var(--color-type-ink-fighting-dark);
-  --type-poison: var(--color-type-ink-poison-dark);
-  --type-ground: var(--color-type-ink-ground-dark);
-  --type-flying: var(--color-type-ink-flying-dark);
-  --type-psychic: var(--color-type-ink-psychic-dark);
-  --type-bug: var(--color-type-ink-bug-dark);
-  --type-rock: var(--color-type-ink-rock-dark);
-  --type-ghost: var(--color-type-ink-ghost-dark);
-  --type-dragon: var(--color-type-ink-dragon-dark);
-  --type-dark: var(--color-type-ink-dark-dark);
-  --type-steel: var(--color-type-ink-steel-dark);
-  --type-fairy: var(--color-type-ink-fairy-dark);
+  /* Every type now has a computed, contrast-verified dark-mode variant
+     (>=4:1 against #141414). "dark" keeps its earlier hand-picked value,
+     tested against real Umbreon artwork, since it already clears the floor. */
+  /* Community palette on dark. 12 of the 17 clear >=4:1 against #141414 as
+     published; the 5 that did not carry the computed lift already recorded in
+     type-color-community-dark-mode-override. No new work in this mode — the
+     light block is where this pass did its measuring. */
+  --type-normal: #a8a878;
+  --type-fire: #f08030;
+  --type-water: #6890f0;
+  --type-electric: #f8d030;
+  --type-grass: #78c850;
+  --type-ice: #98d8d8;
+  --type-fighting: #c94f48;
+  --type-poison: #ab57ab;
+  --type-ground: #e0c068;
+  --type-flying: #a890f0;
+  --type-psychic: #f85888;
+  --type-bug: #a8b820;
+  --type-rock: #b8a038;
+  --type-ghost: #836ea5;
+  --type-dragon: #8556f9;
+  --type-dark: #887467;
+  --type-steel: #b8b8d0;
 }
 
 :root {

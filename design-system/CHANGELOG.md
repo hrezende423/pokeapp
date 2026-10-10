@@ -1,13 +1,4 @@
 # Changelog
-## 2.2.0 — 2026-10-10 (non-breaking)
-- Type colours: `--type-*` (app) now aliases `color.type-ink` per mode, i.e. what `--color-type-text-*` resolves to. All 18 types ≥4.5:1 on both canvases (the old set sat at 4.0:1 on 12 of 17 in light); Fairy added, so a Gen 6+ type no longer falls back to grey
-- New editorial detail page for the Movedex, Abilitydex, Itemdex, Naturedex and Berrydex (`PATTERNS.md` §5): name → identity → ghost → strip → lead text → grouped facts → related data; no borders, fills or shadows for grouping. The Breeding dex keeps the card-grid detail on the same component (`variant` flag)
-- Key-value list: new `strip` layout (label-caps over an h3-size value, side by side, no hairlines) for an entry's headline numbers; first shared implementation (`KeyValueList`), as a `<dl>`
-- Stat bar: first shared implementation (`StatBar`), used for berry flavour potency on a 0–40 scale; the species page's base-stat bars are not yet migrated to it
-- Ghost watermark: a `detail` scale carrying text (a move's power, a nature's stat delta), in flow in its own grid area, `font.style.watermark` in `color.text-watermark`; always restated as readable text
-- Ledger row: a `plain` variant (no number column, no vertical rule, regular-weight name) and a trailing `aside` value, for grouped species lists
-- Naturedex: matrix without gridlines or fills (alignment and a wide gutter; diagonal by italics and muted ink); hover is weight, not background; stat arrows use `color.status.up/down`
-- Berrydex card: the ghost dex number is removed; the grid stays
 ## 2.1.5 — 2026-10-10 (non-breaking)
 - App bar: Grid/List, Sort and Search/Filter merge into one text trigger, "Sort/Filter", whose panel has three parts (View mode · Sort · Search/Filter) with hairlines only between them; disabled on pages with nothing to sort or filter (Naturedex, Type Coverage, Build Form, calculators, Team Matchup)
 - Every navbar menu (nav dropdowns, Sort/Filter, account) is `--surface`, not `--surface-raised`

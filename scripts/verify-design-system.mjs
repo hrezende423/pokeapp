@@ -71,21 +71,35 @@ function tokenValue(node, mode) {
 }
 
 const semantic = tokens.color.semantic
+const primitive = tokens.color.primitive
 /*
-  THE DESIGN SYSTEM'S TYPE INK IS THE PALETTE NOW (owner, 2026-10-10), in both
-  themes: --type-<t> is an alias of design-system/tokens.json's color.type-ink,
-  which is what --color-type-text-<t> resolves to. It replaced the community
-  palette darkened to 4:1, which left 12 of 17 under the 4.5:1 a small label
-  needs and had no Fairy. 18 types now, Fairy included.
+  THE COMMUNITY PALETTE IS THE PALETTE NOW, in both themes.
+
+  `type-color` (the muted custom set) is retired -- still in design-tokens.json
+  for the record, referenced by nothing -- so the expected value of --type-<t> is
+  built from `type-color-community` with each mode's override set applied on top.
+  Neither mode uses all 17 raw community values, and for opposite reasons:
+
+    dark   5 of 17 overridden (fighting, poison, ghost, dragon, dark) -- the
+           mid-dark saturated ones did not clear 4:1 against #141414.
+    light  12 of 17 overridden -- the bright pastels did not clear 4:1 against
+           #fafafa, Electric worst at 1.43:1.
 
   Read from the JSON rather than restated here, so the CSS and the source of
   truth are compared to each other rather than both to a copy in this file.
 */
-const typeInk = JSON.parse(readFileSync('design-system/tokens.json', 'utf8')).color['type-ink']
-const TYPES = Object.keys(typeInk).filter((k) => !k.startsWith('$'))
+const TYPES = Object.keys(primitive['type-color-community']).filter((k) => !k.startsWith('$'))
 
-const typeExpectations = (mode) =>
-  Object.fromEntries(TYPES.map((t) => [`--type-${t}`, typeInk[t][mode].$value]))
+const typeExpectations = (mode) => {
+  const overrideKey = `type-color-community-${mode}-mode-override`
+  const overrides = primitive[overrideKey] ?? {}
+  return Object.fromEntries(
+    TYPES.map((t) => [
+      `--type-${t}`,
+      (overrides[t] ?? primitive['type-color-community'][t]).$value,
+    ]),
+  )
+}
 
 /** The custom properties design-tokens.css is expected to expose, per theme. */
 const EXPECTED = {
@@ -191,9 +205,9 @@ log(`  ${TYPES.length} type colours, light + dark`)
 log(`  light --surface ${EXPECTED.light['--surface']} / dark ${EXPECTED.dark['--surface']}`)
 log(`  light --accent  ${EXPECTED.light['--accent']} / dark ${EXPECTED.dark['--accent']}`)
 log(`  scale tokens: ${Object.keys(SCALE).length}`)
-check('all 18 types have a light value', TYPES.length === 18, `(${TYPES.length})`)
+check('all 17 in-scope types have a light value', TYPES.length === 17, `(${TYPES.length})`)
 check(
-  'all 18 have a dark-mode value too',
+  'all 17 have a dark-mode value too',
   TYPES.every((t) => EXPECTED.dark[`--type-${t}`]),
 )
 
@@ -250,16 +264,9 @@ const appDecls = decls(appCss)
   carry the same IBM Plex Sans / Martian Mono stacks. Anything else differing
   from the handoff copy is still a failure.
 */
-/*
-  THE TYPE COLOURS ARE ALIASES TOO (owner, 2026-10-10), of the design system's
-  per-mode type ink. `decls` keeps the LAST declaration of a name, which is the
-  dark block's, so the dark alias is what is compared here; both modes' resolved
-  values are checked in the browser under TOKENS.
-*/
 const ALIASED = {
   '--font-body': 'var(--font-family-sans)',
   '--font-numeric': 'var(--font-family-mono)',
-  ...Object.fromEntries(TYPES.map((t) => [`--type-${t}`, `var(--color-type-ink-${t}-dark)`])),
 }
 const changed = Object.keys(handoffDecls).filter((k) =>
   k in ALIASED
@@ -2569,12 +2576,9 @@ try {
     /IBM Plex/.test(berryCard?.font ?? ''),
     berryCard?.font,
   )
-  // The shared chrome WITHOUT the ghost dex number (owner, 2026-10-10): a
-  // berry's id is not a catalog number, so the Pokédex card's ghost was its
-  // template carried over rather than a fact about the berry.
   check(
-    'berrydex uses the SHARED species-card chrome, minus the ghost number',
-    berryCard?.isSpeciesCard === true && berryCard?.ghost === false,
+    'berrydex uses the SHARED species-card chrome, not its own card',
+    berryCard?.isSpeciesCard === true && berryCard?.ghost === true,
     JSON.stringify(berryCard),
   )
   check(
@@ -2602,20 +2606,13 @@ try {
   )
 
   // ------------------------------------------- the rebuilt dexes share the card
-  /*
-    ONE TEMPLATE, TWO LAYOUTS (owner, 2026-10-10). The Movedex and Abilitydex
-    opt into EntityDetailPage's `editorial` variant, which lists species as
-    plain grouped rows (the LedgerRow's `plain` variant: no number column, no
-    rule). The Breeding dex keeps the original species-card grid on the same
-    component. Both halves are asserted, so neither can drift into the other.
-  */
-  hr('SHARED COMPONENTS — one detail template, an editorial list or the card grid')
+  hr('SHARED COMPONENTS — one species-card grid and one detail template')
   const SHARED = [
-    { dex: 'movedex', open: 'movedex-row-1', layout: 'editorial' },
-    { dex: 'abilitydex', open: 'abilitydex-row-1', layout: 'editorial' },
-    { dex: 'breedingdex', open: 'breedingdex-row-1', layout: 'grid' },
+    { dex: 'movedex', open: 'movedex-row-1' },
+    { dex: 'abilitydex', open: 'abilitydex-row-1' },
+    { dex: 'breedingdex', open: 'breedingdex-row-1' },
   ]
-  for (const { dex, open, layout } of SHARED) {
+  for (const { dex, open } of SHARED) {
     await goToDex(page, dex)
     await page.waitForSelector(`[data-testid="${dex}-count"]`, { timeout: 30000 })
     await page.waitForSelector(`[data-testid="${open}"]`, { timeout: 30000 })
@@ -2623,54 +2620,25 @@ try {
     await page.waitForSelector('[data-testid="entity-back"]', { timeout: 30000 })
     // The Movedex's sections wait on a learnset partition; the other two are
     // synchronous, so this is only ever a real wait for one of the three.
-    await page.waitForSelector('[data-testid^="entity-grid-"], [data-testid^="entity-list-"]', {
-      timeout: 60000,
-    })
+    await page.waitForSelector('[data-testid^="entity-grid-"]', { timeout: 60000 })
     const shape = await page.evaluate(() => ({
       // The shared template's own landmarks, not a per-dex lookalike.
       name: document.querySelector('[data-testid="entity-name"]') != null,
       back: document.querySelector('[data-testid="entity-back"]') != null,
-      editorial: document.querySelector('[data-variant="editorial"]') != null,
       grids: document.querySelectorAll('[data-testid^="entity-grid-"]').length,
-      lists: document.querySelectorAll('[data-testid^="entity-list-"]').length,
       cards: document.querySelectorAll('.entity-detail-section .species-card').length,
       cardGhosts: document.querySelectorAll('.entity-detail-section .species-card-ghost').length,
-      rows: document.querySelectorAll('[data-testid^="entity-list-"] [data-ds="ledger-row"]').length,
-      plainRows: document.querySelectorAll(
-        '[data-testid^="entity-list-"] [data-ds="ledger-row"][data-variant="plain"]',
-      ).length,
-      rowNumbers: document.querySelectorAll('[data-testid^="entity-list-"] [data-ds="ledger-num"]')
-        .length,
       typeLabels: document.querySelectorAll(
-        '[data-testid^="entity-grid-"] [data-ds="type-label"], [data-testid^="entity-list-"] [data-ds="type-label"]',
+        '.entity-detail-section .species-card [data-ds="type-label"]',
       ).length,
     }))
     log(`  ${dex}: ${JSON.stringify(shape)}`)
-    if (layout === 'grid') {
-      check(`${dex} detail renders the shared template`, shape.name && shape.back && shape.grids > 0)
-      check(
-        `${dex} keeps the shared species card, not a lookalike`,
-        !shape.editorial &&
-          shape.cards > 0 &&
-          shape.cardGhosts === shape.cards &&
-          shape.typeLabels > 0,
-        JSON.stringify(shape),
-      )
-    } else {
-      check(
-        `${dex} detail renders the shared template, editorial variant`,
-        shape.name && shape.back && shape.editorial && shape.lists > 0,
-      )
-      check(
-        `${dex} lists species as plain rows -- no cards, no number column`,
-        shape.cards === 0 &&
-          shape.rows > 0 &&
-          shape.plainRows === shape.rows &&
-          shape.rowNumbers === 0 &&
-          shape.typeLabels > 0,
-        JSON.stringify(shape),
-      )
-    }
+    check(`${dex} detail renders the shared template`, shape.name && shape.back && shape.grids > 0)
+    check(
+      `${dex} detail renders the shared species card, not a lookalike`,
+      shape.cards > 0 && shape.cardGhosts === shape.cards && shape.typeLabels > 0,
+      JSON.stringify(shape),
+    )
   }
 
   await goToDex(page, 'pokedex')

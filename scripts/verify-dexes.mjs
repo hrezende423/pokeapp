@@ -336,8 +336,7 @@ try {
       const cs = getComputedStyle(el)
       return parseFloat(cs.borderTopWidth) > 0 && parseFloat(cs.borderLeftWidth) > 0
     }).length,
-    // Buy/Sell in the strip plus the details group, all key-value rows now.
-    factRows: document.querySelectorAll('[data-testid="itemdex-detail"] .ds-kv-row').length,
+    factRows: document.querySelectorAll('[data-testid="itemdex-facts"] li').length,
     pocket: document.querySelector('[data-testid="itemdex-pocket"]')?.textContent,
     artSource: document.querySelector('[data-testid="itemdex-artwork"]')?.dataset.source,
   }))
@@ -423,15 +422,14 @@ try {
   await page.waitForSelector('[data-testid="abilitydex-detail"]', { timeout: 15000 })
 
   /*
-    The carriers are a plain grouped list now (the editorial detail page's
-    LedgerRow rows, owner 2026-10-10) -- same reverse lookup, same order,
-    different markup. One flat list: hidden
+    The carriers are the shared species-card grid now, not a bespoke <li> list --
+    same reverse lookup, same order, different markup. One flat grid: hidden
     abilities do not exist in Gen 1-4, so there is nothing to split on. (Measured:
     12 residual "hidden" flags at gen 3 and 17 at gen 4, all PokeAPI artifacts.
     See the note at the top of Abilitydex.tsx.)
   */
   const readHolders = () =>
-    page.$$eval('[data-testid="abilitydex-detail"] [data-ds="ledger-row"] .ds-ledger-name', (els) =>
+    page.$$eval('[data-testid="abilitydex-detail"] .species-card .species-name', (els) =>
       els.map((e) => e.textContent.trim()),
     )
 
@@ -535,45 +533,35 @@ try {
   await page.click(`[data-testid="naturedex-row-${adamant.id}"]`)
   await page.waitForSelector('[data-testid="naturedex-detail"]', { timeout: 10000 })
   /*
-    THE DELTA IS REAL TEXT NOW (owner, 2026-10-10): "↑ Attack +10%", the glyph
-    a character rather than an aria-hidden icon, so a screen reader reads the
-    direction off the glyph itself and no visually-hidden word is needed. The
-    glyph's colour is the design system's status token, read off a probe
-    element so the check compares to the token rather than to a copied hex.
-    The same delta is the page's ghost, which is aria-hidden decoration.
+    DIRECTION IS AN ARROW NOW, not the words "increases" / "decreases", so this
+    reads the structure rather than a sentence: the stat name, which arrow class
+    the glyph carries, and which token that class resolves to. textContent still
+    carries the direction as a word, because each arrow is paired with a
+    visually-hidden "raised" / "lowered" for screen readers -- which is why the
+    name is compared against a trimmed prefix rather than the whole string.
   */
   const adamantView = await page.evaluate(() => {
-    const tokenColor = (name) => {
-      const probe = document.createElement('span')
-      probe.style.color = `var(${name})`
-      document.body.appendChild(probe)
-      const c = getComputedStyle(probe).color
-      probe.remove()
-      return c
-    }
     const read = (id) => {
-      const el = document.querySelector(`[data-testid="${id}"]`)
-      if (!el) return null
-      const glyph = el.querySelector('.dex-ed-delta-glyph')
+      const li = document.querySelector(`[data-testid="${id}"]`)
+      if (!li) return null
+      const arrow = li.querySelector('.stat-arrow')
       return {
-        stat: el.querySelector('.dex-ed-delta-stat')?.textContent?.trim(),
-        delta: el.querySelector('.nature-stat-delta')?.textContent?.trim(),
-        arrow: glyph?.textContent === '↑' ? 'up' : glyph?.textContent === '↓' ? 'down' : null,
-        color: glyph ? getComputedStyle(glyph).color : null,
-        hidden: el.closest('[aria-hidden="true"]') != null,
+        stat: li.querySelector('.stat-direction')?.firstChild?.textContent?.trim(),
+        delta: li.querySelector('.nature-stat-delta')?.textContent?.trim(),
+        arrow: arrow?.classList.contains('stat-arrow-up')
+          ? 'up'
+          : arrow?.classList.contains('stat-arrow-down')
+            ? 'down'
+            : null,
+        color: arrow ? getComputedStyle(arrow).color : null,
+        sr: li.querySelector('.visually-hidden')?.textContent?.trim(),
       }
     }
     const words = document.querySelector('[data-testid="naturedex-detail"]')?.textContent ?? ''
-    const ghost = document.querySelector('[data-testid="naturedex-detail"] [data-ds="ghost-watermark"]')
     return {
       name: document.querySelector('[data-testid="naturedex-name"]')?.textContent,
       up: read('naturedex-increased'),
       down: read('naturedex-decreased'),
-      upToken: tokenColor('--color-status-up'),
-      downToken: tokenColor('--color-status-down'),
-      accent: tokenColor('--accent'),
-      ghost: ghost?.textContent ?? null,
-      ghostHidden: ghost?.getAttribute('aria-hidden') === 'true',
       // The words this pass removed must not be back anywhere on the page.
       hasRaisesLowers: /\b(Raises|Lowers|increases|decreases)\b/.test(words),
     }
@@ -583,39 +571,34 @@ try {
   )
   check('Adamant detail names the nature', adamantView.name === 'Adamant')
   check(
-    'Adamant raises Attack, stated as "↑ Attack +10%"',
+    'Adamant raises Attack, shown as an up arrow after the stat name',
     adamantView.up?.stat === 'Attack' &&
       adamantView.up?.arrow === 'up' &&
       adamantView.up?.delta === '+10%',
     JSON.stringify(adamantView.up),
   )
   check(
-    'the up glyph is --color-status-up and NOT --accent',
-    adamantView.up?.color === adamantView.upToken && adamantView.up?.color !== adamantView.accent,
-    `${adamantView.up?.color} vs ${adamantView.upToken}`,
+    'the up arrow is --stat-increase and NOT --accent',
+    adamantView.up?.color === 'rgb(179, 38, 30)',
+    String(adamantView.up?.color),
   )
   check(
-    'and the direction is real text a screen reader reaches, not hidden',
-    adamantView.up?.hidden === false && adamantView.down?.hidden === false,
-    `${adamantView.up?.hidden} / ${adamantView.down?.hidden}`,
+    'and the direction exists as a word for a screen reader',
+    adamantView.up?.sr === 'raised' && adamantView.down?.sr === 'lowered',
+    `${adamantView.up?.sr} / ${adamantView.down?.sr}`,
   )
   check('the words "Raises" and "Lowers" are gone from the page', !adamantView.hasRaisesLowers)
   check(
-    'Adamant lowers Sp. Atk, stated as "↓ Sp. Atk −10%"',
+    'Adamant lowers Sp. Atk, shown as a down arrow after the stat name',
     adamantView.down?.stat === 'Sp. Atk' &&
       adamantView.down?.arrow === 'down' &&
       adamantView.down?.delta === '−10%',
     JSON.stringify(adamantView.down),
   )
   check(
-    'the down glyph is --color-status-down',
-    adamantView.down?.color === adamantView.downToken,
-    `${adamantView.down?.color} vs ${adamantView.downToken}`,
-  )
-  check(
-    'the delta is also the page ghost, aria-hidden decoration',
-    adamantView.ghost === '+Atk\n−SpA' && adamantView.ghostHidden,
-    JSON.stringify(adamantView.ghost),
+    'the down arrow is --stat-decrease',
+    adamantView.down?.color === 'rgb(31, 95, 168)',
+    String(adamantView.down?.color),
   )
 
   check(
@@ -815,11 +798,9 @@ try {
     String(oranCard.ngType),
   )
   check('all six berry fields are on the card at once', oranCard.clipped === 0)
-  // The Pokedex card's chrome WITHOUT its ghost dex number (owner, 2026-10-10):
-  // a berry id is not a catalog number, so the watermark was template furniture.
   check(
-    'the card carries the Pokedex card chrome -- artwork, and no ghost number',
-    oranCard.ghost === null && oranCard.art,
+    'the card carries the Pokedex card chrome -- watermark and artwork',
+    oranCard.ghost === '001'.slice(0, 0) + String(oran.id).padStart(3, '0') && oranCard.art,
     `${oranCard.ghost} / art=${oranCard.art}`,
   )
   check(
@@ -855,16 +836,10 @@ try {
       .querySelector('[data-testid="berrydex-detail-flavours"]')
       ?.textContent?.trim(),
     effect: document.querySelector('[data-testid="berrydex-effect"]')?.textContent?.trim(),
-    /* Same structure as the item page, asserted rather than assumed: the
-       editorial head with art, key-value rows (the strip's and the details'),
-       five flavour bars -- and nothing in a rectangle. */
-    hero: document.querySelectorAll(
-      '[data-testid="berrydex-detail"][data-variant="editorial"] .dex-ed-head[data-has-art="true"]',
-    ).length,
-    factRows: document.querySelectorAll('[data-testid="berrydex-detail"] .ds-kv-row').length,
-    flavourBars: document.querySelectorAll(
-      '[data-testid="berrydex-detail-flavours"] [data-ds="stat-bar"][role="meter"]',
-    ).length,
+    /* Same structure as the item page, asserted rather than assumed: hero,
+       boxless fact rows, back control -- and nothing in a rectangle. */
+    hero: document.querySelectorAll('[data-testid="berrydex-detail"] .item-hero').length,
+    factRows: document.querySelectorAll('[data-testid="berrydex-facts"] li').length,
     boxes: document.querySelectorAll('[data-testid="berrydex-detail"] .dex-card').length,
   }))
   const oranBerry = oran
@@ -887,14 +862,9 @@ try {
     oranPage.effect?.slice(0, 40),
   )
   check(
-    "it is the item page's structure: a head with art, fact rows, and no boxes",
-    oranPage.hero === 1 && oranPage.factRows >= 7 && oranPage.boxes === 0,
+    "it is the item page's structure: a hero, fact rows, and no boxes",
+    oranPage.hero === 1 && oranPage.factRows >= 8 && oranPage.boxes === 0,
     `hero=${oranPage.hero} rows=${oranPage.factRows} boxes=${oranPage.boxes}`,
-  )
-  check(
-    'the flavour profile is five stat bars, zeroes included',
-    oranPage.flavourBars === 5,
-    String(oranPage.flavourBars),
   )
   await page.click('[data-testid="entity-back"]')
   await page.waitForSelector('[data-testid="berrydex-rows"]', { timeout: 15000 })

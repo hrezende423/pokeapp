@@ -18,20 +18,3 @@ Gender ratio: neutral two-tone bar with text "87.5% ♂ · 12.5% ♀" (no red se
 
 ## 4. Dense form (compact) — Build form
 Sticky left summary (sprite, name, types, EV total remaining, BST) · right column of collapsible `section`s: Identity → Moves → EVs/IVs → Item/Ability/Nature → Notes. Each section: `label-caps` heading, hairline, key-value-style fields (underline inputs allowed at compact), `field-strip` for paired fields (EV/IV rows). Closed sections show a one-line summary. Actions are ghost buttons pinned bottom-right; no accent on the form.
-## 5. Editorial detail (compact) — Movedex, Abilitydex, Itemdex, Naturedex, Berrydex
-Chrome-less: no borders, fills or shadows group anything; size and spacing do. One rhythm per entry, top to bottom:
-```
-← All moves
-Name (h2)                                   [ghost]  ← text ghost, own grid area, aria-hidden
-IDENTITY · CATEGORY (type in type-text, rest muted caps)
-POWER  ACCURACY  PP                          ← key-value strip, values by size
-Lead text (h4 size, text.default, ≤60ch)     ← the entry's own description
-DETAILS ─────────────                        ← label-caps heading + one hairline
-Label ............. value                    ← key-value rows
-POKÉMON 28 ─────────────────────────────
-○ Gastly  GHOST · POISON   ○ Haunter ...     ← LedgerRow plain, multi-column
-```
-- **Ghost:** one per page at most, and only when a number or delta orients the reader (a move's power, a nature's `+Atk / −SpA`); none for abilities or items. Always restated as readable text.
-- **Art:** an item or berry shows its literal sprite, compact (60px), beside the name — never as a ghost.
-- **Colour:** type names only, plus `status.up/down` on a stat-delta glyph. Categories, pockets, firmness are muted caps.
-- **Code:** `src/modules/dex/EditorialDetail.tsx`; `EntityDetailPage variant="editorial"` for the two with species lists. The Breeding dex keeps the card-grid detail.

@@ -1067,9 +1067,9 @@ try {
   await page.waitForSelector('[data-testid="movedex-detail"]', { timeout: 15000 })
   const movePage = await page.evaluate(() => {
     const rows = (testId) =>
-      [...document.querySelectorAll(`[data-testid="${testId}"] .ds-kv-row`)].map((li) => [
-        li.querySelector('.ds-kv-label')?.textContent?.trim(),
-        li.querySelector('.ds-kv-value')?.textContent?.trim(),
+      [...document.querySelectorAll(`[data-testid="${testId}"] li`)].map((li) => [
+        li.querySelector('.fact-label')?.textContent?.trim(),
+        li.querySelector('.fact-value')?.textContent?.trim(),
       ])
     return {
       facts: Object.fromEntries(rows('movedex-facts')),
@@ -1107,11 +1107,11 @@ try {
   await page.waitForSelector('[data-testid="movedex-rows"]', { timeout: 15000 })
   await page.click(`[data-testid="movedex-open-${furySwipes.id}"]`)
   await page.waitForSelector('[data-testid="movedex-detail"]', { timeout: 15000 })
-  const hits = await page.$$eval('[data-testid="movedex-meta"] .ds-kv-row', (els) =>
+  const hits = await page.$$eval('[data-testid="movedex-meta"] li', (els) =>
     Object.fromEntries(
       els.map((li) => [
-        li.querySelector('.ds-kv-label')?.textContent?.trim(),
-        li.querySelector('.ds-kv-value')?.textContent?.trim(),
+        li.querySelector('.fact-label')?.textContent?.trim(),
+        li.querySelector('.fact-value')?.textContent?.trim(),
       ]),
     ),
   )
@@ -1137,8 +1137,8 @@ try {
       .querySelector('[data-testid="berrydex-detail-flavours"]')
       ?.textContent?.trim(),
     effect: document.querySelector('[data-testid="berrydex-effect"]')?.textContent?.trim(),
-    hero: document.querySelectorAll('[data-testid="berrydex-detail"] .dex-ed-head[data-has-art="true"]').length,
-    rows: document.querySelectorAll('[data-testid="berrydex-detail"] .ds-kv-row').length,
+    hero: document.querySelectorAll('[data-testid="berrydex-detail"] .item-hero').length,
+    rows: document.querySelectorAll('[data-testid="berrydex-facts"] li').length,
   }))
   log(`  Oran page: ${JSON.stringify(berryPage)}`)
   check(
@@ -1147,8 +1147,8 @@ try {
     berryPage.name,
   )
   check(
-    "it is the item page's structure -- a head with art and boxless key-value rows",
-    berryPage.hero === 1 && berryPage.rows >= 7,
+    "it is the item page's structure -- a hero and boxless fact rows",
+    berryPage.hero === 1 && berryPage.rows >= 8,
     `hero=${berryPage.hero} rows=${berryPage.rows}`,
   )
   check(

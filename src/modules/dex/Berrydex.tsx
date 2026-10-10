@@ -1,19 +1,11 @@
+import { IconArrowLeft } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { ItemArtwork } from '../../components/ItemArtwork'
-import { KeyValueList, type KeyValueItem } from '../../components/ds/KeyValueList'
-import { StatBar, StatBarList } from '../../components/ds/StatBar'
 import { TypeLabel } from '../../components/ds/TypeLabel'
 import { getItem, getType } from '../../data'
 import type { Berry } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell } from './DexPageShell'
-import {
-  EditorialBack,
-  EditorialGroup,
-  EditorialHead,
-  EditorialLead,
-  EditorialPage,
-} from './EditorialDetail'
 import { berryEntries } from './entrySources'
 
 /**
@@ -44,16 +36,10 @@ import { berryEntries } from './entrySources'
  * resolves varieties, generation-aware typing and abilities from a Species, the
  * other reads six scalars off a Berry -- so a single component would be a
  * discriminated union pretending to be one thing. What they do share is every
- * millimetre of the chrome, and that IS shared: the artwork box, the name line
- * and the type row are the same .species-card-* rules in one stylesheet block,
- * so the Figma-measured geometry cannot drift between them. The height
- * difference is a single modifier class.
- *
- * NO GHOST NUMBER (owner, 2026-10-10). A berry's id is not a catalog number
- * anyone navigates by, so the Pokédex card's ghost dex number was its template
- * carried over rather than a fact about the berry. The grid stays a grid -- it
- * is the right shape for 64 pictures -- but only the spacing and borderless
- * system carries across, not the species card's literal furniture.
+ * millimetre of the chrome, and that IS shared: the ghost watermark, the artwork
+ * box, the number and name line and the type row are the same .species-card-*
+ * rules in one stylesheet block, so the Figma-measured geometry cannot drift
+ * between them. The height difference is a single modifier class.
  *
  * ARTWORK: the 90x84 Dream World image, present for all 64 berries -- verified,
  * not assumed. ItemArtwork is the same component the item page uses, and its
@@ -96,6 +82,9 @@ function BerryCard({ berry, onSelect }: { berry: Berry; onSelect: (id: number) =
         aria-label={berryName(berry)}
         onClick={() => onSelect(berry.id)}
       />
+      <span className="species-card-ghost" aria-hidden>
+        {String(berry.id).padStart(3, '0')}
+      </span>
       <ItemArtwork item={item} size={96} testId={`berrydex-art-${berry.id}`} />
       <span className="species-card-text">
         <span className="species-card-line">
@@ -179,28 +168,23 @@ export function Berrydex() {
 }
 
 /**
- * The highest flavour potency any berry in the bundle has (Enigma, Micle,
- * Custap, Jaboca, Rowap -- one per flavour). The flavour bars are drawn on this scale, measured from
- * berries.json rather than assumed: potency runs 0-40, not 0-255 like a stat.
- */
-const MAX_FLAVOUR_POTENCY = 40
-
-/**
- * One berry's page: the Itemdex's editorial layout, because a berry IS an item
- * in this bundle and two layouts for one kind of answer is the drift this app
- * keeps closing.
+ * One berry's page, built as the Itemdex's item page rather than beside it.
  *
- * SAME STRUCTURE, FIELD FOR FIELD: the compact literal sprite beside the name,
- * identity under it, the headline numbers as a strip, the linked item's effect as
- * the lead text, then grouped secondary facts. Nothing is in a rectangle.
+ * SAME STRUCTURE, FIELD FOR FIELD: a back row, artwork beside the name with a
+ * meta line under it, the short effect, the full effect, then label/value rows
+ * on hairlines. Nothing is in a rectangle, which is the house rule for a detail
+ * page here, and it is the Itemdex's layout because a berry IS an item in this
+ * bundle -- two layouts for one kind of answer is the drift this app keeps
+ * closing.
  *
  * THE EFFECT TEXT IS THE LINKED ITEM'S, and that is the only place it can come
- * from: a berry record carries numbers and flavours, not prose.
+ * from: a berry record carries numbers and flavours, not prose. Showing it here
+ * is joining the two halves of one thing rather than borrowing from another.
  *
- * THE FLAVOUR PROFILE IS FIVE STAT BARS, the shared StatBar on a 0-40 scale --
- * not a new chart type. All five are drawn, zeroes included: the page is where
- * the Pokéblock arithmetic lives, and 10 spicy and nothing else is a different
- * ingredient from 10 spicy and 10 dry.
+ * ALL FIVE FLAVOURS ARE LISTED, not just the dominant one. The card shows what
+ * distinguishes a berry at a glance; the page is where the Pokeblock arithmetic
+ * lives, and the zeroes are part of that answer -- 10 spicy and nothing else is
+ * a different ingredient from 10 spicy and 10 dry.
  */
 function BerryDetail({ berry, onBack }: { berry: Berry; onBack: () => void }) {
   const item = berry.item_id != null ? getItem(berry.item_id) : undefined
@@ -208,94 +192,103 @@ function BerryDetail({ berry, onBack }: { berry: Berry; onBack: () => void }) {
   const flavours = berry.flavors.filter((f) => f.flavor != null)
   const num = (value: number | null) => (value != null ? <span className="num">{value}</span> : '—')
 
-  const strip: KeyValueItem[] = [
-    {
-      label: 'Gift power',
-      testId: 'berrydex-detail-ng-power',
-      value: num(berry.natural_gift_power),
-    },
-    {
-      label: 'Size',
-      testId: 'berrydex-detail-size',
-      value: (
-        <>
-          {num(berry.size)}
-          {berry.size != null && <span className="move-unit">mm</span>}
-        </>
-      ),
-    },
-    {
-      label: 'Growth',
-      testId: 'berrydex-detail-growth',
-      value: (
-        <>
-          {num(berry.growth_time)}
-          {berry.growth_time != null && <span className="move-unit">h/stage</span>}
-        </>
-      ),
-    },
-  ]
-
-  const facts: KeyValueItem[] = [
-    { label: 'Smoothness', testId: 'berrydex-detail-smoothness', value: num(berry.smoothness) },
-    { label: 'Max harvest', testId: 'berrydex-detail-harvest', value: num(berry.max_harvest) },
-    { label: 'Soil dryness', testId: 'berrydex-detail-dryness', value: num(berry.soil_dryness) },
-    { label: 'Item', testId: 'berrydex-detail-item', value: item?.display_name ?? '—' },
-  ]
-
   return (
-    <EditorialPage testId="berrydex-detail" entryId={berry.id}>
-      <EditorialBack label="All berries" onBack={onBack} />
-      <EditorialHead
-        title={berryName(berry)}
-        titleTestId="berrydex-name"
-        art={<ItemArtwork item={item} size={60} testId="berrydex-artwork" />}
-        identity={
-          <>
-            <span className="dex-ed-caps" data-testid="berrydex-detail-firmness">
-              {titleCase(berry.firmness)}
-            </span>
+    <div className="entity-detail" data-testid="berrydex-detail" data-entry-id={berry.id}>
+      <div className="pokedex-back-row">
+        <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
+          <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
+          All berries
+        </button>
+      </div>
+
+      <div className="item-hero">
+        <ItemArtwork item={item} size={96} testId="berrydex-artwork" />
+        <div className="item-hero-text">
+          <h2 className="entity-detail-name" data-testid="berrydex-name">
+            {berryName(berry)}
+          </h2>
+          <p className="entity-detail-meta">
+            <span data-testid="berrydex-detail-firmness">{titleCase(berry.firmness)}</span>
             {giftType && (
               <>
-                <span className="dex-ed-sep" aria-hidden>
-                  ·
-                </span>
-                <span className="dex-ed-caps">Natural Gift</span>{' '}
+                {' · Natural Gift '}
                 <span data-testid="berrydex-detail-ng-type">
-                  <TypeLabel type={giftType.name} />
+                  <TypeLabel type={giftType.name} small />
                 </span>
               </>
             )}
-          </>
-        }
-        strip={strip}
-        stripTestId="berrydex-strip"
-      />
-      <EditorialLead testId="berrydex-effect">
-        {item?.effect ?? item?.short_effect ?? 'No effect text in the bundle.'}
-      </EditorialLead>
-      <EditorialGroup label="Flavour">
-        {flavours.length > 0 ? (
-          <StatBarList testId="berrydex-detail-flavours">
-            {flavours.map((f) => (
-              <StatBar
-                key={f.flavor}
-                label={titleCase(f.flavor)}
-                value={f.potency}
-                max={MAX_FLAVOUR_POTENCY}
-                display={<span className="num">{f.potency}</span>}
-              />
-            ))}
-          </StatBarList>
-        ) : (
-          <p className="dex-ed-note" data-testid="berrydex-detail-flavours">
-            No flavour data in the bundle.
           </p>
-        )}
-      </EditorialGroup>
-      <EditorialGroup label="Details">
-        <KeyValueList items={facts} testId="berrydex-facts" />
-      </EditorialGroup>
-    </EditorialPage>
+        </div>
+      </div>
+
+      {item?.short_effect && (
+        <p className="item-short-effect" data-testid="berrydex-short-effect">
+          {item.short_effect}
+        </p>
+      )}
+      <p className="entity-detail-desc" data-testid="berrydex-effect">
+        {item?.effect ?? 'No effect text in the bundle.'}
+      </p>
+
+      <ul className="fact-rows" data-testid="berrydex-facts">
+        <li>
+          <span className="fact-label">Natural Gift power</span>
+          <span className="fact-value" data-testid="berrydex-detail-ng-power">
+            {num(berry.natural_gift_power)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Size</span>
+          <span className="fact-value" data-testid="berrydex-detail-size">
+            {num(berry.size)}
+            {berry.size != null && <span className="move-unit">mm</span>}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Smoothness</span>
+          <span className="fact-value" data-testid="berrydex-detail-smoothness">
+            {num(berry.smoothness)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Growth time</span>
+          <span className="fact-value" data-testid="berrydex-detail-growth">
+            {num(berry.growth_time)}
+            {berry.growth_time != null && <span className="move-unit">h/stage</span>}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Max harvest</span>
+          <span className="fact-value" data-testid="berrydex-detail-harvest">
+            {num(berry.max_harvest)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Soil dryness</span>
+          <span className="fact-value" data-testid="berrydex-detail-dryness">
+            {num(berry.soil_dryness)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Flavours</span>
+          <span className="fact-value" data-testid="berrydex-detail-flavours">
+            {flavours.length > 0
+              ? flavours.map((f, i) => (
+                  <span key={f.flavor}>
+                    {i > 0 && ' · '}
+                    {titleCase(f.flavor)} <span className="num">{f.potency}</span>
+                  </span>
+                ))
+              : '—'}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Item</span>
+          <span className="fact-value" data-testid="berrydex-detail-item">
+            {item?.display_name ?? '—'}
+          </span>
+        </li>
+      </ul>
+    </div>
   )
 }

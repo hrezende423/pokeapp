@@ -1,18 +1,11 @@
+import { IconArrowLeft } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { ItemArtwork } from '../../components/ItemArtwork'
-import { KeyValueList, type KeyValueItem } from '../../components/ds/KeyValueList'
 import { itemIconUrl } from '../../data/itemArtwork'
 import type { Item } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { DataTable, type Column } from '../../components/DataTable'
 import { DexPageShell } from './DexPageShell'
-import {
-  EditorialBack,
-  EditorialGroup,
-  EditorialHead,
-  EditorialLead,
-  EditorialPage,
-} from './EditorialDetail'
 import { itemEntries } from './entrySources'
 
 function titleCase(value: string | null): string {
@@ -162,22 +155,6 @@ export function Itemdex() {
   )
 }
 
-/**
- * One item's page, on the editorial structure (EditorialDetail.tsx).
- *
- * THE SPRITE IS LITERAL AND COMPACT, beside the name -- the item's own picture,
- * not a ghost treatment. 60px: twice the 30px in-game icon, so the fallback
- * stays crisp under nearest-neighbour scaling, and small enough that the name
- * and not the picture is the first thing read.
- *
- * Buy / Sell are the headline numbers, so they are the strip. The effect text is
- * the lead. The short effect is not printed above it any more: it summarised
- * the same text one size up, and on a page that leads with the effect itself it
- * was the same fact twice.
- *
- * NO LOCATIONS. The bundle has no item-location data; sourcing it is separate
- * data work, not part of this layout (owner, 2026-10-10).
- */
 function ItemDetail({
   item,
   versionGroup,
@@ -192,82 +169,92 @@ function ItemDetail({
   const sell = priced?.price.sell_price ?? null
   const generations = item.generation_ids.filter((g) => g <= 4)
 
-  const strip: KeyValueItem[] = [
-    {
-      label: 'Buy',
-      testId: 'itemdex-price',
-      value:
-        purchase != null ? (
-          <>
-            <span className="num">{purchase.toLocaleString()}</span>
-            <span className="move-unit">{titleCase(priced?.price.currency ?? null)}</span>
-            {priced?.from && <span className="fact-note"> (from {priced.from})</span>}
-          </>
-        ) : (
-          'Not sold'
-        ),
-    },
-    {
-      label: 'Sell',
-      testId: 'itemdex-sell-price',
-      value: sell != null ? <span className="num">{sell.toLocaleString()}</span> : '—',
-    },
-  ]
-
-  const facts: KeyValueItem[] = [
-    {
-      label: 'Fling power',
-      value: item.fling_power != null ? <span className="num">{item.fling_power}</span> : '—',
-    },
-    { label: 'Fling effect', value: titleCase(item.fling_effect) },
-    {
-      label: 'Generations',
-      testId: 'itemdex-generations',
-      value: generations.length > 0 ? <span className="num">{generations.join(', ')}</span> : '—',
-    },
-    {
-      label: 'Attributes',
-      value:
-        item.attributes
-          .filter((a) => a)
-          .map(titleCase)
-          .join(', ') || '—',
-    },
-  ]
-
   return (
-    <EditorialPage testId="itemdex-detail" entryId={item.id}>
-      <EditorialBack label="All items" onBack={onBack} />
-      <EditorialHead
-        title={item.display_name}
-        titleTestId="itemdex-name"
-        art={<ItemArtwork item={item} size={60} testId="itemdex-artwork" />}
-        identity={
-          <>
-            <span className="dex-ed-caps" data-testid="itemdex-category">
-              {titleCase(item.category)}
-            </span>
+    <div className="entity-detail" data-testid="itemdex-detail" data-entry-id={item.id}>
+      <div className="pokedex-back-row">
+        <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
+          <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
+          All items
+        </button>
+      </div>
+
+      {/* Artwork beside the name rather than in a panel above it: there is no
+          container here for it to sit inside. */}
+      <div className="item-hero">
+        <ItemArtwork item={item} size={96} testId="itemdex-artwork" />
+        <div className="item-hero-text">
+          <h2 className="entity-detail-name" data-testid="itemdex-name">
+            {item.display_name}
+          </h2>
+          <p className="entity-detail-meta">
+            <span data-testid="itemdex-category">{titleCase(item.category)}</span>
             {item.pocket && (
               <>
-                <span className="dex-ed-sep" aria-hidden>
-                  ·
-                </span>
-                <span className="dex-ed-caps" data-testid="itemdex-pocket">
-                  {titleCase(item.pocket)} pocket
-                </span>
+                {' · '}
+                <span data-testid="itemdex-pocket">{titleCase(item.pocket)} pocket</span>
               </>
             )}
-          </>
-        }
-        strip={strip}
-        stripTestId="itemdex-strip"
-      />
-      <EditorialLead testId="itemdex-effect">
-        {item.effect ?? item.short_effect ?? 'No effect text in the bundle.'}
-      </EditorialLead>
-      <EditorialGroup label="Details">
-        <KeyValueList items={facts} testId="itemdex-facts" />
-      </EditorialGroup>
-    </EditorialPage>
+          </p>
+        </div>
+      </div>
+
+      {item.short_effect && (
+        <p className="item-short-effect" data-testid="itemdex-short-effect">
+          {item.short_effect}
+        </p>
+      )}
+      <p className="entity-detail-desc" data-testid="itemdex-effect">
+        {item.effect ?? 'No effect text in the bundle.'}
+      </p>
+
+      {/* Label/value rows on hairlines, not a bordered facts card. */}
+      <ul className="fact-rows" data-testid="itemdex-facts">
+        <li>
+          <span className="fact-label">Price</span>
+          <span className="fact-value" data-testid="itemdex-price">
+            {purchase != null ? (
+              <>
+                <span className="num">{purchase.toLocaleString()}</span>{' '}
+                {titleCase(priced?.price.currency ?? null)}
+                {priced?.from && <span className="fact-note"> (from {priced.from})</span>}
+              </>
+            ) : (
+              'Not sold'
+            )}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Sell price</span>
+          <span className="fact-value" data-testid="itemdex-sell-price">
+            {sell != null ? <span className="num">{sell.toLocaleString()}</span> : '—'}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Fling power</span>
+          <span className="fact-value">
+            {item.fling_power != null ? <span className="num">{item.fling_power}</span> : '—'}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Fling effect</span>
+          <span className="fact-value">{titleCase(item.fling_effect)}</span>
+        </li>
+        <li>
+          <span className="fact-label">Generations</span>
+          <span className="fact-value" data-testid="itemdex-generations">
+            {generations.length > 0 ? <span className="num">{generations.join(', ')}</span> : '—'}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Attributes</span>
+          <span className="fact-value">
+            {item.attributes
+              .filter((a) => a)
+              .map(titleCase)
+              .join(', ') || '—'}
+          </span>
+        </li>
+      </ul>
+    </div>
   )
 }

@@ -1,11 +1,9 @@
-import { IconArrowNarrowDown, IconArrowNarrowUp } from '@tabler/icons-react'
+import { IconArrowLeft, IconArrowNarrowDown, IconArrowNarrowUp } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { NATURES_INTRODUCED_IN_GENERATION, naturesExistInGeneration } from '../../data'
 import type { Nature } from '../../data'
-import { KeyValueList } from '../../components/ds/KeyValueList'
 import { useVersionGroup } from '../version-group/context'
 import { DexPageShell } from './DexPageShell'
-import { EditorialBack, EditorialGroup, EditorialHead, EditorialPage } from './EditorialDetail'
 import { natureEntries } from './entrySources'
 
 /**
@@ -20,20 +18,18 @@ import { natureEntries } from './entrySources'
  * from convention rather than the bundle, so it is stated rather than buried.
  *
  * No per-column or per-flavour colour: eight new semantic colours would be eight
- * more than this system sanctions. The diagonal is marked by italics and muted
- * ink alone -- the "different/inert" signal -- not by a fill.
+ * more than this system sanctions. The diagonal is marked by a tone-step and
+ * italics, which is the same "different/inert" signal used elsewhere.
  *
- * NO GRIDLINES (owner, 2026-10-10). The matrix is drawn by alignment and space:
- * every cell is the same width and left-aligned, so the columns read as columns
- * without a rule between them, and the row header is set apart by its muted ink
- * rather than by a vertical line.
- *
- * DIRECTION IS AN ARROW, NOT A WORD, in the axis headers: the arrow after the
- * stat name, in --color-status-up / --color-status-down (PRINCIPLES.md: stat
- * deltas, always with a glyph). The arrows are aria-hidden and each is paired
- * with a visually-hidden word, because a colour-plus-glyph pair carrying the
- * only copy of "which way" would be unreadable to a screen reader. The detail
- * page states its delta as text instead -- see StatDelta.
+ * DIRECTION IS AN ARROW, NOT A WORD. The axis headers and the detail page used to
+ * spell out "raises" / "lowers" / "increases" / "decreases"; they now carry an
+ * arrow after the stat name instead, red up for the raised stat and blue down for
+ * the lowered one. Two new tokens back this -- --stat-increase and
+ * --stat-decrease -- rather than --accent, whose four sanctioned uses do not
+ * include stat direction. The arrows are aria-hidden and every one is paired with
+ * a text alternative, because a colour-plus-glyph pair carrying the only copy of
+ * "which way" would be unreadable to a screen reader and to anyone who cannot
+ * separate the two hues.
  */
 
 const STATS = ['attack', 'defense', 'special-attack', 'special-defense', 'speed'] as const
@@ -149,9 +145,6 @@ function NatureMatrix({
                       className="nature-cell-btn"
                       data-testid={`naturedex-row-${nature.id}`}
                       data-entry-id={nature.id}
-                      // Read by CSS to reserve the semibold width, so hover can
-                      // change weight without shifting the column.
-                      data-label={nature.display_name}
                       onClick={() => onSelect(nature.id)}
                     >
                       {nature.display_name}
@@ -167,98 +160,76 @@ function NatureMatrix({
   )
 }
 
-/** Short stat names for the ghost, where the full label would not fit at 108px. */
-const STAT_SHORT: Record<StatKey, string> = {
-  attack: 'Atk',
-  defense: 'Def',
-  'special-attack': 'SpA',
-  'special-defense': 'SpD',
-  speed: 'Spe',
-}
-
-/**
- * One stat change as real text: the direction glyph, the stat, the amount.
- *
- * The glyph is TEXT, not an icon, so a screen reader announces it ("up arrow
- * Attack plus 10 percent") and a reader who cannot tell the two hues apart still
- * has the arrow and the sign. Colour reinforces it -- --color-status-up/down,
- * which is what PRINCIPLES.md gives stat deltas -- and is never the only copy.
- */
-function StatDelta({
-  stat,
-  direction,
-  testId,
-}: {
-  stat: StatKey
-  direction: 'up' | 'down'
-  testId: string
-}) {
-  return (
-    <span className="dex-ed-delta" data-direction={direction} data-testid={testId}>
-      <span className="dex-ed-delta-glyph">{direction === 'up' ? '↑' : '↓'}</span>{' '}
-      <span className="dex-ed-delta-stat">{STAT_LABELS[stat]}</span>{' '}
-      <span className="num nature-stat-delta">{direction === 'up' ? '+10%' : '−10%'}</span>
-    </span>
-  )
-}
-
-/**
- * One nature's page, on the editorial structure (EditorialDetail.tsx).
- *
- * THE STAT DELTA IS THE GHOST, rendered huge -- "+Atk / −SpA" on two lines --
- * because the delta is the whole of what a nature is. The ghost is decoration,
- * so the same fact is stated beside it as text (StatDelta above). A neutral
- * nature's delta is nothing, and its ghost says so: ±0.
- */
 function NatureDetail({ nature, onBack }: { nature: Nature; onBack: () => void }) {
   const neutral = isNeutral(nature)
   const up = nature.increased_stat as StatKey | null
   const down = nature.decreased_stat as StatKey | null
 
   return (
-    <EditorialPage testId="naturedex-detail" entryId={nature.id}>
-      <EditorialBack label="All natures" onBack={onBack} />
-      <EditorialHead
-        title={nature.display_name}
-        titleTestId="naturedex-name"
-        identityTestId="naturedex-summary"
-        identity={
-          neutral || !up || !down ? (
-            <span className="dex-ed-caps">Neutral — no stat change</span>
+    <div className="entity-detail" data-testid="naturedex-detail" data-entry-id={nature.id}>
+      <div className="pokedex-back-row">
+        <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
+          <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
+          All natures
+        </button>
+      </div>
+
+      <h2 className="entity-detail-name" data-testid="naturedex-name">
+        {nature.display_name}
+      </h2>
+      <p className="entity-detail-meta" data-testid="naturedex-summary">
+        {neutral ? (
+          'Neutral — no stat change'
+        ) : (
+          <>
+            <span className="num">+10%</span> {STAT_LABELS[up as StatKey]},{' '}
+            <span className="num">−10%</span> {STAT_LABELS[down as StatKey]}
+          </>
+        )}
+      </p>
+
+      {/* No "increases" / "decreases" labels: the arrow after each stat name is
+          the label now, so the row is the stat and its direction and nothing
+          else. */}
+      <ul className="nature-stat-pair" data-testid="naturedex-stat-pair">
+        <li data-testid="naturedex-increased">
+          {neutral ? (
+            '—'
           ) : (
             <>
-              <StatDelta stat={up} direction="up" testId="naturedex-increased" />
-              <span className="dex-ed-sep" aria-hidden>
-                ·
-              </span>
-              <StatDelta stat={down} direction="down" testId="naturedex-decreased" />
+              <StatDirection label={STAT_LABELS[up as StatKey]} direction="up" />
+              <span className="num nature-stat-delta">+10%</span>
             </>
-          )
-        }
-        ghost={neutral || !up || !down ? '±0' : `+${STAT_SHORT[up]}\n−${STAT_SHORT[down]}`}
-      />
+          )}
+        </li>
+        <li data-testid="naturedex-decreased">
+          {neutral ? (
+            '—'
+          ) : (
+            <>
+              <StatDirection label={STAT_LABELS[down as StatKey]} direction="down" />
+              <span className="num nature-stat-delta">−10%</span>
+            </>
+          )}
+        </li>
+      </ul>
 
       {/*
         The five neutral natures have likes_flavor and hates_flavor null in the
-        bundle, not a flavour pair -- so there is no preference to list and none
-        is invented.
+        bundle, not a flavour pair -- so there is no preference text to show and
+        none is invented.
       */}
-      <EditorialGroup label="Flavour">
-        {neutral ? (
-          <p className="dex-ed-note" data-testid="naturedex-neutral">
-            This nature has no flavour preference: it neither likes nor dislikes any flavour.
-          </p>
-        ) : (
-          <KeyValueList
-            testId="naturedex-flavor"
-            items={[
-              { label: 'Likes', value: titleCase(nature.likes_flavor) ?? '—' },
-              { label: 'Dislikes', value: titleCase(nature.hates_flavor) ?? '—' },
-            ]}
-          />
-        )}
-      </EditorialGroup>
-    </EditorialPage>
+      <p
+        className="entity-detail-desc"
+        data-testid={neutral ? 'naturedex-neutral' : 'naturedex-flavor'}
+      >
+        {neutral
+          ? 'This nature has no flavour preference: it neither likes nor dislikes any flavour.'
+          : `Likes ${titleCase(nature.likes_flavor)}-flavored food, dislikes ${titleCase(
+              nature.hates_flavor,
+            )}-flavored food.`}
+      </p>
+    </div>
   )
 }
 

@@ -27,8 +27,8 @@ import { abilitiesHiddenFromList, abilityEntries } from './entrySources'
  * line's "Flash Fire"). 427 other species DO record slot 3 as empty, which is why
  * the residue is small rather than ~446.
  *
- * A two-section list would therefore present a data gap as a game mechanic, and
- * the Hidden section would be a list of 17 bugs. One flat list, as the handoff's
+ * A two-section grid would therefore present a data gap as a game mechanic, and
+ * the Hidden section would be a list of 17 bugs. One flat grid, as the handoff's
  * own fallback instructs. The residue is worth a separate look -- it also reaches
  * the species detail page -- and is flagged rather than patched here.
  */
@@ -163,36 +163,35 @@ function AbilityDetail({
 
   return (
     <EntityDetailPage
-      variant="editorial"
       testId="abilitydex-detail"
       entryId={ability.id}
       onBack={onBack}
       backLabel="All abilities"
       title={ability.display_name}
       titleTestId="abilitydex-name"
-      // Identity only. The holder count is the Pokémon group's own count now,
-      // and its era ("in Generation N") is said once, in that group's heading.
       meta={
-        <span className="dex-ed-caps" data-testid="abilitydex-intro">
-          Introduced in Generation {ability.generation_id ?? '?'}
-        </span>
+        <>
+          <span data-testid="abilitydex-intro">
+            Introduced in Generation {ability.generation_id ?? '?'}
+          </span>
+          <span data-testid="abilitydex-holder-count">
+            {' '}
+            · {holders.length} species in Generation {generation}
+          </span>
+        </>
       }
-      // The effect IS the ability, so it is the lead text -- the largest running
-      // text on the page, in readable ink. No ghost: an ability has no number
-      // that orients a reader, and no icon is invented to stand in for one.
       description={
         <span data-testid="abilitydex-effect">
           {ability.effect ?? ability.short_effect ?? 'No effect text in the bundle.'}
         </span>
       }
-      // One flat, unlabelled list -- see the note at the top of this file.
+      // One flat, unlabelled grid -- see the note at the top of this file.
       sections={[{ entries: holders.map((h) => ({ species: h.species })) }]}
-      sectionsLabel={`Pokémon in Generation ${generation}`}
       generation={generation}
       onSelectSpecies={onSelectSpecies}
     >
       {holders.length === 0 && (
-        <p className="dex-ed-note" data-testid="abilitydex-holders-none">
+        <p className="subtitle" data-testid="abilitydex-holders-none">
           No species in Generation {generation} has this ability.
         </p>
       )}
