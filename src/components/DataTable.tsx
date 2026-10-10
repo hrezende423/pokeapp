@@ -168,7 +168,9 @@ export function DataTable<T>({
                       </span>
                     </button>
                   ) : (
-                    c.label
+                    /* An unsortable column's header in the sortable ones' face,
+                       so a header row reads as one row (the Trainer Dex's Party). */
+                    <span className="data-table-sort data-table-sort-static">{c.label}</span>
                   )}
                 </th>
               )

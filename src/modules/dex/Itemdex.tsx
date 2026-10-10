@@ -4,7 +4,8 @@ import { ItemArtwork } from '../../components/ItemArtwork'
 import { itemIconUrl } from '../../data/itemArtwork'
 import type { Item } from '../../data'
 import { useVersionGroup } from '../version-group/context'
-import { DexPageShell, LedgerList } from './DexPageShell'
+import { DataTable, type Column } from '../../components/DataTable'
+import { DexPageShell } from './DexPageShell'
 import { itemEntries } from './entrySources'
 
 function titleCase(value: string | null): string {
@@ -65,6 +66,72 @@ export function Itemdex() {
   // Under "All" nothing is filtered out: there is no single era to filter by.
   const entries = useMemo(() => itemEntries({ generation, isAll }), [generation, isAll])
 
+  /*
+    A TABLE WITH SORTABLE HEADERS (owner, 2026-10-10), like the Movedex: it was a
+    ledger list sorted from the bar's Sort menu. The two fields that were a
+    middot-separated sub-line are columns now, and Fling power, which was only
+    a sort key, is on screen. Initial order is the bundle's own (item id), which
+    is what the list showed.
+  */
+  const columns: Column<Item>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: 'Name',
+        width: '15rem',
+        sortValue: (item) => item.display_name,
+        render: (item) => {
+          const icon = itemIconUrl(item)
+          return (
+            <span className="dex-table-name">
+              {item.display_name}
+              {icon && (
+                <img
+                  src={icon}
+                  alt=""
+                  width={24}
+                  height={24}
+                  loading="lazy"
+                  data-testid={`itemdex-row-icon-${item.id}`}
+                />
+              )}
+            </span>
+          )
+        },
+      },
+      {
+        key: 'category',
+        label: 'Category',
+        width: '12rem',
+        sortValue: (item) => item.category,
+        render: (item) => (
+          <span data-testid={`itemdex-row-category-${item.id}`}>{titleCase(item.category)}</span>
+        ),
+      },
+      {
+        key: 'pocket',
+        label: 'Pocket',
+        width: '8rem',
+        sortValue: (item) => item.pocket,
+        render: (item) =>
+          item.pocket ? (
+            <span data-testid={`itemdex-row-pocket-${item.id}`}>{titleCase(item.pocket)}</span>
+          ) : (
+            '—'
+          ),
+      },
+      {
+        key: 'fling',
+        label: 'Fling',
+        width: '4.5rem',
+        numeric: true,
+        sortValue: (item) => item.fling_power,
+        render: (item) => <span className="num">{item.fling_power ?? '—'}</span>,
+      },
+    ],
+    [],
+  )
+
   return (
     <DexPageShell
       dexId="itemdex"
@@ -72,41 +139,12 @@ export function Itemdex() {
       entryId={(item) => item.id}
       gatedMessage={`No item in the bundle is indexed in Generation ${generation}.`}
       list={({ entries: visible, onSelect }) => (
-        <LedgerList
+        <DataTable
+          rows={visible}
+          columns={columns}
+          rowKey={(item) => item.id}
+          onRowClick={(item) => onSelect(item.id)}
           testId="itemdex-rows"
-          rows={visible.map((item) => ({
-            id: item.id,
-            label: item.display_name,
-            icon: itemIconUrl(item) && (
-              <img
-                src={itemIconUrl(item) ?? ''}
-                alt=""
-                width={24}
-                height={24}
-                loading="lazy"
-                data-testid={`itemdex-row-icon-${item.id}`}
-              />
-            ),
-            // Two distinct fields, middot-separated, in the order the bag itself
-            // implies: the pocket is where you would look, the category is what
-            // it is once you are there.
-            sub: (
-              <>
-                <span data-testid={`itemdex-row-category-${item.id}`}>
-                  {titleCase(item.category)}
-                </span>
-                {item.pocket && (
-                  <>
-                    <span className="row-sub-sep">·</span>
-                    <span data-testid={`itemdex-row-pocket-${item.id}`}>
-                      {titleCase(item.pocket)}
-                    </span>
-                  </>
-                )}
-              </>
-            ),
-          }))}
-          onSelect={onSelect}
           emptyNote="No item matches those filters."
         />
       )}

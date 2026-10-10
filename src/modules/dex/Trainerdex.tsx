@@ -26,7 +26,8 @@ import { TypeLabel } from '../../components/ds/TypeLabel'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { GameRow } from '../version-group/GameRow'
-import { DexPageShell, LedgerList } from './DexPageShell'
+import { DataTable, type Column } from '../../components/DataTable'
+import { DexPageShell } from './DexPageShell'
 import {
   TRAINER_KIND_LABEL,
   trainerEntries,
@@ -146,15 +147,12 @@ export function Trainerdex() {
       entries={entries}
       entryId={(e) => e.id}
       list={({ entries: visible, onSelect }) => (
-        <LedgerList
+        <DataTable
+          rows={visible}
+          columns={trainerColumns(vg)}
+          rowKey={(e) => e.id}
+          onRowClick={(e) => onSelect(e.id)}
           testId="trainerdex-rows"
-          rows={visible.map((e) => ({
-            id: e.id,
-            label: e.label,
-            sub: <RowSub entry={e} />,
-            meta: <PartyStrip entry={e} vg={vg} />,
-          }))}
-          onSelect={onSelect}
           emptyNote="No trainer matches those filters."
         />
       )}
@@ -165,27 +163,67 @@ export function Trainerdex() {
   )
 }
 
-function RowSub({ entry: e }: { entry: TrainerEntry }) {
-  const parts: string[] = []
-  if (e.location) parts.push(e.area ? `${e.location} · ${e.area}` : e.location)
-  else if (e.kind !== 'facility') parts.push('Location not found')
-  if (e.variant) parts.push(e.variant)
-  else if (e.kind !== 'story') parts.push(TRAINER_KIND_LABEL[e.kind])
-  if (e.levels)
-    parts.push(
-      e.levels[0] === e.levels[1] ? `Lv ${e.levels[0]}` : `Lv ${e.levels[0]}–${e.levels[1]}`,
-    )
-  if (e.prize != null) parts.push(money(e.prize))
-  return (
-    <span data-testid={`trainerdex-row-sub-${e.id}`}>
-      {parts.map((p, i) => (
-        <span key={i}>
-          {i > 0 && <span className="row-sub-sep">·</span>}
-          {p}
+/**
+ * THE TRAINER DEX AS A TABLE WITH SORTABLE HEADERS (owner, 2026-10-10). What
+ * was one middot-joined sub-line -- location, variant, levels, prize -- is a
+ * column each, so each can be sorted. Initial order stays the walkthrough order
+ * the list had, which is the order the entries arrive in.
+ */
+function trainerColumns(vg: string): Column<TrainerEntry>[] {
+  return [
+    { key: 'name', label: 'Trainer', width: '13rem', sortValue: (e) => e.label },
+    {
+      key: 'location',
+      label: 'Location',
+      width: '15rem',
+      sortValue: (e) => e.location,
+      render: (e) =>
+        e.location
+          ? e.area
+            ? `${e.location} · ${e.area}`
+            : e.location
+          : e.kind !== 'facility'
+            ? 'Location not found'
+            : '—',
+    },
+    {
+      key: 'note',
+      label: 'Note',
+      width: '12rem',
+      sortValue: (e) => e.variant ?? (e.kind !== 'story' ? TRAINER_KIND_LABEL[e.kind] : null),
+      render: (e) => e.variant ?? (e.kind !== 'story' ? TRAINER_KIND_LABEL[e.kind] : '—'),
+    },
+    {
+      key: 'level',
+      label: 'Level',
+      width: '5rem',
+      numeric: true,
+      sortValue: (e) => e.levels?.[1] ?? null,
+      render: (e) => (
+        <span className="num">
+          {e.levels
+            ? e.levels[0] === e.levels[1]
+              ? e.levels[0]
+              : `${e.levels[0]}–${e.levels[1]}`
+            : '—'}
         </span>
-      ))}
-    </span>
-  )
+      ),
+    },
+    {
+      key: 'prize',
+      label: 'Prize',
+      width: '5.5rem',
+      numeric: true,
+      sortValue: (e) => e.prize,
+      render: (e) => <span className="num">{money(e.prize)}</span>,
+    },
+    {
+      key: 'party',
+      label: 'Party',
+      width: '13rem',
+      render: (e) => <PartyStrip entry={e} vg={vg} />,
+    },
+  ]
 }
 
 /** The party as small sprites; a set-drawing facility trainer shows its pool size. */

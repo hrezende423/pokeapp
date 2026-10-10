@@ -4,7 +4,8 @@ import type { EggGroup, Species } from '../../data'
 import { genderFooterLine, type SpeciesCardFooter } from '../../components/speciesCardFooters'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
-import { DexPageShell, LedgerList } from './DexPageShell'
+import { DataTable, type Column } from '../../components/DataTable'
+import { DexPageShell } from './DexPageShell'
 import { EntityDetailPage } from './EntityDetailPage'
 import { BREEDING_INTRODUCED_IN_GENERATION, eggGroupEntries, speciesEntries } from './entrySources'
 
@@ -114,6 +115,24 @@ export function Breedingdex() {
     return map
   }, [entries, inGeneration])
 
+  /* A table with sortable headers (owner, 2026-10-10): the group, and how many
+     species of the selected generation are in it. Initial order is the bundle's. */
+  const columns: Column<EggGroup>[] = [
+    { key: 'name', label: 'Egg group', width: '12rem', sortValue: (g) => g.display_name },
+    {
+      key: 'members',
+      label: 'Species',
+      width: '5.5rem',
+      numeric: true,
+      sortValue: (g) => counts.get(g.id) ?? 0,
+      render: (g) => (
+        <span className="num" data-testid={`breedingdex-members-${g.id}`}>
+          {counts.get(g.id) ?? 0}
+        </span>
+      ),
+    },
+  ]
+
   return (
     <DexPageShell
       dexId="breedingdex"
@@ -125,20 +144,12 @@ export function Breedingdex() {
           : undefined
       }
       list={({ entries: visible, onSelect }) => (
-        <LedgerList
+        <DataTable
+          rows={visible}
+          columns={columns}
+          rowKey={(g) => g.id}
+          onRowClick={(g) => onSelect(g.id)}
           testId="breedingdex-rows"
-          rows={visible.map((group) => ({
-            id: group.id,
-            label: group.display_name,
-            // Right-aligned count in --font-numeric, the same convention every
-            // other count-metadata cell in the app uses.
-            meta: (
-              <span className="row-count" data-testid={`breedingdex-members-${group.id}`}>
-                {counts.get(group.id) ?? 0}
-              </span>
-            ),
-          }))}
-          onSelect={onSelect}
           emptyNote="No egg group matches that search."
         />
       )}

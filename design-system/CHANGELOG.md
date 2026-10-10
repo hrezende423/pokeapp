@@ -1,4 +1,8 @@
 # Changelog
+## 2.1.4 — 2026-10-10 (non-breaking)
+- Species grid card: the four text lines evenly spaced (12.5px baseline-to-cap); `#0001` at the BST number's size
+- Itemdex, Abilitydex (with an Ability # column), Breeding dex and Trainer Dex are sortable data tables like the Movedex; their bar Sort menu is gone
+- Data table: an unsortable column's header takes the sortable headers' face; a prose cell (`.data-table-prose`) wraps
 ## 2.1.3 — 2026-10-10 (non-breaking)
 - Page titles take the nav's face and normal tracking (they inherited a -1.68px h1 letter-spacing)
 - Species grid card: row gap 9px (= column gap), `#0001` back before the name, name and BST/Speed numbers regular, ability line-height normal

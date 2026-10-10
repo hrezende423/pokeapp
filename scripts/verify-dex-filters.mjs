@@ -261,7 +261,8 @@ try {
     'naturedex',
     'breedingdex',
   ]
-  const WITH_SORT = ['pokedex', 'itemdex', 'berrydex', 'abilitydex']
+  // The Itemdex and Abilitydex are tables since 2026-10-10: their headers sort.
+  const WITH_SORT = ['pokedex', 'berrydex']
 
   for (const dex of DEXES) {
     await goTo(dex)
@@ -485,6 +486,25 @@ try {
       columns: grid.gridTemplateColumns,
       rowGap: grid.rowGap,
       columnGap: grid.columnGap,
+      /* The white between one line's baseline and the next line's cap height,
+         for the card's four text lines -- evenly spaced since 2026-10-10. */
+      lineGaps: (() => {
+        const el = document.querySelector('[data-testid="species-row-1"]')
+        const cv = document.createElement('canvas').getContext('2d')
+        const at = (sel) => {
+          const t = el.querySelector(sel)
+          const cs = getComputedStyle(t)
+          cv.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+          const probe = document.createElement('span')
+          probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline'
+          t.appendChild(probe)
+          const base = probe.getBoundingClientRect().bottom
+          probe.remove()
+          return { base, cap: base - cv.measureText('H').actualBoundingBoxAscent }
+        }
+        const l = ['.species-name', '.species-card-types [data-ds="type-label"]', '.species-card-ability', '.species-card-stats'].map(at)
+        return [1, 2, 3].map((i) => +(l[i].cap - l[i - 1].base).toFixed(2))
+      })(),
     }
   })
   log(`  card geometry: ${JSON.stringify(cardBox)}`)
@@ -492,6 +512,11 @@ try {
     'it is UNDER the ability line and inside the card (214px since the looser leading of 2026-09-27)',
     cardBox.statsBelowAbility && cardBox.clipped === false && cardBox.height === 214,
     JSON.stringify(cardBox),
+  )
+  check(
+    'the four card lines are evenly spaced (within 1px: line boxes round per pixel ratio)',
+    Math.max(...cardBox.lineGaps) - Math.min(...cardBox.lineGaps) <= 1,
+    cardBox.lineGaps.join(' / '),
   )
   check(
     'and the grid it sits in -- three 212px columns, 9px gaps both ways (row gap evened 2026-10-10)',
@@ -911,19 +936,21 @@ try {
   )
   await clearAll()
   await closeMenus()
-  await pickSort('name')
-  await closeMenus()
-  const abilityNames = await page.$$eval('[data-testid="abilitydex-rows"] .species-name', (els) =>
-    els.map((e) => e.textContent.trim()),
+  /* A table since 2026-10-10: the Name header sorts it, not the bar's menu. */
+  await page.click('[data-testid="abilitydex-sort-name"]')
+  await page.waitForTimeout(120)
+  const abilityNames = await page.$$eval(
+    '[data-testid="abilitydex-rows"] tbody tr td:nth-child(2)',
+    (els) => els.map((e) => e.textContent.trim()),
   )
   check(
-    'and sorting by Name really re-orders it',
+    'and sorting by the Name header really re-orders it',
     JSON.stringify(abilityNames) ===
       JSON.stringify([...abilityNames].sort((a, b) => a.localeCompare(b))),
     abilityNames.slice(0, 3).join(' | '),
   )
-  await pickSort('id')
-  await closeMenus()
+  await page.click('[data-testid="abilitydex-sort-id"]')
+  await page.waitForTimeout(120)
 
   await goTo('itemdex')
   const itemAll = await countOf('itemdex')

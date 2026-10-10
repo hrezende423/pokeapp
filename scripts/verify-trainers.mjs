@@ -280,7 +280,7 @@ try {
     count === expected,
     `${count} vs ${expected}`,
   )
-  const firstRow = await page.textContent('[data-testid="trainerdex-rows"] li:first-child')
+  const firstRow = await page.textContent('[data-testid="trainerdex-rows"] tbody tr:first-child')
   check(
     'the list opens in walkthrough order: Barry on Route 201 first',
     /Barry/.test(firstRow) && /Route 201/.test(firstRow),
@@ -288,7 +288,7 @@ try {
   )
 
   await page
-    .locator('[data-testid="trainerdex-rows"] button:has-text("Leader Roark")')
+    .locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Leader Roark")')
     .first()
     .click()
   await page.waitForSelector('[data-testid="trainerdex-detail"]')
@@ -310,7 +310,7 @@ try {
   await page.click('[data-testid="entity-back"]')
 
   await page
-    .locator('[data-testid="trainerdex-rows"] button:has-text("Silver Print")')
+    .locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Silver Print")')
     .first()
     .click()
   await page.waitForSelector('[data-testid="trainerdex-detail"]')
@@ -324,7 +324,7 @@ try {
   await pick('red-blue')
   await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
   await page
-    .locator('[data-testid="trainerdex-rows"] button:has-text("Leader Brock")')
+    .locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Leader Brock")')
     .first()
     .click()
   await page.waitForSelector('[data-testid="trainerdex-detail"]')

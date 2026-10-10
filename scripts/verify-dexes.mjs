@@ -314,7 +314,7 @@ try {
     `(${ballCount} vs ${expectedBalls})`,
   )
   check('search actually narrowed it', ballCount < n)
-  const ballLabels = await page.$$eval('[data-testid="itemdex-rows"] .species-name', (els) =>
+  const ballLabels = await page.$$eval('[data-testid="itemdex-rows"] tbody tr td:first-child', (els) =>
     els.map((e) => e.textContent),
   )
   check(
@@ -626,11 +626,11 @@ try {
   check('Breeding dex lists every egg group', eggCount === eggGroups.length, `(${eggCount})`)
 
   // The member count on each row must equal the bundle join, not a guess.
-  const rowCounts = await page.$$eval('[data-testid="breedingdex-rows"] .species-row', (els) =>
+  const rowCounts = await page.$$eval('[data-testid="breedingdex-rows"] tbody tr', (els) =>
     els.map((e) => ({
       id: Number(e.getAttribute('data-entry-id')),
-      name: e.querySelector('.species-name').textContent.trim(),
-      count: Number(e.querySelector('.row-count').textContent.trim()),
+      name: e.querySelector('td:first-child').textContent.trim(),
+      count: Number(e.querySelector('[data-testid^="breedingdex-members-"]').textContent.trim()),
     })),
   )
   const countMismatches = rowCounts.filter((r) => r.count !== eggMembers(r.id, 4).length)
@@ -973,7 +973,8 @@ try {
   )
 
   const listedAbilities = await page.$$eval(
-    '[data-testid="abilitydex-rows"] .species-name',
+    // The Abilitydex is a table since 2026-10-10: # | Name | Effect | Gen.
+    '[data-testid="abilitydex-rows"] tbody tr td:nth-child(2)',
     (els) => els.map((e) => e.textContent.trim()),
   )
   log(`  listed rows: ${listedAbilities.length}`)
@@ -1069,7 +1070,8 @@ try {
   })
   check('the first row of cards is level with the "Pokédex" title, the grid still centred', Math.abs(layout.titleTop - layout.cardTop) <= 2 && layout.centred, JSON.stringify(layout))
   check('the katakana is larger and one line lower (22px at 100px)', layout.kanaSize === 22 && layout.kanaTop === 100, JSON.stringify(layout))
-  check('the card lines are spaced further apart', layout.nameToTypes >= 6, JSON.stringify(layout))
+  // Evenly spaced since 2026-10-10 (owner): see verify-dex-filters for the gaps.
+  check('the name and type lines do not touch', layout.nameToTypes >= 2, JSON.stringify(layout))
   check('page titles use the smaller page-title size (15px)', layout.titleSize === 15, String(layout.titleSize))
   check('Pokemon Collection is gone from the app', await page.evaluate(() => document.querySelector('[data-testid="nav-pokemon-collection"]') == null))
 

@@ -564,12 +564,13 @@
   min-width: 0;
 }
 
-/* The card's national dex number, back on the name line (owner, 2026-10-10). */
+/* The card's national dex number, back on the name line (owner, 2026-10-10),
+   at the BST number's size: the stats line's .num is 0.92em of caption. */
 .species-card .dex-no {
   flex: none;
   font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
-  font-size: var(--font-size-body);
+  font-size: calc(var(--font-size-caption) * 0.92);
   font-weight: var(--font-weight-regular);
   color: var(--text-secondary);
 }
@@ -588,9 +589,16 @@
 /* The type row is --font-size-caption, not --font-size-label: the two reference
    strings with no middot in them -- PSYCHIC and DARK, so no spacing ambiguity --
    measure 9.92px and 9.64px. Set via TypeRow's `small` prop. */
+/*
+  THE FOUR TEXT LINES ARE EVENLY SPACED (owner, 2026-10-10): 12.5px of white
+  between one line's baseline and the next line's cap height, measured in the
+  browser, for all three gaps. They were 17.8 / 11.7 / 8.0. The three margins
+  below are what produce that with these four sizes and leadings; the total is
+  unchanged, so the stats line has not moved.
+*/
 .species-card-types {
   display: block;
-  margin-top: 8px;
+  margin-top: 2.67px;
 }
 
 .species-card-ability {
@@ -609,7 +617,7 @@
      clipped the descenders (owner, 2026-10-10). The card's 214px still holds all
      four lines. */
   line-height: normal;
-  margin-top: 5px;
+  margin-top: 5.83px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -633,10 +641,8 @@
   font-size: var(--font-size-caption);
   /* 11px, the last of the 63px the text block has. See the note above. */
   line-height: 11px;
-  /* 3, not 5: the ability line's `normal` leading above is ~2px taller than
-     the 1 it was, and this line must still end inside the 214px card. Taken
-     here rather than above it, since the ability line's y is Figma-calibrated. */
-  margin-top: 3px;
+  /* Evenly spaced with the lines above; see .species-card-types. */
+  margin-top: 7.5px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -2210,9 +2216,12 @@
   justify-content: flex-end;
 }
 
-.data-table-sort:hover,
+.data-table-sort:not(.data-table-sort-static):hover,
 .data-table-sort.is-active {
   color: var(--text-primary);
+}
+.data-table-sort-static {
+  cursor: default;
 }
 
 .data-table-sort:focus-visible {
@@ -2229,6 +2238,11 @@
   color: var(--text-primary);
   border-bottom: 1px solid var(--hairline);
   white-space: nowrap;
+}
+/* A sentence in a cell (the Abilitydex's effect): wraps within its column. */
+.data-table-prose {
+  display: block;
+  white-space: normal;
 }
 
 /*

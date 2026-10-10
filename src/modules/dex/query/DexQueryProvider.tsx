@@ -32,16 +32,13 @@ import { useTbScreen } from '../../team-builder/tbNav'
 import type { FilterSection, SortField } from './dexQuery'
 import {
   abilitydexSections,
-  abilitydexSorts,
   berrydexSections,
   berrydexSorts,
   breedingdexSections,
   itemdexSections,
-  itemdexSorts,
   movedexSections,
   naturedexSections,
   trainerdexSections,
-  trainerdexSorts,
 } from './registries'
 import { useDexQuery } from './useDexQuery'
 
@@ -163,7 +160,8 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       }
       case 'itemdex': {
         const entries = itemEntries(scope)
-        return erase('itemdex', entries, itemdexSections(entries), itemdexSorts, 'id')
+        // No sort fields: a table since 2026-10-10, its headers are its sort.
+        return erase('itemdex', entries, itemdexSections(entries), [], null)
       }
       case 'berrydex': {
         const entries = berryEntries(scope)
@@ -171,7 +169,8 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       }
       case 'abilitydex': {
         const entries = abilityEntries(scope)
-        return erase('abilitydex', entries, abilitydexSections(entries), abilitydexSorts, 'id')
+        // No sort fields: a table since 2026-10-10, its headers are its sort.
+        return erase('abilitydex', entries, abilitydexSections(entries), [], null)
       }
       case 'naturedex':
         // No sort fields: the page is a 5x5 matrix whose axes are the two stats,
@@ -184,8 +183,9 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
           'trainerdex',
           trainerRows,
           trainerdexSections(trainerRows),
-          trainerdexSorts,
-          'order',
+          // No sort fields: a table since 2026-10-10, its headers are its sort.
+          [],
+          null,
         )
       default:
         // Type Coverage, Team Building, the design-system page: not a dex, so the

@@ -3,7 +3,8 @@ import { ABILITIES_INTRODUCED_IN_GENERATION, speciesWithAbility } from '../../da
 import type { Ability } from '../../data'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
-import { DexPageShell, LedgerList } from './DexPageShell'
+import { DataTable, type Column } from '../../components/DataTable'
+import { DexPageShell } from './DexPageShell'
 import { EntityDetailPage } from './EntityDetailPage'
 import { abilitiesHiddenFromList, abilityEntries } from './entrySources'
 
@@ -56,6 +57,47 @@ export function Abilitydex() {
   const hiddenCount = useMemo(() => abilitiesHiddenFromList().length, [])
   const preAbilityEra = !isAll && generation < ABILITIES_INTRODUCED_IN_GENERATION
 
+  /*
+    A TABLE WITH SORTABLE HEADERS (owner, 2026-10-10), like the Movedex, and with
+    the ability number as its first column -- the number the list stopped
+    printing in an earlier pass, back by request. Initial order is that number.
+  */
+  const columns: Column<Ability>[] = useMemo(
+    () => [
+      {
+        key: 'id',
+        label: '#',
+        width: '3.5rem',
+        numeric: true,
+        sortValue: (a) => a.id,
+        render: (a) => (
+          <span className="num" data-testid={`abilitydex-row-no-${a.id}`}>
+            {String(a.id).padStart(3, '0')}
+          </span>
+        ),
+      },
+      { key: 'name', label: 'Name', width: '11rem', sortValue: (a) => a.display_name },
+      {
+        key: 'effect',
+        label: 'Effect',
+        width: '30rem',
+        sortValue: (a) => a.short_effect,
+        // Prose, so it wraps inside its column rather than running over the Gen
+        // column: .data-table cells are nowrap for the one-word values elsewhere.
+        render: (a) => <span className="data-table-prose">{a.short_effect ?? '—'}</span>,
+      },
+      {
+        key: 'generation',
+        label: 'Gen',
+        width: '3.4rem',
+        numeric: true,
+        sortValue: (a) => a.generation_id,
+        render: (a) => <span className="num">{a.generation_id ?? '—'}</span>,
+      },
+    ],
+    [],
+  )
+
   return (
     <DexPageShell
       dexId="abilitydex"
@@ -68,14 +110,13 @@ export function Abilitydex() {
       }
       list={({ entries: visible, onSelect }) => (
         <>
-          <LedgerList
+          <DataTable
+            rows={visible}
+            columns={columns}
+            rowKey={(a) => a.id}
+            onRowClick={(a) => onSelect(a.id)}
+            initialSort="id"
             testId="abilitydex-rows"
-            rows={visible.map((a) => ({
-              id: a.id,
-              label: a.display_name,
-              meta: a.short_effect ?? undefined,
-            }))}
-            onSelect={onSelect}
             emptyNote="No ability matches those filters."
           />
           {hiddenCount > 0 && (
