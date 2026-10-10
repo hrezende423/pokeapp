@@ -16,11 +16,12 @@
  * been decided is exactly the kind of thing this system says not to improvise.
  * The radius token is wired up in design-tokens.css and ready for it.
  *
- * Colour comes from --type-<name>, which resolves per theme: every one of the 17
- * has a contrast-verified dark-mode value. Types outside that set (fairy,
- * unknown, shadow all exist in the data bundle but not in the Gen 1-4 scope the
- * palette covers) fall back to --text-secondary rather than to an arbitrary
- * colour -- and cannot appear via resolveTypesForGeneration in this app anyway.
+ * Colour comes from --type-<name>, which resolves per theme to the design
+ * system's type ink (design-system/tokens.json, color.type-text): all 18 types,
+ * each verified >=4.5:1 on both canvases. Anything else -- the bundle's
+ * `unknown` and `shadow` -- falls back to --text-secondary rather than to an
+ * arbitrary colour. Fairy was in that fallback until 2026-10-10, which drew a
+ * Gen 6+ move's type in grey once the Movedex reached Gen 9.
  */
 
 const TYPES_WITH_TOKENS = new Set([
@@ -41,6 +42,7 @@ const TYPES_WITH_TOKENS = new Set([
   'dragon',
   'dark',
   'steel',
+  'fairy',
 ])
 
 // Local on purpose: exporting a helper beside components trips

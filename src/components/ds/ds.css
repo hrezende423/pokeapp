@@ -1236,3 +1236,181 @@ span.ds-move-slot-label {
   font-family: var(--font-numeric);
   font-size: var(--font-size-label);
 }
+
+/* ---------------------------------------------- ledger row: plain variant */
+
+/* The grouped species list on a dex detail page (KeyValueList's neighbour, not
+   the ledger): no number column, no vertical rule, and the name at regular
+   weight, as item names are everywhere else. See LedgerRow.tsx. */
+.ds-ledger-row[data-variant='plain'] .ds-ledger-name {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-default);
+}
+
+/* A trailing value -- a learn level. Muted and mono: metadata about the row,
+   always quieter than the name it follows. */
+.ds-ledger-aside {
+  flex: none;
+  min-width: 4ch;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-style-data-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.ds-ledger-row[data-variant='plain']:hover .ds-ledger-name {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* -------------------------------------------------------- ghost: detail */
+
+/* The text ghost on a dex detail page. In flow in its host's grid area, not
+   absolutely positioned like the two number scales; opaque low-contrast ink from
+   the design-system tokens rather than an opacity. pre-line lets a two-part
+   ghost ("+Atk / −SpA") stack instead of running wider than the page. */
+.ds-ghost.ds-ghost-detail {
+  position: static;
+  display: block;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-watermark-size);
+  line-height: var(--font-style-watermark-line-height);
+  font-weight: var(--font-style-watermark-weight);
+  letter-spacing: var(--font-style-watermark-letter-spacing);
+  color: var(--color-text-watermark);
+  opacity: 1;
+  white-space: pre-line;
+}
+
+/* -------------------------------------------------------- key-value list */
+
+/* design-system/components/key-value-list.md. Two layouts; see KeyValueList.tsx. */
+.ds-kv {
+  margin: 0;
+  padding: 0;
+}
+
+.ds-kv-label,
+.ds-kv-value {
+  margin: 0;
+}
+
+.ds-kv-label {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-caption-size);
+  line-height: var(--font-style-caption-line-height);
+  letter-spacing: var(--font-tracking-label);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.ds-kv-value {
+  min-width: 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
+  line-height: var(--font-style-body-line-height);
+  color: var(--color-text-default);
+}
+
+/* ROWS: label left, value right, one hairline under each row and NO row gap --
+   the hairline-band rule (CLAUDE.md): with both, a value centred in its own box
+   reads half a gap low against the band a reader sees. */
+.ds-kv-rows .ds-kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  min-height: var(--d-row);
+  padding-block: var(--space-1);
+  border-bottom: 1px solid var(--color-border-hairline);
+}
+
+.ds-kv-rows .ds-kv-row:last-child {
+  border-bottom: 0;
+}
+
+.ds-kv-rows .ds-kv-value {
+  text-align: right;
+}
+
+/* STRIP: pairs side by side, label above value. The value is the emphasis, by
+   SIZE (h3) and never by weight -- mono values stay regular. No hairlines: the
+   strip is one line of headline numbers, not a list. */
+.ds-kv-strip {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-8);
+  row-gap: var(--space-3);
+}
+
+.ds-kv-strip .ds-kv-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ds-kv-strip .ds-kv-label {
+  font-size: var(--font-style-label-caps-size);
+  line-height: var(--font-style-label-caps-line-height);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+}
+
+.ds-kv-strip .ds-kv-value {
+  font-size: var(--font-style-h3-size);
+  line-height: var(--font-style-h3-line-height);
+  font-weight: var(--font-weight-regular);
+}
+
+/* ------------------------------------------------------------- stat bar */
+
+/* design-system/components/stat-bar.md: label · value · bar. The rows share
+   their parent's columns through subgrid, so every label, value and bar lines up
+   down the stack. Neutral fill on a neutral track, 8px, no ticks, no accent. */
+.ds-statbars {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  column-gap: var(--space-3);
+}
+
+.ds-statbar {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: var(--d-row);
+}
+
+.ds-statbar-label {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-label-caps-size);
+  line-height: var(--font-style-label-caps-line-height);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ds-statbar-value {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-style-data-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-default);
+  text-align: right;
+}
+
+.ds-statbar-track {
+  display: block;
+  height: var(--size-bar-height);
+  border-radius: calc(var(--size-bar-height) / 2);
+  background: var(--color-data-track);
+  overflow: hidden;
+}
+
+.ds-statbar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-data-fill);
+}

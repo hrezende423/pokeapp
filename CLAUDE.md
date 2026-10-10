@@ -419,9 +419,13 @@ that isn't explicitly about design.)
 - **Icons**: Tabler, 24px grid, 1.5px stroke, outline default.
 - **Type indicators**: colored text label only, no fill/badge/icon — same
   treatment in list and detail contexts.
-- Old (pre-redesign) modules — Itemdex, Abilitydex, Naturedex, Berrydex,
-  Movedex — keep their own layout/components/colors untouched, but now
-  inherit the app-wide Plex Sans default like everything else.
+- **The five reference dexes — Movedex, Abilitydex, Itemdex, Naturedex,
+  Berrydex — are no longer "untouched"** (owner, 2026-10-10). Their detail
+  pages are the editorial structure (`design-system/PATTERNS.md` §5,
+  `modules/dex/EditorialDetail.tsx`): no borders/fills/shadows for grouping,
+  one text ghost at most, always restated as readable text. The Breeding dex
+  and Trainer Dex keep the older `.entity-detail` layout; Breeding opts out of
+  the new one by NOT passing `variant="editorial"` to `EntityDetailPage`.
 
 ## Excluded from migration
 

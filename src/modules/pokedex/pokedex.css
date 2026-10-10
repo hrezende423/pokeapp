@@ -2081,6 +2081,15 @@
 
 /* ------------------------------------------------------------ nature matrix */
 
+/*
+  NO GRIDLINES, NO FILLS (owner, 2026-10-10). The 5x5 is drawn by alignment and
+  space: every column the same width, every name left-aligned at the same x, and
+  a wide gutter between columns doing what the cell borders did. The row header
+  is told apart by muted ink, not by a vertical rule; the neutral diagonal by
+  italics and muted ink, not by a tone-step fill. Hover is a weight change, as
+  everywhere -- never a background.
+*/
+
 /* Wide content scrolls inside its own box: the page body must never scroll
    sideways. */
 .nature-matrix-wrap {
@@ -2090,23 +2099,23 @@
 
 .nature-matrix {
   border-collapse: collapse;
-  font-family: var(--font-body);
-  font-size: var(--font-size-body);
+  table-layout: fixed;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
 }
 
 .nature-matrix th {
-  padding: 8px 12px;
+  padding: 0 var(--space-6) var(--space-3) 0;
   font-size: var(--font-size-label);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
   text-align: left;
-  border-bottom: 1px solid var(--hairline);
+  border: 0;
   white-space: nowrap;
 }
 
 .nature-matrix tbody th {
-  border-right: 1px solid var(--hairline);
-  border-bottom: none;
+  padding: 0 var(--space-8) 0 0;
 }
 
 /* The axis word above the stat, so a reader does not have to infer which
@@ -2121,17 +2130,19 @@
 }
 
 .nature-cell {
+  width: 7.5rem;
   padding: 0;
-  border: 1px solid var(--hairline);
+  border: 0;
 }
 
 .nature-cell-btn {
   display: block;
   width: 100%;
-  padding: 10px 12px;
-  font-family: var(--font-body);
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
+  padding: var(--space-2) var(--space-6) var(--space-2) 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-default);
   text-align: left;
   background: none;
   border: none;
@@ -2139,29 +2150,40 @@
   white-space: nowrap;
 }
 
+/* Reserves the semibold width in an invisible zero-height copy of the name, so
+   the hover's weight change cannot nudge the column. */
+.nature-cell-btn::after {
+  content: attr(data-label);
+  display: block;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: var(--font-weight-semibold);
+}
+
 .nature-cell-btn:hover {
-  background: var(--surface-hover);
+  font-weight: var(--font-weight-semibold);
 }
 
 .nature-cell-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
 
-/* The five natures that raise and lower the same stat have no effect. Marked by
-   a tone-step and italics -- "different/inert" -- not by a new colour. */
+/* The five natures that raise and lower the same stat have no effect: italic
+   and muted -- "different/inert" -- with no fill behind them. */
 .nature-cell-neutral {
-  background: var(--surface-raised);
+  background: none;
 }
 
 .nature-cell-neutral .nature-cell-btn {
   font-style: italic;
-  color: var(--text-secondary);
+  color: var(--color-text-muted);
 }
 
 .nature-cell-missing {
-  padding: 10px 12px;
-  color: var(--text-secondary);
+  padding: var(--space-2) var(--space-6) var(--space-2) 0;
+  color: var(--color-text-muted);
 }
 
 /* -------------------------------------------------------------- data table */
@@ -2468,6 +2490,214 @@
   letter-spacing: 0;
 }
 
+/* ------------------------------------- editorial detail page (five dexes) */
+
+/*
+  The structure the Movedex, Abilitydex, Itemdex, Naturedex and Berrydex detail
+  pages share (EditorialDetail.tsx; owner, 2026-10-10). The Breeding dex and the
+  Trainer Dex keep the .entity-detail rules above, untouched.
+
+  EVERY RULE IS SCOPED UNDER .dex-ed, for specificity: App.css's bare
+  `.panel section` (border-top, 2rem margin) and `.panel h2` (uppercase, 0.8rem)
+  outrank a single class, and this page has both a <section> per group and an
+  <h2> name. Two classes beat them, which is the fix the shared page already uses.
+
+  No borders, fills or shadows group anything. A block is set apart by size and
+  by space; a group by a small uppercase heading over one hairline.
+*/
+
+/* HEAD, by area. The ghost has its own column beside the name and identity and
+   never overlaps the text; the strip runs the full width under both, so a
+   narrow window squeezes the ghost (which may clip) and never the numbers. On a
+   page with art the art takes a column on the left. */
+.dex-ed .dex-ed-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) fit-content(45%);
+  /* The third row is a flexible filler: a spanning ghost taller than the name
+     and identity puts its extra height THERE, rather than spreading it into
+     the gap between the name and its identity line. */
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-areas:
+    'name     ghost'
+    'identity ghost'
+    '.        ghost'
+    'strip    strip';
+  column-gap: var(--space-6);
+  align-items: start;
+  margin: 0 0 var(--space-8);
+}
+
+.dex-ed .dex-ed-head[data-has-art='true'] {
+  grid-template-columns: max-content minmax(0, 1fr) fit-content(45%);
+  grid-template-areas:
+    'art   name     ghost'
+    'art   identity ghost'
+    'art   .        ghost'
+    'strip strip    strip';
+}
+
+.dex-ed .dex-ed-art {
+  grid-area: art;
+  align-self: center;
+  line-height: 0;
+}
+
+/* Compact and literal: twice the 30px in-game icon, so the fallback stays crisp. */
+.dex-ed .dex-ed-art .item-artwork {
+  width: 60px;
+  height: 60px;
+}
+
+.dex-ed .dex-ed-name.entity-detail-name {
+  grid-area: name;
+  margin: 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-h2-size);
+  line-height: var(--font-style-h2-line-height);
+  font-weight: var(--font-style-h2-weight);
+  letter-spacing: var(--font-style-h2-letter-spacing);
+}
+
+.dex-ed .dex-ed-identity {
+  grid-area: identity;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
+  color: var(--color-text-muted);
+}
+
+/* A category, a pocket, a firmness: grey uppercase at the TypeLabel's own size
+   and tracking, so a type and a category on one line read as one register --
+   and only the type has a colour. */
+.dex-ed .dex-ed-caps {
+  font-size: var(--font-size-label);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.dex-ed .dex-ed-sep {
+  color: var(--color-text-muted);
+}
+
+/* Stretched to its track and right-aligned INSIDE it, never justify-self: end --
+   an end-justified item wider than its track overflows toward the START, i.e.
+   over the name. This way a ghost too wide for a narrow window is clipped at
+   the page edge, which is the bleed a ghost is allowed. */
+.dex-ed .dex-ed-ghost {
+  grid-area: ghost;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+}
+
+.dex-ed .dex-ed-strip {
+  grid-area: strip;
+  margin-top: var(--space-6);
+}
+
+/* LEAD: the entry's own text, the largest running text on the page, in
+   readable ink. Size makes it dominant, not weight. */
+.dex-ed .dex-ed-lead {
+  max-width: 60ch;
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-h4-size);
+  line-height: var(--font-style-h3-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-default);
+}
+
+/* GROUPS: label-caps heading, one hairline, then the rows. */
+.dex-ed .dex-ed-group {
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.dex-ed .dex-ed-group-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border-hairline);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-label-caps-size);
+  line-height: var(--font-style-label-caps-line-height);
+  font-weight: var(--font-style-label-caps-weight);
+  letter-spacing: var(--font-style-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.dex-ed .dex-ed-group-count {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* A group of facts reads as a column, not a page-wide table -- heading hairline
+   included, so the rule under the label stops where its rows do. A group of
+   species keeps the full width for its columns. */
+.dex-ed .dex-ed-group:has(> .ds-kv, > .ds-statbars) {
+  max-width: 36rem;
+}
+
+/* Species, as plain rows in as many columns as fit. Each row draws its own
+   hairline, so there is no row gap (the hairline-band rule). */
+.dex-ed .dex-ed-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  column-gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dex-ed .dex-ed-note {
+  max-width: 60ch;
+  margin: var(--space-2) 0;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-caption-size);
+  line-height: var(--font-style-caption-line-height);
+  color: var(--color-text-muted);
+}
+
+/* A nature's stat change as text: the glyph carries the direction and the
+   status colour reinforces it, never the other way round. */
+.dex-ed .dex-ed-delta {
+  white-space: nowrap;
+  color: var(--color-text-default);
+}
+
+.dex-ed .dex-ed-delta[data-direction='up'] .dex-ed-delta-glyph {
+  color: var(--color-status-up);
+}
+
+.dex-ed .dex-ed-delta[data-direction='down'] .dex-ed-delta-glyph {
+  color: var(--color-status-down);
+}
+
+/* The page's own status lines (learner count, loading) and the game row sit in
+   the related-data block, a group's width below the facts. */
+.dex-ed > .subtitle,
+.dex-ed > .species-scope,
+.dex-ed > [role='alert'] {
+  margin-top: var(--space-8);
+}
+
+@media (max-width: 560px) {
+  .dex-ed .dex-ed-head,
+  .dex-ed .dex-ed-head[data-has-art='true'] {
+    column-gap: var(--space-4);
+  }
+}
+
 /* ---------------------------------------------- card badge + ledger metadata */
 
 /*
@@ -2592,36 +2822,14 @@
   flex: none;
 }
 
-/* The two new tokens. Not --accent: see the note in Naturedex.tsx. */
+/* Stat direction in the design system's status colours (PRINCIPLES.md: stat
+   deltas, always with a glyph). Not --accent: see the note in Naturedex.tsx. */
 .stat-arrow-up {
-  color: var(--stat-increase);
+  color: var(--color-status-up);
 }
 
 .stat-arrow-down {
-  color: var(--stat-decrease);
-}
-
-/* The detail page's two stat lines. A plain list, hairline-separated -- the
-   boxed .stats grid it replaced was a container this pass removes. */
-.nature-stat-pair {
-  margin: var(--space-gap-md) 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-}
-
-.nature-stat-pair li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-gap-md);
-  padding: 0.5rem 0;
-  font-family: var(--font-body);
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--hairline);
-  max-width: 22rem;
+  color: var(--color-status-down);
 }
 
 .nature-stat-delta {
@@ -3364,22 +3572,6 @@
 
 /* ================================================== item detail page */
 
-/*
-  Boxless: no bordered card anywhere on this page. Artwork beside the name,
-  effect text as text, and facts on hairlines -- the same restraint the shared
-  entity detail page uses.
-*/
-.item-hero {
-  display: flex;
-  align-items: center;
-  gap: var(--space-gap-lg);
-  padding-bottom: var(--space-gap-md);
-}
-
-.item-hero-text {
-  min-width: 0;
-}
-
 .item-artwork {
   flex: none;
   width: 96px;
@@ -3394,14 +3586,6 @@
 */
 .item-artwork-icon {
   image-rendering: pixelated;
-}
-
-.item-short-effect {
-  margin: 0 0 var(--space-gap-sm);
-  font-family: var(--font-body);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
 }
 
 /* Label/value rows, hairline-separated. What the bordered facts card became. */

@@ -2,6 +2,21 @@ import { IconArrowLeft } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
 import { SpeciesCardGrid, type SpeciesCardEntry } from '../../components/SpeciesCardGrid'
 import type { SpeciesCardFooter } from '../../components/speciesCardFooters'
+import { LedgerRow } from '../../components/ds/LedgerRow'
+import type { KeyValueItem } from '../../components/ds/KeyValueList'
+import {
+  DEFAULT_ARTWORK_VIEW,
+  getType,
+  resolveArtworkUrl,
+  resolveTypesForGeneration,
+} from '../../data'
+import {
+  EditorialBack,
+  EditorialGroup,
+  EditorialHead,
+  EditorialLead,
+  EditorialPage,
+} from './EditorialDetail'
 
 /**
  * The detail page shared by the Movedex, the Abilitydex and the Breeding dex.
@@ -10,6 +25,13 @@ import type { SpeciesCardFooter } from '../../components/speciesCardFooters'
  * it does, here are the species it applies to -- so all three render this. The
  * only thing that varies is whether the species are one grid or several labelled
  * sections, which is a prop.
+ *
+ * TWO LAYOUTS, BY FLAG (owner, 2026-10-10). `variant="editorial"` is the
+ * structure the reference dexes moved to -- see EditorialDetail.tsx: identity,
+ * an optional ghost, a key-value strip of headline numbers, the description as
+ * the lead text, and the species as plain grouped lists rather than the card
+ * grid. The Breeding dex keeps the original `grid` layout on this same
+ * component, unchanged, by not passing the flag; it was deliberately not forked.
  *
  * Sections with no entries are dropped before rendering, not rendered empty: a
  * move with no tutor in the selected generation shows no "Move tutor" heading at
@@ -37,6 +59,11 @@ export function EntityDetailPage({
   testId,
   footer,
   children,
+  variant = 'grid',
+  ghost,
+  strip,
+  stripTestId,
+  sectionsLabel = 'Pokémon',
 }: {
   /**
    * The open entry's id, mirrored onto the root as data-entry-id. The lifted
@@ -62,13 +89,55 @@ export function EntityDetailPage({
   testId: string
   /**
    * Overrides the card's bottom line for every grid on this page. The Breeding
-   * dex shows egg groups there instead of abilities.
+   * dex shows egg groups there instead of abilities. Grid variant only.
    */
   footer?: SpeciesCardFooter
   /** Extra blocks between the description and the species grids. */
   children?: ReactNode
+  /** `editorial` opts a dex into the new structure; `grid` is the original. */
+  variant?: 'grid' | 'editorial'
+  /** Editorial only: the ghost text beside the head. */
+  ghost?: string | null
+  /** Editorial only: the headline numbers. */
+  strip?: KeyValueItem[]
+  stripTestId?: string
+  /** Editorial only: the heading of a single unlabelled section. */
+  sectionsLabel?: string
 }) {
   const populated = sections.filter((s) => s.entries.length > 0)
+
+  if (variant === 'editorial') {
+    return (
+      <EditorialPage testId={testId} entryId={entryId}>
+        <EditorialBack label={backLabel} onBack={onBack} />
+        <EditorialHead
+          title={title}
+          titleTestId={titleTestId}
+          identity={meta}
+          ghost={ghost}
+          strip={strip}
+          stripTestId={stripTestId}
+        />
+        {description && <EditorialLead testId="entity-description">{description}</EditorialLead>}
+        {children}
+        {populated.map((section, i) => (
+          <EditorialGroup
+            key={section.label ?? `section-${i}`}
+            label={section.label ?? sectionsLabel}
+            count={section.entries.length}
+            testId={`entity-section-${slug(section.label ?? 'species')}`}
+          >
+            <SpeciesGroupList
+              entries={section.entries}
+              generation={generation}
+              onSelect={onSelectSpecies}
+              testId={`entity-list-${slug(section.label ?? 'species')}`}
+            />
+          </EditorialGroup>
+        ))}
+      </EditorialPage>
+    )
+  }
 
   return (
     <div className="entity-detail" data-testid={testId} data-entry-id={entryId}>
@@ -118,6 +187,48 @@ export function EntityDetailPage({
         </section>
       ))}
     </div>
+  )
+}
+
+/**
+ * The species of one group as plain rows: sprite, name, generation-correct
+ * types, and the card's badge (a learn level) as a trailing muted value. The
+ * card grid's ghost number, katakana and ability line are not carried over --
+ * on these pages the species is related data, not the subject.
+ */
+function SpeciesGroupList({
+  entries,
+  generation,
+  onSelect,
+  testId,
+}: {
+  entries: SpeciesCardEntry[]
+  generation: number
+  onSelect: (id: number) => void
+  testId: string
+}) {
+  return (
+    <ul className="ds-ledger-list dex-ed-list" data-testid={testId}>
+      {entries.map(({ species, badge }) => {
+        const variety = species.varieties.find((v) => v.is_default) ?? species.varieties[0]
+        const types = resolveTypesForGeneration(variety, generation)
+          .map((t) => getType(t.type_id)?.name ?? '')
+          .filter(Boolean)
+        return (
+          <li key={species.id} data-species-id={species.id}>
+            <LedgerRow
+              variant="plain"
+              dexNumber={species.id}
+              name={species.display_name}
+              types={types}
+              spriteUrl={resolveArtworkUrl(species, variety, DEFAULT_ARTWORK_VIEW)}
+              aside={badge}
+              onClick={() => onSelect(species.id)}
+            />
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

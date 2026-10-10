@@ -481,10 +481,10 @@ try {
       sections: [...document.querySelectorAll('[data-testid^="entity-section-"]')].map((el) =>
         el.getAttribute('data-testid'),
       ),
-      sectionLabels: [...document.querySelectorAll('.entity-detail-section-label')].map((el) =>
+      sectionLabels: [...document.querySelectorAll('.dex-ed-group-label')].map((el) =>
         el.textContent.trim(),
       ),
-      levelBadges: [...document.querySelectorAll('.species-card-badge')].map((el) =>
+      levelBadges: [...document.querySelectorAll('[data-ds="ledger-aside"]')].map((el) =>
         el.textContent.trim(),
       ),
     }
@@ -548,7 +548,7 @@ try {
     detail.sectionLabels.join(' | '),
   )
   check(
-    'level-up cards carry a Lv. badge and the others do not',
+    'level-up rows carry a Lv. value and the others do not',
     detail.levelBadges.length > 0 && detail.levelBadges.every((b) => /^Lv\.\d+$/.test(b)),
     detail.levelBadges.slice(0, 6).join(','),
   )
@@ -589,7 +589,7 @@ try {
       { timeout: 120000 },
     )
     return page.evaluate(() => {
-      const cards = [...document.querySelectorAll('.entity-detail-section [data-species-id]')]
+      const cards = [...document.querySelectorAll('[data-testid^="entity-section-"] [data-species-id]')]
       const ids = [...new Set(cards.map((c) => Number(c.getAttribute('data-species-id'))))]
       const el = document.querySelector('[data-testid="movedex-learner-count"]')
       return {
@@ -597,7 +597,7 @@ try {
         rows: ids.length,
         ids,
         partial: document.querySelector('[data-testid="movedex-learners-partial"]') != null,
-        thumbs: document.querySelectorAll('.entity-detail-section img').length,
+        thumbs: document.querySelectorAll('[data-testid^="entity-section-"] img').length,
       }
     })
   }
@@ -624,7 +624,7 @@ try {
           const card = section.querySelector(`[data-species-id="${speciesId}"]`)
           if (!card) continue
           methods.push(method)
-          const b = card.querySelector('.species-card-badge')
+          const b = card.querySelector('[data-ds="ledger-aside"]')
           if (b) badge = b.textContent.trim()
         }
         return { methods: methods.join(','), badge }
@@ -673,7 +673,7 @@ try {
     slowbro.methods,
   )
   check(
-    'Slowbro shows its level-up level (25) as a card badge',
+    'Slowbro shows its level-up level (25) on its row',
     slowbro.badge === 'Lv.25',
     String(slowbro.badge),
   )
