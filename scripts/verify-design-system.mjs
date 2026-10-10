@@ -2295,13 +2295,12 @@ try {
         grid.style.numColor === hexToRgb(want['--text-secondary']),
       grid.style.numText.trim() + ' / ' + grid.style.numColor,
     )
-    // 600, not 700: across all six reference names the measured fit is 14.00px at
-    // weight 600 against 13.82px at 700.
+    // Regular since 2026-10-10 (owner). It was 600, the measured fit to Figma.
     check(
-      '[' + theme + '] the name is --font-weight-medium --text-primary at --font-size-body',
+      '[' + theme + '] the name is --font-weight-regular --text-primary at --font-size-body',
       grid.style.nameColor === hexToRgb(want['--text-primary']) &&
         grid.style.nameFontSize === SCALE['--font-size-body'] &&
-        grid.style.nameWeight === SCALE['--font-weight-medium'],
+        grid.style.nameWeight === SCALE['--font-weight-regular'],
       grid.style.nameColor + ' / ' + grid.style.nameFontSize + ' / ' + grid.style.nameWeight,
     )
     // Measured off the two reference strings with no middot in them, so no
@@ -2337,10 +2336,12 @@ try {
       nearRatio(grid.colPitch, FIG.colPitch / FIG.card.w, grid.card.w, 2),
       grid.colPitch + ' (want ' + ((FIG.colPitch / FIG.card.w) * grid.card.w).toFixed(1) + ')',
     )
+    // The row gap is the column gap since 2026-10-10 (owner), no longer Figma's
+    // 40-raw: one 9px pitch both ways.
     check(
-      '[' + theme + "] row pitch matches Figma's 507:467",
-      nearRatio(grid.rowPitch, FIG.rowPitch / FIG.card.h, grid.card.h, 2),
-      grid.rowPitch + ' (want ' + ((FIG.rowPitch / FIG.card.h) * grid.card.h).toFixed(1) + ')',
+      '[' + theme + '] row gap equals the column gap',
+      grid.rowPitch - grid.card.h === grid.colPitch - grid.card.w,
+      grid.rowPitch - grid.card.h + ' vs ' + (grid.colPitch - grid.card.w),
     )
 
     await page.screenshot({ path: SHOTS + '/grid-' + theme + '.png' })

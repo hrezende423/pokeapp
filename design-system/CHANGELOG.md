@@ -1,4 +1,8 @@
 # Changelog
+## 2.1.3 — 2026-10-10 (non-breaking)
+- Page titles take the nav's face and normal tracking (they inherited a -1.68px h1 letter-spacing)
+- Species grid card: row gap 9px (= column gap), `#0001` back before the name, name and BST/Speed numbers regular, ability line-height normal
+- Dex pages other than the Pokédex: list/table centred, top level with the title; title beside it at ≥1300px
 ## 2.1.2 — 2026-10-10 (non-breaking)
 - Account menu: a Generation row under Theme (label left, underline select right, 112px, label-size type) replaces the game select in the Search/Filter panel
 - Game row (the species page's segmented `species-scope` buttons, game axis only) on the Trainer Dex and the Movedex detail, inside the selected generation

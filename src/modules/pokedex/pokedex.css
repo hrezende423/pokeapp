@@ -224,11 +224,10 @@
 /*
   A catalog number in a list, which is one of the cases --font-numeric exists for.
 
-  ONE CALLER LEFT: the global search results, inside the Search/Filter menu. Every
-  dex surface that printed an entry number -- the grid card, the rail row, the
-  ledger row, the species banner, the list view's two leading columns -- no longer
-  does. A search hit still needs it: the number is how you tell two forms of the
-  same name apart in a flat result list.
+  TWO CALLERS: the global search results, inside the Search/Filter menu, and the
+  species grid card, which got it back on 2026-10-10 (owner). The rail row, the
+  ledger row, the species banner and the list view's leading columns still print
+  none.
 
   It sets font-family as well as font-variant-numeric, which it did not always do:
   asking for tabular digits from whatever family had already applied got Plex Sans
@@ -399,7 +398,9 @@
   display: grid;
   grid-template-columns: repeat(3, 212px);
   column-gap: 9px;
-  row-gap: 17px;
+  /* The column gap, so the grid is one pitch both ways (owner, 2026-10-10).
+     It was Figma's 17px. */
+  row-gap: 9px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -563,11 +564,21 @@
   min-width: 0;
 }
 
-/* 600, not 700: across all six names in the reference the measured fit is 14.00px
-   at weight 600 against 13.82px at 700. */
+/* The card's national dex number, back on the name line (owner, 2026-10-10). */
+.species-card .dex-no {
+  flex: none;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+/* Regular (owner, 2026-10-10), like the number beside it. It was 600, fitted
+   to the Figma reference's measured name widths. */
 .species-card .species-name {
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -594,7 +605,10 @@
     design-system suite asserts. Leading is the one dimension here that is not.
     Both lines are `white-space: nowrap`, so nothing wraps into its neighbour.
   */
-  line-height: 1;
+  /* normal, not the 1 it was set to so a fourth line fitted: at 1 the line box
+     clipped the descenders (owner, 2026-10-10). The card's 214px still holds all
+     four lines. */
+  line-height: normal;
   margin-top: 5px;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -619,7 +633,10 @@
   font-size: var(--font-size-caption);
   /* 11px, the last of the 63px the text block has. See the note above. */
   line-height: 11px;
-  margin-top: 5px;
+  /* 3, not 5: the ability line's `normal` leading above is ~2px taller than
+     the 1 it was, and this line must still end inside the 214px card. Taken
+     here rather than above it, since the ability line's y is Figma-calibrated. */
+  margin-top: 3px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -631,6 +648,8 @@
 .species-card-stats .num {
   font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
+  /* Regular (owner, 2026-10-10): the numbers read as data, not emphasis. */
+  font-weight: var(--font-weight-regular);
   font-size: 0.92em;
   line-height: inherit;
   color: var(--text-primary);
@@ -2690,6 +2709,21 @@
   color: var(--text-primary);
 }
 /*
+  EVERY PAGE TITLE TAKES THE NAV'S FACE AND TRACKING (owner, 2026-10-10): the
+  nav's own family and normal letter-spacing. Without this they inherited
+  index.css's bare `h1 { letter-spacing: -1.68px }`, the Vite template's 56px
+  hero setting, which crushed a 15px title. Listed here, in one place, so a new
+  page title is one more selector rather than a fifth copy of the fix.
+*/
+.dex-title,
+.calc-title,
+.tc-title,
+.tm-title,
+.stub-page-title {
+  font-family: var(--font-body);
+  letter-spacing: normal;
+}
+/*
   THE POKEDEX'S TITLE SITS BESIDE THE GRID, not above it: the cards keep their
   centred x and start level with the title's top. Out of flow for that, on a
   window wide enough that the centred grid clears it; in flow above the grid
@@ -2700,6 +2734,46 @@
 }
 @media (min-width: 1000px) {
   .pokedex-title-row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    padding: 0;
+  }
+}
+
+/*
+  EVERY DEX BUT THE POKEDEX, laid out like it (owner, 2026-10-10): the list or
+  table centred, its top level with the title, and the title beside it at the
+  top-left. The Pokédex has its own markup (.pokedex-title-row) and is untouched.
+
+  1300px, not the Pokédex's 1000: the widest list here is the Movedex table at
+  about 1000px, and the title needs its own ~110px clear of it on the left. Below
+  that the title stays in flow above the list, which is still centred.
+*/
+.dex-list-center > *,
+.dex-list-center .data-table-wrap > .data-table,
+.dex-list-center .nature-matrix-wrap > .nature-matrix {
+  margin-left: auto;
+  margin-right: auto;
+}
+/* The ledger list's own top margin would leave it 8px under the title. */
+.dex-list-center > .species-rows {
+  margin-top: 0;
+}
+.dex-list-controls {
+  flex: 0 0 auto;
+  padding: 0 0 var(--space-gap-sm);
+}
+.dex-list-controls > * {
+  width: fit-content;
+}
+/* The out-of-flow title's containing block. */
+.pokedex:has(> .dex-title-beside) {
+  position: relative;
+}
+@media (min-width: 1300px) {
+  .dex-title-beside {
     position: absolute;
     top: 0;
     left: 0;

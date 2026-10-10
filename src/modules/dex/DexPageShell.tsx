@@ -106,10 +106,14 @@ export function DexPageShell<T>({
     <div className="pokedex" data-testid={`dex-${dexId}`}>
       {selected == null ? (
         <>
-          <div className="dex-controls">
+          {/* The Pokédex's arrangement (owner, 2026-10-10): the title sits beside
+              the list on a wide window, and the list is centred with its top
+              level with the title's. The controls row, when there is one, is
+              part of the centred column rather than the title. */}
+          <div className="dex-controls dex-title-beside">
             <DexTitle dexId={dexId} count={visible.length} />
-            {controls}
           </div>
+          {controls && <div className="dex-list-center dex-list-controls">{controls}</div>}
           {/* The query signature is part of the key for the reason the Pokedex
               grid's filters already were: a narrowed or re-ordered list is a
               different list, and an offset taken against another one means
@@ -118,7 +122,9 @@ export function DexPageShell<T>({
             testId={`${dexId}-list-scroll`}
             memoryKey={scrollKey(dexId, 'list', generation, isAll, query.signature)}
           >
-            {list({ entries: visible, onSelect: setSelectedId })}
+            <div className="dex-list-center">
+              {list({ entries: visible, onSelect: setSelectedId })}
+            </div>
           </ScrollArea>
         </>
       ) : (

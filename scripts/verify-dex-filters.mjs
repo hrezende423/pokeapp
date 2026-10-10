@@ -494,11 +494,11 @@ try {
     JSON.stringify(cardBox),
   )
   check(
-    'and the grid it sits in is untouched -- three 212px columns, 9px / 17px gaps',
+    'and the grid it sits in -- three 212px columns, 9px gaps both ways (row gap evened 2026-10-10)',
     cardBox.width === 212 &&
       cardBox.columns === '212px 212px 212px' &&
       cardBox.columnGap === '9px' &&
-      cardBox.rowGap === '17px',
+      cardBox.rowGap === '9px',
     `${cardBox.columns} / ${cardBox.columnGap} / ${cardBox.rowGap}`,
   )
 
