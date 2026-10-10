@@ -25,6 +25,7 @@ import { readFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { startDevServer } from './lib/devServer.mjs'
+import { appGeneration, selectGeneration } from './lib/controls.mjs'
 
 const PORT = 4186
 const GAME_OF = { 1: 'red-blue', 2: 'gold-silver', 3: 'ruby-sapphire', 4: 'platinum' }
@@ -280,8 +281,8 @@ try {
 
   // ------------------------------------------------------------------ 5
   hr('5. THE SCREEN')
-  await page.selectOption('[data-testid="vg-select"]', { index: 1 }).catch(() => {})
-  const appSelection = await page.inputValue('[data-testid="vg-select"]').catch(() => null)
+  await selectGeneration(page, 1).catch(() => {})
+  const appSelection = await appGeneration(page).catch(() => null)
   // Tools -> Calculators -> Damage Calculator: its own page, nested in the nav.
   const nav = await page.evaluate(() => {
     const sub = document.querySelector('[data-testid="nav-subdropdown-calculators"]')
@@ -351,7 +352,7 @@ try {
 
   check(
     "the calculator's generation does not move the app's",
-    appSelection == null || (await page.inputValue('[data-testid="vg-select"]')) === appSelection,
+    appSelection == null || (await appGeneration(page)) === appSelection,
     String(appSelection),
   )
 

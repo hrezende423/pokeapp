@@ -882,7 +882,10 @@ have loaded and must not show the idle message.
 
 ### 10a — A real per-generation accuracy bug, found while verifying FIX 5
 
-**Raised twice, still unanswered.**
+**RESOLVED 2026-10-10** (owner: "make the dexes gen-aware"). The Movedex and
+the Learnset tab now read moves through `moveForGeneration`
+(`src/data/moveEra.ts`); verify-movedex ITEM 1b asserts Charm, Fire Punch,
+Gust, Dig and Curse per generation. The original note follows.
 
 **Three moves render as Fairy under a Gen 1–4 selection.** Charm, Sweet Kiss
 and Moonlight are `type_id: 18` (Fairy) in the bundle, each with a

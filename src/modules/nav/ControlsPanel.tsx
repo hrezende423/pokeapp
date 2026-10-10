@@ -6,7 +6,6 @@ import { SortPanel } from '../dex/query/SortPanel'
 import { useDexQueryBundle } from '../dex/query/dexQueryContext'
 import { useDisclosureGroup } from '../dex/query/useDisclosureGroup'
 import { GlobalSearch } from '../search/GlobalSearch'
-import { VersionGroupSelector } from '../version-group/VersionGroupSelector'
 
 /**
  * The app bar's controls: the cross-dex search, the game scope, and -- for
@@ -141,13 +140,6 @@ export function ControlsPanel() {
           <div className="app-controls-field">
             <span className="app-controls-label">Search all dexes</span>
             <GlobalSearch />
-          </div>
-
-          {/* Directly under the search input, in its own section: the game scope
-              governs every list and every era-sensitive field in the app, so it
-              belongs at the top of the menu rather than under a long fold. */}
-          <div className="app-controls-field">
-            <VersionGroupSelector />
           </div>
 
           {hasFilters && (

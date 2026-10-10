@@ -6,6 +6,7 @@ import {
   type VersionGroup,
 } from '../../data'
 import { useVersionGroup } from '../version-group/context'
+import { defaultGameOfGeneration } from '../version-group/games'
 
 /**
  * The species page's OWN game scope, for the tabs whose data is per-game.
@@ -43,9 +44,18 @@ export interface SpeciesGameScope {
   setVersionGroup: (name: string) => void
 }
 
-/** Newest group in a generation, by the bundle's own ordering. */
+/**
+ * The group a generation opens on: the app's default game for it
+ * (`defaultGameOfGeneration`), when this species has it. Not "highest order":
+ * that put Gen 3 on XD and Gen 9 on Champions, which has no learnset.
+ */
 function newest(groups: VersionGroup[]): VersionGroup {
-  return groups.reduce((best, g) => ((g.order ?? 0) > (best.order ?? 0) ? g : best), groups[0])
+  const generation = groups[0]?.generation_id
+  const preferred = generation != null ? defaultGameOfGeneration(generation) : null
+  return (
+    groups.find((g) => g.name === preferred?.name) ??
+    groups.reduce((best, g) => ((g.order ?? 0) > (best.order ?? 0) ? g : best), groups[0])
+  )
 }
 
 export function useSpeciesGameScope(speciesId: number): SpeciesGameScope | null {

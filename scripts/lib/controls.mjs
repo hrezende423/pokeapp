@@ -23,9 +23,83 @@
 const PANEL = '[data-testid="app-controls"]'
 const TOGGLE = '[data-testid="controls-toggle"]'
 
-/* vg-select is the one control present on every module, so its visibility is
-   what "the panel is really open" means -- not the toggle's own state. */
-const READY = '[data-testid="vg-select"]'
+/* The cross-dex search is the one control present on every module, so its
+   visibility is what "the panel is really open" means -- not the toggle's own
+   state. (It was the game selector, until that moved to the account menu.) */
+const READY = '[data-testid="global-search"]'
+
+/* ------------------------------------------------------ the app's generation */
+
+/*
+  THE APP SELECTS A GENERATION NOW, from the account menu (owner, 2026-10-10).
+  The suites were written against a game selector, and most of them still think
+  in games -- "Platinum", "red-blue" -- so `selectGame` keeps that vocabulary: it
+  sets the game's generation and then, where the screen on display has its own
+  game row (Movedex detail, Trainer Dex), picks the game there. A screen with no
+  game row shows the generation's default game (src/modules/version-group/games.ts).
+*/
+export const GAME_GENERATION = {
+  'red-blue': 1,
+  yellow: 1,
+  'gold-silver': 2,
+  crystal: 2,
+  'ruby-sapphire': 3,
+  emerald: 3,
+  'firered-leafgreen': 3,
+  colosseum: 3,
+  xd: 3,
+  'diamond-pearl': 4,
+  platinum: 4,
+  'heartgold-soulsilver': 4,
+}
+
+const ACCOUNT = '[data-testid="account"]'
+const GEN_SELECT = '[data-testid="gen-select"]'
+
+/** The app's generation select's value: '1'..'9', or 'all'. */
+export const appGeneration = (page) => page.$eval(GEN_SELECT, (el) => el.value)
+
+/** Set the app's generation ('4', 4 or 'all') through the account menu, then close it. */
+export async function selectGeneration(page, value) {
+  const v = String(value)
+  const wasOpen = await page.$eval(ACCOUNT, (el) => el.dataset.open === 'true')
+  if (!wasOpen) await page.click('[data-testid="account-toggle"]')
+  await page.waitForSelector(GEN_SELECT, { state: 'visible', timeout: 15000 })
+  await page.selectOption(GEN_SELECT, v)
+  await page.waitForFunction((x) => document.querySelector('[data-testid="gen-select"]')?.value === x, v, {
+    timeout: 30000,
+  })
+  if (!wasOpen) await page.click('[data-testid="account-toggle"]')
+  await page.waitForTimeout(80)
+}
+
+/**
+ * Select a game the old way: its generation, plus the screen's own game row if
+ * one is on display. 'all' selects "All".
+ */
+export async function selectGame(page, vg) {
+  if (vg === 'all') return selectGeneration(page, 'all')
+  const gen = GAME_GENERATION[vg]
+  if (gen == null) throw new Error(`selectGame: no generation known for ${vg}`)
+  await selectGeneration(page, gen)
+  await pickGameRow(page, vg)
+}
+
+/**
+ * Click `vg` in whichever game row is on screen (Movedex detail, Trainer Dex, the
+ * species page's Learnset scope). No-op without one.
+ */
+export async function pickGameRow(page, vg) {
+  for (const row of ['movedex-game', 'trainerdex-game', 'learnset-scope-game']) {
+    const btn = await page.$(`[data-testid="${row}-${vg}"]`)
+    if (btn && (await btn.isVisible())) {
+      await btn.click()
+      await page.waitForTimeout(80)
+      return true
+    }
+  }
+  return false
+}
 
 export const controlsOpen = (page) => page.$eval(PANEL, (el) => el.dataset.open === 'true')
 

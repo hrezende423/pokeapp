@@ -27,7 +27,7 @@
 import { mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
-import { controls, fillDexSearch } from './lib/controls.mjs'
+import { controls, fillDexSearch, selectGame as selectAppGame } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
@@ -308,7 +308,7 @@ try {
   }
   const selectGame = async (vg) => {
     await closePanel()
-    await withControls(() => page.selectOption('[data-testid="vg-select"]', vg))
+    await selectAppGame(page, vg)
     await page.waitForTimeout(180)
   }
   const setTerm = async (term) => {

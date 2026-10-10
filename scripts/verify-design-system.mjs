@@ -26,7 +26,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { selectGame } from './lib/controls.mjs'
 import { goToDex, openTab } from './lib/nav.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
@@ -528,7 +528,6 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
   await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
-  const { withControls } = controls(page)
 
   const setTheme = async (theme) => {
     await page.evaluate((t) => {
@@ -1345,7 +1344,7 @@ try {
         visibleByDefault: {
           speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
           typeFilterButtons: [...document.querySelectorAll('.tf')].filter(visible).length,
-          gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+          gameSelect: visible(document.querySelector('[data-testid="gen-select"]')),
           globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
         },
         /*
@@ -1624,9 +1623,9 @@ try {
         shadow: cs.boxShadow,
         speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
         typeFilterButtons: [...document.querySelectorAll('.tf')].filter(visible).length,
-        gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+        gameSelect: visible(document.querySelector('[data-testid="gen-select"]')),
         globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
-        insidePanel: ['species-search', 'vg-select', 'global-search'].every(
+        insidePanel: ['species-search', 'global-search'].every(
           (id) =>
             document
               .querySelector('[data-testid="' + id + '"]')
@@ -1641,9 +1640,9 @@ try {
     })
     log('  [' + theme + '] opened: ' + JSON.stringify(opened))
     check(
-      '[' + theme + '] the toggle reveals all three controls, plus the cross-dex search',
+      '[' + theme + '] the toggle reveals the filters and the cross-dex search (the generation is in the account menu)',
       opened.speciesSearch &&
-        opened.gameSelect &&
+        !opened.gameSelect &&
         opened.globalSearch &&
         opened.typeFilterButtons > 10,
       JSON.stringify(opened),
@@ -1700,7 +1699,7 @@ try {
       const visible = (el) => el != null && el.getClientRects().length > 0
       return {
         speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
-        gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+        gameSelect: visible(document.querySelector('[data-testid="gen-select"]')),
         globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
       }
     })
@@ -2366,7 +2365,7 @@ try {
     }
   })
   log('  baseline (all): ' + JSON.stringify(gridBaseline))
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'platinum'))
+  await selectGame(page, 'platinum')
   await page.waitForTimeout(300)
   const gen4 = await page.evaluate(() => ({
     bulbasaur:
@@ -2393,7 +2392,7 @@ try {
   )
   // Gens 1-2 had no abilities at all: the slot must be absent, and the two lines
   // above it must not move.
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'red-blue'))
+  await selectGame(page, 'red-blue')
   await page.waitForTimeout(300)
   const gen1 = await page.evaluate(() => {
     const card = document.querySelector('[data-testid="species-row-1"]')
@@ -2416,7 +2415,7 @@ try {
       gen1.cardHeight === gridBaseline.cardHeight,
     JSON.stringify(gen1) + ' vs ' + JSON.stringify(gridBaseline),
   )
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'all'))
+  await selectGame(page, 'all')
   await page.waitForTimeout(300)
 
   // The scroll-down affordance: Figma's "icon-scrolldown" instance, centred.

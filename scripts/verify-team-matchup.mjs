@@ -31,6 +31,7 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { startDevServer } from './lib/devServer.mjs'
+import { appGeneration } from './lib/controls.mjs'
 import { seedTeams } from './lib/matchupFixtures.mjs'
 
 const PORT = 4202
@@ -823,9 +824,7 @@ try {
   hr('5. A REAL FIGHT PER GENERATION, THROUGH THE SCREEN')
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-testid="nav-tab-tools"]')
-  const appSelection = await page
-    .$eval('[data-testid="vg-select"]', (e) => e.value)
-    .catch(() => null)
+  const appSelection = await appGeneration(page).catch(() => null)
   await page.evaluate(() => document.querySelector('[data-testid="nav-team-matchup"]').click())
   await page.waitForSelector('[data-testid="team-matchup"]')
   const tab = async (name) => {
@@ -894,7 +893,7 @@ try {
   check(
     "changing the matchup's game never moved the app's (fourth exception, one-way)",
     appSelection == null ||
-      (await page.$eval('[data-testid="vg-select"]', (e) => e.value).catch(() => appSelection)) ===
+      (await appGeneration(page).catch(() => appSelection)) ===
         appSelection,
     String(appSelection),
   )

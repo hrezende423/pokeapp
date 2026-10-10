@@ -12,27 +12,6 @@
   overflow: hidden;
 }
 
-.vg-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.vg-selector select {
-  padding: 0.4rem 0.5rem;
-  font: inherit;
-  font-size: 0.9rem;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--text-h);
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 0.35rem;
-}
-
 /* The list is a fixed 240px rail: it must not grow with the viewport, so the
    detail area absorbs all remaining width. minmax(0, 1fr) rather than 1fr so a
    wide table inside a card can scroll instead of stretching the grid. */
@@ -1796,24 +1775,6 @@
   border-bottom-color: var(--accent);
 }
 
-/* The game scope, previously a permanent control in the bar. */
-.app-controls-field .vg-selector {
-  gap: 6px;
-  font-family: var(--font-body);
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-}
-
-.app-controls-field .vg-selector select {
-  width: 100%;
-  font-family: var(--font-body);
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-control);
-}
-
 /* Inside the panel the cross-dex search is a labelled field in a column, not a
    right-aligned strip in the bar, so both of those bar-specific rules are
    undone here. */
@@ -2941,8 +2902,6 @@
 .dex-menu .tf,
 .dex-menu .ds-field-control,
 .dex-menu .ds-search,
-.dex-menu .vg-selector,
-.dex-menu .vg-selector select,
 .dex-menu .global-search-input,
 .dex-menu input[type='search'] {
   font-size: var(--font-size-caption);

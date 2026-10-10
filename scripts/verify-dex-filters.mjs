@@ -20,6 +20,7 @@
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { goToDex } from './lib/nav.mjs'
+import { selectGame as selectAppGame } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4180
@@ -172,7 +173,7 @@ try {
     if (await panelOpen('app-controls')) return
     await park()
     await page.click('[data-testid="controls-toggle"]')
-    await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    await page.waitForSelector('[data-testid="global-search"]', { state: 'visible', timeout: 15000 })
   }
   const openSort = async () => {
     if (await panelOpen('dex-sort')) return
@@ -243,10 +244,9 @@ try {
     await page.waitForTimeout(180)
   }
   const selectGame = async (vg) => {
-    await openFilters()
-    await page.selectOption('[data-testid="vg-select"]', vg)
-    await page.waitForTimeout(200)
     await closeMenus()
+    await selectAppGame(page, vg)
+    await page.waitForTimeout(200)
   }
 
   // ==================================================================
@@ -335,7 +335,6 @@ try {
     return {
       reset: y('[data-testid="controls-reset-top"]'),
       search: y('[data-testid="global-search"]'),
-      game: y('[data-testid="vg-select"]'),
       filters: y('[data-testid="species-search"]'),
     }
   })
@@ -345,9 +344,9 @@ try {
     menuOrder.reset != null && menuOrder.reset < menuOrder.search,
   )
   check(
-    'and the game selector sits directly below the search input',
-    menuOrder.game > menuOrder.search && menuOrder.game < menuOrder.filters,
-    `search ${Math.round(menuOrder.search)} · game ${Math.round(menuOrder.game)} · filters ${Math.round(menuOrder.filters)}`,
+    'the filters follow the search input (the generation moved to the account menu)',
+    menuOrder.filters > menuOrder.search,
+    `search ${Math.round(menuOrder.search)} · filters ${Math.round(menuOrder.filters)}`,
   )
 
   const sizes = await page.evaluate(() => {

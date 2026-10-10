@@ -149,8 +149,8 @@ export function statChangeLabels(move: Move): string[] {
  * a known open bug for the TYPE field specifically (three moves are stored as
  * Fairy with a Normal past value). This is not a fix for that: it SHOWS the
  * rows, labelled by the version group they belonged to, so the page stops
- * hiding the fact that a move's numbers changed. Resolving them into the
- * displayed figures is a separate decision that touches every learnset table.
+ * hiding the fact that a move's numbers changed. The displayed figures are
+ * resolved separately, by data/moveEra.ts's moveForGeneration.
  */
 export function pastValueRows(
   move: Move,
@@ -171,9 +171,14 @@ export function pastValueRows(
       if (past.pp != null) parts.push(`PP ${past.pp}`)
       if (past.accuracy != null) parts.push(`Accuracy ${past.accuracy}%`)
       if (past.effect_chance != null) parts.push(`Effect ${past.effect_chance}%`)
-      if (past.type_id != null) parts.push(`Type ${titleCaseMove(getType(past.type_id)?.name)}`)
+      if (past.type_id != null) {
+        const name = getType(past.type_id)?.name
+        parts.push(`Type ${name === 'unknown' ? '???' : titleCaseMove(name)}`)
+      }
       return {
-        label: titleCaseMove(past.version_group),
+        // The entry's group is where the NEW value took effect, so its values
+        // are what the move had BEFORE it (see data/moveEra.ts).
+        label: `Before ${titleCaseMove(past.version_group)}`,
         value: parts.length > 0 ? parts.join(' · ') : DASH,
       }
     })

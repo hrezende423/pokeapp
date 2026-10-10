@@ -1,46 +1,51 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { LATEST_GENERATION, listVersionGroups } from '../../data'
-import { ALL_VERSION_GROUPS, VersionGroupContext, type VersionGroupState } from './context'
+import { GENERATION_RANGES, LATEST_GENERATION, listVersionGroups } from '../../data'
+import { VersionGroupContext, type VersionGroupState } from './context'
+import { defaultGameOfGeneration } from './games'
 
 /**
- * Default selection: the newest in-scope games, so the Pokedex opens on the full
- * 493-species dex rather than a 151-species subset.
+ * Default selection: Generation IV, the newest generation the whole app covers
+ * (encounters, items and trainers stop there), and the era the old game selector
+ * opened on (HeartGold/SoulSilver).
  */
-const DEFAULT_VERSION_GROUP = 'heartgold-soulsilver'
+const DEFAULT_GENERATION = 4
 
 export function VersionGroupProvider({ children }: { children: ReactNode }) {
   const available = useMemo(() => listVersionGroups(), [])
-  const [selection, setSelection] = useState(
-    () => available.find((v) => v.name === DEFAULT_VERSION_GROUP)?.name ?? available[0].name,
+  const generations = useMemo(
+    () => GENERATION_RANGES.map((r) => r.generation).filter((g) => g <= LATEST_GENERATION),
+    [],
   )
+  const [selected, setSelected] = useState<number | null>(DEFAULT_GENERATION)
 
-  const setVersionGroup = useCallback((next: string) => {
-    setSelection(next)
+  const setGeneration = useCallback((next: number | null) => {
+    setSelected(next)
   }, [])
 
   const value = useMemo<VersionGroupState>(() => {
-    if (selection === ALL_VERSION_GROUPS) {
+    if (selected == null) {
       return {
-        versionGroup: null,
-        selection,
+        selectedGeneration: null,
         isAll: true,
         // Newest era in scope, derived from the generation ranges: it is the one
         // reading under which every species in the dex exists.
         generation: LATEST_GENERATION,
-        setVersionGroup,
+        versionGroup: null,
+        setGeneration,
+        generations,
         available,
       }
     }
-    const versionGroup = available.find((v) => v.name === selection) ?? available[0]
     return {
-      versionGroup,
-      selection: versionGroup.name,
+      selectedGeneration: selected,
       isAll: false,
-      generation: versionGroup.generation_id ?? 1,
-      setVersionGroup,
+      generation: selected,
+      versionGroup: defaultGameOfGeneration(selected),
+      setGeneration,
+      generations,
       available,
     }
-  }, [available, selection, setVersionGroup])
+  }, [available, generations, selected, setGeneration])
 
   return <VersionGroupContext.Provider value={value}>{children}</VersionGroupContext.Provider>
 }

@@ -17,7 +17,7 @@ import {
   natureEntries,
   speciesEntries,
 } from '../entrySources'
-import { trainerEntries, useTrainerPartition } from '../trainerEntries'
+import { trainerEntries, useTrainerPartition, useTrainerdexGame } from '../trainerEntries'
 import { DexQueryContext, type QueryListId } from './dexQueryContext'
 import {
   buildFilterSections,
@@ -96,7 +96,8 @@ const TEAM_BUILDING_IDS = new Set(['my-teams', 'build-library', 'new-team', 'new
 
 export function DexQueryProvider({ children }: { children: ReactNode }) {
   const nav = useNav()
-  const { generation, isAll, versionGroup } = useVersionGroup()
+  const { generation, isAll } = useVersionGroup()
+  const trainerGame = useTrainerdexGame()
   const [view, setView] = useState<SpeciesView>('grid')
   const [selectedSpecies] = useDexSelection('pokedex')
 
@@ -110,7 +111,7 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
     open module, so browsing elsewhere never downloads a game's trainers.
   */
   const trainerLoad = useTrainerPartition(
-    moduleId === 'trainerdex' ? (versionGroup?.name ?? null) : null,
+    moduleId === 'trainerdex' ? (trainerGame.versionGroup?.name ?? null) : null,
   )
   const trainerPartition = trainerLoad.state.status === 'ready' ? trainerLoad.state.partition : null
   const trainerRows = useMemo(

@@ -18,7 +18,7 @@
 
 import { get as httpGet } from 'node:http'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { selectGame } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4178
@@ -127,15 +127,8 @@ try {
   const mark = () => requests.length
 
   const selectGroup = async (name) => {
-    await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
-    // The scope readout was removed from the page with the header block. The
-    // select holds the same state the list derives from, and both land in one
-    // React commit, so waiting for its value is waiting for the list.
-    await page.waitForFunction(
-      (n) => document.querySelector('[data-testid="vg-select"]')?.value === n,
-      name,
-      { timeout: 30000 },
-    )
+    await selectGame(page, name)
+    // selectGame waits for the generation select to hold the value itself.
   }
   /** Wait for any in-flight partition load to finish rendering. */
   const settle = () =>
@@ -233,7 +226,6 @@ try {
   const navStart = Date.now()
   await page.goto(APP_URL, { waitUntil: 'load' })
 
-  const { withControls } = controls(page)
   // The boot readout now lives inside the footer's hover-only info panel
   // (App.tsx), so it is attached but not visible until the trigger is
   // hovered/focused -- 'attached' is the right wait here, since this step only

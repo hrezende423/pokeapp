@@ -101,6 +101,22 @@
 .account-theme .app-controls-label {
   margin: 0;
 }
+/* The generation select: about the theme switch's footprint and type size, so
+   the two rows read as a pair rather than a pill beside a full form field.
+   Scoped through .account-panel to outrank `.app-controls-panel .ds-field`'s
+   fill-the-panel width. */
+.account-panel .account-generation .ds-field {
+  width: 112px;
+}
+.account-panel .account-generation .ds-field-control {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 18px 3px 1px;
+  font-size: var(--font-size-label);
+}
+.account-panel .account-generation .ds-select-chevron {
+  bottom: 4px;
+}
 
 .account-editor {
   display: flex;

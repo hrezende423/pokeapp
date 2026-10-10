@@ -18,7 +18,7 @@
 
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls, fillDexSearch } from './lib/controls.mjs'
+import { controls, fillDexSearch, selectGame as selectAppGame } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
@@ -212,7 +212,7 @@ try {
     })
   }
   const selectGame = async (vg) => {
-    await withControls(() => page.selectOption('[data-testid="vg-select"]', vg))
+    await selectAppGame(page, vg)
     await page.waitForTimeout(150)
   }
   const countOf = async (dex) =>
@@ -295,6 +295,40 @@ try {
     log(`  ${g.vg.padEnd(21)} gen ${g.gen}: ${got} (expected ${moveCount(g.gen)})`)
     check(`gated correctly for ${g.vg}`, got === moveCount(g.gen), `(${got})`)
   }
+
+  // ------------------------------------------------- item 1b: era-correct rows
+  hr('ITEM 1b — a move reads as it was in the selected generation')
+  /* Type, category and power from past_values plus the pre-Gen-4 rule that a
+     damaging move's category is its type's (owner, 2026-10-10). */
+  const rowFor = (name) =>
+    page.evaluate((n) => {
+      const tr = [...document.querySelectorAll('[data-testid="dex-movedex"] tbody tr')].find(
+        (t) => t.cells[0]?.textContent.trim() === n,
+      )
+      return tr ? [...tr.cells].slice(1, 4).map((c) => c.textContent.trim().toLowerCase()) : null
+    }, name)
+  await toList()
+  await fillDexSearch(page, 'movedex', '')
+  const era = {}
+  for (const [vg, gen] of [['red-blue', 1], ['emerald', 3], ['heartgold-soulsilver', 4]]) {
+    await selectGame(vg)
+    era[gen] = {
+      charm: await rowFor('Charm'),
+      firePunch: await rowFor('Fire Punch'),
+      gust: await rowFor('Gust'),
+      dig: await rowFor('Dig'),
+      curse: await rowFor('Curse'),
+    }
+  }
+  log(`  ${JSON.stringify(era)}`)
+  check('Gen 1: Gust is Normal', era[1].gust?.[0] === 'normal', String(era[1].gust))
+  check('Gen 1: Dig is 100 power', era[1].dig?.[2] === '100', String(era[1].dig))
+  check('Gen 3: Charm is Normal, not Fairy', era[3].charm?.[0] === 'normal', String(era[3].charm))
+  check('Gen 3: Fire Punch is special', era[3].firePunch?.[1] === 'special', String(era[3].firePunch))
+  check('Gen 3: Gust is physical', era[3].gust?.[1] === 'physical', String(era[3].gust))
+  check('Gen 3: Curse is ???', era[3].curse?.[0] === '???', String(era[3].curse))
+  check('Gen 4: Fire Punch is physical again', era[4].firePunch?.[1] === 'physical')
+  check('Gen 4: Charm still Normal', era[4].charm?.[0] === 'normal', String(era[4].charm))
 
   await selectGame('heartgold-soulsilver')
   await toList()

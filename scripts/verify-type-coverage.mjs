@@ -11,6 +11,7 @@
 
 import { chromium } from 'playwright'
 import { startPreviewServer } from './lib/devServer.mjs'
+import { selectGeneration } from './lib/controls.mjs'
 
 /*
   IT HOSTS ITS OWN SERVER, like every other browser suite here, and that was a
@@ -603,13 +604,9 @@ async function main() {
 
   // ------------------------------------------------------- 9. Local generation
   section(9, 'the page generation selector is independent of the app selector')
-  /* The app-wide game selector lives inside the app bar's controls disclosure,
-     which is closed by default -- it has to be opened to be driven. */
-  const appSelect = page.locator('[data-testid="vg-select"]')
-  if (!(await appSelect.isVisible().catch(() => false))) {
-    await page.locator('[data-testid="controls-toggle"]').click()
-    await appSelect.waitFor({ state: 'visible', timeout: 10000 })
-  }
+  /* The app-wide generation select lives in the account menu; it is only read
+     here, and reading works while the menu is closed. */
+  const appSelect = page.locator('[data-testid="gen-select"]')
   const appBefore = await appSelect.inputValue()
 
   /* Existing combos really change with THIS page's selector. */
@@ -629,7 +626,7 @@ async function main() {
   )
   const other = options.find((o) => o !== appBefore)
   if (other) {
-    await appSelect.selectOption(other)
+    await selectGeneration(page, other)
     await page.waitForTimeout(200)
     const stillGen1 = await page.inputValue('[data-testid="tc-generation-select"]')
     check(9, 'the page stayed on Gen 1 when the app selector moved', stillGen1 === '1', `app now ${other}, page gen ${stillGen1}`)
@@ -640,8 +637,6 @@ async function main() {
     check(9, 'a second app selection was available to test with', false, 'none found')
   }
 
-  /* Close the disclosure again -- it overlays the module's own controls. */
-  await page.locator('[data-testid="controls-toggle"]').click()
   await page.mouse.move(4, 4)
 
   /* Gen 1's own oddity, as a real era check: Ghost does nothing to Psychic. */

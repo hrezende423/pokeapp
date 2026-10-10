@@ -39,6 +39,7 @@ export function DexPageShell<T>({
   list,
   detail,
   gatedMessage,
+  controls,
 }: {
   dexId: DexModuleId
   /**
@@ -58,6 +59,11 @@ export function DexPageShell<T>({
   detail?: (args: { entry: T; onBack: () => void }) => ReactNode
   /** Shown instead of the list when `entries` is empty for era reasons. */
   gatedMessage?: string
+  /**
+   * A control row under the title, list view only -- the Trainer Dex's game row.
+   * A scope control rather than a description, so the no-header rule above holds.
+   */
+  controls?: ReactNode
 }) {
   const [selectedId, setSelectedId] = useDexSelection(dexId)
   /*
@@ -102,6 +108,7 @@ export function DexPageShell<T>({
         <>
           <div className="dex-controls">
             <DexTitle dexId={dexId} count={visible.length} />
+            {controls}
           </div>
           {/* The query signature is part of the key for the reason the Pokedex
               grid's filters already were: a narrowed or re-ordered list is a

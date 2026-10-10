@@ -1,4 +1,8 @@
 # Changelog
+## 2.1.2 — 2026-10-10 (non-breaking)
+- Account menu: a Generation row under Theme (label left, underline select right, 112px, label-size type) replaces the game select in the Search/Filter panel
+- Game row (the species page's segmented `species-scope` buttons, game axis only) on the Trainer Dex and the Movedex detail, inside the selected generation
+- Type label: the `unknown` type reads `???`
 ## 2.1.1 — 2026-10-04 (non-breaking)
 - `font.family.sans` is IBM Plex Sans again (Manrope reverted: it breaks the Team Display's cap-height levelling); `font.family.mono` leads with Martian Mono, JetBrains Mono as fallback
 ## 2.1.0 — 2026-10-04 (non-breaking)

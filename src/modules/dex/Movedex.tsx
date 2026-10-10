@@ -5,6 +5,9 @@ import { getType, listVersionGroups } from '../../data'
 import { fixedDamage } from '../../data/moveDamage'
 import type { Move } from '../../data'
 import { useVersionGroup } from '../version-group/context'
+import { GameRow } from '../version-group/GameRow'
+import { useGameInGeneration } from '../version-group/gameInGeneration'
+import { versionGroupLabel } from '../pokedex/speciesFacts'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { DexPageShell } from './DexPageShell'
 import { EntityDetailPage, type SpeciesSection } from './EntityDetailPage'
@@ -92,8 +95,12 @@ function accuracyCell(move: Move) {
  * "All" it unions all fourteen.
  */
 function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
-  const { versionGroup, generation, isAll } = useVersionGroup()
-  const vgName = versionGroup?.name ?? null
+  const { generation, isAll } = useVersionGroup()
+  /* "Learned by" is per GAME, and the app picks a generation: the page has its
+     own game row inside it, seeded to the generation's default game. */
+  const game = useGameInGeneration('movedex')
+  const vgName = game.versionGroup?.name ?? null
+  const vgLabel = vgName ? versionGroupLabel(vgName) : ''
   const { learners, failed, loading, error } = useMoveLearners(move, vgName, isAll)
   const [, selectSpecies] = useDexSelection('pokedex')
   const nav = useNav()
@@ -189,7 +196,8 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
         table would be twelve dashes and one fact on most of them -- the same
         decision the shared detail page makes about empty species sections.
       */}
-      <MoveFactBlocks move={move} />
+      <MoveFactBlocks move={move} versionGroup={vgName} />
+      <GameRow scope={game} testId="movedex-game" />
       {loading && (
         <p className="subtitle" data-testid="movedex-learners-loading">
           {isAll ? 'Loading every version group…' : 'Loading learnset…'}
@@ -207,7 +215,7 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
       )}
       {!loading && !error && learners.length === 0 && (
         <p className="subtitle" data-testid="movedex-learners-none">
-          No species learns this move{isAll ? ' in Generations 1-4' : ` in ${vgName}`}.
+          No species learns this move{isAll ? ' in any game' : ` in ${vgLabel}`}.
         </p>
       )}
       {!loading && !error && learners.length > 0 && (
@@ -218,7 +226,7 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
           data-excluded={excluded}
         >
           <span className="num">{shownIds.size}</span> species
-          {isAll ? ' across all Generation 1-4 games' : ` in ${vgName}`}
+          {isAll ? ' across all games' : ` in ${vgLabel}`}
           {excluded > 0 && (
             <span data-testid="movedex-learners-excluded">
               {' · '}
@@ -253,14 +261,13 @@ function FactRows({
   )
 }
 
-function MoveFactBlocks({ move }: { move: Move }) {
-  const { isAll, versionGroup } = useVersionGroup()
+function MoveFactBlocks({ move, versionGroup }: { move: Move; versionGroup: string | null }) {
   /* Machines are per version group; under a single game only that game's TM
-     counts, under "All" every Gen 1-4 group does. */
+     counts (the page's game row), under "All" every group does. */
   const inScope = useMemo(() => {
-    if (isAll || !versionGroup) return new Set(listVersionGroups().map((vg) => vg.name))
-    return new Set([versionGroup.name])
-  }, [isAll, versionGroup])
+    if (!versionGroup) return new Set(listVersionGroups().map((vg) => vg.name))
+    return new Set([versionGroup])
+  }, [versionGroup])
   /* Past values are scoped to the whole bundle rather than to one game: they
      describe a change BETWEEN games, so narrowing them to the selected one would
      leave nothing to compare. */
@@ -346,8 +353,8 @@ function MoveFactBlocks({ move }: { move: Move }) {
       {pastRows.length > 0 && (
         <>
           <p className="list-caption" data-testid="movedex-past-caption">
-            Values in earlier games. These are recorded, not applied: the figures above are the
-            bundle&apos;s current ones.
+            How this move changed. Each row gives the value it had before that game; the
+            figures above are the ones in force in the selected generation.
           </p>
           <FactRows
             testId="movedex-past"

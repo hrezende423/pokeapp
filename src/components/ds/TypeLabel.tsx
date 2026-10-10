@@ -64,7 +64,9 @@ export function TypeLabel({
       data-ds="type-label"
       data-type={type}
     >
-      {type}
+      {/* The bundle's `unknown` is the games' "???" type -- Curse's type in Gen
+          2-4, now that the dexes resolve a move's type per era. */}
+      {type === 'unknown' ? '???' : type}
     </span>
   )
 }

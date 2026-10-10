@@ -1,20 +1,19 @@
 /**
- * Era-correct move TYPE: the type a move had in a given generation.
+ * Era-correct move facts: the type, power, accuracy, PP, effect chance and
+ * category a move had in a given generation.
  *
- * THE RESOLVER EXISTS, BUT ALMOST NOTHING CALLS IT YET -- and that gap is the point
- * to keep in view. CLAUDE.md records the underlying bug: moves carry `past_values`
- * and nothing in the app reads it, so Charm, Sweet Kiss and Moonlight -- stored as
- * Fairy, a Generation 6 type, with a `past_values` entry giving Normal -- render as
- * FAIRY under every Gen 1-4 selection, and Curse renders as Ghost where it should
- * be ???. That affects the Movedex and every learnset table, not one screen.
+ * Moves carry `past_values`, and for a long time only Team Building and the
+ * damage calculator read it, so Charm, Sweet Kiss and Moonlight -- stored as
+ * Fairy, a Generation 6 type, with a `past_values` entry giving Normal -- rendered
+ * as FAIRY in the Movedex and every learnset table under a Gen 1-4 selection.
+ * `moveForGeneration` below is how the dexes read a move now (owner, 2026-10-10:
+ * "make the dexes gen-aware"): `moveEntries` returns era-resolved copies, so the
+ * Movedex's table, detail and filters all see the era's values without each one
+ * resolving on its own.
  *
- * This file is the `resolveMoveTypeForGeneration` that note asks for, and it lives
- * here beside era.ts's resolveTypesForGeneration and resolveAbilitiesForGeneration
- * because era accuracy is a data-layer rule rather than one module's concern. It was
- * written for the Team Building legal-moveset function, which is still its only
- * caller: WIRING IT INTO THE MOVEDEX OR THE LEARNSET TAB IS A SEPARATE DECISION and
- * has deliberately not been made. Being reachable from src/data does not mean those
- * modules now go through it -- they still read `move.type_id` raw.
+ * It lives here beside era.ts's resolveTypesForGeneration and
+ * resolveAbilitiesForGeneration because era accuracy is a data-layer rule rather
+ * than one module's concern.
  *
  * SEPARATE FROM era.ts ON PURPOSE, not by accident of history: era.ts resolves
  * SPECIES-scoped facts (a species' types, abilities and stats in an era), and this
@@ -47,15 +46,11 @@ import type { Move } from './types'
  *
  * A NAME THE BUNDLE DOES NOT CARRY IS NOT UNRESOLVABLE -- IT IS POST-SCOPE, and
  * getting this wrong is what made the first version of this file silently useless.
- * `version-groups.json` holds exactly the fourteen Gen 1-4 groups, so `x-y` and
- * `black-white` are absent by construction; looking them up returns undefined,
- * which read as "cannot place this entry" and fell straight back to the modern
- * type, so Charm still came out Fairy. But the bundle's own scope is the answer:
- * a group it does not carry is later than Generation 4, hence later than ANY build
- * this app can describe, so its past value is in force for every one of them.
- * Infinity says that without a table of Gen 5+ version groups to keep in sync --
- * and it still sorts behind a bundle-known entry, so a move retyped twice picks
- * the earlier change.
+ * The bundle carries every version group through Gen 9 today, but a group newer
+ * than the bundle is by construction later than any era the app can select, so
+ * its past value is in force for every one of them. Infinity says that without a
+ * table to keep in sync -- and it still sorts behind a bundle-known entry, so a
+ * move retyped twice picks the earlier change.
  *
  * A group the bundle DOES carry but with a null generation stays unplaceable and
  * is skipped; that is a broken row, not a later era.
@@ -130,4 +125,92 @@ export function resolveMovePowerForGeneration(move: Move, generation: number): n
     if (!best || changedIn < best.generation) best = { generation: changedIn, power: past.power }
   }
   return best ? best.power : move.power
+}
+
+type PastField = 'power' | 'pp' | 'accuracy' | 'effect_chance' | 'type_id'
+
+/**
+ * The value `field` had in `generation`, by the same rule as the type and power
+ * resolvers above: among the `past_values` entries that change THIS field (a null
+ * means the entry left it alone) and took effect after the era, the earliest one
+ * holds the value in force then.
+ */
+function resolvePastField(move: Move, field: PastField, generation: number): number | null {
+  let best: { generation: number; value: number } | null = null
+  for (const past of [...move.past_values, ...(MISSING_PAST_POWER[move.name] ?? [])]) {
+    const value = past[field]
+    if (value == null || past.version_group == null) continue
+    const changedIn = generationOfChange(past.version_group)
+    if (changedIn == null || changedIn <= generation) continue
+    if (!best || changedIn < best.generation) best = { generation: changedIn, value }
+  }
+  return best ? best.value : move[field]
+}
+
+/**
+ * Types whose damaging moves were PHYSICAL before the Gen 4 split. Until
+ * Diamond/Pearl a move's category was its type's, not its own: Fire Punch was
+ * special and Gust physical. Everything else damaging (Fire, Water, Grass,
+ * Electric, Psychic, Ice, Dragon, Dark) was special. A known mechanic with a known
+ * start generation, so it is a rule here rather than something the data carries.
+ */
+const PHYSICAL_TYPES_BEFORE_SPLIT = new Set([
+  'normal',
+  'fighting',
+  'flying',
+  'poison',
+  'ground',
+  'rock',
+  'bug',
+  'ghost',
+  'steel',
+])
+const PHYSICAL_SPECIAL_SPLIT_GENERATION = 4
+
+const resolved = new Map<number, WeakMap<Move, Move>>()
+
+/**
+ * The move as it was in `generation`: type, power, accuracy, PP, effect chance and
+ * category resolved for that era, everything else as stored (`past_values`
+ * included, so a detail page can still print the history).
+ *
+ * Returns the SAME object when nothing differs, and caches the copies per
+ * generation, so a list rebuilt for the same era keeps stable identities.
+ */
+export function moveForGeneration(move: Move, generation: number): Move {
+  let cache = resolved.get(generation)
+  if (!cache) resolved.set(generation, (cache = new WeakMap()))
+  const hit = cache.get(move)
+  if (hit) return hit
+
+  const type_id = resolveMoveTypeIdForGeneration(move, generation)
+  let damage_class = move.damage_class
+  if (
+    generation < PHYSICAL_SPECIAL_SPLIT_GENERATION &&
+    (damage_class === 'physical' || damage_class === 'special')
+  ) {
+    const typeName = type_id == null ? null : getType(type_id)?.name
+    if (typeName && typeName !== 'unknown') {
+      damage_class = PHYSICAL_TYPES_BEFORE_SPLIT.has(typeName) ? 'physical' : 'special'
+    }
+  }
+  const next: Move = {
+    ...move,
+    type_id,
+    damage_class,
+    power: resolvePastField(move, 'power', generation),
+    pp: resolvePastField(move, 'pp', generation),
+    accuracy: resolvePastField(move, 'accuracy', generation),
+    effect_chance: resolvePastField(move, 'effect_chance', generation),
+  }
+  const same =
+    next.type_id === move.type_id &&
+    next.damage_class === move.damage_class &&
+    next.power === move.power &&
+    next.pp === move.pp &&
+    next.accuracy === move.accuracy &&
+    next.effect_chance === move.effect_chance
+  const out = same ? move : next
+  cache.set(move, out)
+  return out
 }

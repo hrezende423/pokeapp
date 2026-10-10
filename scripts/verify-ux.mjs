@@ -19,7 +19,7 @@
 
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { controls, selectGame } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4181
@@ -685,23 +685,17 @@ try {
 
   // -------------------------------------------------------------- ITEM 5
   hr('ITEM 5 (DOM) — "All" option shows the whole dex')
-  const allOption = await page.$eval('[data-testid="vg-select"] > option', (el) => ({
+  const allOption = await page.$eval('[data-testid="gen-select"] > option', (el) => ({
     value: el.value,
     text: el.textContent,
     grouped: el.parentElement.tagName === 'OPTGROUP',
   }))
   log(`  first ungrouped option: value=${allOption.value} text=${JSON.stringify(allOption.text)}`)
   check('an ungrouped "All" option exists', allOption.value === 'all' && !allOption.grouped)
-  check('its label names the dex ceiling from the constant', allOption.text.includes('493'))
+  check('its label names the dex ceiling from the constant', allOption.text.includes('1025'))
 
   await withControls(() => page.fill('[data-testid="species-search"]', ''))
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'all'))
-  // Same swap as elsewhere: the scope readout is gone, the select holds the state.
-  await page.waitForFunction(
-    () => document.querySelector('[data-testid="vg-select"]')?.value === 'all',
-    undefined,
-    { timeout: 20000 },
-  )
+  await selectGame(page, 'all')
   const allIds = await page.$$eval('[data-testid="species-rows"] [data-species-id]', (els) =>
     els.map((e) => Number(e.getAttribute('data-species-id'))),
   )
@@ -745,8 +739,10 @@ try {
   log(`  under All: scope=${underAll.versionGroup}, ${underAll.rows} learnset rows`)
   log(`  active generation segment: ${underAll.activeGeneration}`)
   check(
+    // Gen 9's default game (version-group/games.ts), not its highest-order group:
+    // that was Champions, which has no learnset.
     'under All the page falls back to its own newest era',
-    underAll.versionGroup === 'heartgold-soulsilver',
+    underAll.versionGroup === 'scarlet-violet',
     underAll.versionGroup,
   )
   check(
@@ -758,12 +754,7 @@ try {
 
   // Switching the app selector back must not disturb a page that already has a
   // game of its own.
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'heartgold-soulsilver'))
-  await page.waitForFunction(
-    () => document.querySelector('[data-testid="vg-select"]')?.value === 'heartgold-soulsilver',
-    undefined,
-    { timeout: 30000 },
-  )
+  await selectGame(page, 'heartgold-soulsilver')
   await page.waitForFunction(() => !document.querySelector('[data-testid="learnset-loading"]'), {
     timeout: 60000,
   })

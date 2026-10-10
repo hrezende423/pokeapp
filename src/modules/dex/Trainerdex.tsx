@@ -25,10 +25,12 @@ import type {
 import { TypeLabel } from '../../components/ds/TypeLabel'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
+import { GameRow } from '../version-group/GameRow'
 import { DexPageShell, LedgerList } from './DexPageShell'
 import {
   TRAINER_KIND_LABEL,
   trainerEntries,
+  useTrainerdexGame,
   useTrainerPartition,
   type TrainerEntry,
 } from './trainerEntries'
@@ -84,26 +86,30 @@ const money = (n: number | null) => (n == null ? '—' : `₽${n.toLocaleString(
 const AI_LABEL = (flag: string) => flag.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
 export function Trainerdex() {
-  const { versionGroup, isAll } = useVersionGroup()
-  const vgName = versionGroup?.name ?? null
+  const { isAll } = useVersionGroup()
+  /* Trainers belong to one GAME and the app picks a generation: the page has its
+     own game row, offering only the generation's games with trainer data. */
+  const game = useTrainerdexGame()
+  const vgName = game.versionGroup?.name ?? null
   const { state, retry } = useTrainerPartition(vgName)
   const partition = state.status === 'ready' ? state.partition : null
   const entries = useMemo(() => (partition ? trainerEntries(partition) : []), [partition])
+  const row = <GameRow scope={game} testId="trainerdex-game" />
 
-  if (isAll || state.status === 'idle') {
+  if (isAll) {
     return (
       <div className="pokedex" data-testid="dex-trainerdex">
         <p className="subtitle" data-testid="trainerdex-empty">
-          Trainers belong to one game. Choose a game to see its trainers.
+          Trainers belong to one game. Choose a generation to see its trainers.
         </p>
       </div>
     )
   }
-  if (state.status === 'unavailable') {
+  if (state.status === 'idle' || state.status === 'unavailable') {
     return (
       <div className="pokedex" data-testid="dex-trainerdex">
         <p className="subtitle" data-testid="trainerdex-empty">
-          No trainer data for this game: it has no disassembly to build from.
+          No trainer data for this generation: trainers come from the Gen 1-4 disassemblies.
         </p>
       </div>
     )
@@ -111,6 +117,7 @@ export function Trainerdex() {
   if (state.status === 'loading') {
     return (
       <div className="pokedex" data-testid="dex-trainerdex">
+        {row}
         <p className="subtitle" data-testid="trainerdex-loading">
           Loading trainers…
         </p>
@@ -120,6 +127,7 @@ export function Trainerdex() {
   if (state.status === 'error') {
     return (
       <div className="pokedex" data-testid="dex-trainerdex">
+        {row}
         <p className="subtitle" data-testid="trainerdex-error">
           The trainers did not load ({state.message}).{' '}
           <button type="button" className="ghost-button" onClick={retry}>
@@ -134,6 +142,7 @@ export function Trainerdex() {
   return (
     <DexPageShell
       dexId="trainerdex"
+      controls={row}
       entries={entries}
       entryId={(e) => e.id}
       list={({ entries: visible, onSelect }) => (

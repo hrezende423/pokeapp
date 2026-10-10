@@ -22,6 +22,7 @@ import { chromium } from 'playwright'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { startDevServer } from './lib/devServer.mjs'
+import { selectGame } from './lib/controls.mjs'
 
 const PORT = 4201
 const DATA = new URL('../public/data/', import.meta.url)
@@ -249,25 +250,26 @@ try {
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(dev.url, { waitUntil: 'domcontentloaded', timeout: 180000 })
-  await page.waitForSelector('[data-testid="vg-select"]', { state: 'attached', timeout: 180000 })
-  const pick = (vg) =>
-    page.evaluate((v) => {
-      const s = document.querySelector('[data-testid="vg-select"]')
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, v)
-      s.dispatchEvent(new Event('change', { bubbles: true }))
-    }, vg)
+  await page.waitForSelector('[data-testid="gen-select"]', { state: 'attached', timeout: 180000 })
+  /* The app picks a generation; the Trainer Dex picks the game inside it. */
+  const pick = (vg) => selectGame(page, vg)
 
   check('Pokepedia lists the Trainer Dex', (await page.$('[data-testid="nav-trainerdex"]')) != null)
   await pick('all')
   await page.evaluate(() => document.querySelector('[data-testid="nav-trainerdex"]').click())
   await page.waitForSelector('[data-testid="trainerdex-empty"]', { timeout: 30000 })
   check(
-    'under "All" it asks for a game',
-    /Choose a game/.test(await page.textContent('[data-testid="trainerdex-empty"]')),
+    'under "All" it asks for a generation',
+    /Choose a generation/.test(await page.textContent('[data-testid="trainerdex-empty"]')),
   )
 
   await pick('platinum')
   await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
+  check(
+    'its game row offers the three Gen 4 games, Platinum picked',
+    (await page.$$('[data-testid="trainerdex-game"] button')).length === 3 &&
+      (await page.getAttribute('[data-testid="trainerdex-game-platinum"]', 'aria-pressed')) === 'true',
+  )
   const count = Number(
     (await page.textContent('[data-testid="trainerdex-count"]')).replace(/\D/g, ''),
   )

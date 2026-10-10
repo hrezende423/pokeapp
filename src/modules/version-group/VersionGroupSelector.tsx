@@ -1,66 +1,33 @@
-import { useMemo } from 'react'
+import { SelectField } from '../../components/ds/SelectField'
 import { MAX_SPECIES_ID } from '../../data'
-import { ALL_VERSION_GROUPS, useVersionGroup } from './context'
-
-const GENERATION_LABELS: Record<number, string> = {
-  1: 'Generation I',
-  2: 'Generation II',
-  3: 'Generation III',
-  4: 'Generation IV',
-}
-
-/** Human label for a version group, e.g. 'heartgold-soulsilver' -> 'HeartGold / SoulSilver'. */
-function label(name: string): string {
-  return name
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' / ')
-}
+import { ALL_GENERATIONS, useVersionGroup } from './context'
 
 /**
- * Version-group picker: a native select, grouped by generation, with "All" on
- * top for the unfiltered dex.
+ * The app's generation picker. It sits in the account menu, under the theme
+ * switch (owner, 2026-10-10), because it is a standing preference for the whole
+ * app rather than a control of the page on screen. The row's own label says
+ * "Generation", so the field's is visually hidden (still read out).
  *
  * The "All" caption reads its ceiling from MAX_SPECIES_ID, which is derived from
  * the generation ranges -- adding a generation there updates this label too
- * instead of leaving a stale 493 behind.
+ * instead of leaving a stale number behind.
  */
 export function VersionGroupSelector() {
-  const { selection, setVersionGroup, available } = useVersionGroup()
-
-  const byGeneration = useMemo(() => {
-    const groups = new Map<number, typeof available>()
-    for (const vg of available) {
-      const gen = vg.generation_id ?? 0
-      const list = groups.get(gen)
-      if (list) list.push(vg)
-      else groups.set(gen, [vg])
-    }
-    return [...groups.entries()].sort((a, b) => a[0] - b[0])
-  }, [available])
+  const { selectedGeneration, setGeneration, generations } = useVersionGroup()
 
   return (
-    <label className="vg-selector">
-      <span>Game</span>
-      <select
-        data-testid="vg-select"
-        value={selection}
-        onChange={(e) => setVersionGroup(e.target.value)}
-      >
-        <option value={ALL_VERSION_GROUPS}>All (#1-{MAX_SPECIES_ID})</option>
-        {byGeneration.map(([generation, groups]) => (
-          <optgroup
-            key={generation}
-            label={GENERATION_LABELS[generation] ?? `Generation ${generation}`}
-          >
-            {groups.map((vg) => (
-              <option key={vg.name} value={vg.name}>
-                {label(vg.name)}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-    </label>
+    <SelectField
+      label="Generation"
+      hideLabel
+      data-testid="gen-select"
+      value={selectedGeneration == null ? ALL_GENERATIONS : String(selectedGeneration)}
+      onChange={(e) =>
+        setGeneration(e.target.value === ALL_GENERATIONS ? null : Number(e.target.value))
+      }
+      options={[
+        { value: ALL_GENERATIONS, label: `All (#1-${MAX_SPECIES_ID})` },
+        ...generations.map((g) => ({ value: String(g), label: `Gen ${g}` })),
+      ]}
+    />
   )
 }

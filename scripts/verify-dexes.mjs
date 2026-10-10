@@ -16,7 +16,7 @@
 
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls, fillDexSearch } from './lib/controls.mjs'
+import { fillDexSearch, selectGame as selectAppGame } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
@@ -174,7 +174,6 @@ try {
 
   await page.goto(APP_URL, { waitUntil: 'load' })
 
-  const { withControls } = controls(page)
 
   /*
     Four dexes are a list PAGE plus a detail PAGE now (Naturedex, Movedex,
@@ -198,7 +197,7 @@ try {
     })
   }
   const selectGame = async (vg) => {
-    await withControls(() => page.selectOption('[data-testid="vg-select"]', vg))
+    await selectAppGame(page, vg)
     await page.waitForTimeout(150)
   }
   /*

@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { useGameInGeneration } from '../version-group/gameInGeneration'
 import {
   hasTrainerData,
   loadTrainers,
@@ -159,3 +160,9 @@ export function useTrainerPartition(versionGroup: string | null): {
   }
   return { state, retry }
 }
+
+/**
+ * The Trainer Dex's game inside the app's generation (its game row), shared with
+ * DexQueryProvider so the page and its filters always read the same game.
+ */
+export const useTrainerdexGame = () => useGameInGeneration('trainerdex', hasTrainerData)

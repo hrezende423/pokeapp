@@ -6,7 +6,7 @@
  * and a list offering both reads as a duplicate.
  */
 
-import { listVersionGroups } from '../../data'
+import { listVersionGroups, type VersionGroup } from '../../data'
 import { versionGroupLabel } from '../pokedex/speciesFacts'
 
 const HIDDEN = new Set(['red-green-japan', 'blue-japan'])
@@ -39,6 +39,45 @@ export function gameGroups({
     g.options.push({ value: v.name, label: gameLabel(v.name) })
   }
   return [...groups.values()]
+}
+
+/**
+ * The game that stands in for a generation where one game is needed and the
+ * reader has not picked one: the last main-series release of that generation,
+ * which is the most complete table of it (Gen 4 is HeartGold/SoulSilver, the
+ * old selector's default). Written out rather than "highest order", because the
+ * bundle's order puts Colosseum/XD after Emerald and the Gen 8-9 DLC after the
+ * base games, and neither is a fair stand-in for its generation.
+ */
+const DEFAULT_GAME: Record<number, string> = {
+  1: 'yellow',
+  2: 'crystal',
+  3: 'emerald',
+  4: 'heartgold-soulsilver',
+  5: 'black-2-white-2',
+  6: 'omega-ruby-alpha-sapphire',
+  7: 'ultra-sun-ultra-moon',
+  8: 'sword-shield',
+  9: 'scarlet-violet',
+}
+
+/** The games of one generation, in release order, without the hidden duplicates. */
+export function gamesInGeneration(
+  generation: number,
+  include: (vg: string) => boolean = () => true,
+): VersionGroup[] {
+  return listVersionGroups()
+    .filter((v) => v.generation_id === generation && !HIDDEN.has(v.name) && include(v.name))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
+/** The stand-in game for a generation (see DEFAULT_GAME), or null if it has none. */
+export function defaultGameOfGeneration(
+  generation: number,
+  include: (vg: string) => boolean = () => true,
+): VersionGroup | null {
+  const games = gamesInGeneration(generation, include)
+  return games.find((g) => g.name === DEFAULT_GAME[generation]) ?? games[games.length - 1] ?? null
 }
 
 /** The generation a game belongs to, from the same list. */
