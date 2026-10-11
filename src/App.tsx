@@ -1,5 +1,6 @@
 import { IconArrowLeft, IconInfoCircle } from '@tabler/icons-react'
 import { LayoutOverlay } from './components/LayoutOverlay'
+import { usePageCreditSlot } from './components/pageCredit'
 import { useEffect, useState } from 'react'
 import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
@@ -110,6 +111,17 @@ function Shell() {
   )
 }
 
+/** The open page's source credit in the info panel, or nothing. */
+function PageCredit() {
+  const note = usePageCreditSlot()
+  if (!note) return null
+  return (
+    <p className="app-info-credit" data-testid="app-info-credit">
+      {note}
+    </p>
+  )
+}
+
 export default function App() {
   const [boot, setBoot] = useState<BootStats | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
@@ -198,24 +210,28 @@ export default function App() {
           <IconInfoCircle size={15} stroke={1.5} aria-hidden focusable="false" />
         </button>
         {/* Every figure here is a count or a measurement, so every one of them is
-            in --font-numeric -- the words between them are not. */}
-        <p className="app-info-panel" role="tooltip">
-          data layer ready in{' '}
-          <span data-testid="boot-ms" className="num">
-            {boot.ms.toFixed(0)} ms
-          </span>{' '}
-          ·{' '}
-          <span data-testid="boot-bytes" className="num">
-            {kib(boot.bytes)}
-          </span>{' '}
-          decoded · <span className="num">{counts.species.toLocaleString()}</span> species,{' '}
-          <span className="num">{counts.moves.toLocaleString()}</span> moves,{' '}
-          <span className="num">{counts.items.toLocaleString()}</span> items,{' '}
-          <span className="num">{counts.abilities}</span> abilities,{' '}
-          <span className="num">{counts.natures}</span> natures,{' '}
-          <span className="num">{counts.berries}</span> berries · dex{' '}
-          <span className="num">1–{meta.scope.max_species_id}</span>
-        </p>
+            in --font-numeric -- the words between them are not. The open page's
+            source credit, when it has one, leads the panel (pageCredit.ts). */}
+        <div className="app-info-panel" role="tooltip">
+          <PageCredit />
+          <p className="app-info-boot">
+            data layer ready in{' '}
+            <span data-testid="boot-ms" className="num">
+              {boot.ms.toFixed(0)} ms
+            </span>{' '}
+            ·{' '}
+            <span data-testid="boot-bytes" className="num">
+              {kib(boot.bytes)}
+            </span>{' '}
+            decoded · <span className="num">{counts.species.toLocaleString()}</span> species,{' '}
+            <span className="num">{counts.moves.toLocaleString()}</span> moves,{' '}
+            <span className="num">{counts.items.toLocaleString()}</span> items,{' '}
+            <span className="num">{counts.abilities}</span> abilities,{' '}
+            <span className="num">{counts.natures}</span> natures,{' '}
+            <span className="num">{counts.berries}</span> berries · dex{' '}
+            <span className="num">1–{meta.scope.max_species_id}</span>
+          </p>
+        </div>
       </div>
 
       {/* Inert until switched on; see components/LayoutOverlay.tsx. Last child

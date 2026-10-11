@@ -1,4 +1,13 @@
 # Changelog
+## 2.1.9 — 2026-10-11 (non-breaking)
+- Trainer Dex list: ONE ROW PER TRAINER (rematches and per-starter teams fold in; the Note says "3 rematches" / "3 starter teams"); the game row is the right-aligned mini navbar, its right edge the table's, sticky over the list
+- Trainer Dex page: left pane 500px, the party in a 3-across grid of 240px cards; a mini navbar of the trainer's teams (Initial, Rematch 1…, or one per starter); the left column follows the team -- prize (a rematch's derived as class rate × last level), bag items counted ("3× Full Restore"); no Source row, no party count
+- Trainer party card: the Pokédex card's ghost number, katakana and official artwork, then the Team Display's battle lines -- name/gender/level; types | nature | ability | item; EVs/IVs/DVs only where they apply; four moves with type and category in aligned columns. No labels, no item sprite, no outline
+- Info panel ("i", bottom-right): a page can put its source credit above the boot line (the Trainer Dex's pret/Bulbapedia credit moved there). It was being clipped to nothing by the module-layout rule and is visible again
+- Itemdex list: columns sized to their longest content plus padding; 58px rows (the icon no longer sits on a text baseline)
+- Itemdex page: label/value rows at 0.1rem padding with `space.gap.sm` between them
+- Naturedex page: 400px column
+- Breeding dex page: the back link in the page's top-left corner, the content from the top
 ## 2.1.8 — 2026-10-11 (non-breaking)
 - Reference detail pages lose their hairlines: Movedex (Battle/Contest lanes, section heads, between learn-method sections), Itemdex, Berrydex, Naturedex, Breeding dex and Trainer Dex. The only rule left on a split page is the one under the game navbar
 - Split pages (Abilitydex, Movedex, Trainer Dex): the info column's data -- description, grey lines, values -- is LIGHT; titles and uppercase labels stay regular

@@ -2698,6 +2698,41 @@
   margin-top: var(--space-gap-md);
 }
 
+/* The Naturedex page is narrower still (owner, 2026-10-11): two stats and two
+   flavours read as pairs at 400px, not as ends of a 654px line. */
+.entity-column[data-testid='naturedex-detail'] {
+  max-width: 400px;
+}
+
+/* The item page's rows: tight padding, the small gap between them (owner,
+   2026-10-11) -- the gap, not the padding, sets the rhythm. */
+.item-detail .fact-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+}
+
+.item-detail .fact-rows > li {
+  padding: 0.1rem 0;
+}
+
+/* The Breeding dex: the back link pinned to the page's top-left, the column
+   from the top beside it. */
+.entity-stack-page {
+  position: relative;
+}
+
+.entity-stack-page > .pokedex-back-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+
+.entity-stack-page .entity-detail-name {
+  margin-top: 0;
+}
+
 .entity-split .entity-detail-desc {
   max-width: none;
 }
@@ -3920,11 +3955,17 @@
   2026-10-11) -- the "Name" header sits over the names, not over the icons. The
   slot is a fixed 48px box even when an item has no icon.
 */
+/* A block box: inline, the image sat on the text baseline and the row grew
+   8px of descender space below it (66px rows for 48px of icon). */
 .itemdex-name-icon {
   display: inline-flex;
   flex: none;
   width: 48px;
   height: 48px;
+}
+
+[data-testid='itemdex-rows'] .itemdex-name-icon {
+  display: block;
 }
 
 .itemdex-name-icon img {

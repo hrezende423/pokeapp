@@ -273,12 +273,19 @@ try {
   const count = Number(
     (await page.textContent('[data-testid="trainerdex-count"]')).replace(/\D/g, ''),
   )
-  const expected =
+  /* ONE ROW PER TRAINER (owner, 2026-10-11): a trainer's rematches and per-starter
+     teams fold into its row, so the list is shorter than the data's team count
+     and every row the count claims is on screen. */
+  const teamsInData =
     T.platinum.trainers.length + T.platinum.facilities.reduce((n, f) => n + f.trainers.length, 0)
+  const rendered = await page.$$eval(
+    '[data-testid="trainerdex-rows"] tbody tr',
+    (els) => els.length,
+  )
   check(
-    'Platinum lists every trainer and facility trainer',
-    count === expected,
-    `${count} vs ${expected}`,
+    'Platinum lists one row per trainer: fewer rows than teams, and the count is the rows',
+    count === rendered && count < teamsInData,
+    `${count} rows, ${rendered} rendered, ${teamsInData} teams in the data`,
   )
   const firstRow = await page.textContent('[data-testid="trainerdex-rows"] tbody tr:first-child')
   check(
@@ -330,9 +337,48 @@ try {
   await page.waitForSelector('[data-testid="trainerdex-detail"]')
   check(
     'RB Brock shows DVs and a Bide Onix',
-    /9\/8\/8\/8/.test(await page.textContent('[data-testid="trainerdex-party"]')) &&
+    /9Atk\/8Def\/8Spe\/8Spc DV/.test(await page.textContent('[data-testid="trainerdex-party"]')) &&
       /Bide/.test(await page.textContent('[data-testid="trainerdex-party"]')),
   )
+
+  await page.click('[data-testid="entity-back"]')
+
+  /* Every team on the trainer's page: HGSS Joey is four records in the data,
+     one row here, and a navbar of Initial + three rematches. A rematch's record
+     has no prize, so the page derives it -- class rate x last level, 16 x 54. */
+  await pick('heartgold-soulsilver')
+  await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
+  const joeyRow = page.locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Youngster Joey")')
+  check('HGSS Joey is one row', (await joeyRow.count()) === 1, String(await joeyRow.count()))
+  await joeyRow.first().click()
+  await page.waitForSelector('[data-testid="trainerdex-teams"]')
+  const teamLabels = await page.$$eval('[data-testid="trainerdex-teams"] button', (els) =>
+    els.map((e) => e.textContent.trim()),
+  )
+  check(
+    'his page offers all four teams',
+    teamLabels.join(',') === 'Initial,Rematch 1,Rematch 2,Rematch 3',
+    teamLabels.join(','),
+  )
+  await page.click('[data-testid="trainerdex-team-3"]')
+  await page.waitForTimeout(200)
+  const joeyPrize = await page.$eval('[data-testid="trainerdex-prize"] .num', (el) => ({
+    text: el.textContent,
+    derived: el.dataset.derived,
+  }))
+  check(
+    'the third rematch shows its derived prize, ₽864',
+    joeyPrize.text === '₽864' && joeyPrize.derived === 'true',
+    JSON.stringify(joeyPrize),
+  )
+  const art = (await page.getAttribute('[data-testid="trainerdex-mon-0"] img', 'src')) ?? ''
+  check('the party card shows artwork, not a game sprite', !/\/versions\//.test(art), art)
+  check(
+    'the source credit is behind the info icon, not on the page',
+    (await page.$('[data-testid="trainerdex-credit"]')) == null &&
+      /pret disassembly/.test((await page.textContent('[data-testid="app-info-credit"]')) ?? ''),
+  )
+  await page.click('[data-testid="entity-back"]')
 
   await page.setViewportSize({ width: 390, height: 1200 })
   await page.waitForTimeout(300)

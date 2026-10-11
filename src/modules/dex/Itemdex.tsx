@@ -132,6 +132,12 @@ export function Itemdex() {
   /*
     A TABLE WITH SORTABLE HEADERS (owner, 2026-10-10), like the Movedex. Initial
     order is the bundle's own (item id), which is what the list showed.
+
+    EVERY WIDTH IS ITS LONGEST CONTENT PLUS PADDING (owner, 2026-10-11), measured
+    in the browser at an 18px root, at the hover (regular) weight: "1029" 39px,
+    "TM73 (Thunder Wave)" 142px, "Type Enhancement" 122px, "Pokeballs" 62px,
+    "₽10,000" ~66px -- each plus the cell's 14px of padding and ~20px of air. px,
+    because they were measured in px.
   */
   const columns: Column<Item>[] = useMemo(
     () => [
@@ -139,7 +145,7 @@ export function Itemdex() {
         // The bundle's item id, the dex's own order (owner, 2026-10-11).
         key: 'no',
         label: 'No.',
-        width: '4.5rem',
+        width: '60px',
         sortValue: (item) => item.id,
         render: (item) => <span className="num itemdex-no">{item.id}</span>,
       },
@@ -169,7 +175,7 @@ export function Itemdex() {
       {
         key: 'name',
         label: 'Name',
-        width: '20rem',
+        width: '190px',
         sortValue: (item) => item.display_name,
         render: (item) => {
           // A machine names its move after its number: "TM01 (Focus Punch)".
@@ -190,7 +196,7 @@ export function Itemdex() {
       {
         key: 'category',
         label: 'Category',
-        width: '12rem',
+        width: '160px',
         sortValue: (item) => item.category,
         render: (item) => (
           <span data-testid={`itemdex-row-category-${item.id}`}>{titleCase(item.category)}</span>
@@ -199,7 +205,7 @@ export function Itemdex() {
       {
         key: 'pocket',
         label: 'Pocket',
-        width: '8rem',
+        width: '100px',
         sortValue: (item) => item.pocket,
         render: (item) =>
           item.pocket ? (
@@ -213,7 +219,7 @@ export function Itemdex() {
         // not sold anywhere, which is an answer (a dash) rather than a gap.
         key: 'price',
         label: 'Price',
-        width: '6.5rem',
+        width: '100px',
         numeric: true,
         sortValue: (item) => buyPrice(getItemSupplement(item.name), vgName),
         render: (item) => {

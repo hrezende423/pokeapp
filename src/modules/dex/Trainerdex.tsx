@@ -1,20 +1,22 @@
 import { IconArrowLeft } from '@tabler/icons-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   getItem,
   getMove,
   getNature,
   getSpecies,
   getType,
+  DEFAULT_ARTWORK_VIEW,
   resolveAbilitiesForGeneration,
+  resolveArtworkUrl,
   resolveTypesForGeneration,
   slotsFor,
   versionSpriteUrl,
   getSpriteUrl,
   type Variety,
 } from '../../data'
-import { resolveMoveTypeNameForGeneration } from '../../data/moveEra'
-import { trainerLabel } from '../../data/trainers'
+import { moveForGeneration } from '../../data/moveEra'
+import { usePageCredit } from '../../components/pageCredit'
 import type {
   FacilityPokemon,
   FacilitySet,
@@ -83,7 +85,8 @@ const varietyOf = (
   )
 }
 
-const money = (n: number | null) => (n == null ? '—' : `₽${n.toLocaleString()}`)
+// en-US grouping, as the Itemdex prints it: the browser's locale gave "₽1.200".
+const money = (n: number | null) => (n == null ? '—' : `₽${n.toLocaleString('en-US')}`)
 
 const AI_LABEL = (flag: string) => flag.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
@@ -96,7 +99,23 @@ export function Trainerdex() {
   const { state, retry } = useTrainerPartition(vgName)
   const partition = state.status === 'ready' ? state.partition : null
   const entries = useMemo(() => (partition ? trainerEntries(partition) : []), [partition])
-  const row = <GameRow scope={game} testId="trainerdex-game" />
+  /* The Movedex's mini navbar, right-aligned over the list (owner, 2026-10-11). */
+  const row = <GameRow scope={game} testId="trainerdex-game" variant="nav" />
+  /* The source credit lives behind the app's "i" now, not on the page (owner,
+     2026-10-11). Bulbapedia's content is CC BY-NC-SA; the attribution is theirs. */
+  usePageCredit(
+    partition ? (
+      <>
+        Parties from the pret disassembly ({partition.sources.disassembly}). Locations and order
+        from{' '}
+        <a href="https://bulbapedia.bulbagarden.net/" target="_blank" rel="noreferrer">
+          Bulbapedia
+        </a>{' '}
+        (CC BY-NC-SA).
+      </>
+    ) : null,
+    partition ? partition.sources.disassembly : null,
+  )
 
   if (isAll) {
     return (
@@ -144,19 +163,24 @@ export function Trainerdex() {
   return (
     <DexPageShell
       dexId="trainerdex"
-      controls={row}
       entries={entries}
       entryId={(e) => e.id}
+      /* The game navbar heads the TABLE's column rather than the shell's
+         controls row, so its right edge is the table's (owner, 2026-10-11);
+         sticky, so it stays while the list scrolls. */
       list={({ entries: visible, onSelect }) => (
-        <DataTable
-          rows={visible}
-          columns={trainerColumns(vg)}
-          rowKey={(e) => e.id}
-          onRowClick={(e) => onSelect(e.id)}
-          testId="trainerdex-rows"
-          emptyNote="No trainer matches those filters."
-          plain
-        />
+        <div className="trainer-list">
+          <div className="trainer-list-nav">{row}</div>
+          <DataTable
+            rows={visible}
+            columns={trainerColumns(vg)}
+            rowKey={(e) => e.id}
+            onRowClick={(e) => onSelect(e.id)}
+            testId="trainerdex-rows"
+            emptyNote="No trainer matches those filters."
+            plain
+          />
+        </div>
       )}
       detailScrolls
       detail={({ entry, onBack, scrollKey }) => (
@@ -270,7 +294,13 @@ function PartyStrip({ entry: e, vg }: { entry: TrainerEntry; vg: string }) {
 
 /**
  * A trainer's page, in the Movedex's two columns (owner, 2026-10-11): who they
- * are on the left, scrolling on its own, and their party on the right.
+ * are on the left, scrolling on its own, and their party on the right as a grid
+ * of three cards a row.
+ *
+ * EVERY TEAM ON ONE PAGE. The list has one row per trainer now, so a trainer with
+ * rematches or a team per starter offers them as a mini navbar over the party --
+ * the Movedex's game navbar, the same buttons. The left column follows the team:
+ * its prize, its bag items and where it is fought belong to that team.
  */
 function TrainerDetail({
   entry,
@@ -285,11 +315,13 @@ function TrainerDetail({
 }) {
   const gen = partition.generation
   const vg = partition.version_group
-  const t = entry.trainer
+  const teams = entry.teams ?? []
+  const [teamIndex, setTeamIndex] = useState(0)
+  const team = teams[Math.min(teamIndex, teams.length - 1)]
+  const t = team?.trainer
   const ft = entry.facilityTrainer
   const f = entry.facility
   const first = t?.appearances[0]
-  const byId = useMemo(() => new Map(partition.trainers.map((x) => [x.id, x])), [partition])
 
   const info = (
     <>
@@ -335,7 +367,6 @@ function TrainerDetail({
                   .join('; ')}
               </Fact>
             )}
-            {first?.variant && <Fact label="Variant">{first.variant}</Fact>}
             {first?.note && <Fact label="Note">{first.note}</Fact>}
             <Fact label="Battle" testId="trainerdex-battle">
               {t.battle === 'double'
@@ -344,12 +375,24 @@ function TrainerDetail({
                   ? 'Tag battle'
                   : 'Single battle'}
             </Fact>
+            {/* The TEAM's prize. A rematch's is derived (trainerEntries.ts),
+                and says so to a pointer and to the suites. */}
             <Fact label="Prize" testId="trainerdex-prize">
-              <span className="num">{money(t.prize)}</span>
+              <span
+                className="num"
+                data-derived={t.prize == null && team.prize != null ? 'true' : undefined}
+                title={
+                  t.prize == null && team.prize != null
+                    ? "The class's base payout × the last Pokémon's level, the games' own rule"
+                    : undefined
+                }
+              >
+                {money(team.prize)}
+              </span>
             </Fact>
             {t.items.length > 0 && (
               <Fact label="Bag items" testId="trainerdex-items">
-                {t.items.map((id) => getItem(id)?.display_name ?? `#${id}`).join(', ')}
+                {countedItems(t.items)}
               </Fact>
             )}
             {t.ai.length > 0 && (
@@ -362,20 +405,7 @@ function TrainerDetail({
                 {t.versions.map((v) => v.charAt(0).toUpperCase() + v.slice(1)).join(', ')}
               </Fact>
             )}
-            {t.rematch_of && (
-              <Fact label="Rematch of">
-                {(() => {
-                  const base = byId.get(t.rematch_of)
-                  return base
-                    ? trainerLabel(partition.classes[base.class_id]?.name ?? '', base.name)
-                    : t.rematch_of
-                })()}
-              </Fact>
-            )}
             {t.unused && <Fact label="Status">In the game data, never fought</Fact>}
-            <Fact label="Source" testId="trainerdex-source">
-              <span className="trainer-source">{t.id}</span>
-            </Fact>
           </>
         )}
         {ft && f && (
@@ -385,9 +415,6 @@ function TrainerDetail({
             </Fact>
             {ft.group && <Fact label="Where">{ft.group}</Fact>}
             {ft.note && <Fact label="Note">{ft.note}</Fact>}
-            {ft.source === 'bulbapedia' && (
-              <Fact label="Source">Bulbapedia (the game keeps this team in code)</Fact>
-            )}
             {f.source_note && <Fact label="Data">{f.source_note}</Fact>}
           </>
         )}
@@ -398,49 +425,58 @@ function TrainerDetail({
           {f.rules}
         </p>
       )}
-
-      {/* Bulbapedia's content is CC BY-NC-SA; the placement is theirs. */}
-      <p className="trainer-credit" data-testid="trainerdex-credit">
-        Parties from the pret disassembly ({partition.sources.disassembly}). Locations and order
-        from{' '}
-        <a href="https://bulbapedia.bulbagarden.net/" target="_blank" rel="noreferrer">
-          Bulbapedia
-        </a>{' '}
-        (CC BY-NC-SA).
-      </p>
     </>
   )
 
   const party = (
     <>
-      {t && t.party.length > 0 && (
-        <section className="entity-detail-section" data-testid="trainerdex-party">
-          <h3 className="entity-detail-section-label">
-            Party <span className="entity-detail-section-count">{t.party.length}</span>
-          </h3>
-          <div className="trainer-party">
-            {t.party.map((m, i) => (
-              <MonCard key={i} mon={m} gen={gen} vg={vg} index={i} />
+      {teams.length > 1 && (
+        <div className="game-nav trainer-team-nav" data-testid="trainerdex-teams">
+          <div className="game-nav-items" role="group" aria-label="Team">
+            {teams.map((tm, i) => (
+              <button
+                key={tm.trainer.id}
+                type="button"
+                className={i === teamIndex ? 'nav-trigger nav-trigger-active' : 'nav-trigger'}
+                data-testid={`trainerdex-team-${i}`}
+                aria-pressed={i === teamIndex}
+                onClick={() => setTeamIndex(i)}
+              >
+                {tm.label}
+              </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {t && t.party.length > 0 && (
+        <section className="entity-detail-section" data-testid="trainerdex-party">
+          <h3 className="entity-detail-section-label">Party</h3>
+          <ul className="trainer-party">
+            {t.party.map((m, i) => (
+              <li key={`${t.id}-${i}`}>
+                <MonCard mon={m} gen={gen} index={i} />
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
       {ft?.party && ft.party.length > 0 && (
         <section className="entity-detail-section" data-testid="trainerdex-party">
-          <h3 className="entity-detail-section-label">
-            Team <span className="entity-detail-section-count">{ft.party.length}</span>
-          </h3>
-          <div className="trainer-party">
+          <h3 className="entity-detail-section-label">Team</h3>
+          <ul className="trainer-party">
             {ft.party.map((m, i) => (
-              <MonCard key={i} mon={m} gen={gen} vg={vg} index={i} />
+              <li key={i}>
+                <MonCard mon={m} gen={gen} index={i} />
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
       )}
 
       {f && ft && !ft.party && (
-        <SetPool facility={f} keys={ft.set_keys ?? f.sets.map((s) => s.key)} gen={gen} vg={vg} />
+        <SetPool facility={f} keys={ft.set_keys ?? f.sets.map((s) => s.key)} gen={gen} />
       )}
     </>
   )
@@ -451,11 +487,23 @@ function TrainerDetail({
       className="trainer-detail"
       entryId={entry.id}
       infoTestId="trainerdex-detail-scroll"
-      scrollKey={scrollKey}
+      scrollKey={(part) => `${scrollKey(part)}|${vg}|${teamIndex}`}
       info={info}
       grid={party}
     />
   )
+}
+
+/** "4× Full Restore, Potion": one name per item, with its count. */
+function countedItems(ids: number[]): string {
+  const counts = new Map<number, number>()
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1)
+  return [...counts]
+    .map(([id, n]) => {
+      const name = getItem(id)?.display_name ?? `#${id}`
+      return n > 1 ? `${n}× ${name}` : name
+    })
+    .join(', ')
 }
 
 function Fact({
@@ -479,7 +527,63 @@ function Fact({
 
 type AnyMon = TrainerPokemon | FacilityPokemon | FacilitySet
 
-function MonCard({ mon, gen, vg, index }: { mon: AnyMon; gen: number; vg: string; index: number }) {
+const CATEGORY_LABEL: Record<string, string> = {
+  physical: 'Physical',
+  special: 'Special',
+  status: 'Status',
+}
+
+const SPREAD_ORDER: [keyof StatSpread, string][] = [
+  ['hp', 'HP'],
+  ['attack', 'Atk'],
+  ['defense', 'Def'],
+  ['special-attack', 'SpA'],
+  ['special-defense', 'SpD'],
+  ['speed', 'Spe'],
+]
+
+/** "133Atk/125SpD/252Spe", the Team Display's spelling; null when all zero. */
+function spread(s: StatSpread): string | null {
+  const parts = SPREAD_ORDER.filter(([k]) => s[k] != null && s[k] !== 0).map(
+    ([k, l]) => `${s[k]}${l}`,
+  )
+  return parts.length ? parts.join('/') : null
+}
+
+/**
+ * The stat line, only what applies (owner, 2026-10-11: "no EV spread mention if
+ * it doesn't apply"). EVs as the Team Display spells them; IVs after, suffixed so
+ * a lone "0" cannot be read as an EV. Gen 1-2 DVs in their four-stat order.
+ */
+function statLine(mon: AnyMon): string | null {
+  const parts: string[] = []
+  const evs = 'evs' in mon && mon.evs ? spread(mon.evs) : null
+  if (evs) parts.push(evs)
+  if ('dvs' in mon && mon.dvs) {
+    const d = mon.dvs
+    parts.push(`${d.attack}Atk/${d.defense}Def/${d.speed}Spe/${d.special}Spc DV`)
+  } else if ('iv' in mon && mon.iv != null) {
+    parts.push(`${mon.iv} IV`)
+  } else if ('iv_random' in mon && mon.iv_random) {
+    parts.push('random IV')
+  } else if ('ivs' in mon && mon.ivs) {
+    const values = SPREAD_ORDER.map(([k]) => mon.ivs?.[k] ?? 0)
+    parts.push(
+      values.every((v) => v === values[0]) ? `${values[0]} IV` : `${spread(mon.ivs) ?? '0'} IV`,
+    )
+  }
+  return parts.length ? parts.join(' · ') : null
+}
+
+/**
+ * One Pokemon of a trainer's party, as a Pokédex card made battle-ready (owner,
+ * 2026-10-11): the grid card's watermark number, katakana and OFFICIAL ARTWORK,
+ * then the Team Display's battle lines -- name and level; types | nature |
+ * ability | item; the stat line; four moves with type and category. No labels
+ * ("Item", "Ability"), no held-item sprite, no outline. Its own component rather
+ * than the Team Display's MemberCard, which is a signed-off screen.
+ */
+function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number }) {
   const [, selectSpecies] = useDexSelection('pokedex')
   const nav = useNav()
   const species = mon.species_id != null ? getSpecies(mon.species_id) : undefined
@@ -498,120 +602,91 @@ function MonCard({ mon, gen, vg, index }: { mon: AnyMon; gen: number; vg: string
     (mon.item_id ? getItem(mon.item_id)?.display_name : null)
   const gender = 'gender' in mon ? mon.gender : null
   const explicit = 'moves_explicit' in mon ? mon.moves_explicit : true
-  const url = spriteFor(variety.pokemon_id, species.id, variety, vg)
+  const art = resolveArtworkUrl(species, variety, DEFAULT_ARTWORK_VIEW)
   const name = variety.is_default
     ? species.display_name
     : `${species.display_name} (${variety.name.slice(species.name.length + 1).replace(/-/g, ' ')})`
+  const meta = [nature?.display_name, ability?.display_name, itemName].filter(
+    (x): x is string => !!x,
+  )
+  const stats = statLine(mon)
 
   return (
-    <div className="trainer-mon" data-testid={`trainerdex-mon-${index}`}>
-      <div className="trainer-mon-head">
-        {url && <img src={url} alt="" width={64} height={64} loading="lazy" />}
-        <div className="trainer-mon-title">
-          <button
-            type="button"
-            className="ghost-button trainer-mon-name"
-            onClick={() => {
-              selectSpecies(species.id)
-              nav.setModule('pokedex')
-            }}
-          >
-            {name}
-            {gender && <span className="trainer-mon-gender">{gender === 'M' ? ' ♂' : ' ♀'}</span>}
-          </button>
-          <span className="trainer-mon-level num">
-            {level != null ? `Lv ${level}` : 'Lv varies'}
+    <div
+      className="species-card trainer-card"
+      data-testid={`trainerdex-mon-${index}`}
+      data-species-id={species.id}
+    >
+      <button
+        type="button"
+        className="species-card-hit"
+        aria-label={name}
+        onClick={() => {
+          selectSpecies(species.id)
+          nav.setModule('pokedex')
+        }}
+      />
+      <span className="species-card-ghost" aria-hidden>
+        {String(species.id).padStart(3, '0')}
+      </span>
+      {species.name_ja && (
+        <span className="species-card-ghost-ja" aria-hidden>
+          {species.name_ja}
+        </span>
+      )}
+      {art && <img className="species-card-art" src={art} alt="" loading="lazy" />}
+      <span className="trainer-card-text">
+        <span className="trainer-card-head">
+          <span className="species-name">{name}</span>
+          {gender && (
+            <span className="trainer-card-gender" aria-label={gender === 'M' ? 'male' : 'female'}>
+              {gender === 'M' ? '♂' : '♀'}
+            </span>
+          )}
+          <span className="trainer-card-level num">
+            {level != null ? `Lv.${level}` : 'Lv varies'}
           </span>
-          <span className="trainer-mon-types">
-            {types.map((ty) => (
-              <TypeLabel key={ty} type={ty} small />
+        </span>
+        <span className="trainer-card-id">
+          <span className="trainer-card-types">
+            {types.map((ty, i) => (
+              <span key={ty}>
+                {i > 0 && <span className="trainer-card-dot"> · </span>}
+                <TypeLabel type={ty} small />
+              </span>
             ))}
           </span>
-        </div>
-      </div>
-      <ul className="trainer-mon-facts">
-        {itemName && (
-          <li>
-            <span>Item</span>
-            {itemName}
-          </li>
-        )}
-        {ability && (
-          <li>
-            <span>Ability</span>
-            {ability.display_name}
-          </li>
-        )}
-        {nature && (
-          <li>
-            <span>Nature</span>
-            {nature.display_name}
-          </li>
-        )}
-        {'iv' in mon && mon.iv != null && (
-          <li>
-            <span>IVs</span>
-            <span className="num">{mon.iv} all</span>
-          </li>
-        )}
-        {'iv_random' in mon && mon.iv_random && (
-          <li>
-            <span>IVs</span>
-            <span>Random (the data overflows)</span>
-          </li>
-        )}
-        {'dvs' in mon && mon.dvs && (
-          <li>
-            <span>DVs</span>
-            <span className="num">
-              {mon.dvs.attack}/{mon.dvs.defense}/{mon.dvs.speed}/{mon.dvs.special}
+          {meta.map((part) => (
+            <span key={part} className="trainer-card-meta">
+              <span className="trainer-card-bar" aria-hidden>
+                |
+              </span>
+              {part}
             </span>
-          </li>
-        )}
-        {'ivs' in mon && mon.ivs && (
-          <li>
-            <span>IVs</span>
-            <span className="num">{spread(mon.ivs)}</span>
-          </li>
-        )}
-        {'evs' in mon && mon.evs && (
-          <li>
-            <span>EVs</span>
-            <span className="num">{spread(mon.evs)}</span>
-          </li>
-        )}
-      </ul>
-      <ul className="trainer-mon-moves">
-        {mon.moves.map((id) => {
-          const mv = getMove(id)
-          if (!mv) return null
-          return (
-            <li key={id}>
-              <TypeLabel type={resolveMoveTypeNameForGeneration(mv, gen) ?? ''} small />
-              <span>{mv.display_name}</span>
-            </li>
-          )
-        })}
-      </ul>
-      {!explicit && <p className="trainer-mon-note">Moves from the level-up table</p>}
+          ))}
+        </span>
+        {stats && <span className="trainer-card-stats num">{stats}</span>}
+        <span className="trainer-card-moves">
+          {mon.moves.map((id) => {
+            const raw = getMove(id)
+            if (!raw) return null
+            const mv = moveForGeneration(raw, gen)
+            const type = mv.type_id != null ? (getType(mv.type_id)?.name ?? '') : ''
+            return (
+              <span key={id} className="trainer-card-move">
+                <span className="trainer-card-move-name">~ {mv.display_name}</span>
+                {type ? <TypeLabel type={type} small /> : <span />}
+                <span className="trainer-card-move-cat" data-cat={mv.damage_class ?? ''}>
+                  {CATEGORY_LABEL[mv.damage_class ?? ''] ?? '—'}
+                </span>
+              </span>
+            )
+          })}
+        </span>
+        {!explicit && <span className="trainer-card-note">Moves from the level-up table</span>}
+      </span>
     </div>
   )
-}
-
-const SPREAD_ORDER: [keyof StatSpread, string][] = [
-  ['hp', 'HP'],
-  ['attack', 'Atk'],
-  ['defense', 'Def'],
-  ['special-attack', 'SpA'],
-  ['special-defense', 'SpD'],
-  ['speed', 'Spe'],
-]
-
-function spread(s: StatSpread) {
-  const parts = SPREAD_ORDER.filter(([k]) => s[k] != null && s[k] !== 0).map(
-    ([k, l]) => `${s[k]} ${l}`,
-  )
-  return parts.length ? parts.join(' · ') : '0'
 }
 
 /** A facility trainer's pool: every set it can draw from. */
@@ -619,25 +694,23 @@ function SetPool({
   facility,
   keys,
   gen,
-  vg,
 }: {
   facility: TrainerPartition['facilities'][number]
   keys: string[]
   gen: number
-  vg: string
 }) {
   const byKey = useMemo(() => new Map(facility.sets.map((s) => [s.key, s])), [facility])
   const sets = keys.map((k) => byKey.get(k)).filter((s): s is FacilitySet => s != null)
   return (
     <section className="entity-detail-section" data-testid="trainerdex-sets">
-      <h3 className="entity-detail-section-label">
-        Possible Pokémon <span className="entity-detail-section-count">{sets.length}</span>
-      </h3>
-      <div className="trainer-party">
+      <h3 className="entity-detail-section-label">Possible Pokémon</h3>
+      <ul className="trainer-party">
         {sets.map((s, i) => (
-          <MonCard key={s.key} mon={s} gen={gen} vg={vg} index={i} />
+          <li key={s.key}>
+            <MonCard mon={s} gen={gen} index={i} />
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   )
 }

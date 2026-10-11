@@ -26,104 +26,168 @@
   color: var(--text-secondary);
 }
 
+/* The list and its game navbar share one width, so the navbar's right edge is
+   the table's. Sticky on the page's own surface while the list scrolls. */
+.trainer-list {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.trainer-list-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+
+/*
+  THE TRAINER PAGE'S COLUMNS (owner, 2026-10-11): the left pane narrower than the
+  Movedex's so the right one holds the party as THREE cards a row -- a full team
+  is two rows of three. 500 + 32 + 738 = 1270px, inside the split's 1300px
+  container breakpoint.
+*/
+.trainer-detail .entity-split-cols {
+  grid-template-columns: 500px 738px;
+}
+
+@container entity-split (max-width: 1300px) {
+  .trainer-detail .entity-split-info,
+  .trainer-detail .entity-split-grid {
+    max-width: 738px;
+  }
+}
+
 .trainer-party {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--space-gap-md);
-}
-
-.trainer-mon {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-gap-sm);
-  min-width: 0;
-  padding: var(--space-gap-md);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-control, 8px);
-}
-
-.trainer-mon-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-gap-sm);
-}
-.trainer-mon-head img {
-  flex: none;
-  image-rendering: pixelated;
-}
-
-.trainer-mon-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.trainer-mon-name {
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-.trainer-mon-name:hover {
-  text-decoration: underline;
-}
-
-.trainer-mon-gender {
-  color: var(--text-secondary);
-}
-
-.trainer-mon-level {
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-}
-
-.trainer-mon-types {
-  display: inline-flex;
-  gap: var(--space-gap-sm);
-}
-
-.trainer-mon-facts,
-.trainer-mon-moves {
+  grid-template-columns: repeat(3, 240px);
+  gap: 9px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.trainer-mon-facts li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-gap-sm);
-  padding: 2px 0;
-  font-size: var(--font-size-caption);
-  border-bottom: 1px solid var(--hairline);
+@media (max-width: 800px) {
+  .trainer-party {
+    grid-template-columns: repeat(auto-fill, 240px);
+    justify-content: center;
+  }
 }
-.trainer-mon-facts li > span:first-child {
+
+/* The team navbar wraps rather than overflowing: a trainer can have 16 teams. */
+.trainer-team-nav .game-nav-items {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/*
+  A PARTY POKEMON AS A POKEDEX CARD (owner, 2026-10-11): the grid card's ghost
+  number, katakana and artwork exactly as .species-card places them, then the
+  battle lines flowing under the art. Wider than the grid card (240 against 212)
+  so a move, its type and its category fit one line, and as tall as its lines
+  need: no fixed height, no outline.
+*/
+.species-card.trainer-card {
+  width: 240px;
+  height: auto;
+  min-height: 214px;
+}
+
+.trainer-card-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 136px 12px 12px;
+  /* The card's open-species overlay sits under the text; let clicks reach it. */
+  pointer-events: none;
+}
+
+.trainer-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trainer-card-gender {
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   font-size: var(--font-size-label);
 }
 
-.trainer-mon-moves li {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+.trainer-card-level {
+  margin-left: 2px;
+  font-family: var(--font-numeric);
+  font-size: calc(var(--font-size-caption) * 0.92);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* types | nature | ability | item: values only, bar-separated as on the Team
+   Display, wrapping to a second line rather than clipping a long item name. */
+.trainer-card-id {
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-gap-sm);
-  padding: 2px 0;
-  font-size: var(--font-size-body);
+  row-gap: 2px;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
 }
 
-.trainer-mon-note {
-  margin: 0;
+.trainer-card-types,
+.trainer-card-meta {
+  white-space: nowrap;
+}
+
+.trainer-card-dot {
+  color: var(--text-secondary);
+}
+
+.trainer-card-bar {
+  margin: 0 5px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.trainer-card-stats {
+  font-family: var(--font-numeric);
+  font-size: calc(var(--font-size-caption) * 0.92);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* One grid for the four moves, each line display: contents, so type and
+   category line up as columns down the card (the Team Display's rule). */
+.trainer-card-moves {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin-top: 2px;
+  align-items: baseline;
+}
+
+.trainer-card-move {
+  display: contents;
+}
+
+.trainer-card-move-name {
+  font-size: var(--font-size-label);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trainer-card-move-cat {
   font-size: var(--font-size-caption);
   color: var(--text-secondary);
 }
 
-.trainer-credit {
-  margin: var(--space-gap-xl) 0 0;
+.trainer-card-note {
   font-size: var(--font-size-caption);
   color: var(--text-secondary);
-}
-.trainer-credit a {
-  color: inherit;
 }

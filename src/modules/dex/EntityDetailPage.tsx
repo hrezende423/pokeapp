@@ -311,14 +311,19 @@ export function EntityDetailPage({
     )
   }
 
+  /* The back link in the page's top-left corner, under the app bar, and the
+     centred column starting at the top beside it (owner, 2026-10-11, the
+     Breeding dex) -- where the list's title sits on the list page. */
   return (
-    <div className="entity-detail entity-stack" data-testid={testId} data-entry-id={entryId}>
+    <div className="entity-stack-page">
       {back}
-      {head}
-      {children}
-      {gridHeader}
+      <div className="entity-detail entity-stack" data-testid={testId} data-entry-id={entryId}>
+        {head}
+        {children}
+        {gridHeader}
 
-      {grids}
+        {grids}
+      </div>
     </div>
   )
 }

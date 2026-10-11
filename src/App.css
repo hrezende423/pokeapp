@@ -44,7 +44,10 @@
   shares, so this addresses it positionally rather than asking six modules to
   each remember a layout class.
 */
-.panel > .app-bar ~ *:not(.app-footer) {
+/* Not the "i" either: it is a fixed 15px box whose panel opens above it, and
+   this rule's overflow: hidden clipped the panel away entirely (found
+   2026-10-11, when the Trainer Dex's credit moved into it). */
+.panel > .app-bar ~ *:not(.app-footer):not(.app-info) {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -273,6 +276,32 @@
 .app-info:hover .app-info-panel,
 .app-info:focus-within .app-info-panel {
   display: block;
+}
+
+/* The 8px between the trigger and the panel would drop the hover on the way up
+   to a link in the panel; this transparent strip keeps the pointer "inside". */
+.app-info-panel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 10px;
+}
+
+.app-info-panel p {
+  margin: 0;
+}
+
+/* A page's source credit, above the boot line and divided from it. */
+.app-info-credit {
+  padding-bottom: var(--space-gap-sm);
+  margin-bottom: var(--space-gap-sm) !important;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.app-info-credit a {
+  color: inherit;
 }
 
 /*
