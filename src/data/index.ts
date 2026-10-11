@@ -12,6 +12,7 @@ export {
   getEvolutionChain,
   getIndexCounts,
   getItem,
+  getItemSupplement,
   getLocation,
   getLocationArea,
   getMove,

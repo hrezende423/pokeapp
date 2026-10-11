@@ -94,7 +94,15 @@ function accuracyCell(move: Move) {
  * learnset partition, so changing the game re-derives which methods exist. Under
  * "All" it unions all fourteen.
  */
-function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
+function MoveDetail({
+  move,
+  onBack,
+  scrollKey,
+}: {
+  move: Move
+  onBack: () => void
+  scrollKey: (part: string) => string
+}) {
   const { generation, isAll } = useVersionGroup()
   /* "Learned by" is per GAME, and the app picks a generation: the page has its
      own game row inside it, seeded to the generation's default game. */
@@ -178,6 +186,58 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
         selectSpecies(id)
         nav.setModule('pokedex')
       }}
+      /*
+        SPLIT (owner, 2026-10-11): the move on the left, scrolling on its own,
+        and its learners on the right. Everything about WHO learns it -- the game
+        row that scopes the learnset, loading and error lines, the count -- heads
+        the grid column, because that is what it describes.
+      */
+      layout="split"
+      infoTestId="movedex-detail-scroll"
+      scrollKey={scrollKey}
+      gridHeader={
+        <>
+          <GameRow scope={game} testId="movedex-game" />
+          {loading && (
+            <p className="subtitle" data-testid="movedex-learners-loading">
+              {isAll ? 'Loading every version group…' : 'Loading learnset…'}
+            </p>
+          )}
+          {error && (
+            <p role="alert" data-testid="movedex-learners-error">
+              Could not load the learnset data. {error}
+            </p>
+          )}
+          {failed.length > 0 && (
+            <p role="alert" data-testid="movedex-learners-partial">
+              Incomplete: {failed.join(', ')} failed to load.
+            </p>
+          )}
+          {!loading && !error && learners.length === 0 && (
+            <p className="subtitle" data-testid="movedex-learners-none">
+              No species learns this move{isAll ? ' in any game' : ` in ${vgLabel}`}.
+            </p>
+          )}
+          {!loading && !error && learners.length > 0 && (
+            <p
+              className="subtitle"
+              data-testid="movedex-learner-count"
+              data-learner-count={shownIds.size}
+              data-excluded={excluded}
+            >
+              <span className="num">{shownIds.size}</span> species
+              {isAll ? ' across all games' : ` in ${vgLabel}`}
+              {excluded > 0 && (
+                <span data-testid="movedex-learners-excluded">
+                  {' · '}
+                  <span className="num">{excluded}</span> more learn it only by a method this page
+                  does not group (Purification, form change, or a Stadium/Light Ball special case)
+                </span>
+              )}
+            </p>
+          )}
+        </>
+      }
     >
       {/*
         THE WHOLE MOVE, not the six fields the table shows.
@@ -197,45 +257,6 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
         decision the shared detail page makes about empty species sections.
       */}
       <MoveFactBlocks move={move} versionGroup={vgName} />
-      <GameRow scope={game} testId="movedex-game" />
-      {loading && (
-        <p className="subtitle" data-testid="movedex-learners-loading">
-          {isAll ? 'Loading every version group…' : 'Loading learnset…'}
-        </p>
-      )}
-      {error && (
-        <p role="alert" data-testid="movedex-learners-error">
-          Could not load the learnset data. {error}
-        </p>
-      )}
-      {failed.length > 0 && (
-        <p role="alert" data-testid="movedex-learners-partial">
-          Incomplete: {failed.join(', ')} failed to load.
-        </p>
-      )}
-      {!loading && !error && learners.length === 0 && (
-        <p className="subtitle" data-testid="movedex-learners-none">
-          No species learns this move{isAll ? ' in any game' : ` in ${vgLabel}`}.
-        </p>
-      )}
-      {!loading && !error && learners.length > 0 && (
-        <p
-          className="subtitle"
-          data-testid="movedex-learner-count"
-          data-learner-count={shownIds.size}
-          data-excluded={excluded}
-        >
-          <span className="num">{shownIds.size}</span> species
-          {isAll ? ' across all games' : ` in ${vgLabel}`}
-          {excluded > 0 && (
-            <span data-testid="movedex-learners-excluded">
-              {' · '}
-              <span className="num">{excluded}</span> more learn it only by a method this page does
-              not group (Purification, form change, or a Stadium/Light Ball special case)
-            </span>
-          )}
-        </p>
-      )}
     </EntityDetailPage>
   )
 }
@@ -342,19 +363,31 @@ function MoveFactBlocks({ move, versionGroup }: { move: Move; versionGroup: stri
     })
   }
 
+  /*
+    TWO COLUMNS UNDER THE DESCRIPTION (owner, 2026-10-11): the move's own
+    numbers and flags on the left, what it does on a hit and in a contest on the
+    right. The history of changes spans both, under them -- it reads as one table
+    across games, not as a third block competing for a column.
+  */
   return (
     <>
-      <FactRows testId="movedex-facts" rows={basics} />
-      <FactRows
-        testId="movedex-meta"
-        rows={metaRows.map((r) => ({ label: r.label, value: r.value }))}
-      />
-      <FactRows testId="movedex-contest" rows={contest} />
+      <div className="move-fact-cols" data-layout="move-facts">
+        <div className="move-fact-col">
+          <FactRows testId="movedex-facts" rows={basics} />
+        </div>
+        <div className="move-fact-col">
+          <FactRows
+            testId="movedex-meta"
+            rows={metaRows.map((r) => ({ label: r.label, value: r.value }))}
+          />
+          <FactRows testId="movedex-contest" rows={contest} />
+        </div>
+      </div>
       {pastRows.length > 0 && (
         <>
           <p className="list-caption" data-testid="movedex-past-caption">
-            How this move changed. Each row gives the value it had before that game; the
-            figures above are the ones in force in the selected generation.
+            How this move changed. Each row gives the value it had before that game; the figures
+            above are the ones in force in the selected generation.
           </p>
           <FactRows
             testId="movedex-past"
@@ -415,7 +448,9 @@ export function Movedex() {
         label: 'Category',
         width: '6rem',
         sortValue: (m) => m.damage_class,
-        render: (m) => titleCase(m.damage_class),
+        // At the type label's size (owner, 2026-10-11), so the two classifying
+        // columns side by side read as one register.
+        render: (m) => <span className="movedex-category">{titleCase(m.damage_class)}</span>,
       },
       {
         key: 'power',
@@ -486,10 +521,12 @@ export function Movedex() {
           initialSort="name"
           testId="movedex-rows"
           emptyNote="No move matches those filters."
+          plain
         />
       )}
-      detail={({ entry, onBack }) => (
-        <MoveDetail key={`${entry.id}`} move={entry} onBack={onBack} />
+      detailScrolls
+      detail={({ entry, onBack, scrollKey }) => (
+        <MoveDetail key={`${entry.id}`} move={entry} onBack={onBack} scrollKey={scrollKey} />
       )}
     />
   )

@@ -44,7 +44,7 @@ function section(n, title) {
   return n
 }
 
-/** Opens Pokepedia's dropdown and clicks the Type Coverage entry. */
+/** Opens the Tools dropdown and clicks the Type Coverage entry (moved from Poképedia 2026-10-11). */
 async function openModule(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-testid="dex-switcher"], .nav-trigger, .panel', {
@@ -56,7 +56,7 @@ async function openModule(page, base) {
   if (!(await entry.isVisible().catch(() => false))) {
     /* The group opens on mouseenter (NavGroup), not on a trigger click -- the
        trigger click is reserved for the tab's own destination. */
-    await page.locator('[data-testid="nav-group-pokepedia"]').hover()
+    await page.locator('[data-testid="nav-group-tools"]').hover()
     await entry.waitFor({ state: 'visible', timeout: 10000 })
   }
   await entry.click()

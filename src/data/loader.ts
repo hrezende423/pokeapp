@@ -1,7 +1,7 @@
 /**
  * Eager data-bundle loader.
  *
- * Fetches the twelve cross-cutting entity files once at boot, indexes them into
+ * Fetches the thirteen cross-cutting entity files once at boot, indexes them into
  * plain Maps keyed by id, and exposes typed accessors. No query engine — callers
  * that need a different access path build their own index over these Maps.
  *
@@ -18,6 +18,8 @@ import type {
   EvolutionChain,
   GameLocation,
   Item,
+  ItemSupplement,
+  ItemSupplementFile,
   LocationArea,
   LocationsFile,
   Move,
@@ -65,6 +67,8 @@ interface EagerBundle {
   locationAreas: Map<number, LocationArea>
   versionGroups: Map<number, VersionGroup>
   versionGroupsByName: Map<string, VersionGroup>
+  /** Keyed by item NAME (the slug), which is how the generator joins it. */
+  itemSupplement: Map<string, ItemSupplement>
   meta: BundleMeta
   stats: BootStats
 }
@@ -106,7 +110,7 @@ export function initDataLayer(): Promise<BootStats> {
   initPromise = (async () => {
     const started = performance.now()
 
-    // All twelve in parallel; they are independent and the browser caps concurrency.
+    // All thirteen in parallel; they are independent and the browser caps concurrency.
     const [
       species,
       moves,
@@ -120,6 +124,7 @@ export function initDataLayer(): Promise<BootStats> {
       locations,
       meta,
       versionGroups,
+      itemSupplement,
     ] = await Promise.all([
       fetchJson<Record<string, Species>>('species.json'),
       fetchJson<Record<string, Move>>('moves.json'),
@@ -133,6 +138,7 @@ export function initDataLayer(): Promise<BootStats> {
       fetchJson<LocationsFile>('locations.json'),
       fetchJson<BundleMeta>('meta.json'),
       fetchJson<Record<string, VersionGroup>>('version-groups.json'),
+      fetchJson<ItemSupplementFile>('item-supplement.json'),
     ])
 
     const stats: BootStats = {
@@ -153,6 +159,7 @@ export function initDataLayer(): Promise<BootStats> {
       locations,
       meta,
       versionGroups,
+      itemSupplement,
     ]) {
       stats.files.push(loaded.stat)
       stats.bytes += loaded.stat.bytes
@@ -177,6 +184,7 @@ export function initDataLayer(): Promise<BootStats> {
       locationAreas: indexById(locations.value.areas),
       versionGroups: versionGroupMap,
       versionGroupsByName,
+      itemSupplement: new Map(Object.entries(itemSupplement.value.items)),
       meta: meta.value,
       stats,
     }
@@ -230,6 +238,10 @@ export const getVersionGroup = (id: number): VersionGroup | undefined =>
   requireBundle().versionGroups.get(id)
 export const getVersionGroupByName = (name: string): VersionGroup | undefined =>
   requireBundle().versionGroupsByName.get(name)
+
+/** Bulbapedia's prices and acquisition for an item, by its name; undefined when it has none. */
+export const getItemSupplement = (name: string): ItemSupplement | undefined =>
+  requireBundle().itemSupplement.get(name)
 
 export const getBundleMeta = (): BundleMeta => requireBundle().meta
 export const getBootStats = (): BootStats => requireBundle().stats

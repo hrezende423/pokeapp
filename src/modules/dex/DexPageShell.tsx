@@ -40,6 +40,7 @@ export function DexPageShell<T>({
   detail,
   gatedMessage,
   controls,
+  detailScrolls = false,
 }: {
   dexId: DexModuleId
   /**
@@ -56,7 +57,23 @@ export function DexPageShell<T>({
    * Rendered when something is. OMIT for a dex with no detail page. The list
    * then simply always renders.
    */
-  detail?: (args: { entry: T; onBack: () => void }) => ReactNode
+  detail?: (args: {
+    entry: T
+    onBack: () => void
+    /**
+     * A remembered-offset key for one of the detail's OWN scrollers, when it has
+     * them (`detailScrolls`). Composed here so a self-scrolling page is keyed by
+     * exactly what the shell's own detail scroller would have been.
+     */
+    scrollKey: (part: string) => string
+  }) => ReactNode
+  /**
+   * The detail page brings its own scrollers instead of being wrapped in one --
+   * the Abilitydex and Movedex pages, whose info column and species grid scroll
+   * independently side by side (owner, 2026-10-11). The detail then fills the
+   * module's height and must contain a ScrollArea for anything that can run long.
+   */
+  detailScrolls?: boolean
   /** Shown instead of the list when `entries` is empty for era reasons. */
   gatedMessage?: string
   /**
@@ -127,12 +144,24 @@ export function DexPageShell<T>({
             </div>
           </ScrollArea>
         </>
+      ) : detailScrolls ? (
+        detail?.({
+          entry: selected,
+          onBack: () => setSelectedId(null),
+          scrollKey: (part) =>
+            scrollKey(dexId, 'detail', generation, isAll, entryId(selected), part),
+        })
       ) : (
         <ScrollArea
           testId={`${dexId}-detail-scroll`}
           memoryKey={scrollKey(dexId, 'detail', generation, isAll, entryId(selected))}
         >
-          {detail?.({ entry: selected, onBack: () => setSelectedId(null) })}
+          {detail?.({
+            entry: selected,
+            onBack: () => setSelectedId(null),
+            scrollKey: (part) =>
+              scrollKey(dexId, 'detail', generation, isAll, entryId(selected), part),
+          })}
         </ScrollArea>
       )}
     </div>

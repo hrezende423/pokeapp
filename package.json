@@ -10,6 +10,7 @@
     "build:trainers": "node scripts/build-trainers.mjs",
     "build:battle-data": "node scripts/build-battle-data.mjs",
     "build:supplement": "node scripts/build-supplement.mjs",
+    "build:item-supplement": "node scripts/build-item-supplement.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

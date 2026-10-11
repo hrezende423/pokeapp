@@ -1,5 +1,6 @@
 import { IconArrowLeft } from '@tabler/icons-react'
 import type { ReactNode } from 'react'
+import { ScrollArea } from '../../components/ScrollArea'
 import { SpeciesCardGrid, type SpeciesCardEntry } from '../../components/SpeciesCardGrid'
 import type { SpeciesCardFooter } from '../../components/speciesCardFooters'
 
@@ -15,6 +16,14 @@ import type { SpeciesCardFooter } from '../../components/speciesCardFooters'
  * move with no tutor in the selected generation shows no "Move tutor" heading at
  * all. That is why `sections` is filtered here rather than at each call site --
  * three call sites would be three chances to forget.
+ *
+ * TWO LAYOUTS. `stack` is the original single column, which the Breeding dex
+ * keeps. `split` is the Abilitydex's and the Movedex's (owner, 2026-10-11): the
+ * entity's info in a left column and the species grid in a right one, each
+ * scrolling on its own, so the description stays on screen while the grid runs.
+ * The grid column is exactly the grid's own width -- three 212px cards and two
+ * 9px gaps -- so the cards are the size they were on the stacked page; the info
+ * column takes a fixed width beside it and the pair is centred.
  */
 
 export interface SpeciesSection {
@@ -37,6 +46,10 @@ export function EntityDetailPage({
   testId,
   footer,
   children,
+  layout = 'stack',
+  gridHeader,
+  infoTestId,
+  scrollKey,
 }: {
   /**
    * The open entry's id, mirrored onto the root as data-entry-id. The lifted
@@ -67,18 +80,53 @@ export function EntityDetailPage({
   footer?: SpeciesCardFooter
   /** Extra blocks between the description and the species grids. */
   children?: ReactNode
+  layout?: 'stack' | 'split'
+  /**
+   * `split` only: blocks at the top of the GRID column -- a game row, a learner
+   * count, a loading line. In `stack` they would simply follow `children`.
+   */
+  gridHeader?: ReactNode
+  /** `split` only: the info column scroller's test id. */
+  infoTestId?: string
+  /** `split` only: remembered-offset keys for the two scrollers (DexPageShell's). */
+  scrollKey?: (part: string) => string
 }) {
   const populated = sections.filter((s) => s.entries.length > 0)
 
-  return (
-    <div className="entity-detail" data-testid={testId} data-entry-id={entryId}>
-      <div className="pokedex-back-row">
-        <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
-          <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
-          {backLabel}
-        </button>
-      </div>
+  const grids = populated.map((section, i) => (
+    <section
+      key={section.label ?? `section-${i}`}
+      className="entity-detail-section"
+      data-testid={`entity-section-${slug(section.label ?? 'species')}`}
+    >
+      {section.label && (
+        <h3 className="entity-detail-section-label">
+          {section.label}
+          <span className="entity-detail-section-count">{section.entries.length}</span>
+        </h3>
+      )}
+      <SpeciesCardGrid
+        entries={section.entries}
+        generation={generation}
+        onSelect={onSelectSpecies}
+        testId={`entity-grid-${slug(section.label ?? 'species')}`}
+        testIdPrefix="entity-species"
+        footer={footer}
+      />
+    </section>
+  ))
 
+  const back = (
+    <div className="pokedex-back-row">
+      <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
+        <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
+        {backLabel}
+      </button>
+    </div>
+  )
+
+  const head = (
+    <>
       <h2 className="entity-detail-name" data-testid="entity-name">
         {titleTestId ? <span data-testid={titleTestId}>{title}</span> : title}
       </h2>
@@ -92,31 +140,43 @@ export function EntityDetailPage({
           {description}
         </p>
       )}
+    </>
+  )
 
+  if (layout === 'split') {
+    return (
+      <div className="entity-detail entity-split" data-testid={testId} data-entry-id={entryId}>
+        <div className="entity-split-cols" data-layout="entity-split">
+          <div className="entity-split-info">
+            <ScrollArea testId={infoTestId} memoryKey={scrollKey?.('info')} hint={false}>
+              <div className="entity-split-pad">
+                {back}
+                {head}
+                {children}
+              </div>
+            </ScrollArea>
+          </div>
+          <div className="entity-split-grid">
+            <ScrollArea testId={`${testId}-grid-scroll`} memoryKey={scrollKey?.('grid')}>
+              <div className="entity-split-pad">
+                {gridHeader}
+                {grids}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="entity-detail" data-testid={testId} data-entry-id={entryId}>
+      {back}
+      {head}
       {children}
+      {gridHeader}
 
-      {populated.map((section, i) => (
-        <section
-          key={section.label ?? `section-${i}`}
-          className="entity-detail-section"
-          data-testid={`entity-section-${slug(section.label ?? 'species')}`}
-        >
-          {section.label && (
-            <h3 className="entity-detail-section-label">
-              {section.label}
-              <span className="entity-detail-section-count">{section.entries.length}</span>
-            </h3>
-          )}
-          <SpeciesCardGrid
-            entries={section.entries}
-            generation={generation}
-            onSelect={onSelectSpecies}
-            testId={`entity-grid-${slug(section.label ?? 'species')}`}
-            testIdPrefix="entity-species"
-            footer={footer}
-          />
-        </section>
-      ))}
+      {grids}
     </div>
   )
 }

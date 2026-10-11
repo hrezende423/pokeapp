@@ -33,6 +33,13 @@ export const EAGER_DATA_FILES = [
   'locations.json',
   'meta.json',
   'version-groups.json',
+  /*
+    Bulbapedia's per-game item prices and acquisition methods, which PokeAPI does
+    not carry (scripts/build-item-supplement.mjs). Eager, not a partition: the
+    Itemdex's price column reads it on the list, and offline-first means a lazy
+    file would leave that column empty until someone opened it online.
+  */
+  'item-supplement.json',
 ] as const
 
 export type EagerDataFile = (typeof EAGER_DATA_FILES)[number]

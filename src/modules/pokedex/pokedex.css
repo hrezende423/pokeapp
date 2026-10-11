@@ -2386,6 +2386,66 @@
   border-radius: 2px;
 }
 
+/*
+  THE PLAIN TABLE -- Movedex, Abilitydex and Itemdex (owner, 2026-10-11).
+
+  No hairlines at all, header included: spacing separates the rows. Every glyph
+  at regular weight, header labels too (DS: "headings and UPPERCASE labels are
+  regular weight"), and the pointer's row turns SEMIBOLD in place of the hover
+  fill, which the design system forbids anyway.
+
+  `td *` inherits the cell's weight so a type label, a number or the name button
+  goes semibold with its row rather than holding its own declared weight.
+  Semibold cannot push a column: every column is a declared width under
+  `table-layout: fixed` (DataTable's colgroup), so a wider glyph run grows
+  inside its own column and nothing to its right moves.
+*/
+.data-table-plain th,
+.data-table-plain td {
+  border-bottom: none;
+}
+
+.data-table-plain .data-table-sort {
+  font-weight: var(--font-weight-regular);
+}
+
+.data-table-plain td {
+  font-weight: var(--font-weight-regular);
+}
+
+.data-table-plain td * {
+  font-weight: inherit;
+}
+
+.data-table-plain .data-table-row-clickable:hover {
+  background: none;
+}
+
+.data-table-plain .data-table-row-clickable:hover td {
+  font-weight: var(--font-weight-semibold);
+}
+
+/*
+  The one cell that COULD move something: prose wraps, and semibold is wider, so
+  a sentence could gain a line and grow its row under the pointer. ProseCell
+  stacks an invisible semibold copy in the same grid cell, so the row is always
+  as tall as its semibold self and the hover changes ink, never geometry.
+*/
+.data-table-plain .data-table-prose {
+  display: grid;
+}
+
+.data-table-plain .data-table-prose > span,
+.data-table-plain .data-table-prose::after {
+  grid-area: 1 / 1;
+}
+
+.data-table-plain .data-table-prose::after {
+  content: attr(data-text);
+  font-weight: var(--font-weight-semibold);
+  visibility: hidden;
+}
+
 /* ------------------------------------------------ shared entity detail page */
 
 .entity-detail {
@@ -2466,6 +2526,137 @@
   font-variant-numeric: tabular-nums;
   text-transform: none;
   letter-spacing: 0;
+}
+
+/*
+  THE SPLIT DETAIL PAGE -- Abilitydex and Movedex (owner, 2026-10-11).
+
+  Two columns, each its own ScrollArea, so the entity's description stays on
+  screen while its species grid scrolls. The GRID column is the grid's own
+  width and nothing else: three 212px cards and two 9px gaps (.pokedex-grid),
+  654px, so every card is the size it was on the stacked page. The info column
+  is a fixed 34rem beside it -- wide enough for the Movedex's two fact columns --
+  and the pair is centred in the module.
+
+  Below 1300px the two cannot sit side by side (34rem + 32px + 654px is 1230px
+  before the panel's own gutter), so they stack and the PAIR scrolls as one
+  column; the inner scrollers stand down to plain blocks.
+*/
+.entity-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entity-split-cols {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 34rem 654px;
+  justify-content: center;
+  column-gap: var(--space-gap-xl);
+}
+
+.entity-split-info,
+.entity-split-grid {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entity-split-pad {
+  padding-bottom: var(--space-gap-xl);
+}
+
+/* The grid column's first block needs no rule above it: there is nothing above. */
+.entity-split .entity-split-grid .entity-detail-section:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* "Make all info font regular" (owner, 2026-10-11): the title and the section
+   labels were medium; the design system sets headings and UPPERCASE labels
+   regular anyway. */
+.entity-split .entity-detail-name,
+.entity-split .entity-detail-section-label {
+  font-weight: var(--font-weight-regular);
+}
+
+.entity-split .entity-detail-desc {
+  max-width: none;
+}
+
+@media (max-width: 1299px) {
+  .entity-split-cols {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .entity-split-info,
+  .entity-split-grid {
+    display: block;
+    max-width: 654px;
+    margin: 0 auto;
+  }
+
+  .entity-split-cols .scroll-area-outer {
+    display: block;
+  }
+
+  .entity-split-cols .scroll-area {
+    overflow: visible;
+  }
+
+  .entity-split-info .entity-split-pad {
+    padding-bottom: var(--space-gap-md);
+  }
+}
+
+/* The Movedex's facts under the description, in two columns. */
+.move-fact-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--space-gap-lg);
+  align-items: start;
+}
+
+.move-fact-col .fact-rows {
+  max-width: none;
+  margin-top: 0;
+}
+
+.move-fact-col .fact-rows + .fact-rows {
+  margin-top: var(--space-gap-lg);
+}
+
+.move-fact-cols + .list-caption {
+  margin-top: var(--space-gap-lg);
+}
+
+@media (max-width: 720px) {
+  .move-fact-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .move-fact-col + .move-fact-col {
+    margin-top: var(--space-gap-lg);
+  }
+}
+
+/* The Abilitydex's number, set like a species card's dex number: caption x 0.92
+   in --text-secondary beside a body-size name (.species-card .dex-no). */
+.abilitydex-no {
+  font-size: calc(var(--font-size-caption) * 0.92);
+  color: var(--text-secondary);
+}
+
+/* The Movedex's category at the type label's size (.ds-type-sm). */
+.movedex-category {
+  font-size: var(--font-size-caption);
 }
 
 /* ---------------------------------------------- card badge + ledger metadata */
@@ -3439,6 +3630,151 @@
 .fact-note {
   color: var(--text-secondary);
   font-size: var(--font-size-label);
+}
+
+/*
+  THE ITEM LIST'S NAME CELL: icon first, at 48px, centred on the name's line
+  (owner, 2026-10-11). The icon slot is a fixed 48px box even when an item has
+  no icon, so every name starts at the same x.
+*/
+.itemdex-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-gap-sm);
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.itemdex-name-icon {
+  display: inline-flex;
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+
+.itemdex-name-icon img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  /* The 30px pixel-art icon, kept crisp rather than smeared by smooth scaling. */
+  image-rendering: pixelated;
+}
+
+.itemdex-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The row is 48px of icon tall, so every cell centres on it, not on the top. */
+[data-testid='itemdex-rows'] td {
+  vertical-align: middle;
+}
+
+/*
+  THE ITEM PAGE, CENTRED (owner, 2026-10-11): one column, as wide as the
+  acquisition table it can unfold, in the middle of the window. Text inside it
+  stays left-aligned -- it is the column that is centred, not the prose.
+*/
+.item-detail {
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.item-detail .fact-rows {
+  max-width: none;
+}
+
+/* Attributes: a stacked list of read-only checkboxes, the checkbox spec's
+   vertical arrangement, right-aligned with the other values. */
+.item-attr-row {
+  align-items: flex-start;
+}
+
+.item-attrs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-attrs .item-attr {
+  display: flex;
+  align-items: center;
+  /* It is an <li> under .fact-rows, whose rows are space-between. */
+  justify-content: flex-start;
+  gap: var(--space-gap-sm);
+  padding: 0;
+  border: none;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.item-attr-mark {
+  flex: none;
+}
+
+/* The acquisition fold: a ghost control centred in the column. */
+.item-acq {
+  margin-top: var(--space-gap-lg);
+}
+
+.item-acq-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 auto;
+  padding: 6px 8px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.item-acq-toggle:hover,
+.item-acq-toggle[aria-expanded='true'] {
+  color: var(--text-primary);
+}
+
+.item-acq-toggle:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.item-acq-body {
+  margin-top: var(--space-gap-sm);
+}
+
+.item-acq-body .data-table-wrap > .data-table {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.item-acq-body .data-table td {
+  vertical-align: top;
+}
+
+/* Bulbapedia's line breaks inside one method cell, one line each. */
+.item-acq-lines > span {
+  display: block;
+}
+
+.item-acq-lines > span + span {
+  margin-top: 4px;
+}
+
+.item-acq-body .list-caption {
+  text-align: center;
 }
 
 /* ================================================== berry card */

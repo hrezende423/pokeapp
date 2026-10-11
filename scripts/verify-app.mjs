@@ -38,6 +38,7 @@ const EAGER = [
   'locations.json',
   'meta.json',
   'version-groups.json',
+  'item-supplement.json',
 ]
 
 const GROUP_A = 'heartgold-soulsilver' // largest partitions, and the app default

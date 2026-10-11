@@ -1,9 +1,10 @@
 /**
  * Type Coverage's nav registration.
  *
- * A FOURTH PAGE SOURCE, and deliberately not an entry in DEX_MODULES. It sits
- * under Poképedia beside the dexes, but it is not one: there is no entry list and
- * no per-entry selection, so `useDexSelection` would never be called for it.
+ * A FOURTH PAGE SOURCE, and deliberately not an entry in DEX_MODULES. It sat
+ * under Poképedia beside the dexes until 2026-10-11 and is under Tools now (owner),
+ * but it was never one: there is no entry list and no per-entry selection, so
+ * `useDexSelection` would never be called for it.
  *
  * That distinction is load-bearing rather than pedantic. registry.ts is the
  * single source of truth for WHAT A DEX IS, and the suites read it that way --

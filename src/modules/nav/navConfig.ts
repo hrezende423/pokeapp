@@ -79,17 +79,11 @@ export const NAV_TABS: readonly NavTab[] = [
     destination: 'pokedex',
     itemsTestId: 'dex-switcher',
     /*
-      THE DEXES, THEN THE SCREENS THAT ARE NOT DEXES. Type Coverage belongs on
-      this tab but is not a dex -- no entry list, no per-entry selection -- so it
-      registers in its own pages.ts rather than in DEX_MODULES, and joins here.
-      That keeps `dex-switcher` resolving to exactly the registered dexes, in
-      registry order, which is what verify-dexes asserts against the registry
-      source.
+      THE DEXES AND NOTHING ELSE, in registry order. Type Coverage sat here until
+      2026-10-11 and moved to Tools on the owner's request: it is not a dex (no
+      entry list, no per-entry selection), it is a tool you ask a question of.
     */
-    entries: [
-      ...DEX_MODULES.map((m) => ({ id: m.id, label: m.label })),
-      ...TYPE_COVERAGE_PAGES.map((p) => ({ id: p.id, label: p.label })),
-    ],
+    entries: DEX_MODULES.map((m) => ({ id: m.id, label: m.label })),
   },
   {
     id: 'team-building',
@@ -110,6 +104,9 @@ export const NAV_TABS: readonly NavTab[] = [
       calculators/pages.ts. The four small tools are tabs of ONE screen (the Type
       Coverage shape); the Damage Calculator is its own page, nested under it as
       the first `children` entry the nav has used.
+
+      TYPE COVERAGE FOLLOWS IT (owner, 2026-10-11), moved here from Poképedia:
+      like the calculators it answers a question rather than listing entries.
     */
     entries: [
       {
@@ -117,6 +114,7 @@ export const NAV_TABS: readonly NavTab[] = [
         label: 'Calculators',
         children: [{ id: 'damage-calculator', label: 'Damage Calculator' }],
       },
+      ...TYPE_COVERAGE_PAGES.map((p) => ({ id: p.id, label: p.label })),
       /* Team Matchup graduated the Battle Simulator stub, in its place. */
       ...stubs('compare-pokemon'),
       { id: 'team-matchup', label: 'Team Matchup' },

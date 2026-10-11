@@ -1776,16 +1776,14 @@ try {
     JSON.stringify(hovered.items) ===
       JSON.stringify([
         'nav-pokedex',
-        'nav-itemdex',
-        'nav-abilitydex',
-        'nav-naturedex',
-        'nav-berrydex',
         'nav-movedex',
+        'nav-abilitydex',
+        'nav-itemdex',
+        'nav-berrydex',
+        'nav-naturedex',
         'nav-breedingdex',
         'nav-trainerdex',
-        // Not a dex, but it is on this tab: Type Coverage registers in its own
-        // typecoverage/pages.ts and navConfig appends it after the dexes.
-        'nav-type-coverage',
+        // Type Coverage moved to Tools on 2026-10-11 (owner).
       ]),
     hovered.items.join(','),
   )
@@ -1914,12 +1912,13 @@ try {
   })
   log('  tools: ' + JSON.stringify(tools))
   check(
-    'Tools lists Calculators (with Damage Calculator under it) first, Team Matchup in place of the Battle Simulator stub, then the stubs',
+    'Tools lists Calculators (with Damage Calculator under it) first, then Type Coverage, Team Matchup in place of the Battle Simulator stub, then the stubs',
     tools.visible &&
       JSON.stringify(tools.labels) ===
         JSON.stringify([
           'Calculators',
           'Damage Calculator',
+          'Type Coverage',
           'Compare Pokemon',
           'Team Matchup',
           'Training and Optimization',
@@ -2509,31 +2508,35 @@ try {
   */
   await goToDex(page, 'itemdex')
   await page.waitForSelector('[data-testid="itemdex-rows"]', { timeout: 30000 })
+  /*
+    THE ITEMDEX IS A TABLE NOW (2026-10-10), and since 2026-10-11 its icon LEADS
+    the name at 48px, centred on the name's line. The ledger-row checks this
+    replaced (.species-name / .row-icon / .dex-no) looked for markup that no
+    longer exists and threw rather than failing.
+  */
   const itemRow = await page.evaluate(() => {
     const row = document.querySelector('[data-testid="itemdex-row-1"]')
     if (!row) return null
-    const name = row.querySelector('.species-name')
-    const icon = row.querySelector('.row-icon')
+    const name = row.querySelector('.itemdex-name-text')
+    const icon = row.querySelector('[data-testid="itemdex-row-icon-1"]')
+    const n = name?.getBoundingClientRect()
+    const i = icon?.getBoundingClientRect()
     return {
       font: getComputedStyle(row).fontFamily,
-      // Sprite AFTER the name: compare left edges rather than DOM order, since
-      // what matters is where the reader sees it.
-      iconAfterName:
-        name != null &&
-        icon != null &&
-        icon.getBoundingClientRect().left > name.getBoundingClientRect().left,
+      iconBeforeName: n != null && i != null && i.right <= n.left,
+      iconSize: i ? [Math.round(i.width), Math.round(i.height)] : null,
+      centred: n != null && i != null && Math.abs(n.top + n.height / 2 - (i.top + i.height / 2)) <= 1.5,
       chevron: row.querySelector('.row-chevron') != null,
-      sub: row.querySelector('.row-sub')?.textContent?.trim() ?? null,
       category: row.querySelector('[data-testid="itemdex-row-category-1"]')?.textContent?.trim(),
       pocket: row.querySelector('[data-testid="itemdex-row-pocket-1"]')?.textContent?.trim(),
-      // The numeric face on the catalog number, which the base .dex-no rule was
-      // missing until this pass -- it set tabular-nums without a font-family.
-      dexNoFont: getComputedStyle(row.querySelector('.dex-no')).fontFamily,
+      priceFont: getComputedStyle(row.querySelector('[data-testid="itemdex-row-price-1"]')).fontFamily,
     }
   })
   log(`  itemdex row: ${JSON.stringify(itemRow)}`)
   check('itemdex still inherits Plex Sans', /IBM Plex/.test(itemRow?.font ?? ''), itemRow?.font)
-  check('itemdex puts the sprite AFTER the item name', itemRow?.iconAfterName === true)
+  check('itemdex puts the icon BEFORE the item name', itemRow?.iconBeforeName === true)
+  check('at 48px', JSON.stringify(itemRow?.iconSize) === '[48,48]', JSON.stringify(itemRow?.iconSize))
+  check('centred on the name', itemRow?.centred === true)
   check('itemdex rows end in a chevron', itemRow?.chevron === true)
   check(
     'itemdex shows category AND pocket as two distinct fields',
@@ -2543,9 +2546,9 @@ try {
     `${itemRow?.category} / ${itemRow?.pocket}`,
   )
   check(
-    'the catalog number is in --font-numeric, not just tabular-nums',
-    /Martian Mono/.test(itemRow?.dexNoFont ?? ''),
-    itemRow?.dexNoFont,
+    'the price is in --font-numeric',
+    /Martian Mono/.test(itemRow?.priceFont ?? ''),
+    itemRow?.priceFont,
   )
 
   await goToDex(page, 'berrydex')

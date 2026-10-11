@@ -66,6 +66,7 @@ export function DataTable<T>({
   onSort,
   testId,
   emptyNote,
+  plain = false,
 }: {
   rows: T[]
   columns: Column<T>[]
@@ -82,6 +83,16 @@ export function DataTable<T>({
   onSort?: (key: string, direction: SortDirection) => void
   testId: string
   emptyNote?: string
+  /**
+   * The reference dexes' table (owner, 2026-10-11): no hairlines, every cell at
+   * regular weight, and the WHOLE ROW semibold under the pointer in place of a
+   * hover fill. Opt-in rather than the default because the Pokédex list, the
+   * species page's tables and the Trainer Dex were not part of that request.
+   * Hover-bold cannot move a column: every column here is a declared width
+   * under `table-layout: fixed`. A prose cell can still re-wrap, so it reserves
+   * its semibold height up front -- see ProseCell.
+   */
+  plain?: boolean
 }) {
   const [ownSortKey, setOwnSortKey] = useState<string | null>(initialSort ?? null)
   // "movedex-rows" names the table; a row inside it is "movedex-row-29", not
@@ -133,7 +144,12 @@ export function DataTable<T>({
         declared 3.9rem column still came out at the 15rem the fallback asked
         for. Marking the table is what makes Column.width mean what it says.
       */}
-      <table className={widths ? 'data-table data-table-sized' : 'data-table'} data-testid={testId}>
+      <table
+        className={['data-table', widths && 'data-table-sized', plain && 'data-table-plain']
+          .filter(Boolean)
+          .join(' ')}
+        data-testid={testId}
+      >
         {widths && (
           <colgroup>
             {columns.map((c) => (
@@ -243,5 +259,21 @@ export function DataTable<T>({
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * A sentence in a cell, wrapping within its column (the Abilitydex's effect).
+ *
+ * In a `plain` table it also RESERVES ITS SEMIBOLD SIZE: an invisible semibold
+ * copy (`data-text`, drawn by ::after in the same grid cell) sets the height, so
+ * a hover that turns the row semibold cannot re-wrap the sentence and grow the
+ * row. Only for plain strings -- `attr()` can only carry text.
+ */
+export function ProseCell({ text }: { text: string }) {
+  return (
+    <span className="data-table-prose" data-text={text}>
+      <span>{text}</span>
+    </span>
   )
 }

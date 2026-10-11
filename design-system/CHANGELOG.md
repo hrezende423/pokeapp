@@ -1,4 +1,13 @@
 # Changelog
+## 2.1.6 — 2026-10-11 (non-breaking)
+- Poképedia order: Pokédex, Movedex, Abilitydex, Itemdex, Berrydex, Naturedex, Breeding dex, Trainer Dex; Type Coverage moved to Tools (after Calculators)
+- Data table, `plain` variant (Movedex, Abilitydex, Itemdex lists): no hairlines, every cell and header regular, the hovered row semibold in place of a hover fill; columns are declared widths so nothing moves, and a prose cell reserves its semibold height
+- Itemdex list: icon before the name at 48px, centred on it; Price column (₽, selected generation's default game)
+- Itemdex page: centred column; ₽ prices grouped by game; generations as a range ("1–4"); attributes as read-only checkboxes; a centred Acquisition chevron unfolds a Games / Finite / Repeatable table
+- Abilitydex list: the number at caption × 0.92 in `--text-secondary`, as on the species card
+- Movedex list: Category at the type label's size
+- Abilitydex and Movedex pages: two columns, each scrolling on its own — info (title regular) beside the species grid at its unchanged 3 × 212px — centred; stacked below 1300px. The Movedex's facts sit in two columns under the description
+- Checkbox: a read-only state (see `components/checkbox-radio.md`)
 ## 2.1.5 — 2026-10-10 (non-breaking)
 - App bar: Grid/List, Sort and Search/Filter merge into one text trigger, "Sort/Filter", whose panel has three parts (View mode · Sort · Search/Filter) with hairlines only between them; disabled on pages with nothing to sort or filter (Naturedex, Type Coverage, Build Form, calculators, Team Matchup)
 - Every navbar menu (nav dropdowns, Sort/Filter, account) is `--surface`, not `--surface-raised`

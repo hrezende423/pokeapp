@@ -9,4 +9,5 @@
 | focus | 2px `border.focus` ring, 2px offset |
 | disabled | outline `border.hairline`, label `text.disabled` |
 | indeterminate (checkbox) | `text.default` fill + dash |
+| read-only (checkbox) | the on/off look unchanged, no hover, no focus, not a control — a readout of a yes/no fact (the Itemdex's attributes). Never the disabled look: disabled says "unavailable", a readout says "no" |
 **Rules:** group has a legend (label-caps); stack vertically; radios arrow-key navigate as one group; no accent.

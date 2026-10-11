@@ -3,7 +3,7 @@ import { ABILITIES_INTRODUCED_IN_GENERATION, speciesWithAbility } from '../../da
 import type { Ability } from '../../data'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
-import { DataTable, type Column } from '../../components/DataTable'
+import { DataTable, ProseCell, type Column } from '../../components/DataTable'
 import { DexPageShell } from './DexPageShell'
 import { EntityDetailPage } from './EntityDetailPage'
 import { abilitiesHiddenFromList, abilityEntries } from './entrySources'
@@ -61,6 +61,10 @@ export function Abilitydex() {
     A TABLE WITH SORTABLE HEADERS (owner, 2026-10-10), like the Movedex, and with
     the ability number as its first column -- the number the list stopped
     printing in an earlier pass, back by request. Initial order is that number.
+
+    THE NUMBER IS SET LIKE A CARD'S DEX NUMBER (owner, 2026-10-11): the species
+    card's "#0088" is caption x 0.92 in --text-secondary beside a body-size name,
+    and this column keeps that same proportion and colour beside the name column.
   */
   const columns: Column<Ability>[] = useMemo(
     () => [
@@ -71,7 +75,7 @@ export function Abilitydex() {
         numeric: true,
         sortValue: (a) => a.id,
         render: (a) => (
-          <span className="num" data-testid={`abilitydex-row-no-${a.id}`}>
+          <span className="num abilitydex-no" data-testid={`abilitydex-row-no-${a.id}`}>
             {String(a.id).padStart(3, '0')}
           </span>
         ),
@@ -84,7 +88,7 @@ export function Abilitydex() {
         sortValue: (a) => a.short_effect,
         // Prose, so it wraps inside its column rather than running over the Gen
         // column: .data-table cells are nowrap for the one-word values elsewhere.
-        render: (a) => <span className="data-table-prose">{a.short_effect ?? '—'}</span>,
+        render: (a) => <ProseCell text={a.short_effect ?? '—'} />,
       },
       {
         key: 'generation',
@@ -118,6 +122,7 @@ export function Abilitydex() {
             initialSort="id"
             testId="abilitydex-rows"
             emptyNote="No ability matches those filters."
+            plain
           />
           {hiddenCount > 0 && (
             <p className="list-caption" data-testid="abilitydex-clamp-caption">
@@ -127,12 +132,14 @@ export function Abilitydex() {
           )}
         </>
       )}
-      detail={({ entry, onBack }) => (
+      detailScrolls
+      detail={({ entry, onBack, scrollKey }) => (
         <AbilityDetail
           key={entry.id}
           ability={entry}
           generation={generation}
           onBack={onBack}
+          scrollKey={scrollKey}
           onSelectSpecies={(id) => {
             selectSpecies(id)
             nav.setModule('pokedex')
@@ -148,11 +155,13 @@ function AbilityDetail({
   generation,
   onBack,
   onSelectSpecies,
+  scrollKey,
 }: {
   ability: Ability
   generation: number
   onBack: () => void
   onSelectSpecies: (id: number) => void
+  scrollKey: (part: string) => string
 }) {
   // The same reverse lookup as before, and still generation-aware: a Gen 3
   // selection cannot list Leafeon among Chlorophyll's carriers.
@@ -169,16 +178,12 @@ function AbilityDetail({
       backLabel="All abilities"
       title={ability.display_name}
       titleTestId="abilitydex-name"
+      /* The subtitle is the introduction ALONE (owner, 2026-10-11); the species
+         count moved under the description, in the subtitle's own type. */
       meta={
-        <>
-          <span data-testid="abilitydex-intro">
-            Introduced in Generation {ability.generation_id ?? '?'}
-          </span>
-          <span data-testid="abilitydex-holder-count">
-            {' '}
-            · {holders.length} species in Generation {generation}
-          </span>
-        </>
+        <span data-testid="abilitydex-intro">
+          Introduced in Generation {ability.generation_id ?? '?'}
+        </span>
       }
       description={
         <span data-testid="abilitydex-effect">
@@ -189,7 +194,13 @@ function AbilityDetail({
       sections={[{ entries: holders.map((h) => ({ species: h.species })) }]}
       generation={generation}
       onSelectSpecies={onSelectSpecies}
+      layout="split"
+      infoTestId="abilitydex-detail-scroll"
+      scrollKey={scrollKey}
     >
+      <p className="entity-detail-meta" data-testid="abilitydex-holder-count">
+        {holders.length} species in Generation {generation}
+      </p>
       {holders.length === 0 && (
         <p className="subtitle" data-testid="abilitydex-holders-none">
           No species in Generation {generation} has this ability.
