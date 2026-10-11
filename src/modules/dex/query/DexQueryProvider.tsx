@@ -88,6 +88,10 @@ const erase = <T,>(
   defaultSort,
 })
 
+/** True when `id` is one of these entries' ids: the shell would show its page. */
+const isOpen = (entries: unknown[], id: number | null): boolean =>
+  id != null && entries.some((e) => (e as { id: number }).id === id)
+
 const TEAM_BUILDING_IDS = new Set(['my-teams', 'build-library', 'new-team', 'new-build'])
 
 export function DexQueryProvider({ children }: { children: ReactNode }) {
@@ -96,6 +100,8 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
   const trainerGame = useTrainerdexGame()
   const [view, setView] = useState<SpeciesView>('grid')
   const [selectedSpecies] = useDexSelection('pokedex')
+  const [selectedAbility] = useDexSelection('abilitydex')
+  const [selectedMove] = useDexSelection('movedex')
 
   const availableTypes = useMemo(() => typesInGeneration(generation), [generation])
   const moduleId = nav.moduleId
@@ -219,8 +225,14 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       // The Pokedex's browse page only: with a species open there is no list on
       // screen for the switch to describe.
       showViewToggle: config.dexId === 'pokedex' && selectedSpecies == null,
+      /* An entry page, not a list. Checked against the dex's own scoped entries,
+         the test DexPageShell uses: a selection the generation no longer has
+         shows the list, and the list keeps its menu. */
+      menuDisabled:
+        (config.dexId === 'abilitydex' && isOpen(config.entries, selectedAbility)) ||
+        (config.dexId === 'movedex' && isOpen(config.entries, selectedMove)),
     }),
-    [config, query, view, selectedSpecies],
+    [config, query, view, selectedSpecies, selectedAbility, selectedMove],
   )
 
   return <DexQueryContext.Provider value={value}>{children}</DexQueryContext.Provider>

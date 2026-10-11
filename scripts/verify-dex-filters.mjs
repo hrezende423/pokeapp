@@ -1075,6 +1075,8 @@ try {
       facts: Object.fromEntries(rows('movedex-facts')),
       meta: Object.fromEntries(rows('movedex-meta')),
       contest: Object.fromEntries(rows('movedex-contest')),
+      // Its own grey line under the description since 2026-10-11, not a fact row.
+      intro: document.querySelector('[data-testid="movedex-intro"]')?.textContent?.trim(),
     }
   })
   log(`  Swords Dance: ${JSON.stringify(movePage)}`)
@@ -1082,8 +1084,8 @@ try {
   check(
     'its priority and the generation it was introduced in',
     movePage.facts.Priority === String(swordsDance.priority) &&
-      movePage.facts.Introduced === `Generation ${swordsDance.generation_id}`,
-    `${movePage.facts.Priority} / ${movePage.facts.Introduced}`,
+      movePage.intro === `Introduced in Generation ${swordsDance.generation_id}`,
+    `${movePage.facts.Priority} / ${movePage.intro}`,
   )
   check(
     'the stat changes it applies',

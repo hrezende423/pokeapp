@@ -1,5 +1,6 @@
 import { getItem, getType, moveFlags } from '../../data'
 import type { Move } from '../../data'
+import { moveForGeneration } from '../../data/moveEra'
 
 /**
  * The move fields the Movedex did not previously surface, derived once.
@@ -142,44 +143,77 @@ export function statChangeLabels(move: Move): string[] {
     .map((c) => `${c.change > 0 ? '+' : ''}${c.change} ${titleCaseMove(c.stat)}`)
 }
 
+/** One point on a move's history: the generation, and what it was or became. */
+export interface MoveTimelineStep {
+  generation: number
+  /** The first step carries every value; later steps only what changed. */
+  initial: boolean
+  parts: { key: string; label: string }[]
+}
+
+const TIMELINE_FIELDS: {
+  key: string
+  read: (m: Move) => string | number | null
+  show: (v: string | number | null) => string
+}[] = [
+  {
+    key: 'type',
+    read: (m) => (m.type_id == null ? null : (getType(m.type_id)?.name ?? null)),
+    show: (v) => `Type ${v === 'unknown' ? '???' : titleCaseMove(v == null ? null : String(v))}`,
+  },
+  {
+    key: 'category',
+    read: (m) => m.damage_class,
+    show: (v) => titleCaseMove(v == null ? null : String(v)),
+  },
+  { key: 'power', read: (m) => m.power, show: (v) => `BP ${v ?? DASH}` },
+  { key: 'accuracy', read: (m) => m.accuracy, show: (v) => `Acc ${v == null ? DASH : `${v}%`}` },
+  { key: 'pp', read: (m) => m.pp, show: (v) => `PP ${v ?? DASH}` },
+  {
+    key: 'effect_chance',
+    read: (m) => m.effect_chance,
+    show: (v) => `Effect ${v == null ? DASH : `${v}%`}`,
+  },
+]
+
 /**
- * Values this move had in an EARLIER game than the one selected.
+ * A move's history as a vertical timeline (owner, 2026-10-11): the values it was
+ * introduced with, then one step per generation in which any of them changed,
+ * naming only what changed -- "Gen 4 · PP 15" says the power was kept.
  *
- * `past_values` is kept verbatim from PokeAPI and nothing resolves it -- which is
- * a known open bug for the TYPE field specifically (three moves are stored as
- * Fairy with a Normal past value). This is not a fix for that: it SHOWS the
- * rows, labelled by the version group they belonged to, so the page stops
- * hiding the fact that a move's numbers changed. The displayed figures are
- * resolved separately, by data/moveEra.ts's moveForGeneration.
+ * DERIVED BY RESOLVING THE MOVE ONCE PER GENERATION through moveForGeneration,
+ * the same resolver every other era-sensitive figure on the page uses, rather
+ * than by reading `past_values` directly: a step can then never disagree with
+ * what the page shows for that generation. It also catches the changes that
+ * live in RULES rather than rows -- a damaging move's category follows its type
+ * until Generation 4, so Fire Punch steps from Special to Physical there.
+ *
+ * Capped at `untilGeneration` -- the selected one -- because a step from a
+ * generation the reader has not selected describes data the page is not
+ * showing. Takes the RAW bundle move: an era-resolved copy would replay its own
+ * generation's values as the starting point.
  */
-export function pastValueRows(
-  move: Move,
-  inScope: Set<string>,
-): { label: string; value: string }[] {
-  /*
-    SCOPED TO THE GAMES THIS APP COVERS. `past_values` runs to Generation 9, and
-    a row labelled "X Y" on a Gen 1-4 page describes an era the reader cannot
-    select and is not being shown -- it reads as a correction to the figures
-    above it rather than as a later change. Out-of-scope rows are dropped, and
-    when none is left the block does not render at all.
-  */
-  return move.past_values
-    .filter((past) => past.version_group != null && inScope.has(past.version_group))
-    .map((past) => {
-      const parts: string[] = []
-      if (past.power != null) parts.push(`Power ${past.power}`)
-      if (past.pp != null) parts.push(`PP ${past.pp}`)
-      if (past.accuracy != null) parts.push(`Accuracy ${past.accuracy}%`)
-      if (past.effect_chance != null) parts.push(`Effect ${past.effect_chance}%`)
-      if (past.type_id != null) {
-        const name = getType(past.type_id)?.name
-        parts.push(`Type ${name === 'unknown' ? '???' : titleCaseMove(name)}`)
-      }
-      return {
-        // The entry's group is where the NEW value took effect, so its values
-        // are what the move had BEFORE it (see data/moveEra.ts).
-        label: `Before ${titleCaseMove(past.version_group)}`,
-        value: parts.length > 0 ? parts.join(' · ') : DASH,
-      }
-    })
+export function moveTimeline(raw: Move, untilGeneration: number): MoveTimelineStep[] {
+  const from = raw.generation_id
+  if (from == null || from > untilGeneration) return []
+  const steps: MoveTimelineStep[] = []
+  let previous: Move | null = null
+  for (let gen = from; gen <= untilGeneration; gen += 1) {
+    const now = moveForGeneration(raw, gen)
+    const changed = TIMELINE_FIELDS.filter(
+      (f) => previous == null || f.read(previous) !== f.read(now),
+    )
+      // The first step lists what the move HAS; a field it never had (a status
+      // move's power) is absent rather than printed as a dash.
+      .filter((f) => previous != null || f.read(now) != null)
+    if (previous == null || changed.length > 0) {
+      steps.push({
+        generation: gen,
+        initial: previous == null,
+        parts: changed.map((f) => ({ key: f.key, label: f.show(f.read(now)) })),
+      })
+    }
+    previous = now
+  }
+  return steps
 }

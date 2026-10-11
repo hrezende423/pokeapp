@@ -1,4 +1,12 @@
 # Changelog
+## 2.1.7 — 2026-10-11 (non-breaking)
+- New tokens: `font.weight.light` (300); `color.category-ink.*` + semantic `color.category-text.{physical,special,status}` (physical a light orange near the Fighting ink, special a blue near the Water ink, status the muted neutral; contrast-checked both themes)
+- Data table `plain`: rows LIGHT at rest, REGULAR on hover (was regular → semibold)
+- Abilitydex list: the number at the table's size, centred on the row
+- Movedex list: Category in capitals at the type label's size, coloured by category; number columns in `--text-secondary`; "%" in the mono face at the numbers' size
+- Sort/Filter is disabled on an open Abilitydex or Movedex entry page
+- Movedex page: "Introduced in Generation N" as a grey line under the description; Battle (two columns in shared-height lanes) and Contest (one column, values left-aligned) sections that do not fold; change history as a vertical timeline ("Move changes throughout generations"); the learner total is gone and each learn method shows "N species" under its label; the game row is a right-aligned mini navbar (ghost buttons, selected in accent, one hairline under the buttons, no label); info column 600px with a 28px scrollbar gutter, stacking by a container query
+- Itemdex page: attributes on one line; acquisition lists every game from Generation 1 up to the selected one
 ## 2.1.6 — 2026-10-11 (non-breaking)
 - Poképedia order: Pokédex, Movedex, Abilitydex, Itemdex, Berrydex, Naturedex, Breeding dex, Trainer Dex; Type Coverage moved to Tools (after Calculators)
 - Data table, `plain` variant (Movedex, Abilitydex, Itemdex lists): no hairlines, every cell and header regular, the hovered row semibold in place of a hover fill; columns are declared widths so nothing moves, and a prose cell reserves its semibold height

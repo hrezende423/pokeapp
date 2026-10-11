@@ -48,6 +48,12 @@ export interface DexQueryBundle {
   setView: (view: SpeciesView) => void
   /** The Grid/List switch belongs in the bar, on the Pokedex's list page only. */
   showViewToggle: boolean
+  /**
+   * The whole Sort/Filter trigger is disabled: an Abilitydex or Movedex entry
+   * page is open (owner, 2026-10-11). The menu narrows a LIST, and on an entry
+   * page there is none on screen for it to act on.
+   */
+  menuDisabled: boolean
 }
 
 export const DexQueryContext = createContext<DexQueryBundle | null>(null)

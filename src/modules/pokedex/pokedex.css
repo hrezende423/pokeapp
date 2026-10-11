@@ -2389,14 +2389,15 @@
 /*
   THE PLAIN TABLE -- Movedex, Abilitydex and Itemdex (owner, 2026-10-11).
 
-  No hairlines at all, header included: spacing separates the rows. Every glyph
-  at regular weight, header labels too (DS: "headings and UPPERCASE labels are
-  regular weight"), and the pointer's row turns SEMIBOLD in place of the hover
-  fill, which the design system forbids anyway.
+  No hairlines at all, header included: spacing separates the rows. Header
+  labels regular (DS: "headings and UPPERCASE labels are regular weight"). The
+  rows are LIGHT at rest and the pointer's row turns REGULAR (owner, 2026-10-11;
+  it was regular -> semibold), in place of the hover fill the design system
+  forbids anyway.
 
   `td *` inherits the cell's weight so a type label, a number or the name button
-  goes semibold with its row rather than holding its own declared weight.
-  Semibold cannot push a column: every column is a declared width under
+  changes with its row rather than holding its own declared weight. The heavier
+  weight cannot push a column: every column is a declared width under
   `table-layout: fixed` (DataTable's colgroup), so a wider glyph run grows
   inside its own column and nothing to its right moves.
 */
@@ -2410,7 +2411,7 @@
 }
 
 .data-table-plain td {
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-light);
 }
 
 .data-table-plain td * {
@@ -2422,14 +2423,15 @@
 }
 
 .data-table-plain .data-table-row-clickable:hover td {
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
 }
 
 /*
-  The one cell that COULD move something: prose wraps, and semibold is wider, so
-  a sentence could gain a line and grow its row under the pointer. ProseCell
-  stacks an invisible semibold copy in the same grid cell, so the row is always
-  as tall as its semibold self and the hover changes ink, never geometry.
+  The one cell that COULD move something: prose wraps, and the hover weight is
+  wider, so a sentence could gain a line and grow its row under the pointer.
+  ProseCell stacks an invisible copy at the HOVER weight in the same grid cell,
+  so the row is always as tall as its hovered self and the hover changes ink,
+  never geometry.
 */
 .data-table-plain .data-table-prose {
   display: grid;
@@ -2442,7 +2444,7 @@
 
 .data-table-plain .data-table-prose::after {
   content: attr(data-text);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
   visibility: hidden;
 }
 
@@ -2535,25 +2537,28 @@
   screen while its species grid scrolls. The GRID column is the grid's own
   width and nothing else: three 212px cards and two 9px gaps (.pokedex-grid),
   654px, so every card is the size it was on the stacked page. The info column
-  is a fixed 34rem beside it -- wide enough for the Movedex's two fact columns --
-  and the pair is centred in the module.
+  is 600px beside it, of which the right 28px is a GUTTER for the drawn scroll
+  thumb (second pass: values ran under the thumb), and the pair is centred.
 
-  Below 1300px the two cannot sit side by side (34rem + 32px + 654px is 1230px
-  before the panel's own gutter), so they stack and the PAIR scrolls as one
-  column; the inner scrollers stand down to plain blocks.
+  IN PX, NOT REM, and the breakpoint is a CONTAINER query on the module rather
+  than a viewport one. The first pass used 34rem, and on a browser whose root
+  font is 18px that is 612px, not 544: the pair outgrew a module the viewport
+  query thought was wide enough, and centring clipped the info column's left
+  edge ("ANGE" for "RANGE"). The module's own width is the width that matters.
 */
 .entity-split {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  container: entity-split / inline-size;
 }
 
 .entity-split-cols {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 34rem 654px;
+  grid-template-columns: 600px 654px;
   justify-content: center;
   column-gap: var(--space-gap-xl);
 }
@@ -2570,8 +2575,15 @@
   padding-bottom: var(--space-gap-xl);
 }
 
-/* The grid column's first block needs no rule above it: there is nothing above. */
-.entity-split .entity-split-grid .entity-detail-section:first-child {
+/* The thumb is drawn 2px inside the scroller's right edge, 4px wide; 28px keeps
+   every right-aligned value well clear of it. */
+.entity-split-info .entity-split-pad {
+  padding-right: 28px;
+}
+
+/* No rule across the grid column (owner, 2026-10-11): the only hairline at its
+   head is the one under the game navbar. Later sections keep theirs. */
+.entity-split .entity-split-grid .entity-detail-section:first-of-type {
   margin-top: 0;
   padding-top: 0;
   border-top: none;
@@ -2589,7 +2601,21 @@
   max-width: none;
 }
 
-@media (max-width: 1299px) {
+/* The count under a learn method's label: "23 species", caption size. */
+.entity-split .entity-split-grid .entity-detail-section-label {
+  margin-bottom: 2px;
+}
+
+.entity-detail-section-sub {
+  margin: 0 0 var(--space-gap-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* The two columns cannot sit side by side: 600 + 32 + 654 = 1286px. They stack
+   and the PAIR scrolls as one column; the inner scrollers stand down. */
+@container entity-split (max-width: 1300px) {
   .entity-split-cols {
     display: block;
     overflow-y: auto;
@@ -2612,51 +2638,199 @@
   }
 
   .entity-split-info .entity-split-pad {
+    padding-right: 0;
     padding-bottom: var(--space-gap-md);
   }
 }
 
-/* The Movedex's facts under the description, in two columns. */
-.move-fact-cols {
+/*
+  THE MOVEDEX'S GAME NAVBAR (GameRow variant="nav"): right-aligned, the app
+  bar's ghost buttons, and ONE hairline -- under the buttons, as wide as they
+  are, not across the column.
+*/
+.game-nav {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-gap-lg);
+}
+
+.game-nav-items {
+  display: flex;
+  gap: var(--space-gap-md);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* The move page's sections: a label over a hairline, never folded. Two
+   classes on purpose: App.css's bare `.panel section` (0,1,1) would otherwise
+   add its own 2rem margin, padding and top rule -- the documented gotcha. */
+.entity-detail .move-section {
+  margin: var(--space-gap-lg) 0 0;
+  padding: 0;
+  border: none;
+}
+
+.entity-detail .move-section-head {
+  margin: 0;
+  padding-bottom: 6px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* Battle: one grid filled row by row, so side-by-side rows share a lane. */
+.move-lanes {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: var(--space-gap-lg);
-  align-items: start;
 }
 
-.move-fact-col .fact-rows {
-  max-width: none;
-  margin-top: 0;
+.move-lane-list {
+  display: contents;
 }
 
-.move-fact-col .fact-rows + .fact-rows {
-  margin-top: var(--space-gap-lg);
+.move-lane {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-gap-md);
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--hairline);
 }
 
-.move-fact-cols + .list-caption {
-  margin-top: var(--space-gap-lg);
+.move-lane .fact-value {
+  min-width: 0;
 }
 
-@media (max-width: 720px) {
-  .move-fact-cols {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .move-fact-col + .move-fact-col {
-    margin-top: var(--space-gap-lg);
-  }
+/* Contest: one column, values left-aligned beside a fixed label column. */
+.move-contest-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* The Abilitydex's number, set like a species card's dex number: caption x 0.92
-   in --text-secondary beside a body-size name (.species-card .dex-no). */
-.abilitydex-no {
-  font-size: calc(var(--font-size-caption) * 0.92);
+.move-contest-rows .move-lane {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  justify-content: stretch;
+}
+
+.move-contest-rows .fact-value {
+  text-align: left;
+}
+
+/* The history: a vertical line through one dot per generation. */
+.move-timeline {
+  position: relative;
+  margin: var(--space-gap-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.move-timeline-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  column-gap: var(--space-gap-md);
+  align-items: baseline;
+  padding: 0 0 var(--space-gap-md) 20px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+}
+
+/* The line runs from this dot to the next; the last step draws none. */
+.move-timeline-step::before {
+  content: '';
+  position: absolute;
+  top: 0.55em;
+  bottom: -0.55em;
+  left: 4px;
+  border-left: 1px solid var(--color-border-strong);
+}
+
+.move-timeline-step:last-child::before {
+  display: none;
+}
+
+.move-timeline-step::after {
+  content: '';
+  position: absolute;
+  top: 0.35em;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+}
+
+.move-timeline-gen {
   color: var(--text-secondary);
 }
 
-/* The Movedex's category at the type label's size (.ds-type-sm). */
+.move-timeline-values {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-gap-md);
+  row-gap: 2px;
+}
+
+@container entity-split (max-width: 640px) {
+  .move-lanes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The Abilitydex's number: --text-secondary like a species card's dex number,
+   at the table's own size (owner, 2026-10-11: it was caption x 0.92, which sat
+   on the name's baseline and read low). Every cell centres on the row, so a
+   two-line effect keeps the number level with the name. */
+.abilitydex-no {
+  color: var(--text-secondary);
+}
+
+[data-testid='abilitydex-rows'] td {
+  vertical-align: middle;
+}
+
+/*
+  THE MOVEDEX'S CATEGORY reads like a type label -- caption size, capitals, the
+  label tracking -- in its own colour (owner, 2026-10-11): physical a light
+  orange near the Fighting ink, special a blue near the Water ink, status the
+  muted neutral. Tokens: --color-category-text-*, contrast-checked both themes.
+*/
 .movedex-category {
   font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.movedex-category[data-category='physical'] {
+  color: var(--color-category-text-physical);
+}
+
+.movedex-category[data-category='special'] {
+  color: var(--color-category-text-special);
+}
+
+.movedex-category[data-category='status'] {
+  color: var(--color-category-text-status);
+}
+
+/* The number columns in the colour of their own "%" (owner, 2026-10-11), and the
+   "%" itself in the numbers' face and size, so "100%" is one figure. */
+[data-testid='movedex-rows'] td.data-table-num {
+  color: var(--text-secondary);
+}
+
+[data-testid='movedex-rows'] .move-unit-pct {
+  margin-left: 0;
+  font-family: var(--font-numeric);
+  font-size: 1em;
 }
 
 /* ---------------------------------------------- card badge + ledger metadata */
@@ -3678,7 +3852,9 @@
 */
 .item-detail {
   width: 100%;
-  max-width: 52rem;
+  /* px, not rem: the seven attribute checkboxes must fit one line beside their
+     label, and a rem width shrinks with a 14px root and grows with an 18px one. */
+  max-width: 1000px;
   margin: 0 auto;
 }
 
@@ -3686,22 +3862,25 @@
   max-width: none;
 }
 
-/* Attributes: a stacked list of read-only checkboxes, the checkbox spec's
-   vertical arrangement, right-aligned with the other values. */
+/* Attributes: read-only checkboxes in one row, right-aligned with the values. */
 .item-attr-row {
-  align-items: flex-start;
+  align-items: center;
 }
 
 .item-attrs {
+  /* One row (owner, 2026-10-11), wrapping only on a window too narrow for it. */
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  column-gap: 12px;
+  row-gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .item-attrs .item-attr {
+  flex: none;
   display: flex;
   align-items: center;
   /* It is an <li> under .fact-rows, whose rows are space-between. */
@@ -3717,6 +3896,13 @@
 
 .item-attr-mark {
   flex: none;
+}
+
+/* A window too narrow for one line wraps rather than overflowing the column. */
+@media (max-width: 1100px) {
+  .item-attrs {
+    flex-wrap: wrap;
+  }
 }
 
 /* The acquisition fold: a ghost control centred in the column. */

@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { DataTable, type Column } from '../../components/DataTable'
 import { TypeLabel } from '../../components/ds/TypeLabel'
-import { getType, listVersionGroups } from '../../data'
+import { getMove, getType, listVersionGroups } from '../../data'
 import { fixedDamage } from '../../data/moveDamage'
 import type { Move } from '../../data'
 import { useVersionGroup } from '../version-group/context'
@@ -18,7 +18,7 @@ import {
   moveMetaRows,
   moveRange,
   moveRangeSort,
-  pastValueRows,
+  moveTimeline,
   statChangeLabels,
 } from './moveFacts'
 import { LEARN_SECTIONS, useMoveLearners } from './useMoveLearners'
@@ -77,7 +77,7 @@ function accuracyCell(move: Move) {
   return (
     <span className="num">
       {move.accuracy ?? '—'}
-      <span className="move-unit">%</span>
+      <span className="move-unit move-unit-pct">%</span>
     </span>
   )
 }
@@ -197,7 +197,9 @@ function MoveDetail({
       scrollKey={scrollKey}
       gridHeader={
         <>
-          <GameRow scope={game} testId="movedex-game" />
+          {/* A mini navbar, right-aligned, in the app bar's own treatment
+              (owner, 2026-10-11): it is the game the grid below belongs to. */}
+          <GameRow scope={game} testId="movedex-game" variant="nav" />
           {loading && (
             <p className="subtitle" data-testid="movedex-learners-loading">
               {isAll ? 'Loading every version group…' : 'Loading learnset…'}
@@ -218,25 +220,28 @@ function MoveDetail({
               No species learns this move{isAll ? ' in any game' : ` in ${vgLabel}`}.
             </p>
           )}
+          {/* The total is no longer drawn (owner, 2026-10-11): each section
+              says its own count under its label. Kept for a screen reader, and
+              as the readout the suites check the page's arithmetic against. */}
           {!loading && !error && learners.length > 0 && (
             <p
-              className="subtitle"
+              className="visually-hidden"
               data-testid="movedex-learner-count"
               data-learner-count={shownIds.size}
               data-excluded={excluded}
             >
-              <span className="num">{shownIds.size}</span> species
-              {isAll ? ' across all games' : ` in ${vgLabel}`}
-              {excluded > 0 && (
-                <span data-testid="movedex-learners-excluded">
-                  {' · '}
-                  <span className="num">{excluded}</span> more learn it only by a method this page
-                  does not group (Purification, form change, or a Stadium/Light Ball special case)
-                </span>
-              )}
+              {shownIds.size} species{isAll ? ' across all games' : ` in ${vgLabel}`}
             </p>
           )}
         </>
+      }
+      gridFooter={
+        !loading && !error && excluded > 0 ? (
+          <p className="list-caption" data-testid="movedex-learners-excluded">
+            <span className="num">{excluded}</span> more species learn it only by a method this page
+            does not group (Purification, form change, or a Stadium/Light Ball special case).
+          </p>
+        ) : undefined
       }
     >
       {/*
@@ -256,64 +261,78 @@ function MoveDetail({
         table would be twelve dashes and one fact on most of them -- the same
         decision the shared detail page makes about empty species sections.
       */}
-      <MoveFactBlocks move={move} versionGroup={vgName} />
+      {/* Below the description, in the subtitle's grey (owner, 2026-10-11). */}
+      <p className="entity-detail-meta" data-testid="movedex-intro">
+        Introduced in Generation <span className="num">{move.generation_id ?? '—'}</span>
+      </p>
+      <MoveFactBlocks
+        move={move}
+        versionGroup={vgName}
+        untilGeneration={isAll ? Number.POSITIVE_INFINITY : generation}
+      />
     </EntityDetailPage>
   )
 }
 
-/** Label/value rows on hairlines, the Itemdex's treatment. Nothing in a box. */
-function FactRows({
+/** A section of the move page: a label over a hairline, never folded. */
+function MoveSection({
+  title,
   testId,
-  rows,
+  children,
 }: {
+  title: string
   testId: string
-  rows: { label: string; value: ReactNode }[]
+  children: ReactNode
 }) {
-  if (rows.length === 0) return null
   return (
-    <ul className="fact-rows" data-testid={testId}>
-      {rows.map((row) => (
-        <li key={row.label}>
-          <span className="fact-label">{row.label}</span>
-          <span className="fact-value">{row.value}</span>
-        </li>
-      ))}
-    </ul>
+    <section className="move-section" data-testid={testId}>
+      <h3 className="move-section-head">{title}</h3>
+      {children}
+    </section>
   )
 }
 
-function MoveFactBlocks({ move, versionGroup }: { move: Move; versionGroup: string | null }) {
+/** One label/value pair. The classes are the fact rows', which the suites read. */
+function Lane({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <li className="move-lane">
+      <span className="fact-label">{label}</span>
+      <span className="fact-value">{value}</span>
+    </li>
+  )
+}
+
+function MoveFactBlocks({
+  move,
+  versionGroup,
+  untilGeneration,
+}: {
+  move: Move
+  versionGroup: string | null
+  untilGeneration: number
+}) {
   /* Machines are per version group; under a single game only that game's TM
      counts (the page's game row), under "All" every group does. */
   const inScope = useMemo(() => {
     if (!versionGroup) return new Set(listVersionGroups().map((vg) => vg.name))
     return new Set([versionGroup])
   }, [versionGroup])
-  /* Past values are scoped to the whole bundle rather than to one game: they
-     describe a change BETWEEN games, so narrowing them to the selected one would
-     leave nothing to compare. */
-  const allGroups = useMemo(() => new Set(listVersionGroups().map((vg) => vg.name)), [])
 
   const machines = machineNames(move, inScope)
   const flags = moveFlagLabels(move)
   const statChanges = statChangeLabels(move)
   const metaRows = moveMetaRows(move)
-  const pastRows = pastValueRows(move, allGroups)
+  /* The history needs the RAW move: `move` here is the selected generation's
+     resolved copy, and replaying from it would start at that generation. */
+  const raw = getMove(move.id) ?? move
+  const cap = Number.isFinite(untilGeneration)
+    ? untilGeneration
+    : Math.max(...listVersionGroups().map((vg) => vg.generation_id ?? 0))
+  const timeline = moveTimeline(raw, cap)
 
   const basics: { label: string; value: ReactNode }[] = [
     { label: 'Range', value: moveRange(move) },
     { label: 'Priority', value: <span className="num">{move.priority}</span> },
-    {
-      label: 'Introduced',
-      value:
-        move.generation_id != null ? (
-          <>
-            Generation <span className="num">{move.generation_id}</span>
-          </>
-        ) : (
-          '—'
-        ),
-    },
   ]
   if (move.effect_chance != null) {
     basics.push({
@@ -364,36 +383,73 @@ function MoveFactBlocks({ move, versionGroup }: { move: Move; versionGroup: stri
   }
 
   /*
-    TWO COLUMNS UNDER THE DESCRIPTION (owner, 2026-10-11): the move's own
-    numbers and flags on the left, what it does on a hit and in a contest on the
-    right. The history of changes spans both, under them -- it reads as one table
-    across games, not as a third block competing for a column.
+    BATTLE AND CONTEST, as sections that do not fold (owner, 2026-10-11).
+
+    Battle is two columns in LANES: one grid, filled row by row, so the pair of
+    rows side by side always share a height and their hairlines meet. The two
+    lists inside it are `display: contents` -- the grid sees only the rows -- and
+    stay two lists because they are two sources (the move's own fields, then
+    PokeAPI's meta block).
+
+    Contest is one column with the values LEFT-aligned beside a fixed label
+    column: its values are sentences, which read badly ragged-right.
   */
   return (
     <>
-      <div className="move-fact-cols" data-layout="move-facts">
-        <div className="move-fact-col">
-          <FactRows testId="movedex-facts" rows={basics} />
+      <MoveSection title="Battle" testId="movedex-battle">
+        <div className="move-lanes" data-layout="move-lanes">
+          <ul className="move-lane-list" data-testid="movedex-facts">
+            {basics.map((r) => (
+              <Lane key={r.label} label={r.label} value={r.value} />
+            ))}
+          </ul>
+          {metaRows.length > 0 && (
+            <ul className="move-lane-list" data-testid="movedex-meta">
+              {metaRows.map((r) => (
+                <Lane key={r.label} label={r.label} value={r.value} />
+              ))}
+            </ul>
+          )}
         </div>
-        <div className="move-fact-col">
-          <FactRows
-            testId="movedex-meta"
-            rows={metaRows.map((r) => ({ label: r.label, value: r.value }))}
-          />
-          <FactRows testId="movedex-contest" rows={contest} />
-        </div>
-      </div>
-      {pastRows.length > 0 && (
-        <>
-          <p className="list-caption" data-testid="movedex-past-caption">
-            How this move changed. Each row gives the value it had before that game; the figures
-            above are the ones in force in the selected generation.
-          </p>
-          <FactRows
-            testId="movedex-past"
-            rows={pastRows.map((r) => ({ label: r.label, value: r.value }))}
-          />
-        </>
+      </MoveSection>
+      {contest.length > 0 && (
+        <MoveSection title="Contest" testId="movedex-contest-section">
+          <ul className="move-contest-rows" data-testid="movedex-contest">
+            {contest.map((r) => (
+              <Lane key={r.label} label={r.label} value={r.value} />
+            ))}
+          </ul>
+        </MoveSection>
+      )}
+      {/*
+        THE HISTORY AS A TIMELINE: the values it was introduced with, then only
+        what changed, generation by generation. Rendered only when there is a
+        change to show -- a single "Gen 1" point is not a history.
+      */}
+      {timeline.length > 1 && (
+        <MoveSection title="Move changes throughout generations" testId="movedex-past">
+          <ol className="move-timeline">
+            {timeline.map((step) => (
+              <li
+                key={step.generation}
+                className="move-timeline-step"
+                data-generation={step.generation}
+                data-initial={step.initial}
+              >
+                <span className="move-timeline-gen">
+                  Gen <span className="num">{step.generation}</span>
+                </span>
+                <span className="move-timeline-values">
+                  {step.parts.map((p) => (
+                    <span key={p.key} className="move-timeline-value" data-field={p.key}>
+                      {p.label}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </MoveSection>
       )}
     </>
   )
@@ -450,7 +506,11 @@ export function Movedex() {
         sortValue: (m) => m.damage_class,
         // At the type label's size (owner, 2026-10-11), so the two classifying
         // columns side by side read as one register.
-        render: (m) => <span className="movedex-category">{titleCase(m.damage_class)}</span>,
+        render: (m) => (
+          <span className="movedex-category" data-category={m.damage_class ?? undefined}>
+            {titleCase(m.damage_class)}
+          </span>
+        ),
       },
       {
         key: 'power',

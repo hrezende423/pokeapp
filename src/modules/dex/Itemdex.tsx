@@ -342,8 +342,20 @@ function ItemDetail({
       </span>
     ))
 
-  // Not memoised: a few dozen rows at most, re-derived only when the page renders.
-  const inScope = new Set(games)
+  /*
+    ACQUISITION RUNS FROM GENERATION 1 UP TO THE SELECTED ONE (owner,
+    2026-10-11), not the selected generation alone: where an item could be found
+    is a history the reader is standing at the end of. Still bounded by the
+    selector -- a Gen 3 reader sees no Gen 4 game. Prices stay per generation.
+    Not memoised: a few dozen rows at most.
+  */
+  const inScope = new Set(
+    isAll
+      ? legacyGames()
+      : [1, 2, 3, 4]
+          .filter((g) => g <= generation)
+          .flatMap((g) => gamesInGeneration(g).map((vg) => vg.name)),
+  )
   const rows: AcquisitionRow[] = (supplement?.acquisition.rows ?? [])
     .map((r, i) => ({ ...r, games: r.games.filter((g) => inScope.has(g)), key: i }))
     .filter((r) => r.games.length > 0)
@@ -522,7 +534,12 @@ function ItemDetail({
             ) : (
               <p className="subtitle" data-testid="itemdex-acquisition-none">
                 Bulbapedia lists no way to obtain {item.display_name}{' '}
-                {isAll ? 'in Generations 1–4' : `in Generation ${generation}`}.
+                {isAll || generation >= 4
+                  ? 'in Generations 1–4'
+                  : generation === 1
+                    ? 'in Generation 1'
+                    : `in Generations 1–${generation}`}
+                .
               </p>
             )}
             <p className="list-caption">

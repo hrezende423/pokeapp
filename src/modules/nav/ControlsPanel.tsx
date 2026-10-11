@@ -39,12 +39,13 @@ export function ControlsPanel() {
   const hasFilters = bundle.sections.length > 0
   const hasSort = bundle.sorts.length > 0
   const hasView = bundle.showViewToggle
-  const available = hasFilters || hasSort || hasView
+  const available = !bundle.menuDisabled && (hasFilters || hasSort || hasView)
   /* ANDed with `available` so a menu left open on one page cannot hang open
      under a disabled trigger on the next, with nothing left to close it. */
   const open = openId === 'menu' && available
   const count = bundle.query.visible.length
-  const sortActive = hasSort && !bundle.sortDisabled && bundle.query.sortKey !== bundle.sorts[0]?.key
+  const sortActive =
+    hasSort && !bundle.sortDisabled && bundle.query.sortKey !== bundle.sorts[0]?.key
 
   return (
     <div className="app-controls-cluster" ref={ref}>
@@ -119,7 +120,11 @@ export function ControlsPanel() {
           )}
 
           {hasFilters && (
-            <div className="app-controls-part" data-part="filter" data-testid="controls-part-filter">
+            <div
+              className="app-controls-part"
+              data-part="filter"
+              data-testid="controls-part-filter"
+            >
               <div className="app-controls-field">
                 <span className="app-controls-label">Search all dexes</span>
                 <GlobalSearch />

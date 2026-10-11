@@ -48,6 +48,7 @@ export function EntityDetailPage({
   children,
   layout = 'stack',
   gridHeader,
+  gridFooter,
   infoTestId,
   scrollKey,
 }: {
@@ -86,6 +87,8 @@ export function EntityDetailPage({
    * count, a loading line. In `stack` they would simply follow `children`.
    */
   gridHeader?: ReactNode
+  /** `split` only: blocks under the last grid -- a caption about what it omits. */
+  gridFooter?: ReactNode
   /** `split` only: the info column scroller's test id. */
   infoTestId?: string
   /** `split` only: remembered-offset keys for the two scrollers (DexPageShell's). */
@@ -99,12 +102,22 @@ export function EntityDetailPage({
       className="entity-detail-section"
       data-testid={`entity-section-${slug(section.label ?? 'species')}`}
     >
-      {section.label && (
-        <h3 className="entity-detail-section-label">
-          {section.label}
-          <span className="entity-detail-section-count">{section.entries.length}</span>
-        </h3>
-      )}
+      {/* Split: the count is its own line under the label, "23 species"
+          (owner, 2026-10-11). Stacked pages keep it beside the label. */}
+      {section.label &&
+        (layout === 'split' ? (
+          <>
+            <h3 className="entity-detail-section-label">{section.label}</h3>
+            <p className="entity-detail-section-sub">
+              <span className="num">{section.entries.length}</span> species
+            </p>
+          </>
+        ) : (
+          <h3 className="entity-detail-section-label">
+            {section.label}
+            <span className="entity-detail-section-count">{section.entries.length}</span>
+          </h3>
+        ))}
       <SpeciesCardGrid
         entries={section.entries}
         generation={generation}
@@ -161,6 +174,7 @@ export function EntityDetailPage({
               <div className="entity-split-pad">
                 {gridHeader}
                 {grids}
+                {gridFooter}
               </div>
             </ScrollArea>
           </div>

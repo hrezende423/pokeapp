@@ -79,6 +79,10 @@
   --color-accent-700: #A11717;
   --color-accent-800: #741111;
   --color-accent-900: #470A0A;
+  --color-category-ink-physical-light: #BF4A14;
+  --color-category-ink-physical-dark: #F08A5D;
+  --color-category-ink-special-light: #3558CC;
+  --color-category-ink-special-dark: #86A0F2;
   --color-type-ink-normal-light: #75744C;
   --color-type-ink-normal-dark: #A8A77A;
   --color-type-ink-fire-light: #B3550F;
@@ -163,6 +167,7 @@
   --size-bar-height: 8px;
   --font-family-sans: 'IBM Plex Sans', -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-family-mono: 'Martian Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --font-weight-light: 300;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
@@ -289,6 +294,9 @@
   --color-type-on-dark: var(--color-white);
   --color-type-on-steel: var(--color-neutral-900);
   --color-type-on-fairy: var(--color-neutral-900);
+  --color-category-text-physical: var(--color-category-ink-physical-light);
+  --color-category-text-special: var(--color-category-ink-special-light);
+  --color-category-text-status: var(--color-neutral-600);
   --color-type-text-normal: var(--color-type-ink-normal-light);
   --color-type-text-fire: var(--color-type-ink-fire-light);
   --color-type-text-water: var(--color-type-ink-water-light);
@@ -373,6 +381,9 @@
   --color-type-on-dark: var(--color-white);
   --color-type-on-steel: var(--color-neutral-900);
   --color-type-on-fairy: var(--color-neutral-900);
+  --color-category-text-physical: var(--color-category-ink-physical-dark);
+  --color-category-text-special: var(--color-category-ink-special-dark);
+  --color-category-text-status: var(--color-neutral-300);
   --color-type-text-normal: var(--color-type-ink-normal-dark);
   --color-type-text-fire: var(--color-type-ink-fire-dark);
   --color-type-text-water: var(--color-type-ink-water-dark);
@@ -458,6 +469,9 @@
     --color-type-on-dark: var(--color-white);
     --color-type-on-steel: var(--color-neutral-900);
     --color-type-on-fairy: var(--color-neutral-900);
+    --color-category-text-physical: var(--color-category-ink-physical-dark);
+    --color-category-text-special: var(--color-category-ink-special-dark);
+    --color-category-text-status: var(--color-neutral-300);
     --color-type-text-normal: var(--color-type-ink-normal-dark);
     --color-type-text-fire: var(--color-type-ink-fire-dark);
     --color-type-text-water: var(--color-type-ink-water-dark);
