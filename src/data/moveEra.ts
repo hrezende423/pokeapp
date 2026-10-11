@@ -165,7 +165,7 @@ const PHYSICAL_TYPES_BEFORE_SPLIT = new Set([
   'ghost',
   'steel',
 ])
-const PHYSICAL_SPECIAL_SPLIT_GENERATION = 4
+export const PHYSICAL_SPECIAL_SPLIT_GENERATION = 4
 
 const resolved = new Map<number, WeakMap<Move, Move>>()
 

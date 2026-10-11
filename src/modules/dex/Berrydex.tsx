@@ -193,7 +193,11 @@ function BerryDetail({ berry, onBack }: { berry: Berry; onBack: () => void }) {
   const num = (value: number | null) => (value != null ? <span className="num">{value}</span> : '—')
 
   return (
-    <div className="entity-detail" data-testid="berrydex-detail" data-entry-id={berry.id}>
+    <div
+      className="entity-detail entity-column"
+      data-testid="berrydex-detail"
+      data-entry-id={berry.id}
+    >
       <div className="pokedex-back-row">
         <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
           <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />

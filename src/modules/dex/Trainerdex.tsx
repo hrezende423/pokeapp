@@ -26,8 +26,9 @@ import { TypeLabel } from '../../components/ds/TypeLabel'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { GameRow } from '../version-group/GameRow'
-import { DataTable, type Column } from '../../components/DataTable'
+import { DataTable, ProseCell, type Column } from '../../components/DataTable'
 import { DexPageShell } from './DexPageShell'
+import { SplitColumns } from './EntityDetailPage'
 import {
   TRAINER_KIND_LABEL,
   trainerEntries,
@@ -154,10 +155,18 @@ export function Trainerdex() {
           onRowClick={(e) => onSelect(e.id)}
           testId="trainerdex-rows"
           emptyNote="No trainer matches those filters."
+          plain
         />
       )}
-      detail={({ entry, onBack }) => (
-        <TrainerDetail key={entry.id} entry={entry} partition={state.partition} onBack={onBack} />
+      detailScrolls
+      detail={({ entry, onBack, scrollKey }) => (
+        <TrainerDetail
+          key={entry.id}
+          entry={entry}
+          partition={state.partition}
+          onBack={onBack}
+          scrollKey={scrollKey}
+        />
       )}
     />
   )
@@ -177,21 +186,29 @@ function trainerColumns(vg: string): Column<TrainerEntry>[] {
       label: 'Location',
       width: '15rem',
       sortValue: (e) => e.location,
-      render: (e) =>
-        e.location
-          ? e.area
-            ? `${e.location} · ${e.area}`
-            : e.location
-          : e.kind !== 'facility'
-            ? 'Location not found'
-            : '—',
+      // ProseCell: the plain table's hover weight must not re-wrap a location.
+      render: (e) => (
+        <ProseCell
+          text={
+            e.location
+              ? e.area
+                ? `${e.location} · ${e.area}`
+                : e.location
+              : e.kind !== 'facility'
+                ? 'Location not found'
+                : '—'
+          }
+        />
+      ),
     },
     {
       key: 'note',
       label: 'Note',
       width: '12rem',
       sortValue: (e) => e.variant ?? (e.kind !== 'story' ? TRAINER_KIND_LABEL[e.kind] : null),
-      render: (e) => e.variant ?? (e.kind !== 'story' ? TRAINER_KIND_LABEL[e.kind] : '—'),
+      render: (e) => (
+        <ProseCell text={e.variant ?? (e.kind !== 'story' ? TRAINER_KIND_LABEL[e.kind] : '—')} />
+      ),
     },
     {
       key: 'level',
@@ -251,14 +268,20 @@ function PartyStrip({ entry: e, vg }: { entry: TrainerEntry; vg: string }) {
   )
 }
 
+/**
+ * A trainer's page, in the Movedex's two columns (owner, 2026-10-11): who they
+ * are on the left, scrolling on its own, and their party on the right.
+ */
 function TrainerDetail({
   entry,
   partition,
   onBack,
+  scrollKey,
 }: {
   entry: TrainerEntry
   partition: TrainerPartition
   onBack: () => void
+  scrollKey: (part: string) => string
 }) {
   const gen = partition.generation
   const vg = partition.version_group
@@ -268,12 +291,8 @@ function TrainerDetail({
   const first = t?.appearances[0]
   const byId = useMemo(() => new Map(partition.trainers.map((x) => [x.id, x])), [partition])
 
-  return (
-    <div
-      className="entity-detail trainer-detail"
-      data-testid="trainerdex-detail"
-      data-entry-id={entry.id}
-    >
+  const info = (
+    <>
       <div className="pokedex-back-row">
         <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
           <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
@@ -380,6 +399,20 @@ function TrainerDetail({
         </p>
       )}
 
+      {/* Bulbapedia's content is CC BY-NC-SA; the placement is theirs. */}
+      <p className="trainer-credit" data-testid="trainerdex-credit">
+        Parties from the pret disassembly ({partition.sources.disassembly}). Locations and order
+        from{' '}
+        <a href="https://bulbapedia.bulbagarden.net/" target="_blank" rel="noreferrer">
+          Bulbapedia
+        </a>{' '}
+        (CC BY-NC-SA).
+      </p>
+    </>
+  )
+
+  const party = (
+    <>
       {t && t.party.length > 0 && (
         <section className="entity-detail-section" data-testid="trainerdex-party">
           <h3 className="entity-detail-section-label">
@@ -409,17 +442,19 @@ function TrainerDetail({
       {f && ft && !ft.party && (
         <SetPool facility={f} keys={ft.set_keys ?? f.sets.map((s) => s.key)} gen={gen} vg={vg} />
       )}
+    </>
+  )
 
-      {/* Bulbapedia's content is CC BY-NC-SA; the placement is theirs. */}
-      <p className="trainer-credit" data-testid="trainerdex-credit">
-        Parties from the pret disassembly ({partition.sources.disassembly}). Locations and order
-        from{' '}
-        <a href="https://bulbapedia.bulbagarden.net/" target="_blank" rel="noreferrer">
-          Bulbapedia
-        </a>{' '}
-        (CC BY-NC-SA).
-      </p>
-    </div>
+  return (
+    <SplitColumns
+      testId="trainerdex-detail"
+      className="trainer-detail"
+      entryId={entry.id}
+      infoTestId="trainerdex-detail-scroll"
+      scrollKey={scrollKey}
+      info={info}
+      grid={party}
+    />
   )
 }
 

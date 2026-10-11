@@ -335,8 +335,18 @@ function balancedFrom(s, at) {
 }
 
 /** "{{PDollar}}1,500" -> 1500; "N/A" or empty -> null. */
+/*
+  Prices in ANOTHER currency are not prices here. A Gen 4 TM bought at the
+  Battle Tower costs "48 BP", Game Corner prizes cost coins and Colosseum/XD's
+  Poké Coupons are their own money; reading the leading number of those as
+  Pokédollars printed TM04 at ₽48 (found 2026-10-11). They are acquisition
+  facts -- the location column keeps them -- not a buy price.
+*/
+const OTHER_CURRENCY = /Battle Point|\bBP\b|Coin|Coupon|League Point|Sphere|Poké currency|MDBag/i
+
 function money(cell) {
   if (cell == null) return null
+  if (OTHER_CURRENCY.test(cell)) return null
   const text = textOf(cell)
   const n = text.replace(/[₽,\s]/g, '').match(/^\d+/)
   return n ? Number(n[0]) : null

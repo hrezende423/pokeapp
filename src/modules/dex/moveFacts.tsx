@@ -1,6 +1,6 @@
 import { getItem, getType, moveFlags } from '../../data'
 import type { Move } from '../../data'
-import { moveForGeneration } from '../../data/moveEra'
+import { moveForGeneration, PHYSICAL_SPECIAL_SPLIT_GENERATION } from '../../data/moveEra'
 
 /**
  * The move fields the Movedex did not previously surface, derived once.
@@ -192,6 +192,14 @@ const TIMELINE_FIELDS: {
  * generation the reader has not selected describes data the page is not
  * showing. Takes the RAW bundle move: an era-resolved copy would replay its own
  * generation's values as the starting point.
+ *
+ * THE SPLIT ALONE IS NOT A HISTORY (owner, 2026-10-11). Every damaging move
+ * older than Generation 4 whose category differs from its type's gets a "Gen 4:
+ * Physical" step from the rule above, and a timeline that says only that is
+ * saying something true of ~100 moves rather than of this one. So when the only
+ * change is the category at the split, the history is just the initial step and
+ * the page draws no timeline. A category change in any OTHER generation -- the
+ * case the owner named -- still counts, as does the split beside a real change.
  */
 export function moveTimeline(raw: Move, untilGeneration: number): MoveTimelineStep[] {
   const from = raw.generation_id
@@ -215,5 +223,12 @@ export function moveTimeline(raw: Move, untilGeneration: number): MoveTimelineSt
     }
     previous = now
   }
-  return steps
+  const onlySplit = steps
+    .slice(1)
+    .every(
+      (step) =>
+        step.generation === PHYSICAL_SPECIAL_SPLIT_GENERATION &&
+        step.parts.every((p) => p.key === 'category'),
+    )
+  return onlySplit ? steps.slice(0, 1) : steps
 }

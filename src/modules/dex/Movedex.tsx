@@ -113,19 +113,24 @@ function MoveDetail({
   const [, selectSpecies] = useDexSelection('pokedex')
   const nav = useNav()
 
-  const sections: SpeciesSection[] = useMemo(
-    () =>
-      LEARN_SECTIONS.map(({ method, label }) => ({
-        label,
-        entries: learners
-          .filter((l) => l.methods.includes(method))
-          .map((l) => ({
-            species: l.species,
-            badge: method === 'level-up' && l.level != null ? `Lv.${l.level}` : undefined,
-          })),
-      })),
-    [learners],
-  )
+  const sections: SpeciesSection[] = useMemo(() => {
+    const levelOf = new Map(learners.map((l) => [l.species.id, l.level]))
+    return LEARN_SECTIONS.map(({ method, label }) => ({
+      label,
+      entries: learners
+        .filter((l) => l.methods.includes(method))
+        .map((l) => ({
+          species: l.species,
+          badge: method === 'level-up' && l.level != null ? `Lv.${l.level}` : undefined,
+        })),
+      /* Level-up learners re-sort by level from an arrow after the label
+         (owner, 2026-10-11); dex order stays the default. */
+      sort:
+        method === 'level-up'
+          ? { what: 'level', value: (e) => levelOf.get(e.species.id) ?? null }
+          : undefined,
+    }))
+  }, [learners])
 
   /*
     The count describes what this page SHOWS, which is the four sections.
@@ -177,6 +182,13 @@ function MoveDetail({
       title={move.display_name}
       titleTestId="movedex-name"
       meta={meta}
+      /* ABOVE the description, in the subtitle's grey (owner, 2026-10-11: the
+         second pass had it under; this one inverts them). */
+      lead={
+        <p className="entity-detail-meta" data-testid="movedex-intro">
+          Introduced in Generation <span className="num">{move.generation_id ?? '—'}</span>
+        </p>
+      }
       description={move.effect ?? move.short_effect ?? 'No effect text in the bundle.'}
       sections={sections}
       generation={generation}
@@ -261,10 +273,6 @@ function MoveDetail({
         table would be twelve dashes and one fact on most of them -- the same
         decision the shared detail page makes about empty species sections.
       */}
-      {/* Below the description, in the subtitle's grey (owner, 2026-10-11). */}
-      <p className="entity-detail-meta" data-testid="movedex-intro">
-        Introduced in Generation <span className="num">{move.generation_id ?? '—'}</span>
-      </p>
       <MoveFactBlocks
         move={move}
         versionGroup={vgName}
@@ -274,7 +282,7 @@ function MoveDetail({
   )
 }
 
-/** A section of the move page: a label over a hairline, never folded. */
+/** A section of the move page: a label, its rows indented under it, never folded. */
 function MoveSection({
   title,
   testId,
@@ -386,7 +394,8 @@ function MoveFactBlocks({
     BATTLE AND CONTEST, as sections that do not fold (owner, 2026-10-11).
 
     Battle is two columns in LANES: one grid, filled row by row, so the pair of
-    rows side by side always share a height and their hairlines meet. The two
+    rows side by side always share a height. No hairlines (third pass): the
+    lanes are told apart by their rhythm and the indent under the label. The two
     lists inside it are `display: contents` -- the grid sees only the rows -- and
     stay two lists because they are two sources (the move's own fields, then
     PokeAPI's meta block).

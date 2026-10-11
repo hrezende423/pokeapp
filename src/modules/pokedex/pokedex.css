@@ -2581,12 +2581,22 @@
   padding-right: 28px;
 }
 
-/* No rule across the grid column (owner, 2026-10-11): the only hairline at its
-   head is the one under the game navbar. Later sections keep theirs. */
-.entity-split .entity-split-grid .entity-detail-section:first-of-type {
-  margin-top: 0;
+/* No rules in the grid column (owner, 2026-10-11; the third pass took the
+   later sections' too): the only hairline left on a split page is the one under
+   the game navbar. A section is set off by space and its label instead. */
+.entity-split .entity-split-grid .entity-detail-section {
+  margin-top: var(--space-gap-xl);
   padding-top: 0;
   border-top: none;
+}
+
+.entity-split .entity-split-grid .entity-detail-section:first-of-type {
+  margin-top: 0;
+}
+
+/* Nor between the info column's label/value rows -- the Trainer Dex's facts. */
+.entity-split-info .fact-rows li {
+  border-bottom: none;
 }
 
 /* "Make all info font regular" (owner, 2026-10-11): the title and the section
@@ -2595,6 +2605,97 @@
 .entity-split .entity-detail-name,
 .entity-split .entity-detail-section-label {
   font-weight: var(--font-weight-regular);
+}
+
+/* THE DATA IS LIGHT (owner, 2026-10-11, third pass): the description, the grey
+   lines and every value in the info column. The title and the uppercase labels
+   stay regular -- the design system's rule for headings and labels -- so the
+   structure reads over the data rather than through it. */
+.entity-split-info .entity-detail-desc,
+.entity-split-info .entity-detail-meta,
+.entity-split-info .fact-value,
+.entity-split-info .move-timeline-step {
+  font-weight: var(--font-weight-light);
+}
+
+/*
+  A SECTION'S SORT ARROW, after its label (owner, 2026-10-11). In the default
+  order it is invisible until the pointer is over the GRID column -- then a faint
+  down arrow -- and once a sort is on it stays, solid. Keyboard focus shows it
+  too, or a keyboard reader would be tabbing onto nothing.
+*/
+.entity-detail .entity-section-sort {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  margin: 0;
+  padding: 2px;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-control, 4px);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.entity-split-grid:hover .entity-section-sort[data-state='none'],
+.entity-detail .entity-section-sort[data-state='none']:focus-visible {
+  opacity: 0.35;
+}
+
+.entity-detail .entity-section-sort[data-state='none']:hover {
+  opacity: 0.6;
+}
+
+.entity-detail .entity-section-sort[data-state='asc'],
+.entity-detail .entity-section-sort[data-state='desc'] {
+  opacity: 1;
+}
+
+.entity-detail .entity-section-sort:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/*
+  THE CENTRED SINGLE COLUMN -- the Itemdex, Berrydex and Naturedex pages, and
+  the Breeding dex's (owner, 2026-10-11). One width for all of them: 654px, the
+  species grid's own (three 212px cards, two 9px gaps), so the Breeding dex's
+  cards keep their size and every reference page is the same column. px, for
+  the reason the split page's widths are.
+
+  NO HAIRLINES in it: the label/value rows are told apart by their rhythm.
+*/
+.entity-column,
+.entity-stack {
+  width: 100%;
+  max-width: 654px;
+  margin: 0 auto;
+}
+
+.entity-column .entity-detail-desc,
+.entity-column .fact-rows,
+.entity-column .nature-stat-pair li {
+  max-width: none;
+}
+
+.entity-column .fact-rows li,
+.entity-column .nature-stat-pair li {
+  border-bottom: none;
+}
+
+/* The Breeding dex: no rule above the grid, and the grid straight under the
+   count -- the hairline's margin and padding went with it. */
+.entity-stack .entity-detail-section {
+  margin-top: var(--space-gap-md);
+  padding-top: 0;
+  border-top: none;
+}
+
+/* The Naturedex's flavours: label and value, one row each. */
+.entity-column .nature-flavors {
+  margin-top: var(--space-gap-md);
 }
 
 .entity-split .entity-detail-desc {
@@ -2679,7 +2780,15 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border-bottom: 1px solid var(--hairline);
+}
+
+/* The rows sit slightly in from their section's label (owner, 2026-10-11), which
+   is what groups them now that no hairline does. Scoped under .entity-detail so
+   it outranks the lists' own `padding: 0` resets further down. */
+.entity-detail .move-lanes,
+.entity-detail .move-contest-rows,
+.entity-detail .move-timeline {
+  padding-left: 12px;
 }
 
 /* Battle: one grid filled row by row, so side-by-side rows share a lane. */
@@ -2699,7 +2808,6 @@
   justify-content: space-between;
   gap: var(--space-gap-md);
   padding: 0.4rem 0;
-  border-bottom: 1px solid var(--hairline);
 }
 
 .move-lane .fact-value {
@@ -2840,18 +2948,19 @@
   pill, --font-numeric text: it is a number about the card's subject, which is
   what the numeric face is for. Only the level-up section sets one.
 */
+/* Plain text since 2026-10-11 (owner: "remove the background from the level
+   labels") -- the pill was the last fill on a card. Offset by the padding it
+   lost, so the text sits where it did. */
 .species-card-badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 8px;
+  left: 12px;
   z-index: 1;
-  padding: 2px 6px;
+  padding: 0;
   font-family: var(--font-numeric);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
-  background: var(--surface-raised);
-  border-radius: var(--radius-pill, 999px);
   line-height: 1.4;
 }
 
@@ -3807,18 +3916,10 @@
 }
 
 /*
-  THE ITEM LIST'S NAME CELL: icon first, at 48px, centred on the name's line
-  (owner, 2026-10-11). The icon slot is a fixed 48px box even when an item has
-  no icon, so every name starts at the same x.
+  THE ITEM LIST'S ICON COLUMN: 48px, centred on the row, with no header (owner,
+  2026-10-11) -- the "Name" header sits over the names, not over the icons. The
+  slot is a fixed 48px box even when an item has no icon.
 */
-.itemdex-name-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-gap-sm);
-  max-width: 100%;
-  vertical-align: middle;
-}
-
 .itemdex-name-icon {
   display: inline-flex;
   flex: none;
@@ -3835,9 +3936,15 @@
 }
 
 .itemdex-name-text {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemdex-no {
+  color: var(--text-secondary);
 }
 
 /* The row is 48px of icon tall, so every cell centres on it, not on the top. */
@@ -3846,35 +3953,24 @@
 }
 
 /*
-  THE ITEM PAGE, CENTRED (owner, 2026-10-11): one column, as wide as the
-  acquisition table it can unfold, in the middle of the window. Text inside it
-  stays left-aligned -- it is the column that is centred, not the prose.
+  THE ITEM PAGE is the shared centred column (.entity-column, the Berrydex's
+  width since the third pass). Text inside it stays left-aligned -- it is the
+  column that is centred, not the prose.
 */
-.item-detail {
-  width: 100%;
-  /* px, not rem: the seven attribute checkboxes must fit one line beside their
-     label, and a rem width shrinks with a 14px root and grows with an 18px one. */
-  max-width: 1000px;
-  margin: 0 auto;
-}
 
-.item-detail .fact-rows {
-  max-width: none;
-}
-
-/* Attributes: read-only checkboxes in one row, right-aligned with the values. */
-.item-attr-row {
-  align-items: center;
+/* Attributes: read-only checkboxes in TWO ROWS of four, under their label
+   (owner, 2026-10-11). Beside the label, four "Usable overworld"-length names
+   do not fit a 654px column. */
+.entity-detail .item-attr-row {
+  display: block;
 }
 
 .item-attrs {
-  /* One row (owner, 2026-10-11), wrapping only on a window too narrow for it. */
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: 12px;
-  row-gap: 6px;
-  margin: 0;
+  row-gap: 8px;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -3891,17 +3987,17 @@
   font-family: var(--font-body);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
-  color: var(--text-primary);
+  /* The disabled look (owner, 2026-10-11), label and mark alike. */
+  color: var(--color-text-disabled);
 }
 
 .item-attr-mark {
   flex: none;
 }
 
-/* A window too narrow for one line wraps rather than overflowing the column. */
-@media (max-width: 1100px) {
+@media (max-width: 700px) {
   .item-attrs {
-    flex-wrap: wrap;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -3941,9 +4037,16 @@
   margin-top: var(--space-gap-sm);
 }
 
+/* The column's full width: the acquisition columns are percentages of it. */
 .item-acq-body .data-table-wrap > .data-table {
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+}
+
+/* No row rules either (owner, 2026-10-11: "remove the hairlines" on the item
+   page). Not the `plain` table: its hover weight would re-wrap these cells. */
+.item-acq-body .data-table th,
+.item-acq-body .data-table td {
+  border-bottom: none;
 }
 
 .item-acq-body .data-table td {

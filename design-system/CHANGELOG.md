@@ -1,4 +1,14 @@
 # Changelog
+## 2.1.8 — 2026-10-11 (non-breaking)
+- Reference detail pages lose their hairlines: Movedex (Battle/Contest lanes, section heads, between learn-method sections), Itemdex, Berrydex, Naturedex, Breeding dex and Trainer Dex. The only rule left on a split page is the one under the game navbar
+- Split pages (Abilitydex, Movedex, Trainer Dex): the info column's data -- description, grey lines, values -- is LIGHT; titles and uppercase labels stay regular
+- Movedex page: "Introduced in Generation N" above the description; Battle/Contest/history rows indented 12px under their labels; no history when the only change is the Gen 4 physical/special split; Level-up learners re-sort by level from an arrow after the label (hidden until the grid column is hovered, faint in dex order, solid when sorted; dex order → ascending → descending → dex order)
+- Species card level label: plain text, no pill
+- Centred single column (`.entity-column` / `.entity-stack`): 654px, the species grid's width -- Itemdex, Berrydex, Naturedex and Breeding dex pages
+- Itemdex list: "No." column first, the icon its own unlabelled column, a TM/HM names its move ("TM01 (Focus Punch)", per game); Fling column removed
+- Itemdex page: attributes in two rows of four under their label, drawn in the checkbox's DISABLED look (owner's call, replacing 2.1.6's read-only look)
+- Naturedex page: liked and disliked flavour as two label/value rows
+- Breeding dex and Trainer Dex lists: `plain` tables. Trainer Dex page: two columns, the party on the right
 ## 2.1.7 — 2026-10-11 (non-breaking)
 - New tokens: `font.weight.light` (300); `color.category-ink.*` + semantic `color.category-text.{physical,special,status}` (physical a light orange near the Fighting ink, special a blue near the Water ink, status the muted neutral; contrast-checked both themes)
 - Data table `plain`: rows LIGHT at rest, REGULAR on hover (was regular → semibold)

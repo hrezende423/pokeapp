@@ -1,5 +1,5 @@
-import { IconArrowLeft } from '@tabler/icons-react'
-import type { ReactNode } from 'react'
+import { IconArrowDown, IconArrowLeft, IconArrowUp } from '@tabler/icons-react'
+import { useState, type ReactNode } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
 import { SpeciesCardGrid, type SpeciesCardEntry } from '../../components/SpeciesCardGrid'
 import type { SpeciesCardFooter } from '../../components/speciesCardFooters'
@@ -30,6 +30,102 @@ export interface SpeciesSection {
   /** Small uppercase label, e.g. "Level up". Omit for a single unlabelled grid. */
   label?: string
   entries: SpeciesCardEntry[]
+  /**
+   * Makes the section re-orderable by a number of its own -- the Movedex's
+   * level-up learners by level. The default order stays the national dex; see
+   * SectionSort below. `what` names the number for the control's label.
+   */
+  sort?: { what: string; value: (entry: SpeciesCardEntry) => number | null }
+}
+
+type SortState = 'none' | 'asc' | 'desc'
+const NEXT_SORT: Record<SortState, SortState> = { none: 'asc', asc: 'desc', desc: 'none' }
+
+/**
+ * A section's sort, as one arrow after its label (owner, 2026-10-11).
+ *
+ * Three states on one control, cycled by click: the national dex order (the
+ * default, a faint down arrow that appears only while the pointer is over the
+ * GRID column -- never the info column), ascending (a solid down arrow), then
+ * descending (an up arrow), then back. A sorted section keeps its arrow on
+ * screen, since an order the reader cannot see the cause of reads as a bug.
+ */
+function SectionSort({
+  state,
+  what,
+  testId,
+  onClick,
+}: {
+  state: SortState
+  what: string
+  testId: string
+  onClick: () => void
+}) {
+  const Arrow = state === 'desc' ? IconArrowUp : IconArrowDown
+  const label =
+    state === 'none'
+      ? `Sort by ${what}, lowest first`
+      : state === 'asc'
+        ? `Sorted by ${what}, lowest first. Sort highest first`
+        : `Sorted by ${what}, highest first. Restore dex order`
+  return (
+    <button
+      type="button"
+      className="entity-section-sort"
+      data-state={state}
+      data-testid={testId}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
+      <Arrow size={14} stroke={1.5} aria-hidden focusable="false" />
+    </button>
+  )
+}
+
+/**
+ * The split page's skeleton on its own: an info column and a grid column, each
+ * its own ScrollArea. EntityDetailPage renders it for the Abilitydex and the
+ * Movedex; the Trainer Dex renders it directly, because its right column is a
+ * party of trainer cards rather than a species grid (owner, 2026-10-11).
+ */
+export function SplitColumns({
+  testId,
+  entryId,
+  info,
+  grid,
+  infoTestId,
+  scrollKey,
+  className,
+}: {
+  testId: string
+  entryId: number
+  info: ReactNode
+  grid: ReactNode
+  infoTestId?: string
+  scrollKey?: (part: string) => string
+  className?: string
+}) {
+  return (
+    <div
+      className={['entity-detail entity-split', className].filter(Boolean).join(' ')}
+      data-testid={testId}
+      data-entry-id={entryId}
+    >
+      <div className="entity-split-cols" data-layout="entity-split">
+        <div className="entity-split-info">
+          <ScrollArea testId={infoTestId} memoryKey={scrollKey?.('info')} hint={false}>
+            <div className="entity-split-pad">{info}</div>
+          </ScrollArea>
+        </div>
+        <div className="entity-split-grid">
+          <ScrollArea testId={`${testId}-grid-scroll`} memoryKey={scrollKey?.('grid')}>
+            <div className="entity-split-pad">{grid}</div>
+          </ScrollArea>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function EntityDetailPage({
@@ -39,6 +135,7 @@ export function EntityDetailPage({
   title,
   titleTestId,
   meta,
+  lead,
   description,
   sections,
   generation,
@@ -69,6 +166,8 @@ export function EntityDetailPage({
   titleTestId?: string
   /** One line under the name: type, category, counts. */
   meta?: ReactNode
+  /** A line between `meta` and the description -- the Movedex's "Introduced in". */
+  lead?: ReactNode
   description?: ReactNode
   sections: SpeciesSection[]
   generation: number
@@ -95,39 +194,69 @@ export function EntityDetailPage({
   scrollKey?: (part: string) => string
 }) {
   const populated = sections.filter((s) => s.entries.length > 0)
+  /* Per section label. The page is keyed by its entry, so a new move starts in
+     dex order again. */
+  const [sorts, setSorts] = useState<Record<string, SortState>>({})
 
-  const grids = populated.map((section, i) => (
-    <section
-      key={section.label ?? `section-${i}`}
-      className="entity-detail-section"
-      data-testid={`entity-section-${slug(section.label ?? 'species')}`}
-    >
-      {/* Split: the count is its own line under the label, "23 species"
+  const ordered = (section: SpeciesSection, state: SortState) => {
+    if (!section.sort || state === 'none') return section.entries
+    const value = section.sort.value
+    const sign = state === 'asc' ? 1 : -1
+    // Ties -- several species learning it at one level -- stay in dex order.
+    return section.entries.slice().sort((a, b) => {
+      const va = value(a)
+      const vb = value(b)
+      if (va == null || vb == null) return va == null ? (vb == null ? 0 : 1) : -1
+      return (va - vb) * sign || a.species.id - b.species.id
+    })
+  }
+
+  const grids = populated.map((section, i) => {
+    const key = section.label ?? `section-${i}`
+    const state = sorts[key] ?? 'none'
+    return (
+      <section
+        key={section.label ?? `section-${i}`}
+        className="entity-detail-section"
+        data-testid={`entity-section-${slug(section.label ?? 'species')}`}
+      >
+        {/* Split: the count is its own line under the label, "23 species"
           (owner, 2026-10-11). Stacked pages keep it beside the label. */}
-      {section.label &&
-        (layout === 'split' ? (
-          <>
-            <h3 className="entity-detail-section-label">{section.label}</h3>
-            <p className="entity-detail-section-sub">
-              <span className="num">{section.entries.length}</span> species
-            </p>
-          </>
-        ) : (
-          <h3 className="entity-detail-section-label">
-            {section.label}
-            <span className="entity-detail-section-count">{section.entries.length}</span>
-          </h3>
-        ))}
-      <SpeciesCardGrid
-        entries={section.entries}
-        generation={generation}
-        onSelect={onSelectSpecies}
-        testId={`entity-grid-${slug(section.label ?? 'species')}`}
-        testIdPrefix="entity-species"
-        footer={footer}
-      />
-    </section>
-  ))
+        {section.label &&
+          (layout === 'split' ? (
+            <>
+              <h3 className="entity-detail-section-label">
+                {section.label}
+                {section.sort && (
+                  <SectionSort
+                    state={state}
+                    what={section.sort.what}
+                    testId={`entity-sort-${slug(section.label)}`}
+                    onClick={() => setSorts((s) => ({ ...s, [key]: NEXT_SORT[state] }))}
+                  />
+                )}
+              </h3>
+              <p className="entity-detail-section-sub">
+                <span className="num">{section.entries.length}</span> species
+              </p>
+            </>
+          ) : (
+            <h3 className="entity-detail-section-label">
+              {section.label}
+              <span className="entity-detail-section-count">{section.entries.length}</span>
+            </h3>
+          ))}
+        <SpeciesCardGrid
+          entries={ordered(section, state)}
+          generation={generation}
+          onSelect={onSelectSpecies}
+          testId={`entity-grid-${slug(section.label ?? 'species')}`}
+          testIdPrefix="entity-species"
+          footer={footer}
+        />
+      </section>
+    )
+  })
 
   const back = (
     <div className="pokedex-back-row">
@@ -148,6 +277,7 @@ export function EntityDetailPage({
           {meta}
         </p>
       )}
+      {lead}
       {description && (
         <p className="entity-detail-desc" data-testid="entity-description">
           {description}
@@ -158,33 +288,31 @@ export function EntityDetailPage({
 
   if (layout === 'split') {
     return (
-      <div className="entity-detail entity-split" data-testid={testId} data-entry-id={entryId}>
-        <div className="entity-split-cols" data-layout="entity-split">
-          <div className="entity-split-info">
-            <ScrollArea testId={infoTestId} memoryKey={scrollKey?.('info')} hint={false}>
-              <div className="entity-split-pad">
-                {back}
-                {head}
-                {children}
-              </div>
-            </ScrollArea>
-          </div>
-          <div className="entity-split-grid">
-            <ScrollArea testId={`${testId}-grid-scroll`} memoryKey={scrollKey?.('grid')}>
-              <div className="entity-split-pad">
-                {gridHeader}
-                {grids}
-                {gridFooter}
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
-      </div>
+      <SplitColumns
+        testId={testId}
+        entryId={entryId}
+        infoTestId={infoTestId}
+        scrollKey={scrollKey}
+        info={
+          <>
+            {back}
+            {head}
+            {children}
+          </>
+        }
+        grid={
+          <>
+            {gridHeader}
+            {grids}
+            {gridFooter}
+          </>
+        }
+      />
     )
   }
 
   return (
-    <div className="entity-detail" data-testid={testId} data-entry-id={entryId}>
+    <div className="entity-detail entity-stack" data-testid={testId} data-entry-id={entryId}>
       {back}
       {head}
       {children}

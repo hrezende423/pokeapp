@@ -2,7 +2,7 @@ import { IconArrowLeft, IconChevronDown, IconChevronUp } from '@tabler/icons-rea
 import { useMemo, useState } from 'react'
 import { ItemArtwork } from '../../components/ItemArtwork'
 import { itemIconUrl } from '../../data/itemArtwork'
-import { getItemSupplement, listItems, type Item, type ItemSupplement } from '../../data'
+import { getItemSupplement, getMove, listItems, type Item, type ItemSupplement } from '../../data'
 import { useVersionGroup } from '../version-group/context'
 import { gameLabel, gamesInGeneration } from '../version-group/games'
 import { DataTable, type Column } from '../../components/DataTable'
@@ -57,6 +57,24 @@ function buyPrice(supplement: ItemSupplement | undefined, game: string | null): 
 }
 
 /**
+ * The move a TM or HM teaches in ONE game: the selected generation's default
+ * game, or under "All" the latest Gen 1-4 game that has the machine -- the
+ * price column's rule. TM01 is Mega Punch in Generation 1 and Focus Punch from
+ * Generation 3, so the name is per game or it is wrong somewhere.
+ */
+function machineMove(item: Item, game: string | null): string | null {
+  if (item.machines.length === 0) return null
+  const byGame = new Map(item.machines.map((m) => [m.version_group, m.move_id]))
+  const id = game
+    ? byGame.get(game)
+    : legacyGames()
+        .reverse()
+        .map((vg) => byGame.get(vg))
+        .find((m) => m != null)
+  return id != null ? (getMove(id)?.display_name ?? null) : null
+}
+
+/**
  * The item's generations as ranges: [1, 2, 3, 4] reads "1–4", and a gap keeps
  * its gap ("1–2, 4") rather than being smoothed into a range it is not.
  */
@@ -91,9 +109,9 @@ function allAttributes(): string[] {
  * The Itemdex: a sortable table, and a boxless item page.
  *
  * THE ICON LEADS THE NAME (owner, 2026-10-11), at 48px -- twice the 24 it was
- * drawn at when it trailed the name -- and centred on the name's line. It used
- * to trail so the names formed one left edge; leading, the icons form that edge
- * instead and the names still start at one x, 48px + a gap in.
+ * drawn at when it trailed the name -- and centred on the name's line. Third
+ * pass: it is a COLUMN of its own with no header, after the item number, so the
+ * "Name" header sits over the names rather than over the icons.
  *
  * CATEGORY AND POCKET ARE BOTH REAL AND BOTH SHOWN. They are separate fields, not
  * a coarse and a fine version of one thing: 40 categories map onto 8 bag pockets,
@@ -118,27 +136,53 @@ export function Itemdex() {
   const columns: Column<Item>[] = useMemo(
     () => [
       {
-        key: 'name',
-        label: 'Name',
-        width: '17rem',
-        sortValue: (item) => item.display_name,
+        // The bundle's item id, the dex's own order (owner, 2026-10-11).
+        key: 'no',
+        label: 'No.',
+        width: '4.5rem',
+        sortValue: (item) => item.id,
+        render: (item) => <span className="num itemdex-no">{item.id}</span>,
+      },
+      {
+        // The icon, inert and unlabelled: not sortable, nothing to read.
+        key: 'icon',
+        label: '',
+        width: '64px',
         render: (item) => {
           const icon = itemIconUrl(item)
           return (
-            <span className="itemdex-name-cell">
-              <span className="itemdex-name-icon">
-                {icon && (
-                  <img
-                    src={icon}
-                    alt=""
-                    width={48}
-                    height={48}
-                    loading="lazy"
-                    data-testid={`itemdex-row-icon-${item.id}`}
-                  />
-                )}
-              </span>
-              <span className="itemdex-name-text">{item.display_name}</span>
+            <span className="itemdex-name-icon">
+              {icon && (
+                <img
+                  src={icon}
+                  alt=""
+                  width={48}
+                  height={48}
+                  loading="lazy"
+                  data-testid={`itemdex-row-icon-${item.id}`}
+                />
+              )}
+            </span>
+          )
+        },
+      },
+      {
+        key: 'name',
+        label: 'Name',
+        width: '20rem',
+        sortValue: (item) => item.display_name,
+        render: (item) => {
+          // A machine names its move after its number: "TM01 (Focus Punch)".
+          const move = machineMove(item, vgName)
+          return (
+            <span className="itemdex-name-text">
+              {item.display_name}
+              {move && (
+                <span className="itemdex-machine-move" data-testid={`itemdex-row-move-${item.id}`}>
+                  {' '}
+                  ({move})
+                </span>
+              )}
             </span>
           )
         },
@@ -181,14 +225,6 @@ export function Itemdex() {
           )
         },
       },
-      {
-        key: 'fling',
-        label: 'Fling',
-        width: '4.5rem',
-        numeric: true,
-        sortValue: (item) => item.fling_power,
-        render: (item) => <span className="num">{item.fling_power ?? '—'}</span>,
-      },
     ],
     [vgName],
   )
@@ -224,14 +260,16 @@ export function Itemdex() {
 }
 
 /**
- * A read-only checkbox, drawn to the design system's checkbox spec (18px mark,
- * 3px radius, 1.5px --color-border-strong outline; "on" is a --color-text-default
- * fill with a --color-bg-canvas check).
+ * A read-only checkbox, drawn in the design system's DISABLED look (owner,
+ * 2026-10-11: "gray-ish like they were disabled"): 18px mark, 3px radius, a
+ * --color-text-disabled outline, "on" filled in the same grey with a
+ * --color-bg-canvas check, and the label in --color-text-disabled too. The first
+ * pass drew the enabled look so it would not read "unavailable"; the owner
+ * preferred it receding.
  *
- * AN SVG, NOT AN <input>: it is a readout, so it must not take focus or a click,
- * and a disabled input would draw the disabled state -- hairline outline, greyed
- * label -- which says "unavailable" rather than "no". And not a CSS border, which
- * is what lets the item page stay boxless (verify-dexes asserts it).
+ * AN SVG, NOT AN <input>: it is a readout, so it must not take focus or a click.
+ * And not a CSS border, which is what lets the item page stay boxless
+ * (verify-dexes asserts it).
  */
 function CheckMark({ checked }: { checked: boolean }) {
   return (
@@ -249,8 +287,8 @@ function CheckMark({ checked }: { checked: boolean }) {
         width="16.5"
         height="16.5"
         rx="3"
-        fill={checked ? 'var(--color-text-default)' : 'none'}
-        stroke={checked ? 'var(--color-text-default)' : 'var(--color-border-strong)'}
+        fill={checked ? 'var(--color-text-disabled)' : 'none'}
+        stroke="var(--color-text-disabled)"
         strokeWidth="1.5"
       />
       {checked && (
@@ -369,22 +407,24 @@ function ItemDetail({
 
   const acquisitionColumns: Column<AcquisitionRow>[] = split
     ? [
+        /* Percentages: the table fills the page's column, which is the
+           Berrydex's width now (owner, 2026-10-11) rather than 1000px. */
         {
           key: 'games',
           label: 'Games',
-          width: '10rem',
+          width: '24%',
           render: (r) => <span className="data-table-prose">{r.games}</span>,
         },
         {
           key: 'finite',
           label: 'Finite methods',
-          width: '20rem',
+          width: '38%',
           render: (r) => <MethodLines text={r.finite} />,
         },
         {
           key: 'repeatable',
           label: 'Repeatable methods',
-          width: '20rem',
+          width: '38%',
           render: (r) => <MethodLines text={r.repeatable} />,
         },
       ]
@@ -392,13 +432,13 @@ function ItemDetail({
         {
           key: 'games',
           label: 'Games',
-          width: '10rem',
+          width: '24%',
           render: (r) => <span className="data-table-prose">{r.games}</span>,
         },
         {
           key: 'finite',
           label: 'Methods',
-          width: '40rem',
+          width: '76%',
           render: (r) => <MethodLines text={r.finite} />,
         },
       ]
@@ -407,7 +447,11 @@ function ItemDetail({
   const has = new Set(item.attributes.filter((a): a is string => !!a))
 
   return (
-    <div className="entity-detail item-detail" data-testid="itemdex-detail" data-entry-id={item.id}>
+    <div
+      className="entity-detail entity-column item-detail"
+      data-testid="itemdex-detail"
+      data-entry-id={item.id}
+    >
       <div className="pokedex-back-row">
         <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
           <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
@@ -444,7 +488,7 @@ function ItemDetail({
         {item.effect ?? 'No effect text in the bundle.'}
       </p>
 
-      {/* Label/value rows on hairlines, not a bordered facts card. */}
+      {/* Label/value rows -- no hairlines since the third pass. */}
       <ul className="fact-rows" data-testid="itemdex-facts">
         <li>
           <span className="fact-label">Price</span>
@@ -482,6 +526,8 @@ function ItemDetail({
             )}
           </span>
         </li>
+        {/* Two rows of four under their label (owner, 2026-10-11), which is
+            what lets the page be the Berrydex's width. */}
         <li className="item-attr-row">
           <span className="fact-label">Attributes</span>
           <ul className="item-attrs" data-testid="itemdex-attributes">

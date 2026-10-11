@@ -151,6 +151,7 @@ export function Breedingdex() {
           onRowClick={(g) => onSelect(g.id)}
           testId="breedingdex-rows"
           emptyNote="No egg group matches that search."
+          plain
         />
       )}
       detail={({ entry, onBack }) => (
