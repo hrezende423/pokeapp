@@ -450,8 +450,9 @@ function TrainerDetail({
       )}
 
       {t && t.party.length > 0 && (
+        /* No "Party" label (owner, 2026-10-11): the navbar above says whose
+           team it is, and the label cost the second row its place on screen. */
         <section className="entity-detail-section" data-testid="trainerdex-party">
-          <h3 className="entity-detail-section-label">Party</h3>
           <ul className="trainer-party">
             {t.party.map((m, i) => (
               <li key={`${t.id}-${i}`}>
@@ -464,7 +465,6 @@ function TrainerDetail({
 
       {ft?.party && ft.party.length > 0 && (
         <section className="entity-detail-section" data-testid="trainerdex-party">
-          <h3 className="entity-detail-section-label">Team</h3>
           <ul className="trainer-party">
             {ft.party.map((m, i) => (
               <li key={i}>
@@ -578,10 +578,17 @@ function statLine(mon: AnyMon): string | null {
 /**
  * One Pokemon of a trainer's party, as a Pokédex card made battle-ready (owner,
  * 2026-10-11): the grid card's watermark number, katakana and OFFICIAL ARTWORK,
- * then the Team Display's battle lines -- name and level; types | nature |
- * ability | item; the stat line; four moves with type and category. No labels
- * ("Item", "Ability"), no held-item sprite, no outline. Its own component rather
- * than the Team Display's MemberCard, which is a signed-off screen.
+ * then the battle lines in the owner's order --
+ *
+ *   Pikachu ♂ @Light Ball Lv.88
+ *   ELECTRIC
+ *   Bashful · Static
+ *   30 IV
+ *   ~ the four moves, type and category
+ *
+ * No labels ("Item", "Ability"), no held-item sprite, no outline, and no "moves
+ * from the level-up table" note. Its own component rather than the Team
+ * Display's MemberCard, which is a signed-off screen.
  */
 function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number }) {
   const [, selectSpecies] = useDexSelection('pokedex')
@@ -601,20 +608,21 @@ function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number 
     ('item_name' in mon && mon.item_name) ||
     (mon.item_id ? getItem(mon.item_id)?.display_name : null)
   const gender = 'gender' in mon ? mon.gender : null
+  /* Whether the game sets the moves or fills them from the level-up table is
+     no longer drawn (owner, 2026-10-11); it stays on the card for the suites. */
   const explicit = 'moves_explicit' in mon ? mon.moves_explicit : true
   const art = resolveArtworkUrl(species, variety, DEFAULT_ARTWORK_VIEW)
   const name = variety.is_default
     ? species.display_name
     : `${species.display_name} (${variety.name.slice(species.name.length + 1).replace(/-/g, ' ')})`
-  const meta = [nature?.display_name, ability?.display_name, itemName].filter(
-    (x): x is string => !!x,
-  )
+  const meta = [nature?.display_name, ability?.display_name].filter((x): x is string => !!x)
   const stats = statLine(mon)
 
   return (
     <div
       className="species-card trainer-card"
       data-testid={`trainerdex-mon-${index}`}
+      data-moves-explicit={explicit}
       data-species-id={species.id}
     >
       <button
@@ -643,28 +651,25 @@ function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number 
               {gender === 'M' ? '♂' : '♀'}
             </span>
           )}
+          {/* The held item, Showdown-style: "@" is the convention, not a label. */}
+          {itemName && (
+            <span className="trainer-card-item" data-testid={`trainerdex-held-item-${index}`}>
+              @{itemName}
+            </span>
+          )}
           <span className="trainer-card-level num">
             {level != null ? `Lv.${level}` : 'Lv varies'}
           </span>
         </span>
-        <span className="trainer-card-id">
-          <span className="trainer-card-types">
-            {types.map((ty, i) => (
-              <span key={ty}>
-                {i > 0 && <span className="trainer-card-dot"> · </span>}
-                <TypeLabel type={ty} small />
-              </span>
-            ))}
-          </span>
-          {meta.map((part) => (
-            <span key={part} className="trainer-card-meta">
-              <span className="trainer-card-bar" aria-hidden>
-                |
-              </span>
-              {part}
+        <span className="trainer-card-types">
+          {types.map((ty, i) => (
+            <span key={ty}>
+              {i > 0 && <span className="trainer-card-dot"> · </span>}
+              <TypeLabel type={ty} small />
             </span>
           ))}
         </span>
+        {meta.length > 0 && <span className="trainer-card-meta">{meta.join(' · ')}</span>}
         {stats && <span className="trainer-card-stats num">{stats}</span>}
         <span className="trainer-card-moves">
           {mon.moves.map((id) => {
@@ -683,7 +688,6 @@ function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number 
             )
           })}
         </span>
-        {!explicit && <span className="trainer-card-note">Moves from the level-up table</span>}
       </span>
     </div>
   )

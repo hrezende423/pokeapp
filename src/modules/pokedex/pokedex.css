@@ -2170,6 +2170,43 @@
   overflow-x: auto;
 }
 
+/*
+  FROZEN HEADERS ON EVERY POKÉPEDIA TABLE (owner, 2026-10-11): the header row
+  sticks to the top of the page's scroller while the rows run under it.
+
+  Three things have to give way for `position: sticky` to work, each said here:
+  - THE WRAP'S overflow-x. Sticky resolves against the nearest scrolling
+    ancestor, and an overflow-x: auto wrap IS one (overflow-y computes to auto
+    with it) -- a scroller that never scrolls vertically, so the header stuck to
+    nothing. Inside Poképedia the wrap is visible, and the PAGE's scroller takes
+    the sideways scroll the Pokédex's 42-column table needs instead.
+  - border-collapse. A collapsed border belongs to the table, not the cell, so
+    it stays behind when the header cell moves; separate with no spacing looks
+    the same and lets each header carry its own rule.
+  - A background, or the rows show through.
+  --table-sticky-top is for a page with its own sticky bar above the table (the
+  Trainer Dex's game navbar).
+*/
+.pokedex .data-table-wrap {
+  overflow-x: visible;
+}
+
+.pokedex .scroll-area:has(.data-table-wrap) {
+  overflow-x: auto;
+}
+
+.pokedex .data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.pokedex .data-table thead th {
+  position: sticky;
+  top: var(--table-sticky-top, 0);
+  z-index: 1;
+  background: var(--surface);
+}
+
 /* The table no longer fills the width, so the wrap must not force it to. */
 .data-table-wrap > .data-table {
   margin-right: auto;
@@ -3275,6 +3312,18 @@
   }
 }
 
+/* THE LIST VIEW keeps its title in flow, on a row of its own above the table:
+   the table runs from the left edge, and its frozen header (2026-10-11) would
+   stick right under a title floating over the scroller's top-left corner. */
+.pokedex-body-list {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.pokedex-body-list .pokedex-title-row {
+  position: static;
+  padding: 0 0 var(--space-gap-sm);
+}
+
 /*
   EVERY DEX BUT THE POKEDEX, laid out like it (owner, 2026-10-10): the list or
   table centred, its top level with the title, and the title beside it at the
@@ -3310,7 +3359,9 @@
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 2;
+    /* Above the list's sticky bars, whose opaque backgrounds start where the
+       table does -- a hair left of where this title ends ("Trainer De"). */
+    z-index: 5;
     padding: 0;
   }
 }

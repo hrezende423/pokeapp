@@ -34,33 +34,46 @@
   margin: 0 auto;
 }
 
+/*
+  A FIXED HEIGHT, so the table's frozen header can stick exactly under it
+  (--table-sticky-top). The navbar's own bottom margin is dropped here; the
+  height carries that space instead.
+*/
+.trainer-list {
+  --trainer-list-nav-h: 3rem;
+  --table-sticky-top: var(--trainer-list-nav-h);
+}
+
 .trainer-list-nav {
   position: sticky;
   top: 0;
   z-index: 2;
+  height: var(--trainer-list-nav-h);
   background: var(--surface);
+}
+
+.trainer-list-nav .game-nav {
+  margin-bottom: 0;
 }
 
 /*
   THE TRAINER PAGE'S COLUMNS (owner, 2026-10-11): the left pane narrower than the
-  Movedex's so the right one holds the party as THREE cards a row -- a full team
-  is two rows of three. 500 + 32 + 738 = 1270px, inside the split's 1300px
-  container breakpoint.
+  Movedex's, the party three cards a row -- a full team is two rows of three, and
+  both rows fit the column without scrolling. The cards are the Pokédex grid's
+  212px since the second pass narrowed them, so the column is the grid's 654.
 */
 .trainer-detail .entity-split-cols {
-  grid-template-columns: 500px 738px;
+  grid-template-columns: 500px 654px;
 }
 
-@container entity-split (max-width: 1300px) {
-  .trainer-detail .entity-split-info,
-  .trainer-detail .entity-split-grid {
-    max-width: 738px;
-  }
+/* No label above the party: the navbar is the column's only head. */
+.trainer-detail .entity-split-grid .entity-detail-section {
+  margin-top: 0;
 }
 
 .trainer-party {
   display: grid;
-  grid-template-columns: repeat(3, 240px);
+  grid-template-columns: repeat(3, 212px);
   gap: 9px;
   margin: 0;
   padding: 0;
@@ -69,7 +82,7 @@
 
 @media (max-width: 800px) {
   .trainer-party {
-    grid-template-columns: repeat(auto-fill, 240px);
+    grid-template-columns: repeat(auto-fill, 212px);
     justify-content: center;
   }
 }
@@ -83,12 +96,12 @@
 /*
   A PARTY POKEMON AS A POKEDEX CARD (owner, 2026-10-11): the grid card's ghost
   number, katakana and artwork exactly as .species-card places them, then the
-  battle lines flowing under the art. Wider than the grid card (240 against 212)
-  so a move, its type and its category fit one line, and as tall as its lines
-  need: no fixed height, no outline.
+  battle lines flowing under the art. The grid card's own 212px (owner, second
+  pass: the move names sat far from their type), as tall as its lines need: no
+  fixed height, no outline.
 */
 .species-card.trainer-card {
-  width: 240px;
+  width: 212px;
   height: auto;
   min-height: 214px;
 }
@@ -98,8 +111,8 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 136px 12px 12px;
+  gap: 3px;
+  padding: 132px 8px 8px;
   /* The card's open-species overlay sits under the text; let clicks reach it. */
   pointer-events: none;
 }
@@ -116,6 +129,15 @@
   font-size: var(--font-size-label);
 }
 
+.trainer-card-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
 .trainer-card-level {
   margin-left: 2px;
   font-family: var(--font-numeric);
@@ -124,19 +146,7 @@
   white-space: nowrap;
 }
 
-/* types | nature | ability | item: values only, bar-separated as on the Team
-   Display, wrapping to a second line rather than clipping a long item name. */
-.trainer-card-id {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  row-gap: 2px;
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-}
-
-.trainer-card-types,
-.trainer-card-meta {
+.trainer-card-types {
   white-space: nowrap;
 }
 
@@ -144,10 +154,13 @@
   color: var(--text-secondary);
 }
 
-.trainer-card-bar {
-  margin: 0 5px;
+/* Nature · Ability: values only. */
+.trainer-card-meta {
+  font-size: var(--font-size-label);
   color: var(--text-secondary);
-  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .trainer-card-stats {
@@ -160,10 +173,13 @@
 }
 
 /* One grid for the four moves, each line display: contents, so type and
-   category line up as columns down the card (the Team Display's rule). */
+   category line up as columns down the card (the Team Display's rule). The
+   name column is as wide as its longest name, not the card's leftover: the
+   type sits one gap after the name (owner, 2026-10-11). */
 .trainer-card-moves {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, max-content) auto auto;
+  justify-content: start;
   column-gap: 8px;
   row-gap: 2px;
   margin-top: 2px;
@@ -187,7 +203,3 @@
   color: var(--text-secondary);
 }
 
-.trainer-card-note {
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-}

@@ -1,4 +1,9 @@
 # Changelog
+## 2.1.10 — 2026-10-11 (non-breaking)
+- Data table: FROZEN HEADER on every Poképedia table (Pokédex list, Movedex, Abilitydex, Itemdex, Breeding dex, Trainer Dex, species-page and item-page tables). Inside `.pokedex` the wrap no longer scrolls sideways (the page's scroller does), cells are `border-collapse: separate` with no spacing so the header carries its own rule, and the header has the surface background. `--table-sticky-top` offsets it under a page's own sticky bar
+- Pokédex list view: the title on its own row above the table, not over its corner
+- Trainer Dex: no "Party" label; cards at the grid's 212px with the move name column as wide as its longest name; lines in the owner's order -- "Name ♂ @Item Lv.N", types, "Nature · Ability", IV/EV line, moves; no "moves from the level-up table" note. Two rows of three fit the column without scrolling at 900px tall
+- Trainer Dex list: the title no longer clipped by the sticky game navbar
 ## 2.1.9 — 2026-10-11 (non-breaking)
 - Trainer Dex list: ONE ROW PER TRAINER (rematches and per-starter teams fold in; the Note says "3 rematches" / "3 starter teams"); the game row is the right-aligned mini navbar, its right edge the table's, sticky over the list
 - Trainer Dex page: left pane 500px, the party in a 3-across grid of 240px cards; a mini navbar of the trainer's teams (Initial, Rematch 1…, or one per starter); the left column follows the team -- prize (a rematch's derived as class rate × last level), bag items counted ("3× Full Restore"); no Source row, no party count
