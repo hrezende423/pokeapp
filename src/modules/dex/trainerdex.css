@@ -87,9 +87,10 @@
 */
 .trainer-party {
   --trainer-card-min: 150px;
-  /* Wider than the Pokédex grid's 9px (owner, 2026-10-12): these cards are
-     text-heavy and sit closer together now they fit their content. */
-  --trainer-card-gap: var(--space-gap-md);
+  /* Wider than the Pokédex grid's 9px (owner, 2026-10-12, twice: 14px, then
+     20px): these cards are text-heavy and sit closer together now they fit
+     their content. Rows and columns both. */
+  --trainer-card-gap: var(--space-gap-lg);
   display: grid;
   grid-template-columns: repeat(3, minmax(var(--trainer-card-min), 1fr));
   width: max-content;

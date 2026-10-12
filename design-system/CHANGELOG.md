@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.14 — 2026-10-12 (non-breaking)
+- Trainer Dex party cards: 20px between cards (`--space-gap-lg`, was 14px)
 ## 2.1.13 — 2026-10-12 (non-breaking)
 - Trainer Dex party cards: the move type and category icons are gone (`TypeDot` and `MoveCategoryIcon` removed); a move line reads "~ Thunder  ELE  Spe" -- the Build Form's spelling, mono, type in its ink (`TypeAbbr`, type-label.md), category muted, full names as tooltips
 - Trainer Dex party cards: 14px between cards (`--space-gap-md`, was 9px)
