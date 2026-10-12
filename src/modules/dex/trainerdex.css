@@ -59,11 +59,17 @@
 /*
   THE TRAINER PAGE'S COLUMNS (owner, 2026-10-11): the left pane narrower than the
   Movedex's, the party three cards a row -- a full team is two rows of three, and
-  both rows fit the column without scrolling. The cards are the Pokédex grid's
-  212px since the second pass narrowed them, so the column is the grid's 654.
+  both rows fit the column without scrolling. The party column is as wide as its
+  cards, which fit their content (see PartySizer in Trainerdex.tsx).
 */
 .trainer-detail .entity-split-cols {
-  grid-template-columns: 500px 654px;
+  grid-template-columns: 500px max-content;
+}
+
+/* The team navbar sits close over its cards (owner, 2026-10-12): the cards'
+   own gap, not the page navbar's. */
+.trainer-team-nav {
+  margin-bottom: var(--space-gap-sm);
 }
 
 /* No label above the party: the navbar is the column's only head. */
@@ -71,9 +77,20 @@
   margin-top: 0;
 }
 
+/*
+  CARDS AS WIDE AS THEIR WIDEST LINE (owner, 2026-10-12). Three equal fractions
+  of a max-content grid: each column resolves to the widest item in ANY column,
+  so the three are one width, set by the widest card or by the sizer -- every
+  team's lines, so the width does not change with the team. The floor keeps the
+  watermark numbers (166px of letter-spaced digits) from running into each
+  other across the gap on a party of short names.
+*/
 .trainer-party {
+  --trainer-card-min: 150px;
   display: grid;
-  grid-template-columns: repeat(3, 212px);
+  grid-template-columns: repeat(3, minmax(var(--trainer-card-min), 1fr));
+  width: max-content;
+  max-width: 100%;
   gap: 9px;
   margin: 0;
   padding: 0;
@@ -82,9 +99,24 @@
 
 @media (max-width: 800px) {
   .trainer-party {
-    grid-template-columns: repeat(auto-fill, 212px);
-    justify-content: center;
+    grid-template-columns: repeat(auto-fill, minmax(var(--trainer-card-min), 1fr));
+    width: auto;
   }
+}
+
+/* Its own row under the cards, zero tall and invisible: only its width counts.
+   The negative margin takes back the row gap the extra row adds. */
+.trainer-party-sizer {
+  grid-column: 1;
+  height: 0;
+  margin-top: -9px;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.trainer-party-sizer .trainer-card-text {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* The team navbar wraps rather than overflowing: a trainer can have 16 teams. */
@@ -101,7 +133,7 @@
   fixed height, no outline.
 */
 .species-card.trainer-card {
-  width: 212px;
+  width: auto;
   height: auto;
   min-height: 214px;
 }
@@ -112,7 +144,8 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 132px 8px 8px;
+  /* 12px a side: the "comfortable margin" around the widest line. */
+  padding: 132px 12px 8px;
   /* The card's open-species overlay sits under the text; let clicks reach it. */
   pointer-events: none;
 }
@@ -172,15 +205,15 @@
   text-overflow: ellipsis;
 }
 
-/* One grid for the four moves, each line display: contents, so type and
-   category line up as columns down the card (the Team Display's rule). The
-   name column is as wide as its longest name, not the card's leftover: the
-   type sits one gap after the name (owner, 2026-10-11). */
+/* One grid for the four moves, each line display: contents, so the type dot
+   and the category icon line up as columns down the card (the Team Display's
+   rule). The name column is as wide as its longest name, not the card's
+   leftover: the marks sit one gap after the name (owner, 2026-10-11). */
 .trainer-card-moves {
   display: grid;
   grid-template-columns: minmax(0, max-content) auto auto;
   justify-content: start;
-  column-gap: 8px;
+  column-gap: 6px;
   row-gap: 2px;
   margin-top: 2px;
   align-items: baseline;
@@ -198,8 +231,12 @@
   text-overflow: ellipsis;
 }
 
-.trainer-card-move-cat {
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
+/* The marks size from the move name's text, and take the pointer so their
+   tooltips ("Electric", "Physical") show through the text block's
+   pointer-events: none. */
+.trainer-card-moves .ds-type-dot,
+.trainer-card-moves .ds-move-cat-icon {
+  font-size: var(--font-size-label);
+  pointer-events: auto;
 }
 

@@ -1,4 +1,9 @@
 # Changelog
+## 2.1.12 — 2026-10-12 (non-breaking)
+- Trainer Dex party cards: a move's type is a DOT in its ink (`TypeDot`, type-label.md -- sanctioned for these move lines only) and its category an ICON (`MoveCategoryIcon`, icon.md): physical an outlined eight-point star, special concentric circles, status an outlined yin-yang without its dots, each in the Movedex's category ink
+- Trainer Dex party cards FIT THEIR WIDEST LINE plus 12px a side (150px floor), across every team of the trainer so switching teams never resizes them: an invisible sizer in the grid holds every team's lines. Most parties come in at 150px; the widest (a held item like Bright Powder) at ~233px. The party column is as wide as its cards
+- Trainer Dex: the team navbar sits `--space-gap-sm` above the cards (was `--space-gap-lg`)
+- PWA: the open app now takes a new deploy -- a worker found waiting is told to skip waiting, and the app checks for one on returning to the foreground and hourly. The preview had been showing a build two deploys old
 ## 2.1.11 — 2026-10-11 (non-breaking)
 - ROW ALIGNMENT PASS, app-wide, measured (each row item's first-line baseline from its text box and the used font's descent; icons against the text's cap-height centre):
   - ♂ / ♀ are Tabler icons seated like a capital (`GenderSign`, `withGenderSigns`): IBM Plex has neither character, so they fell back to a system symbol font whose circle hangs below the baseline. The character stays in the DOM, visually hidden. Trainer cards, Breeding dex card gender line, Pokédex list's gender column, the gender-ratio filter options

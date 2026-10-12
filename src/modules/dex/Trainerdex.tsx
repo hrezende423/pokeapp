@@ -13,6 +13,7 @@ import {
   slotsFor,
   versionSpriteUrl,
   getSpriteUrl,
+  type Species,
   type Variety,
 } from '../../data'
 import { moveForGeneration } from '../../data/moveEra'
@@ -25,7 +26,8 @@ import type {
   TrainerPartition,
   TrainerPokemon,
 } from '../../data/trainers'
-import { TypeLabel } from '../../components/ds/TypeLabel'
+import { TypeDot, TypeLabel } from '../../components/ds/TypeLabel'
+import { MoveCategoryIcon } from '../../components/ds/MoveCategoryIcon'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { GameRow } from '../version-group/GameRow'
@@ -460,6 +462,7 @@ function TrainerDetail({
                 <MonCard mon={m} gen={gen} index={i} />
               </li>
             ))}
+            <PartySizer parties={teams.map((tm) => tm.trainer.party)} gen={gen} />
           </ul>
         </section>
       )}
@@ -528,12 +531,6 @@ function Fact({
 
 type AnyMon = TrainerPokemon | FacilityPokemon | FacilitySet
 
-const CATEGORY_LABEL: Record<string, string> = {
-  physical: 'Physical',
-  special: 'Special',
-  status: 'Status',
-}
-
 const SPREAD_ORDER: [keyof StatSpread, string][] = [
   ['hp', 'HP'],
   ['attack', 'Atk'],
@@ -585,7 +582,7 @@ function statLine(mon: AnyMon): string | null {
  *   ELECTRIC
  *   Bashful · Static
  *   30 IV
- *   ~ the four moves, type and category
+ *   ~ the four moves, a type dot and a category icon after each
  *
  * No labels ("Item", "Ability"), no held-item sprite, no outline, and no "moves
  * from the level-up table" note. Its own component rather than the Team
@@ -594,6 +591,65 @@ function statLine(mon: AnyMon): string | null {
 function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number }) {
   const [, selectSpecies] = useDexSelection('pokedex')
   const nav = useNav()
+  const species = mon.species_id != null ? getSpecies(mon.species_id) : undefined
+  const variety = varietyOf(mon.species_id, mon.pokemon_id)
+  if (!species || !variety) return null
+  /* Whether the game sets the moves or fills them from the level-up table is
+     no longer drawn (owner, 2026-10-11); it stays on the card for the suites. */
+  const explicit = 'moves_explicit' in mon ? mon.moves_explicit : true
+  const art = resolveArtworkUrl(species, variety, DEFAULT_ARTWORK_VIEW)
+
+  return (
+    <div
+      className="species-card trainer-card"
+      data-testid={`trainerdex-mon-${index}`}
+      data-moves-explicit={explicit}
+      data-species-id={species.id}
+    >
+      <button
+        type="button"
+        className="species-card-hit"
+        aria-label={monName(species, variety)}
+        onClick={() => {
+          selectSpecies(species.id)
+          nav.setModule('pokedex')
+        }}
+      />
+      <span className="species-card-ghost" aria-hidden>
+        {String(species.id).padStart(3, '0')}
+      </span>
+      {species.name_ja && (
+        <span className="species-card-ghost-ja" aria-hidden>
+          {species.name_ja}
+        </span>
+      )}
+      {art && <img className="species-card-art" src={art} alt="" loading="lazy" />}
+      <MonText mon={mon} gen={gen} index={index} />
+    </div>
+  )
+}
+
+function monName(species: Species, variety: Variety): string {
+  return variety.is_default
+    ? species.display_name
+    : `${species.display_name} (${variety.name.slice(species.name.length + 1).replace(/-/g, ' ')})`
+}
+
+/**
+ * The card's battle lines. Also drawn, without test ids, by PartySizer -- the
+ * cards' width is the widest of these lines across every team the trainer has.
+ */
+function MonText({
+  mon,
+  gen,
+  index,
+  sizer = false,
+}: {
+  mon: AnyMon
+  gen: number
+  index: number
+  sizer?: boolean
+}) {
   const species = mon.species_id != null ? getSpecies(mon.species_id) : undefined
   const variety = varietyOf(mon.species_id, mon.pokemon_id)
   if (!species || !variety) return null
@@ -609,88 +665,80 @@ function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number 
     ('item_name' in mon && mon.item_name) ||
     (mon.item_id ? getItem(mon.item_id)?.display_name : null)
   const gender = 'gender' in mon ? mon.gender : null
-  /* Whether the game sets the moves or fills them from the level-up table is
-     no longer drawn (owner, 2026-10-11); it stays on the card for the suites. */
-  const explicit = 'moves_explicit' in mon ? mon.moves_explicit : true
-  const art = resolveArtworkUrl(species, variety, DEFAULT_ARTWORK_VIEW)
-  const name = variety.is_default
-    ? species.display_name
-    : `${species.display_name} (${variety.name.slice(species.name.length + 1).replace(/-/g, ' ')})`
   const meta = [nature?.display_name, ability?.display_name].filter((x): x is string => !!x)
   const stats = statLine(mon)
 
   return (
-    <div
-      className="species-card trainer-card"
-      data-testid={`trainerdex-mon-${index}`}
-      data-moves-explicit={explicit}
-      data-species-id={species.id}
-    >
-      <button
-        type="button"
-        className="species-card-hit"
-        aria-label={name}
-        onClick={() => {
-          selectSpecies(species.id)
-          nav.setModule('pokedex')
-        }}
-      />
-      <span className="species-card-ghost" aria-hidden>
-        {String(species.id).padStart(3, '0')}
-      </span>
-      {species.name_ja && (
-        <span className="species-card-ghost-ja" aria-hidden>
-          {species.name_ja}
-        </span>
-      )}
-      {art && <img className="species-card-art" src={art} alt="" loading="lazy" />}
-      <span className="trainer-card-text">
-        <span className="trainer-card-head">
-          <span className="species-name">{name}</span>
-          {gender && (
-            <span className="trainer-card-gender">
-              <GenderSign sign={gender === 'M' ? '♂' : '♀'} />
-            </span>
-          )}
-          {/* The held item, Showdown-style: "@" is the convention, not a label. */}
-          {itemName && (
-            <span className="trainer-card-item" data-testid={`trainerdex-held-item-${index}`}>
-              @{itemName}
-            </span>
-          )}
-          <span className="trainer-card-level num">
-            {level != null ? `Lv.${level}` : 'Lv varies'}
+    <span className="trainer-card-text">
+      <span className="trainer-card-head">
+        <span className="species-name">{monName(species, variety)}</span>
+        {gender && (
+          <span className="trainer-card-gender">
+            <GenderSign sign={gender === 'M' ? '♂' : '♀'} />
           </span>
-        </span>
-        <span className="trainer-card-types">
-          {types.map((ty, i) => (
-            <span key={ty}>
-              {i > 0 && <span className="trainer-card-dot"> · </span>}
-              <TypeLabel type={ty} small />
-            </span>
-          ))}
-        </span>
-        {meta.length > 0 && <span className="trainer-card-meta">{meta.join(' · ')}</span>}
-        {stats && <span className="trainer-card-stats num">{stats}</span>}
-        <span className="trainer-card-moves">
-          {mon.moves.map((id) => {
-            const raw = getMove(id)
-            if (!raw) return null
-            const mv = moveForGeneration(raw, gen)
-            const type = mv.type_id != null ? (getType(mv.type_id)?.name ?? '') : ''
-            return (
-              <span key={id} className="trainer-card-move">
-                <span className="trainer-card-move-name">~ {mv.display_name}</span>
-                {type ? <TypeLabel type={type} small /> : <span />}
-                <span className="trainer-card-move-cat" data-cat={mv.damage_class ?? ''}>
-                  {CATEGORY_LABEL[mv.damage_class ?? ''] ?? '—'}
-                </span>
-              </span>
-            )
-          })}
+        )}
+        {/* The held item, Showdown-style: "@" is the convention, not a label. */}
+        {itemName && (
+          <span
+            className="trainer-card-item"
+            data-testid={sizer ? undefined : `trainerdex-held-item-${index}`}
+          >
+            @{itemName}
+          </span>
+        )}
+        <span className="trainer-card-level num">
+          {level != null ? `Lv.${level}` : 'Lv varies'}
         </span>
       </span>
-    </div>
+      <span className="trainer-card-types">
+        {types.map((ty, i) => (
+          <span key={ty}>
+            {i > 0 && <span className="trainer-card-dot"> · </span>}
+            <TypeLabel type={ty} small />
+          </span>
+        ))}
+      </span>
+      {meta.length > 0 && <span className="trainer-card-meta">{meta.join(' · ')}</span>}
+      {stats && <span className="trainer-card-stats num">{stats}</span>}
+      <span className="trainer-card-moves">
+        {mon.moves.map((id) => {
+          const raw = getMove(id)
+          if (!raw) return null
+          const mv = moveForGeneration(raw, gen)
+          const type = mv.type_id != null ? (getType(mv.type_id)?.name ?? '') : ''
+          return (
+            <span key={id} className="trainer-card-move">
+              <span className="trainer-card-move-name">~ {mv.display_name}</span>
+              {type ? <TypeDot type={type} /> : <span />}
+              <MoveCategoryIcon category={mv.damage_class} />
+            </span>
+          )
+        })}
+      </span>
+    </span>
+  )
+}
+
+/**
+ * THE CARDS FIT THEIR WIDEST LINE (owner, 2026-10-12: "reduce the card width to
+ * fit + comfortable margin") -- across EVERY team of the trainer, not just the
+ * one on screen, so switching teams never resizes the cards or moves the
+ * navbar. A fixed width cannot do it: the head line runs from ~110px for most
+ * parties to 233px (Misdreavus @Bright Powder), so one number either truncates
+ * the held items or barely narrows anything.
+ *
+ * This is an invisible, zero-height grid item holding every team's text lines.
+ * The party grid's columns are equal fractions of a max-content grid, so each
+ * resolves to the widest item in any column -- the sizer included.
+ */
+function PartySizer({ parties, gen }: { parties: AnyMon[][]; gen: number }) {
+  if (parties.length < 2) return null
+  return (
+    <li className="trainer-party-sizer" aria-hidden>
+      {parties.flat().map((m, i) => (
+        <MonText key={i} mon={m} gen={gen} index={i} sizer />
+      ))}
+    </li>
   )
 }
 

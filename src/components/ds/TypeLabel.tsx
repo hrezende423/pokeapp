@@ -71,6 +71,27 @@ export function TypeLabel({
   )
 }
 
+/**
+ * A type as a dot in its colour, for the Trainer Dex cards' move lines only
+ * (owner, 2026-10-12) -- a sanctioned exception to "colored text only", scoped
+ * to that grid where four type words per card set the card's width. The name is
+ * the accessible label and the tooltip.
+ */
+export function TypeDot({ type }: { type: string }) {
+  const name = type === 'unknown' ? '???' : type.charAt(0).toUpperCase() + type.slice(1)
+  return (
+    <span
+      className="ds-type-dot"
+      style={{ color: typeColorVar(type) }}
+      data-ds="type-dot"
+      data-type={type}
+      role="img"
+      aria-label={name}
+      title={name}
+    />
+  )
+}
+
 /** Dual types, middot-separated, each in its own colour (§5, species grid card). */
 export function TypeRow({ types, small = false }: { types: string[]; small?: boolean }) {
   return (

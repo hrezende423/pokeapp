@@ -391,6 +391,35 @@
   align-items: baseline;
 }
 
+/* The Trainer Dex move lines' type mark (TypeDot): a filled circle in the
+   type's ink, about an x-height across and centred on it. */
+.ds-type-dot {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 0.02em;
+}
+
+/* MoveCategoryIcon: a cap height tall, seated on the baseline like the gender
+   sign (App.css). Each category in its own text ink. */
+.ds-move-cat-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.14em;
+}
+.ds-move-cat-icon[data-cat='physical'] {
+  color: var(--color-category-text-physical);
+}
+.ds-move-cat-icon[data-cat='special'] {
+  color: var(--color-category-text-special);
+}
+.ds-move-cat-icon[data-cat='status'] {
+  color: var(--color-category-text-status);
+}
+
 .ds-type-sep {
   padding: 0 5px;
   color: var(--text-secondary);

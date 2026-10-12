@@ -63,6 +63,9 @@ export default defineConfig({
         navigateFallback: `${BASE}index.html`,
         navigateFallbackDenylist: [PARTITION_PATTERN],
         cleanupOutdatedCaches: true,
+        // A message handler so the page can promote a worker left waiting --
+        // see public/sw-skip-waiting.js and src/pwa.ts.
+        importScripts: ['sw-skip-waiting.js'],
         runtimeCaching: [
           {
             // Artwork lives on other origins: PokeAPI's sprite repo for the static
