@@ -1,4 +1,7 @@
 # Changelog
+## 2.1.13 — 2026-10-12 (non-breaking)
+- Trainer Dex party cards: the move type and category icons are gone (`TypeDot` and `MoveCategoryIcon` removed); a move line reads "~ Thunder  ELE  Spe" -- the Build Form's spelling, mono, type in its ink (`TypeAbbr`, type-label.md), category muted, full names as tooltips
+- Trainer Dex party cards: 14px between cards (`--space-gap-md`, was 9px)
 ## 2.1.12 — 2026-10-12 (non-breaking)
 - Trainer Dex party cards: a move's type is a DOT in its ink (`TypeDot`, type-label.md -- sanctioned for these move lines only) and its category an ICON (`MoveCategoryIcon`, icon.md): physical an outlined eight-point star, special concentric circles, status an outlined yin-yang without its dots, each in the Movedex's category ink
 - Trainer Dex party cards FIT THEIR WIDEST LINE plus 12px a side (150px floor), across every team of the trainer so switching teams never resizes them: an invisible sizer in the grid holds every team's lines. Most parties come in at 150px; the widest (a held item like Bright Powder) at ~233px. The party column is as wide as its cards

@@ -72,23 +72,23 @@ export function TypeLabel({
 }
 
 /**
- * A type as a dot in its colour, for the Trainer Dex cards' move lines only
- * (owner, 2026-10-12) -- a sanctioned exception to "colored text only", scoped
- * to that grid where four type words per card set the card's width. The name is
- * the accessible label and the tooltip.
+ * A type as its three-letter abbreviation in its colour ("ELE"), in the mono
+ * face so a column of them lines up -- the Build Form's move-line convention,
+ * used by the Trainer Dex cards' move lines (owner, 2026-10-12). Still coloured
+ * text, not a mark; the full name is the tooltip.
  */
-export function TypeDot({ type }: { type: string }) {
+export function TypeAbbr({ type }: { type: string }) {
   const name = type === 'unknown' ? '???' : type.charAt(0).toUpperCase() + type.slice(1)
   return (
     <span
-      className="ds-type-dot"
+      className="ds-type-abbr"
       style={{ color: typeColorVar(type) }}
-      data-ds="type-dot"
+      data-ds="type-abbr"
       data-type={type}
-      role="img"
-      aria-label={name}
       title={name}
-    />
+    >
+      {type === 'unknown' ? '???' : type.slice(0, 3).toUpperCase()}
+    </span>
   )
 }
 

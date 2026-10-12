@@ -87,11 +87,14 @@
 */
 .trainer-party {
   --trainer-card-min: 150px;
+  /* Wider than the Pokédex grid's 9px (owner, 2026-10-12): these cards are
+     text-heavy and sit closer together now they fit their content. */
+  --trainer-card-gap: var(--space-gap-md);
   display: grid;
   grid-template-columns: repeat(3, minmax(var(--trainer-card-min), 1fr));
   width: max-content;
   max-width: 100%;
-  gap: 9px;
+  gap: var(--trainer-card-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -109,7 +112,7 @@
 .trainer-party-sizer {
   grid-column: 1;
   height: 0;
-  margin-top: -9px;
+  margin-top: calc(-1 * var(--trainer-card-gap));
   overflow: hidden;
   visibility: hidden;
 }
@@ -205,15 +208,15 @@
   text-overflow: ellipsis;
 }
 
-/* One grid for the four moves, each line display: contents, so the type dot
-   and the category icon line up as columns down the card (the Team Display's
+/* One grid for the four moves, each line display: contents, so the type and
+   category abbreviations line up as columns down the card (the Team Display's
    rule). The name column is as wide as its longest name, not the card's
-   leftover: the marks sit one gap after the name (owner, 2026-10-11). */
+   leftover: they sit one gap after the name (owner, 2026-10-11). */
 .trainer-card-moves {
   display: grid;
   grid-template-columns: minmax(0, max-content) auto auto;
   justify-content: start;
-  column-gap: 6px;
+  column-gap: 8px;
   row-gap: 2px;
   margin-top: 2px;
   align-items: baseline;
@@ -231,12 +234,17 @@
   text-overflow: ellipsis;
 }
 
-/* The marks size from the move name's text, and take the pointer so their
-   tooltips ("Electric", "Physical") show through the text block's
-   pointer-events: none. */
-.trainer-card-moves .ds-type-dot,
-.trainer-card-moves .ds-move-cat-icon {
-  font-size: var(--font-size-label);
+/* "ELE Spe": the Build Form's move-line spelling -- mono, the type in its
+   ink, the category muted. They take the pointer so their tooltips ("Electric",
+   "Special") show through the text block's pointer-events: none. */
+.trainer-card-moves .ds-type-abbr,
+.trainer-card-move-cat {
+  font-family: var(--font-family-mono);
+  font-size: calc(var(--font-size-caption) * 0.92);
   pointer-events: auto;
+}
+
+.trainer-card-move-cat {
+  color: var(--text-secondary);
 }
 

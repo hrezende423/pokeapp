@@ -26,8 +26,7 @@ import type {
   TrainerPartition,
   TrainerPokemon,
 } from '../../data/trainers'
-import { TypeDot, TypeLabel } from '../../components/ds/TypeLabel'
-import { MoveCategoryIcon } from '../../components/ds/MoveCategoryIcon'
+import { TypeAbbr, TypeLabel } from '../../components/ds/TypeLabel'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
 import { GameRow } from '../version-group/GameRow'
@@ -531,6 +530,19 @@ function Fact({
 
 type AnyMon = TrainerPokemon | FacilityPokemon | FacilitySet
 
+/* The Build Form's spelling of a move's category (owner, 2026-10-12). */
+const CATEGORY_ABBR: Record<string, string> = {
+  physical: 'Phy',
+  special: 'Spe',
+  status: 'Sta',
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  physical: 'Physical',
+  special: 'Special',
+  status: 'Status',
+}
+
 const SPREAD_ORDER: [keyof StatSpread, string][] = [
   ['hp', 'HP'],
   ['attack', 'Atk'],
@@ -582,7 +594,7 @@ function statLine(mon: AnyMon): string | null {
  *   ELECTRIC
  *   Bashful · Static
  *   30 IV
- *   ~ the four moves, a type dot and a category icon after each
+ *   ~ the four moves, then type and category abbreviated: "ELE Spe"
  *
  * No labels ("Item", "Ability"), no held-item sprite, no outline, and no "moves
  * from the level-up table" note. Its own component rather than the Team
@@ -709,8 +721,13 @@ function MonText({
           return (
             <span key={id} className="trainer-card-move">
               <span className="trainer-card-move-name">~ {mv.display_name}</span>
-              {type ? <TypeDot type={type} /> : <span />}
-              <MoveCategoryIcon category={mv.damage_class} />
+              {type ? <TypeAbbr type={type} /> : <span />}
+              <span
+                className="trainer-card-move-cat"
+                title={CATEGORY_LABEL[mv.damage_class ?? '']}
+              >
+                {CATEGORY_ABBR[mv.damage_class ?? ''] ?? '—'}
+              </span>
             </span>
           )
         })}
