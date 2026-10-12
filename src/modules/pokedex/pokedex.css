@@ -2393,6 +2393,22 @@
   text-align: right;
 }
 
+/* The species page's tables are text only, in two faces and three sizes (a
+   location and its area, mono level and rate): on one BASELINE per row rather
+   than each cell centred, which left the mono figures 2px below the names
+   (2026-10-11 alignment pass). */
+.species-page .data-table td {
+  vertical-align: baseline;
+}
+
+/* A BLOCK, so the middle-aligned cell centres the icon itself. Inline, it sat
+   on the text baseline with the descent space under it, 3-4px above the
+   row's text in every table (2026-10-11 alignment pass). */
+.data-table-chevron-col .row-chevron {
+  display: block;
+  margin-left: auto;
+}
+
 /* A name longer than the column gets an ellipsis rather than widening the table. */
 .data-table td:first-child {
   overflow: hidden;

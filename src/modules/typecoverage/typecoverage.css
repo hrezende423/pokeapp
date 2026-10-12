@@ -99,9 +99,12 @@
 
 /* ------------------------------------------------------------- page chrome */
 
+/* baseline, not flex-end (2026-10-11 alignment pass): the bottoms of a title
+   and a row of small toggles are not where either one's text sits, and the
+   title read 7px low against "Matrix · Flow · Against · Card". */
 .tc-head {
   display: flex;
-  align-items: flex-end;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--space-gap-lg);
   /* The subtitle used to sit between the title and the content and is gone, so
@@ -432,6 +435,13 @@ table.tc-table td {
   min-width: 30px;
   line-height: 22px;
   text-align: center;
+}
+
+/* The header row on one baseline: the corner's "defending ↓ / attacking →" is
+   a different size from the type abbreviations, and middle alignment put its
+   text 3px below theirs. */
+table.tc-table thead th {
+  vertical-align: baseline;
 }
 
 /* Top-left: sticky on BOTH axes, so it stays over the corner both headers

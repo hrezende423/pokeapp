@@ -11,6 +11,7 @@ import {
 import type { VersionGroup } from '../../data'
 import { evolutionFacts } from './evoDescribe'
 import { statFieldsFor, type SpeciesRow } from './speciesQuery'
+import { withGenderSigns } from '../../components/genderSigns'
 
 /**
  * The Pokedex list view's columns: every field the bundle carries about a
@@ -285,7 +286,7 @@ export function speciesColumns({
       // Sorted by the underlying eighths, so the column reads as a scale rather
       // than alphabetically by the label that describes it.
       sortValue: (row) => row.species.gender_rate ?? -1,
-      render: (row) => genderLabel(row.species.gender_rate),
+      render: (row) => withGenderSigns(genderLabel(row.species.gender_rate)),
     },
     {
       key: 'growth',

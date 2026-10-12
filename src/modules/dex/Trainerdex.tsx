@@ -17,6 +17,7 @@ import {
 } from '../../data'
 import { moveForGeneration } from '../../data/moveEra'
 import { usePageCredit } from '../../components/pageCredit'
+import { GenderSign } from '../../components/GenderSign'
 import type {
   FacilityPokemon,
   FacilitySet,
@@ -647,8 +648,8 @@ function MonCard({ mon, gen, index }: { mon: AnyMon; gen: number; index: number 
         <span className="trainer-card-head">
           <span className="species-name">{name}</span>
           {gender && (
-            <span className="trainer-card-gender" aria-label={gender === 'M' ? 'male' : 'female'}>
-              {gender === 'M' ? '♂' : '♀'}
+            <span className="trainer-card-gender">
+              <GenderSign sign={gender === 'M' ? '♂' : '♀'} />
             </span>
           )}
           {/* The held item, Showdown-style: "@" is the convention, not a label. */}

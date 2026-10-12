@@ -226,6 +226,13 @@
 .dcalc .ds-ev-row {
   padding: 1px 0;
   column-gap: 6px;
+  /* One baseline across the row's text and fields (2026-10-11 alignment pass):
+     centred, the stat label, the numbers and the stage select's text sat at
+     three different heights. The slider has no text and stays centred. */
+  align-items: baseline;
+}
+.dcalc .ds-ev-row .ds-range {
+  align-self: center;
 }
 /* IV and EV values centred under their headers. The EV header is laid out on
    the effort cell's own grid, so it centres over the number box, not the slider. */

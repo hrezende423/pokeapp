@@ -304,6 +304,18 @@
   color: inherit;
 }
 
+/* ♂ / ♀ as icons seated like a capital letter -- see components/GenderSign.tsx. */
+.gender-sign {
+  white-space: nowrap;
+}
+
+.gender-sign-icon {
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  vertical-align: -0.12em;
+}
+
 /*
   Placeholder screens for nav destinations that have no feature yet. Deliberately
   plain: tokens only, no layout work, nothing that could read as a half-built

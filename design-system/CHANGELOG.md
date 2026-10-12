@@ -1,4 +1,12 @@
 # Changelog
+## 2.1.11 — 2026-10-11 (non-breaking)
+- ROW ALIGNMENT PASS, app-wide, measured (each row item's first-line baseline from its text box and the used font's descent; icons against the text's cap-height centre):
+  - ♂ / ♀ are Tabler icons seated like a capital (`GenderSign`, `withGenderSigns`): IBM Plex has neither character, so they fell back to a system symbol font whose circle hangs below the baseline. The character stays in the DOM, visually hidden. Trainer cards, Breeding dex card gender line, Pokédex list's gender column, the gender-ratio filter options
+  - Data-table row chevron: a block, centred in its cell (it sat 3–4px high in every table)
+  - Species page tables: cells on one baseline (mono figures sat 2px low)
+  - Type Coverage: header row on a baseline (title 7px low against the view toggles); table header cells on a baseline (corner label 3px low)
+  - Damage calculator EV/IV rows: one baseline across label, numbers and the stage select; the slider stays centred
+- Left as they are, on purpose: the species page's Gender ratio row and type-matchup tiers are centred against multi-line values by design (see their CSS notes). The Build Form's copy icon (6px) is on a signed-off screen and needs the owner's word
 ## 2.1.10 — 2026-10-11 (non-breaking)
 - Data table: FROZEN HEADER on every Poképedia table (Pokédex list, Movedex, Abilitydex, Itemdex, Breeding dex, Trainer Dex, species-page and item-page tables). Inside `.pokedex` the wrap no longer scrolls sideways (the page's scroller does), cells are `border-collapse: separate` with no spacing so the header carries its own rule, and the header has the surface background. `--table-sticky-top` offsets it under a page's own sticky bar
 - Pokédex list view: the title on its own row above the table, not over its corner

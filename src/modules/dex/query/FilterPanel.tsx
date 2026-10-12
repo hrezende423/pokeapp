@@ -16,6 +16,7 @@ import {
   type FilterSection,
 } from './dexQuery'
 import type { DexQuery } from './useDexQuery'
+import { withGenderSigns } from '../../../components/genderSigns'
 
 /**
  * Every dex's filter panel, rendered from its config.
@@ -246,7 +247,7 @@ function Control<T>({
                       )
                     }
                   >
-                    {option.label}
+                    {withGenderSigns(option.label)}
                   </button>
                 </span>
               )
