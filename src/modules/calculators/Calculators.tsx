@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
 import { Tabs } from '../../components/ds/Navigation'
 import { CatchRateCalculator } from './CatchRateCalculator'
+import { clearCalculatorsTab, peekCalculatorsTab } from './calculatorsHandoff'
 import { ExperienceCalculator } from './ExperienceCalculator'
 import { SpeedCalculator } from './SpeedCalculator'
 import { StatCalculator } from './StatCalculator'
@@ -26,13 +27,19 @@ import './calculators.css'
  */
 
 const TABS = ['Catch Rate', 'Stat', 'Experience', 'Speed'] as const
-type CalculatorTab = (typeof TABS)[number]
+export type CalculatorTab = (typeof TABS)[number]
 
 /** Test-id slug: lowercase, spaces to hyphens — "Catch Rate" -> "catch-rate". */
 const slug = (tab: string) => tab.toLowerCase().replace(/\s+/g, '-')
 
 export function Calculators() {
-  const [tab, setTab] = useState<CalculatorTab>('Catch Rate')
+  // Another screen (the Tools index) may ask for a tab: read it here, clear it
+  // after mount, so the next visit opens on the default again.
+  const [handoff] = useState(peekCalculatorsTab)
+  const [tab, setTab] = useState<CalculatorTab>(handoff?.tab ?? 'Catch Rate')
+  useEffect(() => {
+    if (handoff) clearCalculatorsTab(handoff.id)
+  }, [handoff])
 
   return (
     <div className="calc">
