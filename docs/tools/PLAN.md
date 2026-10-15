@@ -58,10 +58,10 @@ Gen 5+ mechanics, coverage analyzers, ribbons, Nuzlocke danger lists.
   check, the location-loader total-failure bug (Gen 5–9 groups with no file
   count as loaded), and the Team Display move-name column regression (find the
   cause, restore the signed-off width). Remove the `.cache` deny rule.
-- **Branches:** `tools` (from `feature/generation-selector`) is the
+- **Branches:** `tools/integration` (from `feature/generation-selector`) is the
   integration branch; each tool is `tools/NN-slug` off it, merged back by
   Claude once `npm run check` passes. Never `main`.
-- **Preview:** push `tools` to the preview site once per batch.
+- **Preview:** push `tools/integration` to the preview site once per batch.
 - **Test values:** Bulbapedia worked examples, read in the owner's Chrome
   (Bulbapedia 403s scripts), cross-checked against the pinned pret routine.
   Optimizers (#6, #7) are checked by brute force.
