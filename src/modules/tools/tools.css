@@ -1,0 +1,131 @@
+/*
+  Tools: the index and the shared tool page frame.
+
+  TOKEN-SCALED, and built on the Calculators' own classes (.calc, .calc-head,
+  .calc-section, .calc-result) so a tool reads like the calculators beside it.
+  Only what those classes do not already say lives here: the named regions and
+  the index list.
+*/
+
+/* ---------------------------------------------------------------- the index */
+
+.tools-index {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'title'
+    'groups';
+}
+
+.tools-index-title {
+  grid-area: title;
+  margin-bottom: var(--space-gap-md);
+}
+
+.tools-index-groups {
+  grid-area: groups;
+  min-height: 0;
+}
+
+.tools-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Hairline rows, and NO row gap: the hairline-band rule. */
+.tools-item {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  column-gap: var(--calc-4);
+  align-items: baseline;
+  padding: var(--calc-2) 0;
+  border-bottom: 1px solid var(--color-border-hairline);
+}
+
+/* A label you can click, not a button shape (MODULE-PATTERNS §7). */
+.tools-link {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-default);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tools-link:disabled {
+  color: var(--color-text-disabled);
+  font-weight: inherit;
+  cursor: default;
+}
+
+.tools-link:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.tools-blurb {
+  color: var(--color-text-muted);
+}
+
+.tools-reason {
+  grid-column: 2;
+  color: var(--color-text-default);
+  font-size: var(--font-size-caption);
+}
+
+/* ------------------------------------------------------------ a tool's page */
+
+.tool-page {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'head'
+    'body';
+}
+
+.tool-head {
+  grid-area: head;
+}
+
+.tool-scroll {
+  grid-area: body;
+  min-height: 0;
+}
+
+.tool-scope {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--calc-4);
+}
+
+.tool-scope-gen {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-label);
+}
+
+.tool-body {
+  display: grid;
+  grid-template-areas:
+    'inputs'
+    'result';
+  gap: var(--space-gap-xl);
+}
+
+.tool-inputs {
+  grid-area: inputs;
+}
+
+.tool-result {
+  grid-area: result;
+}
+
+/* An answer that is a sentence, not a number: the default text colour, never
+   the accent (its two uses are the active nav item and the selected tab). */
+.tool-reason {
+  margin: 0;
+  color: var(--color-text-default);
+}

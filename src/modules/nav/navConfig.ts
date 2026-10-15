@@ -3,6 +3,7 @@ import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
 import { findTeamMatchupPage, type TeamMatchupPageId } from '../team-matchup/pages'
+import { findToolsPage, type ToolsPageId } from '../tools/pages'
 import {
   TYPE_COVERAGE_PAGES,
   findTypeCoveragePage,
@@ -34,7 +35,13 @@ import type { ComponentType } from 'react'
  * resolve them without a stub fallback swallowing a real screen.
  */
 export type PageId =
-  DexModuleId | TbPageId | TypeCoveragePageId | CalculatorsPageId | TeamMatchupPageId | StubPageId
+  | DexModuleId
+  | TbPageId
+  | TypeCoveragePageId
+  | CalculatorsPageId
+  | TeamMatchupPageId
+  | ToolsPageId
+  | StubPageId
 
 export interface NavEntry {
   /** The page this entry opens. */
@@ -99,6 +106,9 @@ export const NAV_TABS: readonly NavTab[] = [
   {
     id: 'tools',
     label: 'Tools',
+    /* Clicking the word opens the Tools index (owner, 2026-10-15): every tool,
+       grouped. The dropdown below is unchanged. */
+    destination: 'tools',
     /*
       CALCULATORS LEADS, and is a real screen now rather than a stub -- see
       calculators/pages.ts. The four small tools are tabs of ONE screen (the Type
@@ -152,6 +162,8 @@ export function findPage(id: PageId): ResolvedPage {
   if (calc) return { id: calc.id, label: calc.label, Component: calc.Component }
   const tm = findTeamMatchupPage(id)
   if (tm) return { id: tm.id, label: tm.label, Component: tm.Component }
+  const tool = findToolsPage(id)
+  if (tool) return { id: tool.id, label: tool.label, Component: tool.Component }
   const stub = findStub(id)
   if (stub) return { id: stub.id, label: stub.label, Component: StubPage }
   // Not reachable through PageId; findPage is also the shell's fallback.
