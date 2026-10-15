@@ -17,7 +17,7 @@ imperfections are already logged there deliberately.
   the grid is `flex: 1` with `1fr 1fr` rows, and `.tb-card-art` is `flex: 1`
   against `flex: 0 0 auto` facts — so the artwork absorbs the remainder of a
   grid row and is as large as the window allows at any window size. Measured:
-  188px at a 720px window up to the 264px cap from 900 up, against the 84px it
+  188px at a 720px window up to the 260px cap from 900 up, against the 84px it
   was fixed at. All six cards stay on screen with no overflow across that whole
   range; verify-team-builder §14 drives five heights.
   **`max-height: var(--tb-slot-card)` on the art box is load-bearing**, not
@@ -25,7 +25,7 @@ imperfections are already logged there deliberately.
   taller than the card is wide makes a square frame WIDER than its card — and
   the card sets `overflow: hidden`, so the held-item badge positioned against
   that frame gets clipped off the picture.
-  `--tb-slot-card: 264px` is measured the same way as the Team Library card:
+  `--tb-slot-card: 260px` (264 until 2026-10-03) is measured the same way as the Team Library card:
   the widest Gen 1–4 move row (218px — "High Jump Kick" at 112px plus the type
   and category columns) and the widest types|nature|ability line (259px), which
   is the binding one.

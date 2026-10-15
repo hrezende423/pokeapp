@@ -314,12 +314,15 @@ try {
     `(${ballCount} vs ${expectedBalls})`,
   )
   check('search actually narrowed it', ballCount < n)
-  const ballLabels = await page.$$eval('[data-testid="itemdex-rows"] tbody tr td:first-child', (els) =>
+  // The NAME cell, by its class: the table's first column is the item number
+  // since the owner's 2026-10-11 table pass, which is why `td:first-child` failed.
+  const ballLabels = await page.$$eval('[data-testid="itemdex-rows"] tbody tr .itemdex-name-text', (els) =>
     els.map((e) => e.textContent),
   )
   check(
     'every result contains the search term',
-    ballLabels.every((l) => l.toLowerCase().includes('ball')),
+    ballLabels.length === ballCount && ballLabels.every((l) => l.toLowerCase().includes('ball')),
+    `${ballLabels.length} names read`,
   )
   await fillDexSearch(page, 'itemdex', 'master ball')
   await page.waitForSelector('[data-testid="itemdex-row-1"]', { timeout: 10000 })

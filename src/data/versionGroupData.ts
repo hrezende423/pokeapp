@@ -298,11 +298,19 @@ export async function loadAllLearnsets(): Promise<{
  * of them fail it THROWS instead, because zero rows and zero games loaded is an
  * error state and not an empty result -- the same distinction LoadState draws
  * between `error` and a `ready` empty array.
+ *
+ * ONLY THE GROUPS THAT HAVE A FILE COUNT. Gen 5+ groups have no encounters file
+ * and resolve to an empty partition without a fetch; counted as "loaded", they
+ * made "every partition failed" unreachable once the dexes reached Gen 9 (18 of
+ * 32 groups), so a total failure rendered as a partial one. verify-eggmoves'
+ * ROOT CAUSE section is the check.
  */
 export async function getEncountersForSpeciesAllGames(
   speciesId: number,
 ): Promise<{ rows: EncounterRow[]; failed: string[] }> {
-  const groups = listVersionGroups().map((v) => v.name)
+  const groups = listVersionGroups()
+    .filter((v) => v.encounters_path != null)
+    .map((v) => v.name)
   const settled = await Promise.allSettled(groups.map((vg) => loadEncounters(vg)))
   const rows: EncounterRow[] = []
   const failed: string[] = []

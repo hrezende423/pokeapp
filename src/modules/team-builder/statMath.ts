@@ -155,6 +155,12 @@ export interface StatInput {
  * The nature multiplier applies AFTER the +5 and only in Gen 3-4, because natures
  * do not exist before Gen 3 -- passing a neutral NatureMods for an earlier
  * generation would give the same answer, but the branch says why.
+ *
+ * MULTIPLY BY THE LEVEL, THEN DIVIDE BY 100 -- never `* (level / 100)`. Level/100
+ * is not exact in binary (0.29 is 0.28999...), so the product can land just under
+ * a whole number and the floor drops a point: Charmander's Sp. Def at level 29
+ * came out 33 instead of 34. That hit levels 29, 35, 41, 57, 58, 69, 70 and 82.
+ * The integer product divided once is always exact where the true answer is whole.
  */
 export function computeStat(input: StatInput): number {
   const { generation, level, base, key, effort, individual, nature } = input
@@ -162,7 +168,7 @@ export function computeStat(input: StatInput): number {
 
   if (generation <= 2) {
     const dv = dvFor(individual, key)
-    const shared = Math.floor(((base + dv) * 2 + statExpBonus(at(effort, key))) * (level / 100))
+    const shared = Math.floor((((base + dv) * 2 + statExpBonus(at(effort, key))) * level) / 100)
     return isHp ? shared + level + 10 : shared + 5
   }
 
@@ -171,7 +177,7 @@ export function computeStat(input: StatInput): number {
   if (isHp && base === 1) return 1
 
   const shared = Math.floor(
-    (2 * base + at(individual, key) + Math.floor(at(effort, key) / 4)) * (level / 100),
+    ((2 * base + at(individual, key) + Math.floor(at(effort, key) / 4)) * level) / 100,
   )
   if (isHp) return shared + level + 10
   return Math.floor((shared + 5) * natureMultiplier(nature, key))
