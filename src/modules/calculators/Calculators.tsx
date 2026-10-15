@@ -7,6 +7,9 @@ import { clearCalculatorsTab, peekCalculatorsTab } from './calculatorsHandoff'
 import { ExperienceCalculator } from './ExperienceCalculator'
 import { SpeedCalculator } from './SpeedCalculator'
 import { StatCalculator } from './StatCalculator'
+import { toolAvailability } from '../tools/gates'
+import { ToolResult } from '../tools/ToolShell'
+import { useVersionGroup } from '../version-group/context'
 import '../../components/ds/ds.css'
 import './calculators.css'
 
@@ -32,6 +35,14 @@ export type CalculatorTab = (typeof TABS)[number]
 /** Test-id slug: lowercase, spaces to hyphens — "Catch Rate" -> "catch-rate". */
 const slug = (tab: string) => tab.toLowerCase().replace(/\s+/g, '-')
 
+/**
+ * Tabs whose mechanics are Gen 1-4 only. With the app on Gen 5-9 (or "All") they
+ * say so instead of answering (owner, 2026-10-15) -- the same gate as the Tools
+ * pages. Experience is not here: growth rates did not change after Gen 4.
+ */
+const GATED: ReadonlySet<CalculatorTab> = new Set(['Catch Rate', 'Stat', 'Speed'])
+const GEN_1_4 = { gens: [1, 2, 3, 4] }
+
 export function Calculators() {
   // Another screen (the Tools index) may ask for a tab: read it here, clear it
   // after mount, so the next visit opens on the default again.
@@ -40,6 +51,10 @@ export function Calculators() {
   useEffect(() => {
     if (handoff) clearCalculatorsTab(handoff.id)
   }, [handoff])
+  const app = useVersionGroup()
+  const availability = GATED.has(tab)
+    ? toolAvailability(GEN_1_4, app.isAll ? null : app.generation)
+    : ({ ok: true } as const)
 
   return (
     <div className="calc">
@@ -52,10 +67,11 @@ export function Calculators() {
 
       <ScrollArea testId="calc-scroll-area" memoryKey={scrollKey('calc', tab)}>
         <div className="calc-content" role="tabpanel" data-testid={`calc-panel-${slug(tab)}`}>
-          {tab === 'Catch Rate' && <CatchRateCalculator />}
-          {tab === 'Stat' && <StatCalculator />}
+          {!availability.ok && <ToolResult reason={availability.reason} />}
+          {availability.ok && tab === 'Catch Rate' && <CatchRateCalculator />}
+          {availability.ok && tab === 'Stat' && <StatCalculator />}
           {tab === 'Experience' && <ExperienceCalculator />}
-          {tab === 'Speed' && <SpeedCalculator />}
+          {availability.ok && tab === 'Speed' && <SpeedCalculator />}
         </div>
       </ScrollArea>
     </div>

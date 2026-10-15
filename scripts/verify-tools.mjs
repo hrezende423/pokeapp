@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { startDevServer } from './lib/devServer.mjs'
 import { selectGeneration } from './lib/controls.mjs'
+import { goToPage } from './lib/nav.mjs'
 
 const PORT = 4203
 const SHOTS = new URL('./.verify-shots/', import.meta.url)
@@ -155,6 +156,75 @@ try {
   await openIndex(page)
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.length)
   check('on Gen 1 nothing built so far is disabled', gen1Disabled === 0, `${gen1Disabled} disabled`)
+
+  // ------------------------------------------------------------------ #1
+  hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
+  /*
+    Read in a real browser 2026-10-15 (Bulbapedia 403s scripts), "Stat" →
+    Formula → Example:
+      Gen I/II: level 81 Pikachu, DVs Atk 8 Def 13 Spe 5 Spc 9 (HP DV 7), Stat Exp
+        HP 22850 Atk 23140 Def 17280 Spc 19625 Spe 24795 -> 189 / 137 / 101 /
+        Sp.Atk 128 / Sp.Def 112 / 190; Gen I's Special (base 50) is the 128.
+      Gen III on: level 78 Adamant Garchomp, IVs 24/12/30/16/23/5, EVs
+        74/190/91/48/84/23 -> 289 / 278 / 193 / 135 / 171 / 171. The formula is
+        "Generation III onward", so Gen 3 is checked with the same numbers.
+  */
+  const statFixtures = await page.evaluate(async () => {
+    const s = await import('/pokeapp/src/modules/team-builder/statMath.ts')
+    const neutral = { increased: null, decreased: null }
+    const adamant = { increased: 'attack', decreased: 'special-attack' }
+    const pikaDv = { attack: 8, defense: 13, speed: 5, special: 9 }
+    const pikaExp = { hp: 22850, attack: 23140, defense: 17280, special: 19625, speed: 24795 }
+    const pika = (generation, key, base, effortKey = key) =>
+      s.computeStat({
+        generation, level: 81, base, key: effortKey, nature: neutral,
+        effort: pikaExp, individual: pikaDv,
+      })
+    const chompIv = { hp: 24, attack: 12, defense: 30, 'special-attack': 16, 'special-defense': 23, speed: 5 }
+    const chompEv = { hp: 74, attack: 190, defense: 91, 'special-attack': 48, 'special-defense': 84, speed: 23 }
+    const chompBase = { hp: 108, attack: 130, defense: 95, 'special-attack': 80, 'special-defense': 85, speed: 102 }
+    const chomp = (generation) =>
+      Object.keys(chompBase).map((key) =>
+        s.computeStat({ generation, level: 78, base: chompBase[key], key, effort: chompEv, individual: chompIv, nature: adamant }),
+      )
+    return {
+      gen1: [pika(1, 'hp', 35), pika(1, 'attack', 55), pika(1, 'defense', 30), pika(1, 'special', 50), pika(1, 'speed', 90)],
+      // Gen 2 split Special into two BASE stats; the DV and Stat Exp stay the Special ones.
+      gen2: [pika(2, 'hp', 35), pika(2, 'attack', 55), pika(2, 'defense', 30), pika(2, 'special', 50), pika(2, 'special', 40), pika(2, 'speed', 90)],
+      hpDv: s.hpDvFrom(pikaDv),
+      gen3: chomp(3),
+      gen4: chomp(4),
+    }
+  })
+  check('Gen 1: level 81 Pikachu is 189 / 137 / 101 / Special 128 / 190', JSON.stringify(statFixtures.gen1) === '[189,137,101,128,190]', JSON.stringify(statFixtures.gen1))
+  check('Gen 2: the same Pikachu is 189 / 137 / 101 / 128 / 112 / 190', JSON.stringify(statFixtures.gen2) === '[189,137,101,128,112,190]', JSON.stringify(statFixtures.gen2))
+  check('its HP DV is 7, packed from the other four', statFixtures.hpDv === 7, String(statFixtures.hpDv))
+  check('Gen 3: level 78 Adamant Garchomp is 289 / 278 / 193 / 135 / 171 / 171', JSON.stringify(statFixtures.gen3) === '[289,278,193,135,171,171]', JSON.stringify(statFixtures.gen3))
+  check('Gen 4: the same Garchomp, same numbers', JSON.stringify(statFixtures.gen4) === '[289,278,193,135,171,171]', JSON.stringify(statFixtures.gen4))
+
+  // The screen: the generation switches the formula and the stat list; Gen 5 says why it cannot answer.
+  const statLabels = async (gen) => {
+    await selectGeneration(page, gen)
+    await openIndex(page)
+    await page.click('[data-testid="tool-link-1"]')
+    await page.waitForSelector('[data-testid="calc-panel-stat"]', { timeout: 30000 })
+    return page.$$eval('[data-testid="calc-stat-result"] .ds-stat-label', (els) => els.map((e) => e.textContent.trim()))
+  }
+  const g1 = await statLabels(1)
+  const g3 = await statLabels(3)
+  check('Gen 1 lists the unsplit Special', g1.includes('Special') && !g1.includes('Sp. Atk'), g1.join(','))
+  check('Gen 3 lists Sp. Atk and Sp. Def instead', g3.includes('Sp. Atk') && g3.includes('Sp. Def') && !g3.includes('Special'), g3.join(','))
+  await selectGeneration(page, 5)
+  // The index link is disabled on Gen 5, so through the dropdown.
+  await goToPage(page, 'tools', 'calculators')
+  await page.waitForSelector('[data-testid="calc-scroll-area"]', { timeout: 30000 })
+  await page.click('.calc-subnav [role="tab"]:text-is("Stat")')
+  const gen5Stat = await page.$eval('[data-testid="calc-panel-stat"]', (el) => ({
+    reason: el.querySelector('[data-testid="tool-reason"]')?.textContent ?? null,
+    form: Boolean(el.querySelector('[data-testid="calc-stat"]')),
+  }))
+  check('on Gen 5 the Stat tab says "Gen 1–4 only" instead of a form', gen5Stat.reason?.startsWith('Gen 1–4 only') && !gen5Stat.form, JSON.stringify(gen5Stat))
+  await page.mouse.move(1200, 700)
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
