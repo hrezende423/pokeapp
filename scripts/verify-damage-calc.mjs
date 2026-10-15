@@ -266,6 +266,22 @@ try {
       mewtwoSpecial: stat.computeStat({ generation: 1, level: 100, base: 154, key: 'special', effort: { special: 65535 }, individual: { special: 15 }, nature: { increased: null, decreased: null } }),
       bonusMax: stat.statExpBonus(65535),
       shedinja: stat.computeStat({ generation: 3, level: 100, base: 1, key: 'hp', effort: { hp: 252 }, individual: { hp: 31 }, nature: { increased: null, decreased: null } }),
+      // Level 29 is one of the eight levels where `x * (level / 100)` floored a
+      // point low: (2*50 + 0 + 0) * 29 / 100 is exactly 29, and 0.29 is not.
+      charmanderSpd29: stat.computeStat({ generation: 3, level: 29, base: 50, key: 'special-defense', effort: {}, individual: {}, nature: { increased: null, decreased: null } }),
+      gen1Atk29: stat.computeStat({ generation: 1, level: 29, base: 40, key: 'attack', effort: {}, individual: { attack: 10 }, nature: { increased: null, decreased: null } }),
+      // Every level x base x IV (Gen 3-4, 0 EVs, neutral) against integer arithmetic.
+      integerMismatches: (() => {
+        const bad = []
+        for (let level = 1; level <= 100; level++)
+          for (let base = 1; base <= 255; base++)
+            for (let iv = 0; iv <= 31; iv++) {
+              const got = stat.computeStat({ generation: 3, level, base, key: 'attack', effort: {}, individual: { attack: iv }, nature: { increased: null, decreased: null } })
+              const want = Math.floor(((2 * base + iv) * level) / 100) + 5
+              if (got !== want && bad.length < 5) bad.push(`L${level} base ${base} IV ${iv}: ${got} vs ${want}`)
+            }
+        return bad
+      })(),
       dig: [1, 2, 3, 4].map((g) => era.resolveMovePowerForGeneration(move('dig'), g)),
       lowKick: [1, 2, 3].map((g) => era.resolveMovePowerForGeneration(move('low-kick'), g)),
       tackle: era.resolveMovePowerForGeneration(move('tackle'), 4),
@@ -275,6 +291,9 @@ try {
   check('Stat Exp bonus caps at 63 (pret CalcStat: sqrt counted to $ff)', facts.bonusMax === 63, String(facts.bonusMax))
   check('Gen 1 Mewtwo max Special is 406, not 407', facts.mewtwoSpecial === 406, String(facts.mewtwoSpecial))
   check('Shedinja HP is 1 at any spread', facts.shedinja === 1, String(facts.shedinja))
+  check('Gen 3 Charmander Sp. Def at level 29 is 34, not 33 (level is multiplied, then divided)', facts.charmanderSpd29 === 34, String(facts.charmanderSpd29))
+  check('Gen 1 base 40 + DV 10 at level 29 is 34, not 33', facts.gen1Atk29 === 34, String(facts.gen1Atk29))
+  check('computeStat matches integer arithmetic at every level, base and IV', facts.integerMismatches.length === 0, facts.integerMismatches.join('; ') || 'none')
   check('Dig power by era: 100 / 60 / 60 / 80', JSON.stringify(facts.dig) === '[100,60,60,80]', JSON.stringify(facts.dig))
   check('Low Kick is 50 in Gen 1-2, weight-based (null) from Gen 3', JSON.stringify(facts.lowKick) === '[50,50,null]', JSON.stringify(facts.lowKick))
   check('Tackle is 35 in Gen 4', facts.tackle === 35, String(facts.tackle))

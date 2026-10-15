@@ -43,7 +43,9 @@ The template and the reasons are in `docs/FEATURE-BRIEF.md`.
 4. **Done = `npm run check` passes** (typecheck, lint of changed files, build,
    and the verify suites for the touched areas — see `scripts/check.mjs`), plus
    the "Done when" lines asserted in a suite where they can be, plus a
-   browser look. A Stop hook runs `check --fast`; it is not the whole gate.
+   browser look. On a feature branch whose work is committed, run
+   `npm run check -- --since <base branch>`, or it checks nothing. A Stop hook
+   runs `check --fast`; it is not the whole gate.
 5. **Hand over a preview link** (see memory: push to the preview repo), and
    ask for one batched review with regions named from `?layout=1`.
 
@@ -108,7 +110,7 @@ Frozen by the owner: a change here needs a request, not a justification. They
 are also **excluded from the design-system migration** (2026-10-04).
 
 - **Team Display** (`.tb-team-viewer`): sprite sized from what the text
-  leaves over, `--tb-slot-card: 264px`, the seven-line order on
+  leaves over, `--tb-slot-card: 260px`, the seven-line order on
   `variant="full"`, mono lines levelled by cap height (`--tb-slot-mono`).
 - **Coverage panel placement** (`Popover` in `team-builder/ui/Overlay.tsx`,
   `.tb-popover`): portalled, fixed, framed by `.panel`; the `--tb-*` scale is
@@ -213,8 +215,8 @@ Deliberately left alone; the cheap fix is usually the wrong one.
   `src/modules/team-builder/CLAUDE.md`.
 - **verify-design-system: 12 species-card geometry checks fail** (card is
   212 × 214 vs Figma's 199-high aspect, after the owner's looser leading). Needs
-  the owner to decide whether 214 is the new reference. `npm run check` labels
-  this failure as known.
+  the owner to decide whether 214 is the new reference. `npm run check` passes it
+  only while exactly these 12 fail (`KNOWN_FAILING` in `scripts/check.mjs`).
 
 ## Module rules live beside the module
 

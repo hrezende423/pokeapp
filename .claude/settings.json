@@ -33,7 +33,7 @@
       "PowerShell(git reset:*)",
       "PowerShell(npm install:*)"
     ],
-    "deny": ["Read(./node_modules/**)", "Read(./dist/**)"]
+    "deny": ["Read(./node_modules/**)"]
   },
   "hooks": {
     "Stop": [
