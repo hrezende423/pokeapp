@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run verify:*)",
+      "Bash(npm run audit:*)",
+      "Bash(npm run report:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "PowerShell(npm run lint:*)",
+      "PowerShell(npm run build:*)",
+      "PowerShell(npm run check:*)",
+      "PowerShell(npm run verify:*)",
+      "PowerShell(npm run audit:*)",
+      "PowerShell(npm run report:*)",
+      "PowerShell(git status:*)",
+      "PowerShell(git diff:*)",
+      "PowerShell(git log:*)",
+      "PowerShell(git branch:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(npm install:*)",
+      "PowerShell(git push:*)",
+      "PowerShell(git reset:*)",
+      "PowerShell(npm install:*)"
+    ],
+    "deny": ["Read(./.cache/**)", "Read(./node_modules/**)", "Read(./dist/**)"]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-gate.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
+}

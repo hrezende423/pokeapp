@@ -36,7 +36,8 @@
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
     "audit:supplement": "node scripts/audit-supplement.mjs",
     "audit:white-sprites": "node scripts/audit-white-sprites.mjs",
-    "report:type-scale": "node scripts/report-type-scale.mjs"
+    "report:type-scale": "node scripts/report-type-scale.mjs",
+    "check": "node scripts/check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
