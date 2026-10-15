@@ -16,131 +16,73 @@ account menu's name and picture live in `profiles`, both
 RLS own-row only) so it follows the owner across devices. localStorage stays the
 primary copy; signed out, nothing changes. See `src/sync/`.
 
-Full rationale for anything below lives in `/design-system/DESIGN-SYSTEM.md`
-and `/design-system/design-tokens.json`. This file is only the rules that
-must never be re-derived, re-explained, or re-litigated in a fresh session.
+This file is only the rules that must never be re-derived, re-explained, or
+re-litigated in a fresh session. The reasons behind them are in
+`docs/claude/rationale.md`, the module rules beside each module (table below),
+and the design rationale in `/design-system/DESIGN-SYSTEM.md`.
 
 **STARTING A NEW MODULE? Read `/design-system/MODULE-PATTERNS.md` first.**
 It is the build reference — every pattern the Pokédex grid and species
-detail page established, in the order you need them, each with the file to
-copy from and the mistake it exists to prevent. `DESIGN-SYSTEM.md` §12 is
-the as-built audit of those two screens and is authoritative wherever it
-disagrees with §1–§11, which were written before implementation.
+detail page established, each with the file to copy from and the mistake it
+exists to prevent. `DESIGN-SYSTEM.md` §12 is the as-built audit of those two
+screens and is authoritative wherever it disagrees with §1–§11.
+
+## Workflow: requirements in, features out
+
+The template and the reasons are in `docs/FEATURE-BRIEF.md`.
+
+1. **Before code, ask once.** If a request is more than a one-file change and
+   lacks a "Done when" or a "Not doing", reply with EVERY open question in one
+   batch, the files you will touch, and the acceptance checks. No code until
+   the owner answers. Never trickle questions across turns.
+2. **New screen or redesign → mockup first** (static, real tokens, real data)
+   for the owner to mark up. Do not build a full redesign on a guess — two were
+   built and reverted that way.
+3. **One feature per branch**, named for the feature. Don't pile unrelated work
+   onto the current branch; ask if unsure which branch something belongs on.
+4. **Done = `npm run check` passes** (typecheck, lint of changed files, build,
+   and the verify suites for the touched areas — see `scripts/check.mjs`), plus
+   the "Done when" lines asserted in a suite where they can be, plus a
+   browser look. A Stop hook runs `check --fast`; it is not the whole gate.
+5. **Hand over a preview link** (see memory: push to the preview repo), and
+   ask for one batched review with regions named from `?layout=1`.
 
 ## Architecture
 
 - **Generation-scoped source of truth**: every dex module (species, moves,
   items, abilities) has its own scoped list function
   (`src/modules/dex/entrySources.ts`). Cross-module features (search,
-  filters, the global game/gen selector) must reuse those functions —
-  never a fresh index or raw bundle query. This is how generation-leak
-  bugs get introduced, and it's happened before.
-- **Global game/generation selector** filters the *entire* app: which
+  filters, the global selector) must reuse those functions — never a fresh
+  index or raw bundle query. Generation-leak bugs came from exactly this.
+- **Global GENERATION selector** filters the *entire* app: which
   species appear in lists, AND all data fields shown for them (moves,
-  abilities, items, learnsets as of the selected game). Not just a list
-  filter — a full context that every module must respect.
+  abilities, items, learnsets as of the selected generation). Not just a list
+  filter — a full context that every module must respect. It picks a
+  generation, not a game (owner, 2026-10-10), and lives in the account menu
+  under the theme switch. Per-game data uses the generation's default game
+  (`defaultGameOfGeneration`, `version-group/games.ts`); the screens where the
+  game matters — species page, Trainer Dex, Movedex "learned by" — have their
+  own game row INSIDE the generation (`useGameInGeneration` + `GameRow`). Those
+  rows are not exceptions to the selector: they cannot leave its generation.
+- **Exactly four sanctioned exceptions** to the global selector, each by the
+  owner's request. **Do not add a fifth without asking.** Each is detailed in
+  its module's CLAUDE.md:
+  1. the species page Info tab's **locations** section — every game in one
+     table; must stay lazy, gated on "is it on screen" (`pokedex/`);
+  2. **Type Coverage**'s own generation selector (`typecoverage/`);
+  3. the **Damage calculator** tab's own generation selector (`calculators/`);
+  4. **Team Matchup**'s own GAME selector, seeded once per session
+     (`team-matchup/`).
+  The selector-owning ones share one shape: seeded once from the app
+  selection, then independent, one-way.
 - Favor extensibility (Gen 5+ additions via config) over refactoring.
-- **The species detail page reproduces its Figma frame proportionally**,
-  not at the token sizes. `DetailPage-Light` is 1860 × 1172 raw units drawn
-  at 2.23× (established by `scripts/calibrate-scale.mjs`), so every length
-  on that page is a multiple of `--dp-u` = `100cqw / 1860` and the type
-  tokens are REDEFINED in those units on `.species-page-inner`. That is why
-  shared components (`DataTable`, `StatRow`, `Tabs`) scale with the page
-  without per-component work — and why an element there cannot query its
-  own container, which is what the `-inner` wrapper exists for.
-  **It has exactly two tunable numbers**, and they are separate on purpose:
-  the 1400px width cap, and `--dp-s` (0.78) which multiplies only the TYPE.
-  Because every length is one unit, "smaller text" and "narrower page" would
-  otherwise be the same control. `npm run report:type-scale` prints every
-  size in the app — the fixed tokens and this page's raw units, measured in
-  a browser — and the RAW column is the number to edit.
-  **The SPACING tokens are redefined in those units too** (`--space-gap-*`,
-  `--space-row-padding-block`), which is not decoration: the type dropped 22%
-  when `--dp-s` landed and absolute padding did not come with it, so every
-  row kept the rhythm of a larger face. Two values in shared CSS cannot be
-  reached that way and are overridden inside `.species-page` —
-  `.ds-stat-row`'s `padding: 8px 0` and `.data-table`'s `5px 7px`. If a
-  spacing value on that page is in `rem` or `px`, it is a bug.
-- **The Info tab's locations section is the ONE EXCEPTION to the global
-  game selector**, by explicit request: it shows every game's locations in
-  one table, with a `--game-*` badge per row and release order as the
-  default sort. Nothing else on the page may follow it in ignoring the
-  selector — every other era-sensitive field still goes through a resolver.
-- **And it must stay lazy — that gate is now essential, not an
-  optimisation.** Info is the DEFAULT tab and being game-agnostic means all
-  fourteen encounter partitions, 9.6 MiB raw / ~280 KiB gzipped, so an
-  eager section there would spend that on every species open for a visit
-  that only wanted the stat line. **The gate is "is it on screen", NOT "has
-  the reader scrolled"** — since the metadata rows lost their row gap the
-  block is ~92px shorter, so on a window taller than ~800px the section is
-  already visible when Info opens and correctly loads then. A section the
-  reader can see must never sit behind "Loads when you scroll to it". The
-  cost lands once per session, not once per species. It gates its own fetch
-  behind an `IntersectionObserver`; `getEncountersForSpeciesAllGames` de-duplicates
-  in-flight loads and indexes each file once per session, so the second
-  species is free. Four suites drive a scroll rather than a tab click
-  because of this, and verify-app asserts 14 files / 14 requests.
-  It reports partitions that FAILED rather than dropping them — a table
-  missing three games must never read as "not in those games" — and throws
-  only when every one of them failed.
-- **Type Coverage has its OWN generation selector — the SECOND sanctioned
-  exception**, also by explicit request (`useTypeCoverageScope`). The
-  question that page asks is "which type chart, and which combinations
-  really exist" — asked *about* a generation rather than inside one — so
-  answering it must not re-filter the app behind it. It seeds from the app
-  selection once on mount (the `useSpeciesGameScope` pattern) and then
-  diverges; the dependency runs one way only, so neither selector can move
-  the other. Generation only, no version-group axis: every game in a
-  generation shares one chart, so a second row would offer a choice that
-  changes nothing.
-- **The Damage calculator has its OWN generation selector — the THIRD
-  sanctioned exception**, approved by the owner 2026-09-26
-  (`calculators/useDamageCalcScope.ts`). A calc is pinned to a ruleset; changing
-  the app's game to change one calc's era would re-filter every screen behind it.
-  Same shape as Type Coverage: seeded once, then independent, one-way, generation
-  only (legality is answered across all of a generation's games at once). It
-  scopes the Damage TAB only — the other four calculator tabs still follow the
-  app.
-- **Team Matchup has its OWN GAME selector — the FOURTH sanctioned exception**,
-  approved by the owner 2026-10-01 (`team-matchup/useMatchupScope.ts`). A matchup
-  is pinned to one GAME: the game decides the trainers, their AI, the badge boosts
-  and the send-out logic. Same shape as the Damage Calculator's: seeded once from
-  the app selection, then independent, one-way; it picks a game (the ten Gen 1–4
-  main-series games with a disassembly), not a generation. Unlike the
-  calculator it is seeded once per SESSION, not per visit: the M3 hand-off to
-  the Damage Calculator unmounts the page, and re-seeding on return dropped the
-  reader onto a game with no setup. Do not add a fifth exception without asking.
-- Sprites: GitHub Release assets in `hrezende423/pokeapp-sprites`,
-  runtime-cached, NOT precached (648MB total, too large to bundle).
-  `species-background-colors.json` lives in the same repo, fetched at
-  runtime — applies ONLY to the species detail page's artwork panel,
-  never the grid or any other screen.
-- **PokéAPI serves the Gen 1–2 sprites on an opaque WHITE background**, and
-  it is inconsistent about what it also serves transparently. 2,110 of those
-  slots have a `transparent/` counterpart upstream and are simply not
-  rendered; 2,110 have none (both gray slots on red-blue/yellow,
-  front_shiny/back_default/back_shiny on gold/silver) and are keyed to
-  transparency by us, hosted at
-  `pokeapp-sprites/transparent/{game}/{slot}/{id}.png`. The keying is a
-  **border flood fill, never a global colour key** — these sprites use the
-  same `#ffffff` for eyes and teeth as for the background. `npm run
-  audit:white-sprites` re-derives the table; the pixel proof is in
-  verify-species-page section N, which decodes every Gen 1–2 tile in a canvas.
-- **Two animated sets live in that repo, under separate release tags.**
-  `gen1`…`gen4` are the high-resolution animated WebP artwork (1,174 files).
-  `bw-gen1`…`bw-gen4` are PokéAPI's Black/White animated GIFs converted to
-  animated WebP (2,340 files, `{iii}-bw-{front|back}-{n|s}[-f].webp`) — the
-  ONLY animated sprites the API has, and Gen 5 art of Gen 1–4 species, so
-  the section showing them names the game. Which of the eight slots exists
-  per species is an 8-bit mask in `src/data/animatedSprites.ts`;
-  `npm run audit:bw-sprites` cross-checks upstream, the mask and the
-  releases, because a mask entry with no asset is a broken image.
-- **Sprite slot encoding**: 14 real slot variants exist across Gen 1–4
-  (16,204 tiles for 493 species), stored as a per-game bitmask rather
-  than a name array purely for install payload — 98 KiB against 638 KiB
-  on the eagerly precached `species.json`. Eager and NOT lazy-fetched on
-  purpose: the app is offline-first, and a lazy file would leave the
-  Sprites tab broken until someone opened it online first.
+- **The species detail page scales its Figma frame proportionally** (`--dp-u`
+  units, type × `--dp-s`). A `rem`/`px` length or spacing there is a bug.
+  Detail in `src/modules/pokedex/CLAUDE.md`.
+- **Sprites** are GitHub Release assets in `hrezende423/pokeapp-sprites`,
+  runtime-cached, NOT precached (648MB). `species-background-colors.json`
+  applies ONLY to the species page's artwork panel. Gen 1–2 white-background
+  keying, the two animated sets and slot encoding: `src/data/CLAUDE.md`.
 
 ## Data sourcing (don't deviate without asking)
 
@@ -151,197 +93,40 @@ disagrees with §1–§11, which were written before implementation.
   modern-only model: Gen 1's unsplit Special stat, Gen 1–2's DVs/Stat Exp
   (not EVs/IVs), abilities and natures don't exist before Gen 3, and
   **hidden abilities don't exist before Gen 5**. Any component showing
-  these fields must hide/adapt them per the active generation, not just
-  always show the modern version.
-- **PokéAPI's `past_` arrays are incomplete, so era rules can't be left
-  to the data alone.** Two cases fixed in `src/data/era.ts`: 17 species
-  have no `past_abilities` entry emptying their hidden slot (Koffing
-  advertised Stench in HGSS), and 20 have a Gen 1 `special` entry *plus* a
-  later entry on a physical stat, so stats must resolve per stat rather
-  than per entry (Beedrill's Gen 1 Attack is 80, not the modern 90).
-  Where a mechanic's start generation is a known fact, encode it as a rule.
-- **Moves have `past_values` and NOTHING READS IT — open bug.** Charm,
-  Sweet Kiss and Moonlight are stored as Fairy (`type_id: 18`, a Gen 6
-  type) with a `past_values` entry giving Normal, so all three render as
-  FAIRY under a Gen 1–4 selection. Affects the Movedex and every learnset
-  table, not one page. Same class as the hidden-ability case and the data
-  is already in the bundle; needs a `resolveMoveTypeForGeneration` and a
-  decision, since it touches a pre-redesign module. See
-  `src/modules/pokedex/SPECIES-PAGE-PUNCH-LIST.md` §10a.
-- **Japanese species names**: PokéAPI's `ja-roma` gives the real,
-  official Nintendo romanization, NOT a mechanical transliteration —
-  ゲンガー is "Gangar", not "gengaa"; ラッキー is "Lucky", not
-  "rakkii". Never use a kana-to-romaji library for this (wanakana was
-  considered and rejected); `ja-roma` already carries the correct
-  trademark name for all 493 species in Gen 1–4 scope. Language codes
-  are lowercase: `ja-hrkt`, not `ja-Hrkt` — the documented casing
-  silently returns null rather than erroring.
+  these fields must hide/adapt them per the active generation.
+- **PokéAPI's `past_` arrays are incomplete** — where a mechanic's start
+  generation is a known fact, encode it as a rule (`src/data/era.ts`). Moves
+  resolve per generation through `moveForGeneration` (`src/data/moveEra.ts`).
+  Detail in `src/data/CLAUDE.md`.
+- **Japanese names come from `ja-roma`** (official romanization: "Gangar",
+  not "gengaa"). Never a kana-to-romaji library. Codes are lowercase
+  (`ja-hrkt`) — the documented casing silently returns null.
 
 ## Signed off — do not touch without being asked
 
-Screens the owner has reviewed, accepted and explicitly frozen. Not
-"finished" in the sense of having no debt — frozen in the sense that a
-change here needs a request, not a justification. Read the deferred-debt
-section below before deciding something on this list is a bug: the known
-imperfections are already logged there deliberately.
+Frozen by the owner: a change here needs a request, not a justification. They
+are also **excluded from the design-system migration** (2026-10-04).
 
-- **The Team Display sizes its sprite from what the text leaves over.**
-  `.tb-team-viewer` is `min-height: 100%` with `box-sizing: border-box` (the
-  screen's own 8/14px padding would otherwise push it 22px past the scroller),
-  the grid is `flex: 1` with `1fr 1fr` rows, and `.tb-card-art` is `flex: 1`
-  against `flex: 0 0 auto` facts — so the artwork absorbs the remainder of a
-  grid row and is as large as the window allows at any window size. Measured:
-  188px at a 720px window up to the 264px cap from 900 up, against the 84px it
-  was fixed at. All six cards stay on screen with no overflow across that whole
-  range; verify-team-builder §14 drives five heights.
-  **`max-height: var(--tb-slot-card)` on the art box is load-bearing**, not
-  taste: the frame is `aspect-ratio: 1` sized from its height, so an art box
-  taller than the card is wide makes a square frame WIDER than its card — and
-  the card sets `overflow: hidden`, so the held-item badge positioned against
-  that frame gets clipped off the picture.
-  `--tb-slot-card: 264px` is measured the same way as the Team Library card:
-  the widest Gen 1–4 move row (218px — "High Jump Kick" at 112px plus the type
-  and category columns) and the widest types|nature|ability line (259px), which
-  is the binding one.
-  **The seven-line order is scoped to `variant="full"`.** The Build Library card
-  keeps the layout it was signed off with — species on its own line, nature and
-  ability dot-separated — and §14 guards that the two have not merged.
+- **Team Display** (`.tb-team-viewer`): sprite sized from what the text
+  leaves over, `--tb-slot-card: 264px`, the seven-line order on
+  `variant="full"`, mono lines levelled by cap height (`--tb-slot-mono`).
+- **Coverage panel placement** (`Popover` in `team-builder/ui/Overlay.tsx`,
+  `.tb-popover`): portalled, fixed, framed by `.panel`; the `--tb-*` scale is
+  hosted on `.tb, .tb-popover` and `box-sizing: border-box` is load-bearing.
+- **An immunity is never counted as a resistance** (`TeamMatchup`: Weak /
+  Resist / Immune).
+- **Attacking coverage** (`OffencePanel`, `team-builder/ui/TypeMatchup.tsx`):
+  counts attacks per tier, one table at both scopes.
+- **Team Library card width** `--tb-compact-card: 127px` is a measured constant.
+- **Build Form: the owner's nine changes** (2026-10-04).
 
-  **ONE DRAWN SIZE, TWO NOMINAL ONES.** The sans lines are at caption; the mono
-  ones (nickname, level, EV spread, all four move names) are at
-  `--tb-slot-mono`, `calc(var(--font-size-caption) * 0.82)`. Martian Mono draws
-  about a fifth larger than Plex Sans at the same px — the rail measured it as
-  9px mono == 11px sans — and the mono lines here are the long ones, so a card
-  levelled at ONE nominal size read as two. Cap heights are now within 0.4px and
-  §14 asserts that rather than nominal equality.
-  `.tb-card-full .tb-card-facts` sets a font-size of its own, and it is NOT
-  redundant with the per-line rules: the wrappers between the block and the
-  lines (headline, id line, type run, the separator+fact spans) set none, so
-  `.tb-meta-sep` and `.tb-type-sep` drew at the PAGE's 18px body — and an 18px
-  item in a 13px line box pushed the baseline down far enough to make the id
-  line 3px taller than its own leading, on every card. Leading is
-  `--tb-slot-line: 12px`. The facts block went 115px → 91px and all 24 of those
-  pixels went to the sprite.
-
-- **A coverage panel is placed in the app frame, not in the card.**
-  `Popover` (`ui/Overlay.tsx`) portals to `document.body` and is
-  `position: fixed`, placed from a measurement of the wrapper it is written
-  inside — so every call site keeps its old anchor contract without passing a
-  ref, via a `display: none` marker whose `parentElement` IS that wrapper. It
-  was `position: absolute`, and two different ancestors cut it: `.tb-card` sets
-  `overflow: hidden` (the watermark and the artwork both bleed to the card's
-  edge), so a member's panel was clipped to a 264px card and lost its bottom
-  rows; and the team's panel hangs off a dock that now sits in the narrow left
-  column, where right-aligned it started at a NEGATIVE x. It is pushed back
-  inside horizontally rather than flipped — a coverage chart's left edge is its
-  labels, and flipping would move the panel out from under the icon that opened
-  it — and it flips ABOVE the trigger when there is more room there, taking a
-  `max-height` of that room so a panel taller than the window scrolls itself.
-  **The frame is `.panel`, not the window**: clamped to the window, the team's
-  panel came to rest outside the app, over the page background beside it.
-  A side effect worth keeping: the panel no longer inherits `.tb-corner`'s
-  `opacity: 0`, so moving the mouse off a card no longer makes an open panel
-  invisible while it is still open. verify-team-builder §15 drives all four
-  panels at two window heights and asserts no ancestor cuts them, that they sit
-  inside `.panel`, and that nothing in them is unreachable.
-
-  **THE TOKENS ARE HOSTED TWICE BECAUSE OF THIS**, and it is not optional:
-  `.tb, .tb-popover` declares the `--tb-*` scale, because a portalled panel is
-  no longer inside `.tb` and an unresolved custom property does not fall back --
-  it makes the whole declaration invalid, so `gap: var(--tb-3) var(--tb-4)`
-  computed to `normal` and the type run ran straight into "2 of 4 moves
-  counted". §15 reads a real gap back out of a live panel. Anything else the
-  module scopes to `.tb` and a panel might use has to be hosted the same way;
-  moving the scale to `:root` is the wrong fix, since it exists precisely
-  because it is not the app's.
-
-  **`box-sizing: border-box` on `.tb-popover`** is load-bearing for the same
-  placement: `max-height` arrives as the room actually available, and under
-  content-box the panel's own 14px padding and 1px border were added to it, so
-  a capped panel came out 34px taller than the space it was capped to -- with
-  its bottom edge outside the frame, which is the one thing the placement is
-  there to prevent.
-
-- **An immunity is never counted as a resistance.** The team's defensive table
-  (`TeamMatchup`) has three exclusive buckets — Weak, Resist, **Immune** — and
-  the immune one exists because `multiplier < 1` swept 0x in with 0.5x: a team
-  of Zapdos, Bronzong, Gengar and Aggron read "Ground: 1 weak, 3 resist" when
-  three of those members cannot be hit by Ground at all (Zapdos by its Flying
-  half, the other two by Levitate). Every immunity the per-species panel knows
-  about is counted here: both halves of a dual type, type-and-ability
-  (Bronzong's Levitate, Heatran's Flash Fire over an otherwise neutral Fire) and
-  ability-only. **A row earns its place with a weakness OR an immunity**, not a
-  weakness alone — the old `weak > 0` filter dropped the team's best news, so
-  Gengar's Normal immunity never appeared because nothing on that team happened
-  to be weak to Normal. verify-team-builder §10 asserts the three buckets off
-  the rendered table; the two checks it replaced asserted the conflated numbers,
-  which is how the bug survived a suite that was already driving this panel.
-
-- **Attacking coverage counts ATTACKS, per tier, in ONE table at both scopes.**
-  `OffencePanel` (`ui/TypeMatchup.tsx`) renders one moveset or six: a member's
-  panel and the team's are the same component, because "the same analysis for a
-  member and for the team" is a requirement and two implementations would drift.
-  One row per defending type, one column per multiplier, and the cell is how
-  many damaging attacks land there — so a row's columns SUM to the number of
-  damaging moves, which is the invariant §8 and §16 assert (a double count or a
-  dropped move shows up as a row that does not add up). Counting attacks rather
-  than "the best you can manage" is the point: 2x said coverage existed without
-  saying whether it was one move deep, and six members with one Earthquake
-  between them is not the team six members with one each is.
-
-  **4x AND 0.25x CANNOT OCCUR HERE and that is not a gap.** The chart gives one
-  of 0, 0.5, 1 or 2 for a single attacking type against a single defending type;
-  the doubling that produces 4x on defence comes from the DEFENDER having two
-  types, and an attack has only one type to bring. Those tiers need a pair-aware
-  pass over the type combinations that really exist, which is a different panel
-  and has not been asked for. **Nothing hardcodes their absence** — `TIER_ORDER`
-  is `[4, 2, 1, 0.5, 0.25, 0]` and the columns rendered are the ones the rows
-  actually use, so a pair-aware caller would simply see more of them.
-
-  **Worst matchups lead, and only a WALL is marked.** Rows with no
-  super-effective attack sort to the top (the opposite of the defensive table,
-  where the high count leads), and such a row prints an explicit `0` where every
-  other empty cell is blank. The `--accent` marker goes on that zero only when
-  the type also resists or ignores something: a half-built member has no
-  super-effective answer to almost anything, and colouring all thirteen of those
-  rows would spend the page's one alarm colour on "this build is unfinished".
-  Each member's moves resolve in the MEMBER's own generation while the chart is
-  the enclosing generation, the same split the defensive panel makes.
-
-  **The panel's leading is its own** (`.tb-matchup { line-height: 15px }`, table
-  cells at 2px): seventeen rows at the page's inherited 26.1px did not fit an
-  800px window and the panel capped itself into a scroller. verify-team-builder
-  §16 derives every number in it by hand from a three-member team.
-
-- **The Team Library card's width is a MEASURED CONSTANT.**
-  `--tb-compact-card: 127px` is the rendered width of "ELECTRIC · FIGHTING" —
-  the longest type pair in Gen 1–4 scope, 116.6px with the card's own uppercase
-  transform, tracking and separator margins — plus a 5px inset either side.
-  All 272 ordered pairs were measured in a browser to establish that it is the
-  longest. Do not replace it with `max-content` (each card would then be as
-  wide as its own type pair) or with `flex: 1` (a team of one drew a card as
-  wide as the lane, which is what it used to do). verify-team-builder §13
-  re-measures every pair and asserts the constant still fits.
-
-  The 5px inset lives on `.tb-card-facts`, not on the card: the type run is
-  centred inside it and every other line starts at its left edge, while the
-  sprite group and the dex watermark stay centred on the CARD so the watermark's
-  bleed is symmetrical.
-
-- **Team Building — Build Form: the owner's nine changes** (2026-10-04, branch
-  `team-builder-v2`, pending review). A first, broader redesign was merged and
-  reverted the same day; this one applies ONLY the nine requested items and
-  leaves the rest of the screen as it was (native selects, label sizes, stat
-  table, identity panel). In short: no accent on the page; move type/category
-  abbreviations (NOR FIR WAT… / Phy Spe Sta, mono 11px); no ⓘ icons, the label
-  is the tooltip trigger (`ui/LabelTip`, `data-tip` + aria-describedby); EV Total
-  directly under the sliders with "⚠ N (over by X)"; "− value +" steppers
-  (`ui/NumberStepper`); regular-weight fields; underline focus on fields and a
-  ring on :focus-visible elsewhere; rail with 64px sprites and type-only
-  selection; one spacing variable `--fgap` (24 / Tight 16 / Roomy 32,
-  `?fgap=tight|roomy`). The old frozen layout notes (17px rail leading, rail
-  ending level with the Total row) no longer hold.
-  Its BEHAVIOUR (see "the unsaved member" below) is unchanged.
+Working near them:
+- **A shared component a frozen screen uses must not change in place.** Add a
+  NEW version beside it (e.g. `FooV2`) for migrated screens.
+- **Global values still reach them.** After any global token or font change,
+  run `npm run verify:team-builder` (a Manrope trial failed 3 checks there).
+- Measurements and rationale: `src/modules/team-builder/CLAUDE.md`. Read it
+  before touching any of them.
 
 ## Verification discipline
 
@@ -349,901 +134,103 @@ imperfections are already logged there deliberately.
   (or an equivalent real check) is required before marking anything done
   — not just that code compiles or type-checks pass.
 - **Stop and ask, don't over-engineer.** When an automated approach
-  produces wrong results, the correct response is pausing to ask, not
-  applying a cleverer algorithm.
+  produces wrong results, pause and ask; don't apply a cleverer algorithm.
 - Ambiguity → ask. Don't silently pick a resolution for anything not
   explicitly covered here or in the fuller docs.
+- **Every script that starts a server goes through `scripts/lib/devServer.mjs`**
+  and owns its own port; a new browser suite must self-host. Detail in
+  `scripts/CLAUDE.md`.
+- **Prettier is not a gate**: 260 files predate it. Never run `npm run format`
+  over the repo (it once rewrapped five calculator files that had to be restored).
 
-## Design system non-negotiables
+## Design system
 
-(Full rationale in DESIGN-SYSTEM.md — this is the condensed "don't violate
-by accident" version, since these are easy to break even in a session
-that isn't explicitly about design.)
+Source of truth: `design-system/`. Read `PRINCIPLES.md` and `PATTERNS.md`
+first, then `components/<name>.md` before building or changing any UI
+component. `design-system/preview.html` shows every component and state.
 
-- **No `box-shadow`, anywhere, either theme.** Elevation is a tone-step:
-  `--surface` vs `--surface-raised`.
-- **The hairline-band rule.** Where rows draw their own `border-bottom`,
-  the band a reader sees runs from one hairline to the NEXT — so a row
-  `gap` falls inside that band and content centred in its own box reads a
-  half-gap low. Either no row gap or no per-row border; never both. This
-  shipped wrong once with every box-relative measurement passing, so
-  verify by reconstructing the band from the hairlines, not the row box.
-- **Base-stat bars are the one sanctioned reversal of "stats are a plain
-  table".** Six values on one 0-255 scale where the spread is the fact.
-  Scoped to that block; not a licence for progress bars anywhere else.
+- Never hardcode colors, font sizes, weights, spacing or radii. Use the
+  variables from `design-system/dist/tokens.css`; components use semantic
+  tokens only, never primitives (`--color-accent-600` etc.).
+- Theme: `data-theme="light|dark"` on `<html>`; density:
+  `data-density="airy|default|compact"` on the page root.
+- **No `box-shadow`, anywhere, either theme.** Elevation is a tone-step.
 - **`--accent` (red) has exactly TWO uses**: the active nav item and the
-  selected tab — wayfinding, "you are here". **At most 2 accent elements per
-  screen.** Decided 2026-10-04 with the new design system
-  (`design-system/PRINCIPLES.md`), replacing the earlier four-use rule. The two
-  retired uses move to neutrals, via the design-system tokens:
-  - **emphasis** (binary state indicators such as caught/not-caught, and
-    error/validation emphasis) → `--color-text-default`;
-  - **lines** (the filled portion of a base-stat bar, the gender-ratio bar's
-    female share) → `--color-border-strong`. The male share and the track stay
-    neutral too, never a literal `#fff`.
-  Never decoration. App-wide, not namespaced. **Existing code still uses
-  `--accent` for the retired uses until each screen is migrated** — do not
-  "fix" one as a drive-by; migrate it with its screen.
-- **NOTHING gets a badge. No fill, no pill, no chip, anywhere.** "Type is
-  data, not decoration" is now the whole rule rather than a rule with one
-  exception: game names were badged for two passes, in a `--game-*` colour
-  at a 12% self-tint, and the badge was removed on request along with the
-  palette and `scripts/calibrate-game-colors.mjs`. A version name is set in
-  the label size and `--text-secondary`, the same as every other small
-  label. `--radius-badge-square` remains a sanctioned token that nothing
-  uses; do not reach for it without asking, and if a badge is ever wanted
-  again, `git log -- src/modules/pokedex/GameBadge.tsx` has the whole thing.
-- **No ALL-CAPS on the species detail page.** One block in `pokedex.css`
-  scoped to `.species-page` turns `text-transform: uppercase` into
-  `capitalize` and drops the tracking to 0.01em. Scoped, not global: the
-  five pre-redesign dexes and the design-system reference page keep their
-  own typography.
-- **Fonts: IBM Plex Sans for text, Martian Mono for values** (Manrope was tried
-  on 2026-10-04 and reverted the same day: it draws ~9% larger than Plex at the
-  same px, which broke the Team Display's levelled cap heights). The design
-  system's `--font-family-sans` / `--font-family-mono` carry these stacks
-  (source `design-system/tokens.json` -> `dist/tokens.css`, never hand-edit the
-  dist) and the old names are ALIASES of them in `src/design-tokens.css`:
-  `--font-body` = `var(--font-family-sans)`, `--font-numeric` =
-  `var(--font-family-mono)`. New code uses the design-system names.
-  Self-hosted, no CDN; the font must lead the stack, or a system font silently
-  wins (happened once already). Mono is for tabular/functional numbers only.
-  **Roman AND italic faces are bundled** — four `@font-face` blocks, two
-  subsets x two styles. The italic was missing for months and the failure
-  was invisible: `font-style: italic` fell back to the Roman and Chrome
-  synthesised nothing, so the romanised name, the banner genus and the
-  Naturedex's neutral cell all drew upright. A real italic, never an
-  `oblique`/`skewX` fake: Plex Italic is a redrawn face. Never assert
-  italic from a computed style — measure the advance width, because a
-  fallback and a synthesised oblique both report `font-style: italic`.
+  selected tab. **At most 2 per screen.** Emphasis → `--color-text-default`;
+  lines (stat-bar fill, gender-ratio female share) → `--color-border-strong`.
+  Existing code still uses `--accent` for the retired uses until each screen
+  is migrated — do not "fix" one as a drive-by.
+- **NOTHING gets a badge** — no fill, pill or chip, anywhere. A type is its
+  colored name text; a game name is label size in `--text-secondary`.
+- **The hairline-band rule**: rows with their own `border-bottom` get no row
+  `gap` — never both. Verify by reconstructing the band from the hairlines.
+- **Base-stat bars** are the one sanctioned graphic in a stat table; no ticks.
+- No hover backgrounds; no underlined text; ghost buttons only; underline text
+  fields only; headings and UPPERCASE labels are regular weight.
+- **Fonts: IBM Plex Sans (text), Martian Mono (tabular numbers only)**,
+  self-hosted, leading the stack, Roman AND italic faces. New code uses
+  `--font-family-sans` / `--font-family-mono` (`--font-body`/`--font-numeric`
+  are aliases). Never assert italic from a computed style — measure the advance.
 - **Icons**: Tabler, 24px grid, 1.5px stroke, outline default.
-- **Type indicators**: colored text label only, no fill/badge/icon — same
-  treatment in list and detail contexts.
-- Old (pre-redesign) modules — Itemdex, Abilitydex, Naturedex, Berrydex,
-  Movedex — keep their own layout/components/colors untouched, but now
-  inherit the app-wide Plex Sans default like everything else.
-
-## Excluded from migration
-
-The migration to the new design system (`design-system/`, tokens in
-`dist/tokens.css`) **does not touch these screens**. Decided 2026-10-04. They
-are the signed-off screens above, frozen as they are:
-
-- **Team Display** (`.tb-team-viewer`, the member cards and their sprite sizing)
-- **Coverage panels** (`Popover` placement, `.tb-popover`, `--tb-*` scale)
-- **Team Matchup defensive table** (Weak / Resist / Immune)
-- **Attacking coverage** (`OffencePanel`, `.tb-matchup`)
-- **Team Library card** (`--tb-compact-card`)
-
-Rules for working near them:
-- **Do not edit these files or their CSS** to migrate them.
-- **A shared component a frozen screen uses must not change in place.** If the
-  migration needs it different, add a NEW version beside it (e.g.
-  `FooV2`) used by migrated screens, and leave the old one for the frozen ones.
-- **Global values still reach them.** Any global token or font change lands on
-  these screens without editing them, and their measured constants
-  (`--tb-compact-card` 127px, `--tb-slot-card` 264px, the cap-height levelling)
-  were measured with Plex Sans and Martian Mono. Re-run
-  `npm run verify:team-builder` after any global change rather than assuming
-  they still hold (a Manrope trial failed 3 checks there).
-
-## Type Coverage (Poképedia)
-
-Four tabs — **Matrix | Flow | Against | Card**, Matrix leading and default.
-Built from `design-system/typechart-mockup.html`, which stays as the design
-record and is NOT app code.
-
-- **Matrix is ONE computation read two ways.** `defendingRows` is built per
-  defending typing in attacking-type order; Custom renders it as it stands,
-  Standard reads the same array with the loops exchanged. The transpose is an
-  index swap, never a second table — that is what makes the two orientations
-  incapable of disagreeing about a cell. Do not add a separate Standard path.
-- **Custom is the default orientation**, and it is the only one that can show
-  4x / ¼x: those tiers need a defender holding two types, and only the row
-  axis carries a pair. 31 cells reach 4x in Gen 4, 48 fall to ¼x.
-- **Toggles B (Full/Single) and C (Existing/All) are Custom-only**, hidden
-  rather than disabled, and **switching orientation RESETS both to their
-  defaults plus clears the type filter** — by explicit request, so nobody
-  reads a matrix shaped by a control they cannot see.
-- **STANDARD DOES NOT PRUNE ITS AXES BY WHAT EXISTS**, and this is where the
-  brief contradicted itself. Standard is specified as "the traditional
-  layout" *and* as forcing Existing; those cannot both hold, because the
-  printed chart is a chart of the type system. Measured: nothing in Gen 1–4
-  is pure Flying, and in Gen 1 nothing is pure Rock, Ghost or Ice either — so
-  pruning made the Gen 1 chart 11 columns against 15 rows. Existing keeps its
-  stated meaning where it is a CONTROL (Custom); Standard shows the full
-  system. **CONFIRMED by the owner — keep the columns. Settled; do not
-  re-litigate.**
-- **The matrix table is its own scroller and that is load-bearing.**
-  `position: sticky` resolves against the nearest *scrolling* ancestor, so a
-  table that merely grows the page has nothing to stick to — the mockup's
-  column headers already declared `top: 0` and still scrolled away for
-  exactly that reason. **Both axes freeze**: vertical was the request, and the
-  horizontal row-header freeze was kept deliberately on request.
-- **The dark row highlight could not use `--surface-hover`.** In dark that
-  token is `#141414`, byte-identical to `--surface`, so the rule painted a
-  colour indistinguishable from the page while the CSS looked correct.
-  `--surface-raised` is the reuse, per "elevation is a tone-step".
-- **The type filter is underlined, not filled**, and is deliberately NOT
-  `components/TypeFilter.tsx` — that one fills selected buttons with the type
-  colour, which is the chip the design system forbids. It is kept for the
-  pre-redesign dexes; reusing it here would import a forbidden pattern.
-- **"By type" was dropped on request** and never built in `src/`. "Defending"
-  is not missing either — it IS Matrix's Custom orientation.
-- **Registered in `typecoverage/pages.ts`, NOT in `DEX_MODULES`.** It is not a
-  dex (no entry list, no per-entry selection) and `registry.ts` is the single
-  source of truth for what a dex is — `verify-dexes` walks that array and
-  requires each entry to mount a `dex-<id>` rows table. Same arrangement as
-  `team-builder/pages.ts`, for the same reason. Consequence: `dex-switcher`
-  wraps this entry too, so verify-dexes narrows to the registered dex ids
-  rather than asserting nothing else shares the wrapper.
-- **TWO NAMED REGIONS, AND ONLY THE LEFT ONE SCROLLS.**
-  `data-layout="type-coverage-main"` is a grid of `content rail` — the view
-  left inside its own `ScrollArea`, the controls right **outside** it, directly
-  under the tab strip. The rail is a SIBLING of the scroller, not a child:
-  `position: sticky` inside one scroller would look identical until the rail
-  grew taller than the window, then scroll away too. `.tc-main` needs
-  `flex: 1; min-height: 0` or the grid grows to fit all 153 rows and nothing
-  scrolls — the bottom just becomes unreachable. `.tc-scroll-col` exists
-  because `ScrollArea` is `flex: 1; min-height: 0` and needs a bounded flex
-  parent to resolve against. Two scrollers side by side is an established
-  arrangement here (the Itemdex rail and its detail panel), which is why
-  `ScrollArea`'s back-to-top anchors to its own section, not the viewport. The generation
-  dropdown has to land in the SAME place on all four tabs, so the rail belongs
-  to the shell and Matrix's toggle state lives in `useMatrixControls` rather
-  than inside the view. **`--tc-rail: 132px` is a FIXED track and that is
-  load-bearing**: sized to its content the rail sat 47px further right on the
-  three tabs with no toggles, so the one control common to all four moved as
-  you switched. 132px is measured against the Combinations segmented control.
-  Moving a control is editing that grid, not editing a view.
-- **The column headers' bottom hairline is a pseudo-element, not a border.**
-  Under `border-collapse: collapse` the collapsed borders are painted by the
-  TABLE, so a `position: sticky` header travels without its own bottom border —
-  the cell's `borderBottomWidth` reads as set while nothing is drawn. Verify it
-  off the `::after`, never off the cell. `border-collapse: separate` would also
-  fix it, at the cost of hand-managing every shared edge in a 17-column table.
-- **`--tc-control-size` (caption) is declared once** so the rail, the toggles
-  and the type filter cannot drift apart; the table stays the loudest thing on
-  the page. Assert it against `--font-size-label` read off the page, not
-  against a hardcoded 10.
-- **Flow is capped but NOT centred.** The 1040px cap stays (full-bleed, the
-  wings were mostly whitespace and read as two columns). `margin: 0 auto` was
-  removed on request — centred, it floated 80px in from the left with empty
-  page either side, and the room it frees is the room the rail sits in.
-- **Against wraps its type runs at four, in a GRID not a wrapping flex line.**
-  Grid gives every line in a cell the same four column widths, so names align
-  into columns instead of ragging wherever the wrap fell. That is what let the
-  table drop its 620px `min-width`.
-- **No page subtitle, no scope caption, and the row count is the corner cell's
-  tooltip** — all removed/moved on request. The per-generation chart notes went
-  with the subtitle; Gen 1 is still genuinely its own chart, just not narrated.
-- **`typeCombos.ts` is combo-shaped everywhere**, and that is deliberate
-  future-proofing: Flow, Against and Card are expected to grow dual-type
-  support, so nothing takes a bare `typeId` on the defending side and the
-  three single-type views call `singleCombos()`. It computes no chart of its
-  own — `typeEffectivenessAgainst` in `data/era.ts` already composes across a
-  dual typing, and a wrong matrix still renders as a matrix.
-
-## Damage calculator (Tools → Calculators → Damage Calculator)
-
-First replaced the simplified Damage tab from `9ac37d7`; then, by the owner's
-request (2026-09-26), moved to ITS OWN PAGE (`damage-calculator` in
-calculators/pages.ts), nested under Calculators as the nav's first `children`
-entry. The Calculators screen keeps the other four tabs. The page head is the
-title with the generation select beside it -- no tab strip -- so the form
-starts high. The IV / EV headers are ghost buttons that zero that side's spread.
-
-- **The engine (`calculators/damage/`) is a PORT of the Showdown calculator, not
-  a dependency.** `gen12.ts` / `gen3.ts` / `gen4.ts` mirror smogon/damage-calc's
-  `calc/src/mechanics` files line for line, against pokeapp's own records and
-  resolvers (era.ts, moveEra.ts, statMath.ts). Pure, no React. `index.ts`
-  dispatches by a table: **Gen 5 is a new module + one table line + a
-  `FIELD_RULES` entry**, not an edit to the existing three.
-- **Checked against the reference, not against itself.** `npm run
-  verify:damage-calc` (port 4186) diffs every roll and every character of the
-  description line for 155 matchups in `scripts/fixtures/damage-calc-reference.json`,
-  recorded from @smogon/calc at the commit named in that file, plus five lines
-  quoted verbatim from the live calc.pokemonshowdown.com. To extend it, build the
-  reference locally and regenerate — never hand-edit an expectation.
-- **ONE DELIBERATE DEVIATION: Gen 4 Triple Kick hits 10/20/30.** The reference's
-  gen4.ts computes every hit at 10 BP (it does not pass the hit index; its gen3.ts
-  does). The fixture marks the case and the suite asserts our numbers.
-- **Where the reference prints nothing, so do we — except these.** Present,
-  Magnitude, Spit Up, Trump Card, Return and Frustration take an editable Power
-  with a stated default (`POWER_OVERRIDE_DEFAULTS`); OHKOs, Counter-likes, Super
-  Fang, Endeavor, Psywave and Bide are "not calculated", never a guessed number.
-- **The category is by TYPE before Gen 4** (`moveResolve.ts`, one gate). Gen 1-2
-  roll 39 values (217..255), Gen 3-4 sixteen. Field conditions come from
-  `FIELD_RULES` (Gen 2: no Hail, one Spikes layer; Stealth Rock and Gravity Gen 4)
-  and the UI hides what an era lacks.
-- **Moves default to the learnset** (`useGenerationLearnset`: every row, any
-  method, any of the generation's games — `getLearnsetsForSpecies`, not Team
-  Building's stricter legal moveset), with an "Any" switch for hypotheticals.
-  Prevo-only moves are reachable only through Any.
-- **Laid out as the Showdown calc is, in our controls** (by request): both
-  Pokemon's move results across the top, the selected line under them, then
-  Pokemon 1 | Field | Pokemon 2, with stat stages inline in the stat table and a
-  field column per side. **Every move runs in both directions** — there is no
-  attacker/defender role and no swap; `DualField.sides` is per Pokemon and
-  `fieldFor` picks attacker/defender per calculation. **The type scale is
-  redefined on `.dcalc`** (12px body, 14 title), the species page's technique, so
-  nothing outside this screen changes; it also sets `line-height: 1.3`, because
-  the inherited ~26px leading made every 12px row a 26px box.
-- **Its form is the team-build form, built as shared components** in
-  `components/ds/` (`FormParts`, `EvStatTable`, `MoveSlotTile`, `SearchSelect`).
-  EV entry is the Build Form's slider + number box by decision, not §5's plain
-  field. The Build Form does not use these yet — see deferred debt.
-
-## Team Matchup (Tools → Team Matchup)
-
-My team (a Team Building team) against a trainer's, every Pokémon against every
-Pokémon, and whole battles against the trainer's OWN AI. Graduated the Battle
-Simulator stub. Built 2026-10-01 to a requirement list (S1–S7, M1–M4, V1–V4,
-D1–D5, P1–P8, O1–O4, R1–R7); the IDs are in the code comments.
-
-- **Two layers.** `src/modules/battle/` is the ENGINE — pure, no React: the game
-  context (`game.ts`, every mechanic read off one object), spreads as RANGES
-  (`battler.ts`: any IV/EV may be a range; outputs are computed at the two corners
-  that bound them, never sampled), damage as a distribution (`damage.ts`, exact KO
-  convolution with crits, accuracy, multi-hit and residual), speed (`speed.ts`),
-  the turn engine (`engine/`), the AI per generation (`ai/`) and the analyses
-  (`analysis/`). `src/modules/team-matchup/` is only the screen. Heavy jobs (Monte
-  Carlo, search, gauntlet, scan, suggestions) run in a Web Worker
-  (`matchup.worker.ts`, one per hook; cancelling terminates it).
-- **Damage is the verified Showdown port** (`calculators/damage`), never
-  re-derived. `calculateDamage`'s optional `{ koText: false }` skips the
-  description's KO clause, which for a Gen 1–2 five-hit move was 280 ms of a 0.8 ms
-  call; the matchup computes its own KO maths. The default is unchanged.
-- **Battle data** (`npm run build:battle-data`, `scripts/build-battle-data.mjs`):
-  per-game move tables, held effects and AI from the same pinned disassemblies as
-  the trainers (BATTLE_PATHS in `trainers/sources.mjs`), written to
-  `public/data/battle/<vg>.json` (a PARTITION_DIR, runtime-cached). Gen 3 AI
-  scripts are assembled from each repo's own macros. **Gen 4 AI is decoded from
-  the shipped binary** (`tr_ai_seq.narc`): Platinum's `script.s` is NOT the shipped
-  AI (25 instructions differ); DP's binary is byte-identical to Platinum's; HGSS's
-  is not in its disassembly, so HGSS predictions (and DP/HGSS item use, assumed
-  Platinum's) are flagged LOW CONFIDENCE on screen. Rebuilds are byte-identical.
-- **The AI is the game's, bugs included**, transcribed per generation and named by
-  routine in the prediction's score breakdown (`Basic_CheckForImmunity -10`). A
-  prediction is a distribution: the AI's own random checks, sampled 300 times.
-  Facility AI flags come from the games' code (`sources.ts` facilityTrainerInfo).
-- **Nothing writes to Team Building.** "Use current" is read-only; "Customize"
-  edits an override in the matchup's own store (`pokeapp:team-matchup:v1`).
-  Scenarios snapshot a setup and carry link fields for Notes, Journal, the
-  Nuzlocke Tracker and the Collection, which do not exist yet (empty until then).
-- **Verdicts are coloured TEXT with a symbol and a word** (▲ Win, ◆ Trade,
-  ◐ Roll, ▼ Lose) in `--effect-super` / `--effect-resist` / `--stat-decrease` —
-  no fill, never colour alone. The batch scan's grid is the same: coloured numbers.
-- **`.tm .tm-section` exists to beat App.css's `.panel section` / `.panel h2`**
-  (MODULE-PATTERNS §10): without it every section opened on a border, a 2rem gap
-  and an uppercase tracked heading.
-- **Double battles run two-on-two** (S6, Gen 3–4; Gen 1–2 have none) — a
-  trainer's own double/tag battle or the Double format. `engine/doubles.ts` holds
-  the rules, each from the games' code: targets from the per-game move table
-  (`tg`; Surf hits both foes in Gen 3, everyone adjacent in Gen 4), Follow Me,
-  Gen 3 vs Gen 4 Lightning Rod / Storm Drain, spread order (battler order Gen 3,
-  speed order Gen 4). The damage port takes an optional `CalcField.doubles` (Gen 3
-  screens `2*(d/3)` and MOVE_TARGET_BOTH halving; Gen 4 screens `d*2/3`, ×3/4
-  spreads; Helping Hand) that the Damage Calculator page never sets. Turn order
-  is each game's pairwise sort; an emptied slot is refilled AT ONCE in Gen 3
-  (`HandleAction_TryFinish`) and at TURN END in Gen 4 (`ReplaceFainted`). The AI
-  runs on VIEWS (`ai/view.ts`): Emerald and Platinum score every target incl. the
-  ally (≥ 100 only) with AI_DoubleBattle / TAG_STRATEGY forced on; Ruby and
-  FireRed pick a random foe and run the singles choice (no doubles routine).
-  Singles are untouched: the state's `active2`/`doubles` are absent and every
-  singles result is byte-identical to before. The matrix, speed and damage tabs
-  stay pairs, with spreads at their doubles reduction. A tag battle's NPC partner
-  is not in the data: I play both slots (stated on screen).
-- **A matrix cell opens the Damage Calculator on that pair**
-  (`calculators/damageCalcHandoff.ts`: a one-shot prefill the calculator's state
-  initializers READ and an effect clears by id, so StrictMode's double call is
-  harmless).
-- `npm run verify:team-matchup` (port 4202): the engine through the matchup's
-  pipeline vs the Showdown fixture per generation (a crit, a multi-hit, a weather
-  case), chance constants vs the asm, a speed tie per generation, AI behaviour per
-  generation, the battle bundle vs the app's move records, a real fight per
-  generation through the screen, spreads / scenarios / format / custom / facility
-  / hand-off / sandbox, the worker analyses, double battles (the doubles damage
-  rules against a re-implementation of each game's formula, targeting, Follow Me,
-  Lightning Rod, Helping Hand, Intimidate, turn order, Gen 3 vs Gen 4 refill
-  timing, each game's doubles AI, and the screen), design rules and both themes. Its
-  move diff found Luster Purge's missing `past_values` (now an era rule in
-  `moveEra.ts`), and its crit checks found Gen 2 Lucky Punch / Stick never firing
-  (the game compares the item id, not a held effect).
-
-## Trainer Dex (Poképedia) and its bundle
-
-Owner's decisions (2026-09-26): **sources** = pret disassemblies for parties +
-Bulbapedia for placement; **games** = all ten Gen 1–4 main-series version
-groups at once; **scope** = everything, battle facilities included;
-**deliverable** = database and screen. Colosseum, XD and the Japanese
-Red/Green/Blue have no disassembly and no file (`hasTrainerData`).
-
-- **Build:** `npm run build:trainers` (`scripts/build-trainers.mjs` +
-  `scripts/trainers/`). Writes `public/data/trainers/<vg>.json`, an on-demand
-  partition like learnsets (`PARTITION_DIRS`, `src/data/trainers.ts`). The ten
-  disassemblies are sparse-cloned at **pinned SHAs** (`trainers/sources.mjs`);
-  Bulbapedia wikitext is cached in `.cache/trainers/bulbapedia/`
-  (`--refresh-wiki` refetches). Offline rebuilds need no network.
-- **What the disassembly decides:** species, levels, moves, items, IVs/DVs, AI,
-  bag items, prize money, facility pools. Derived values are TRANSCRIPTIONS of
-  the game routines, each named in `trainers/mechanics.mjs` / `complete.mjs`:
-  level-up default moves (from the disassembly's own learnset order, never
-  PokeAPI's, whose same-level ties are sorted by id); Gen 1's LoneMoves /
-  TeamMoves / Champion moves and Yellow's SpecialTrainerMoves; Gen 3 personality
-  (running name hash over the charmap, never reset between party members); Gen 4
-  personality (LCRNG seeded by IV scale + level + species + trainer id, stepped
-  class-index times; HGSS's gender/ability override leaks into later party
-  members — reproduced); nature, ability SLOT and gender from it; Gen 2 gender
-  from the Attack DV. Gen 4 IVs go through the game's u8 — Platinum Volkner's
-  Electivire (`ivScale 2500`) is `iv_random`, as in the game.
-- **What Bulbapedia decides:** where and in what order. Walkthrough parts first
-  (play order), location pages second (`placeFromLocationPages`, only for
-  still-unplaced trainers, only under a "Trainers" heading for that game),
-  rematches inherit their original's place. The join key is the PARTY (species +
-  level, in order); the name breaks ties; a rival (player-named, placeholder in
-  the data: Cedric, ?, Terry) may differ; one trainer is one person (a sighting
-  cannot claim a trainer already placed under another wiki name).
-- **The wiki is a witness, not a source of truth.** `checks` in each file counts
-  agreement on prize, gender and boss movesets; `verify:trainers` holds floors.
-  The disagreements examined were wiki errors (Karate Master's Mega Kick,
-  Platinum prizes copied from DP, Kadabra shown female for a female trainer) —
-  **the disassembly wins**, don't "fix" the build toward the wiki.
-- **Facilities:** Crystal Battle Tower, RS Battle Tower, Emerald Frontier (+ 3
-  Tents + Trainer Hill + Brains from `frontier_util.c`), FRLG Trainer Tower, DP
-  Battle Tower (raw NARC members, names from message bank 16; Platinum revised
-  the pool — only 14/950 sets survive), Platinum Frontier (JSON). **HGSS's pool
-  is Platinum's** (not extracted in its disassembly; Bulbapedia documents one
-  shared list and 350/350 of its rows match) — marked `source_note`. **Gen 4
-  Frontier Brains come from Bulbapedia** (the games keep them in code), marked
-  `source: 'bulbapedia'`; Thorton and Argenta have no fixed team.
-- **Unplaced ≠ unused.** `unused` is only a provable placeholder (DUMMY slots,
-  DP's Mickey/Angelica Rattata, FRLG's RS leftovers, Gen 1 "Unused" lines).
-  Other unplaced trainers (Gen 2's leftover Beauties/Cooltrainers, some HGSS)
-  stay in the list with "Location not found".
-- **Attribution:** Bulbapedia content is CC BY-NC-SA; the detail page credits
-  it. The User-Agent and 1.2 s delay are the same courtesy as the supplement.
-
-## Dex search / filter / sort
-
-**ONE Search/Filter menu and ONE Sort menu for the whole of Poképedia, both in
-the app bar.** Every dex used to carry its own control row above its own list;
-none does now. The bar is rendered ABOVE the active module in the tree, so a
-module cannot hand its config upward — `DexQueryProvider` (app level, inside
-NavProvider) builds the config for whichever page the nav says is active, owns
-the state, and hands the filtered, sorted list back DOWN. `DexPageShell` renders
-the COUNT and nothing else above the list: a readout, not a control.
-
-- **A dex declares its filters and sorts as DATA, never as JSX.**
-  `modules/dex/query/dexQuery.ts` defines the model — filter *sections*, each
-  holding filters of six kinds (`text`, `multi`, `select`, `range`, `toggle`,
-  `types`), plus `SortField`s. The configs live in
-  `modules/dex/query/registries.ts` (and `pokedex/speciesQuery.ts` for species,
-  which needs its own row type). `FilterPanel`/`SortPanel` render whatever they
-  are handed. Add a filter by adding a definition; if a dex needs a control the
-  model has no kind for, add a **seventh kind** — never an escape hatch.
-- **The context is type-erased and `useDexRows(dexId)` guards it at runtime.**
-  One dex's entries at a time, different shapes per dex, so the context carries
-  `unknown` and a module asking while another dex is active THROWS rather than
-  rendering a berry as a species.
-- **Switching dex resets the query**, via `resetKey` — state carries the key it
-  was written under and a mismatch derives back to defaults. Not an effect and
-  not setState-during-render: no extra render, no frame of the previous dex's
-  filters applied to this one's list.
-- **`components/TypeFilter.tsx` has exactly ONE call site**: `FilterPanel`, via
-  the `types` kind. Pokédex, Movedex and Berrydex all reach it from there.
-  **It is a GHOST LABEL now, not a chip** — no border, no fill; selected takes
-  the type's own colour on the TEXT, from the same cited palette. That was the
-  last badge in the app and its removal closes "type is data, not decoration".
-- **`hidden: true` is how an era removes a filter**, and a hidden filter is
-  skipped by the matcher as well as the renderer. Habitat is Gen 3+, egg groups
-  Gen 2+, and Gen 1 offers the combined **Special** in place of the split pair.
-- **Option lists are read off the entries in scope, never hardcoded.** The
-  Itemdex's categories go further and are derived from the pocket selection
-  (`FilterOptions` may be a function); `clampValues` drops a selection its own
-  control has stopped offering.
-- **One comparator, app-wide**: `components/sortValues.ts`, shared by
-  `DataTable` and the sort panels. Stable, **null-last in both directions**.
-- **Each dex's default sort IS its shipped order, declared as a field**
-  (`Ability #`, `Berry #`, `Item #`, `Dex #`).
-- **Panels dismiss on an outside click**, and opening one closes the other —
-  `useDisclosureGroup` holds one open id. Destructure its result at the call
-  site: it returns a ref, and the react-hooks lint refuses to let an object
-  carrying a ref be passed to a function during render.
-- **The menus are the smallest type in the app, at one size.** Everything in a
-  `.dex-menu` is `--font-size-caption` — the size the egg-group names in the
-  filter rows already used — so a 320px panel has one type size rather than
-  three, and the tables it narrows stay the loudest thing on screen. The numeric
-  range inputs go smaller still (`--dex-menu-mono`, 0.82 of it): Martian Mono
-  draws about a fifth larger than Plex Sans at the same px, so at a shared size
-  the numbers were visibly the biggest text in the menu.
-  **`--dex-menu-row` is the type filter's own row gap**, lifted to every stacked
-  gap in the panel, rather than five hand-picked numbers that drift apart. The
-  hairline-separated blocks keep a little more (`--dex-menu-band`), because that
-  padding is half of a band between two hairlines, not a gap between two rows.
-- **The bar's order is Grid/List · Sort · Search/Filter · theme**, and the theme
-  switcher being LAST is the point: the cluster is right-aligned, so the one
-  control that belongs to no page never moves as the page-specific triggers come
-  and go beside it. Its segments are sized to the word ("Light" + 2px either
-  side, `min-width: 33px` measured), not to the full-95 spec's 12px inset.
-- **The Sort trigger is DISABLED, not hidden, where the list is a table** (the
-  Pokédex list view). The column headers are the control there. Flipping the view
-  also closes the menus, and `sortOpen` is ANDed with `!sortDisabled`, so a panel
-  can never be left open under a disabled trigger.
-
-### The Pokédex's two views
-
-- **Grid** — the Figma MainPage frame, untouched: 212px cards, three columns,
-  9px/17px gaps. Its Sort menu offers only what a card prints (Dex #, Name, BST,
-  Speed). **The card gained a fourth line** (`BST 318 · Spe 45`) and the card did
-  NOT grow: the 5px came out of the bottom two lines' LEADING, because the card
-  height and the y of the number, type and ability lines are Figma ratios
-  `verify-design-system` asserts and leading is the one dimension that is not.
-  The Breeding dex's cards gained a gender row the same way — and
-  `.species-card-egg-group` needs `line-height: inherit`, because a `<button>`
-  does not inherit it and its UA box was 3px taller than its line.
-- **List** — 44 columns (`pokedex/speciesColumns.tsx`), **one fact per column,
-  never a joined list**: two type columns, two ability columns plus the hidden
-  slot, two egg-group columns and one EV-yield column per stat. A cell reading
-  "Grass/Poison" sorts under G, which is not a column. The EV block follows the
-  same era rule as the base stats beside it and is absent before Gen 3.
-  **The identity block — national # → Speed, fifteen columns — fits the
-  window**; the rest are over a horizontal scroll. **This table sorts itself from
-  its own headers** — it is NOT wired to the bar's sort state, because the menu
-  holds four keys and the table has 44, so a header click would set a key the
-  menu could not hold and the fallback would silently do nothing.
-- **A table's own widths only win because it says so.** `Column.width` emits a
-  `<colgroup>`, and DataTable also marks the table `data-table-sized`. Both are
-  needed. The positional `.data-table th:nth-child(n)` rules were written for the
-  Movedex's original six columns and reach every table in the app; they are
-  wrapped in `:where()` so anything declaring its own widths outranks them, and
-  the marker class resets the cell widths outright — because Chrome's fixed
-  layout takes the LARGER of the column's width and the first row's cell width,
-  so a colgroup alone left the first column at 282px against the 70px it asked
-  for. **And `.data-table-sized` is `width: min-content`**: under `width: auto`
-  Chrome sizes the table by the CONTENT algorithm first, so one overlong cell
-  still set its column (Eevee's seven evolutions made "Evolves to" 1359px against
-  a declared 360px) while every other column obeyed.
-- **The list view is the app's one horizontally scrolling section**, via
-  `ScrollArea`'s `horizontal` prop. It shipped without one: `.scroll-area` sets
-  `overflow-x: hidden` for every other scroller, so the columns past the twelfth
-  were not merely off-screen but unreachable. The bar is drawn, not native, and
-  it lives in the OUTER frame rather than at the foot of the content — a bar
-  below 493 rows is a control you have to scroll to the bottom to reach.
-  `useScrollThumb` takes an axis rather than being copied. **Its idle state is
-  the one that is visible rather than invisible**, and that is deliberate: the
-  vertical thumb can fade to nothing because the scroll-down chevron still says
-  "more below", and there is no sideways equivalent of that cue.
-- **Regional dex numbers are a written-out table**, not derived: a generation
-  does not determine the dex (FRLG are Gen 3 and use KANTO, Platinum extends
-  Sinnoh, HGSS use updated-johto). Colosseum, XD and "All games" have none and
-  print a dash rather than borrowing a number.
-
-**BLOCKED — the Pokédex's "Has evolutions" FILTER is UI-only.** It renders, it
-is settable, and it deliberately never matches and never counts as active
-(`stub: true`), with a note on screen saying so. The semantics need a decision:
-*can still evolve further* (excludes Charizard) or *belongs to a multi-stage
-line* (includes it). The list view's **"Further evo" COLUMN** is not blocked and
-is implemented — "further" is unambiguous — so the definition for the filter is
-one line away in `speciesQuery.ts` once the reading is chosen.
-
-## The scroll model and the back stack
-
-`components/ScrollArea.tsx` owns the scroll half, and all six mounts get every
-part of it by construction. `npm run verify:scroll-nav` (port 4198) drives the
-lot, including a real touch context.
-
-- **THE SCROLLBAR IS DRAWN, NOT NATIVE, and the fade is why.** A native bar's
-  gutter is layout rather than paint, so hiding its thumb when idle leaves the
-  gutter behind — the full width paid permanently for a mark visible a second at
-  a time, and every row in the app narrower for good. CSS cannot fade one
-  either, only switch it on and off, and the three engines disagree on how a
-  native bar is styled and how wide `thin` is. Drawing it also lets it stop
-  short of the corner where the back-to-top control sits.
-  **The universal no-scrollbar rule in `index.css` therefore STAYS** — the drawn
-  thumb is additive, and the small internal scrollers (learnset tables, search
-  dropdown, evolution tree) keep no bar at all, by request.
-  It reproduces exactly what an 8px native track with a 2px inset paints: 4px of
-  rounded bar, 2px off the edge. Tone is `color-mix` down from
-  `--text-secondary`, **not `--border`** — that token disappears against
-  `--surface-raised`, which is what three of the six scrollers sit on — and it is
-  translucent on purpose, since the thumb sits over content.
-- **The thumb's geometry is written straight to the node**, never through state:
-  it moves on every scroll frame, and a `setState` there re-rendered the whole
-  section to shift one element 3px. The three booleans that DO need a render are
-  compared before setting, which the original hook did not do.
-- **On touch it is an indicator at rest and a handle once awake.** The invisible
-  state takes no pointer events, because a 12px strip that eats them is 12px of
-  every list a right-handed thumb cannot swipe; press-to-jump on the empty track
-  is mouse-only for the same reason. The finger-sized hit area is a `::before`
-  that grows **leftward only** — symmetric insets reach outside the section, and
-  `.scroll-area-outer` does not clip, so in the two side-by-side arrangements
-  (Itemdex rail + detail, Type Coverage view + rail) it would swallow events in
-  the neighbour.
-- **Scroll memory is keyed by what a scroller is SHOWING, not by which scroller
-  it is.** Three mounts host several screens each — `tb-scroll` is every Team
-  Building screen, `tc-scroll-area` all four Type Coverage tabs, the species
-  page's scroller a different species and tab every time — so the call site
-  composes the key and a missing part is visible there.
-  **The Pokédex grid's key includes the filter state, and that IS the whole
-  invalidation story**: a different generation, search term or type filter is a
-  different key, so it opens at the top, and returning to a filter you had
-  before restores your place in it for free. There is no invalidation step to
-  forget to call.
-- **NOTHING IS WRITTEN IN THE RESTORE EFFECT'S CLEANUP, and that is
-  load-bearing.** A "last word" write there — the obvious belt to the scroll
-  handler's braces — silently destroyed the feature: React runs an effect
-  cleanup after the element is detached, and a detached element reports
-  `scrollTop === 0`, so the last thing to reach the store on every exit was a
-  zero over the real offset. The log read `WRITE 900` then `WRITE 0`, in that
-  order, every single time. The scroll handler is sufficient alone — the only
-  way to change `scrollTop` without a scroll event is not to change it.
-- **Not persisted**, by request: a reload starts at the top of everything.
-  sessionStorage would need a clamp and a staleness rule for a restored offset
-  pointing past the end of a list whose data changed since.
-
-### The back stack
-
-`nav/navHistory.ts`, and it is **STILL NOT A ROUTER** — nothing writes a URL, so
-no deep links and no `?ds=1` / `?layout=1` to preserve. It uses the History API
-only for the browser's *stack*, one entry per screen carrying a depth number, so
-**the Android back gesture, the browser button and the app-bar control are one
-mechanism**. That was the whole reason to involve the platform: this app is
-reviewed on a phone, where the gesture is how people go back.
-
-- **One path for every back.** The app-bar control calls `history.back()` and
-  lets the `popstate` handler do the work, so the guard, the depth bookkeeping
-  and the application of a location exist once. A second implementation for the
-  button is how the two would drift.
-- **A location is a page plus the entry open in it** — what the nav context
-  already owns. **Module-internal screens are NOT steps**: Team Building's four
-  live in `tbNav` and the species page's tabs in local state, so leaving Team
-  Building returns to whatever preceded Team Building rather than walking out
-  through My Teams. Those screens have their own back controls. Adding them
-  later means pushing a location from `goTo`, not changing the shape here.
-- **Two ways a guard can say yes, and they need opposite handling.** With
-  nothing to ask, `proceed` runs synchronously and the location is applied on
-  the spot. With something to ask it runs frames later — and by then the browser
-  has ALREADY moved, because `popstate` fires after the fact and cannot be
-  prevented. So a blocked back re-pushes the depth we never left, and the
-  blocker's `proceed` re-enters through the platform with `bypassGuard` set. An
-  `asking` flag tells the two apart. Applying directly in the late case leaves
-  our depth and the browser's disagreeing, which is the bug that shape exists to
-  avoid.
-- **`applying` guards reentrancy**: restoring a location calls the nav setters,
-  and those setters are what push history.
-- **Every page change goes through `NavProvider`**, which is what lets one
-  guard cover the app bar, the global search's cross-module jump and the back
-  control at once. That is the point of `navGuard.ts` living in the nav layer —
-  see the closed debt entry below.
-- **Deliberate: the species page's own "All species" control pushes a step.**
-  It is a destination ("show me the grid"), not an undo — it has to reach the
-  grid even when the reader arrived at that species from the global search in
-  another module, which an undo cannot promise. So grid → detail → All species
-  leaves three entries and a back press re-opens the detail, exactly as a
-  browser does with links. Do not "fix" that by collapsing it; the two controls
-  are independent on purpose.
-- **Learnset move names link into the Movedex** (`onSelectMove`, threaded
-  Pokédex → SpeciesDetailPage → SpeciesLearnsetTab), which is what makes
-  Pokédex > species > move page walkable back. The treatment is
-  `.species-egg-group`'s, **shared rather than copied** — same act, and two
-  rules would be two treatments in one session.
-
-## Known gotchas (already hit once)
-
-- Bare element selectors in old CSS (`.panel h2`, `.panel section`) can
-  silently outrank a component class by specificity. **`.panel section`
-  has bitten once for real**: `margin-top: 2rem; padding-top: 1.5rem;
-  border-top: 1px solid` reached every `<section>` on all four species-page
-  tabs, and was the actual cause of what looked like three separate design
-  problems (unremovable whitespace on the Learnset tab, a stray hairline
-  above the first table, and an "airy" Info tab). When a page's own spacing
-  will not respond to its own rules, check for one of these first.
-- `:hover` can outrank `.active`/`.selected` at equal specificity if
-  declared later — scope hovers to `:not(.active)`.
-- Font stack order matters — list the self-hosted font first, or a
-  same-named system font wins silently.
-- A global font-family default and a per-module opt-in are mutually
-  exclusive, same as the --accent situation — moving one to "everywhere"
-  moves it everywhere, including untouched legacy modules.
+- Pre-redesign modules (Itemdex, Abilitydex, Naturedex, Berrydex, Movedex)
+  keep their own layout/components/colors.
+- **Tokens**: never hand-edit `dist/tokens.css`. Change `tokens.json`, run
+  `python3 design-system/scripts/build-tokens.py` then
+  `python3 design-system/scripts/check-contrast.py` (must show `fails: 0`).
+  **On Windows set `PYTHONUTF8=1`** (and `py` if `python3` is missing), or
+  `tokens.css` is written non-UTF-8 and the Vite build fails.
+- A design change = update the matching `components/*.md` + CHANGELOG entry in
+  the same commit.
 
 ## Laying out a screen
 
-Adopted after the Build Form took four review rounds of "move it up a bit".
-Every one of those notes was about the same thing: elements placed by
-independent pixel coordinates that did not refer to each other, so each fix
-was local and the next complaint was too.
+- **Position by AREA, not by coordinate**: a container placing more than two
+  children declares `grid-template-areas`; no absolute offsets inside it.
+- **No raw px gaps**: a module needing gaps below 8px declares a scale once
+  (as `.tb` does with `--tb-1`…`--tb-6`).
+- **Name the regions**: layout containers carry `data-layout="<name>"`.
+- **Nothing may be clipped**: every module root contains a `ScrollArea`.
+- **Layout inspector**: `?layout=1` or Ctrl+Shift+L
+  (`src/components/LayoutOverlay.tsx`). Ships in production on purpose — the
+  app is reviewed on the deployed preview from a phone.
 
-- **Position by AREA, not by coordinate.** A container that places more than
-  two children declares `grid-template-areas` and each child takes a
-  `grid-area`. Absolute `top`/`left` offsets inside a container are the
-  smell — they encode a relationship ("just under the numeral") as a number
-  that silently stops being true when the other thing changes. Moving an
-  element should be swapping two words in the template.
-- **No raw px gaps.** The design system's `--space-gap-*` starts at 8px,
-  which is too coarse for dense form UI, so `.tb` declares its own scale
-  (`--tb-1: 2px` … `--tb-6: 20px`). If a module needs gaps below 8px it
-  declares a scale once; it does not pick numbers per rule.
-- **Name the regions.** A layout container carries `data-layout="<name>"`.
-  That name is the vocabulary for reviewing it — see below.
-- **Nothing may be clipped.** `#root` is pinned to the viewport and `.panel`
-  sets `overflow: hidden`, so a module taller than the window does NOT
-  scroll — it is truncated, with the bottom unreachable. Every module root
-  must contain a `ScrollArea`. Team Building shipped without one and the
-  Build Form simply ended mid-page. verify-team-builder section 7 asserts
-  reachability at a deliberately short viewport rather than asserting a
-  height, which would only be true on the machine that ran it.
+## Known gotchas (already hit once)
 
-### The layout inspector
-
-`?layout=1` on any URL, or Ctrl+Shift+L — `src/components/LayoutOverlay.tsx`.
-Draws every `[data-layout]` region and every named grid area over the live
-page, with sizes and column tracks. **It ships in the production bundle on
-purpose**: this app is reviewed on the deployed preview from a phone, and a
-`import.meta.env.DEV` gate would put it exactly where it is no use. ~2KB,
-inert until switched on, `pointer-events: none` so the page stays usable.
-
-Use it to REVIEW: screenshot with it on and name the region, rather than
-describing a direction and a distance. It reads `grid-template-areas` from
-the computed style, so a name it prints is a name in the stylesheet.
-
-## The Bulbapedia supplement layer
-
-Two generated modules carrying facts the PokeAPI snapshot does not:
-`src/data/moveFlags.ts` and `src/data/abilityIgnorability.ts`, both written by
-`npm run build:supplement` and committed. **Generated, not hand-typed and not
-fetched at runtime** — the app is offline-first with no backend, so a screen
-needing a wiki would break on a plane; and 114 names copied from a console dump
-is transcription nobody re-checks. The generator throws rather than emitting a
-short list if a category vanishes or an in-scope member stops matching, because
-nothing downstream can tell "Bite has no flag" from "the category moved".
-`npm run audit:supplement` re-joins every name and then asserts hand-derived
-facts (Tackle is not a biting move, Mega Kick is not a punch, Intimidate is not
-ignorable) — a join can be internally consistent and still wrong.
-
-- **SEVEN FLAGS, NOT EIGHT — contact has no source and that is settled.**
-  Bulbapedia documents it neither as an inclusion list nor as an exception list:
-  `Category:Contact moves`, `Category:Moves that make contact`,
-  `Category:Non-contact moves` and both "do/don't make contact" phrasings all
-  return DOES NOT EXIST, and none of the 91 real `Moves that …` categories
-  concerns it. The `PokeAPI/api-data` snapshot has no `move-flag` resource and
-  no `flags` field on a move — checked in the extracted snapshot, not assumed.
-  Sourcing it would mean a new dependency, so it was dropped rather than allowed
-  to block the other seven. Do not re-derive this; the search is recorded here
-  precisely so nobody repeats it.
-- **THE ABILITY EXCEPTION LIST IS EMPTY ON PURPOSE.** Comatose, Shields Down,
-  Full Metal Body, Shadow Shield and Prism Armor are the five usually named as
-  ignorable-by-pattern but immune in practice. All five are Generation 7+ and
-  **not in this bundle at all** (the recon prints `(not in bundle)` for each), so
-  a rule about them could never fire in a Gen 1–4 app — it would be a branch
-  nothing reaches that a reader must verify to dismiss. The audit asserts the
-  absence, since an unguarded absence is indistinguishable from an omission.
-  First thing to add back if this app ever grows past Gen 6.
-- **`recon-bulbapedia.mjs`'s "Gen 5+" bucket is structurally dead for moves.**
-  The bundle carries 485 moves and *all* of them are Gen ≤4, so `allMoveNames`
-  and the in-scope set are the same — that column reads 0 in all seven rows and
-  every post-Gen-4 member falls into "unmatched" by construction. Its
-  `unmatched needing a decision: 91` therefore overstates the real figure, which
-  is **0**; only the ability row's 12 are genuine Gen 5+ classifications. Read a
-  future run's output with that in mind rather than re-deriving the confusion.
-- **Item locations are explicitly NOT part of this layer** — a separate future
-  pass, never started here.
-- **`f9cb816`'s authorship is unresolved and accepted as-is.** It appeared
-  between sessions; git records the repo's configured name on every commit, so
-  authorship cannot distinguish authors. Its content was verified clean — the
-  recon fetches and prints, writes nothing into `src/data`, and matches project
-  conventions. Not worth further investigation unless something else surfaces.
-
-## Verification plumbing
-
-- **Every script that starts a server owns its port**, and
-  `verify-design-system` asserts it statically from the tracked file list.
-  Three scripts once shared 4183 (`verify-species-page`, `verify-eggmoves`,
-  `report-type-scale`) and two more pairs collided on 4193 and 4195 — so those
-  could never run concurrently, and before `startPreviewServer`'s port guard
-  existed the second one silently measured the first one's build. A collision
-  does not fail; it just quietly shares a server. That is why the check is
-  static and scanned rather than a hardcoded roster.
-- **Everything that needs a server goes through `scripts/lib/devServer.mjs`,
-  with no exceptions** — and the empty allow-list *is* the assertion. There is
-  no sanctioned second way to start a server here. `spawn('npx', …,
-  { shell: true })` puts cmd.exe between the script and its vite on Windows, so
-  `kill()` reaps the shell and orphans the server — the failure that once left
-  78 servers holding the 4173–4199 range.
-  **The deeper half is readiness, and it is the half that actually bit.**
-  Polling "did the URL answer" cannot tell your server from someone else's: with
-  the port already held, `--strictPort` makes the new vite exit and the poll
-  succeeds against the *other* one. Demonstrated on the pre-conversion
-  `calibrate-scale` — with a foreign server on its port it printed a full report
-  of measurements taken from a build it never started, and **exited 0**. For a
-  tool whose entire output is the measured constants this file cites, silently
-  stale numbers are the worst failure available. Converted, the same experiment
-  exits 1 with zero measurements.
-  `report-type-scale` and all three `calibrate-*` tools were converted; the
-  `SPAWN_EXCEPTIONS` allow-list is deleted, not shortened.
-- **`startPreviewServer` does NOT handle SIGINT** — no `process.on('SIGINT')`
-  anywhere in `devServer.mjs`; its only `.on('exit')` is on the child vite, used
-  to catch the `--strictPort` bail. So Ctrl+C mid-run still skips the `finally`
-  and can leave a bound port. The conversion **moved** that gap rather than
-  closing it, though it narrowed the blast radius: with no shell in between, a
-  terminal SIGINT reaches the vite directly, where previously it had to pass
-  through cmd.exe. The port guard also turns any resulting orphan into a loud
-  refusal on the next run instead of a stale measurement. Genuinely open; a
-  `process.once('SIGINT')` in `devServer.mjs` would close it for every caller at
-  once, which is the right place if it is ever wanted.
-- **A calibration tool's coarse sweep is not a correction to a committed
-  value.** `calibrate-ghost` sweeps letter-spacing at 0.01em steps and nominates
-  `0.22em`; the committed value is `0.222em`, refined past that granularity, and
-  the tool's own render line confirms it lands dead on target (157.83px against
-  157.83px) where the swept candidate is 0.37px off. The committed constant is
-  the better one. Do not "fix" source to match a sweep's resolution.
-- **A new browser suite must self-host.** `verify-type-coverage` shipped
-  pointing at a hardcoded dev-server URL: it scored 0 checks and exited 1 on
-  any machine without a dev server, and tested whatever was listening when
-  there was one.
+- Bare element selectors in old CSS (`.panel h2`, **`.panel section`**) outrank
+  component classes. When a page's spacing ignores its own rules, check these first.
+- `:hover` can outrank `.active`/`.selected` if declared later — scope hovers
+  to `:not(.active)`.
+- A global default and a per-module opt-in (font, accent) are mutually
+  exclusive — moving one to "everywhere" reaches untouched legacy modules too.
 
 ## Known deferred debt (logged, not fixed)
 
-Real, reproducible, and deliberately left alone. Each entry says why it is
-not worth fixing yet — read that before "fixing" one as a drive-by, because
-the reason is usually that the cheap fix is the wrong one.
+Deliberately left alone; the cheap fix is usually the wrong one.
 
-- ~~**Leaving Build Form via the global app nav bar does not prompt for a
-  shared build's unsaved edits.**~~ **FIXED** — the cross-module navigation
-  guard this entry asked for now exists, in the nav layer, as
-  `src/modules/nav/navGuard.ts`. See "The scroll model and the back stack"
-  above. Build Form registers a blocker that delegates to its own `saveThen`,
-  so the three-way question gets asked at every door rather than at the ones
-  Team Building happens to know about — which now includes the back control, a
-  second door that did not exist when this was logged. The unmount flush stays
-  as the fallback for the paths no guard can cover (`pagehide`, a closing tab).
-  verify-scroll-nav §5 drives both the nav bar and the back control, and
-  asserts nothing is written while the question is open.
-- **The Pokédex's "Has evolutions" filter is UI-only, pending a definition.**
-  Not a bug and not an oversight: see "Dex search / filter / sort" above. It is
-  `stub: true`, so it cannot narrow the list or read as active, and it says so on
-  screen. Unblocked by one answer — "can still evolve" or "is in a multi-stage
-  line" — and wired by one function in `speciesQuery.ts`.
+- **The Pokédex's "Has evolutions" filter is UI-only** (`stub: true`), pending
+  the owner's definition: "can still evolve" or "is in a multi-stage line".
+- **Build Form does not autosave; every other screen does.** Deliberate — see
+  `src/modules/team-builder/CLAUDE.md`.
+- **verify-design-system: 12 species-card geometry checks fail** (card is
+  212 × 214 vs Figma's 199-high aspect, after the owner's looser leading). Needs
+  the owner to decide whether 214 is the new reference. `npm run check` labels
+  this failure as known.
 
-- **Build Form does not autosave; every other screen does.** This is deliberate
-  and is not an inconsistency to "fix". Build Form holds field edits in local
-  state and writes them only at a transition — going back, duplicating, adding
-  to a team, answering a rail prompt, or leaving by the app bar. My Teams, Team
-  Viewer and Build Library all still commit on blur. Reset and Delete are the
-  two actions that deliberately do NOT commit first.
+## Module rules live beside the module
 
-  **THE RAIL ASKS; everything else commits silently.** Clicking another member
-  offers save-first or discard; clicking the "+" adds a third answer, move the
-  edit to the new member; clicking the slot you are already on offers to revert,
-  and is not even a control when there is nothing to revert. A build two or more
-  teams use keeps its own three-way prompt instead of any of those, because it
-  is a superset of them and it carries the warning about how far a save reaches.
+A nested CLAUDE.md loads on the first read of a file under its directory.
+**Read the matching file before changing anything in that area.**
 
-## The unsaved member
-
-`Build.draft` IS LEGACY. Nothing writes it; the shell prunes any it finds.
-
-A member that does not exist yet is **a value in the Build Form's state plus
-the rail SLOT it is destined for** (`buildId: null` + `slot` in `tbNav`). The
-build and its slot assignment are written **together**, by `persist`, at the
-first save point — or never. This is not a refactor for its own sake; the
-previous shape (create the record up front, flag it `draft`, place it by a
-later "keep it?" answer) failed in four ways that were all reported at once:
-
-- when that question was removed, **nothing placed it** — filling the form and
-  pressing "Back to team" put the build in the library and returned to a team
-  that was still empty;
-- the id was consumed up front, so **the numbering drifted**;
-- the slot being filled read as free, so the rail drew an "add member" button
-  on it — **the same question the reader had just answered** — and answering it
-  again abandoned the member in progress;
-- and if that member was still untouched it was deleted underneath the open
-  form, which is where **"this build no longer exists" mid-build** came from.
-
-Rules that must not be re-derived:
-
-- **The slot and the record are one write.** Never save one without the other.
-- **The slot being edited is never an "add" affordance.** `railAddSlot` skips it.
-- **A slot holding an id nothing resolves to is an EMPTY slot** (`slotIsFree`).
-  Team Viewer always treated it that way; the rail did not, and skipped it.
-- **`slot` and `seed` must be threaded through the shell.** `TeamBuilding` drops
-  them on the floor if you forget, and the symptom is a member saved into the
-  library with its team left empty — the original bug, exactly.
-- **One build cannot be in two slots of one team.** The picker hides builds
-  already on the target team and "add to other team" disables such a team. Two
-  identical ids in one team's slots is not a cosmetic duplicate: React reports
-  a duplicate key, the coverage panels count that Pokemon twice, "remove from
-  this team" clears only the first slot, and it does not register as a shared
-  build — sharing counts teams, not slots — so editing changes both with no
-  prompt.
-
-- **A build from one generation can be placed on a team of another.** The
-  picker offers every build whatever the team's generation, so a Gen 3 build
-  with a nature, an ability and a held item can sit on a Gen 1 team, and the
-  team then renders cards with two different `data-generation` values. Every
-  field is still gated on the BUILD's own generation, so nothing renders a
-  mechanic that did not exist — the team is simply not a legal team for its
-  era. Left alone because the fix is a product decision, not a bug fix: hide
-  mismatched builds from the picker, warn and allow, or offer to convert. Ask
-  before picking one.
-
-- **Three defensive abilities are deliberately not modelled**, all in
-  `src/modules/team-builder/typeDefence.ts`: Filter and Solid Rock (0.75x on
-  super-effective) and Dry Skin's 1.25x Fire penalty. Each would put a build on a
-  multiplier that is not a chart tier — 1.5x, 3x, 2.5x — and the matchup panel
-  groups by tier. Dry Skin's Water immunity IS modelled. **Lightning Rod and
-  Storm Drain are absent on purpose and are an era trap, not an omission**: in
-  Gen 3-4 both only REDIRECT the move and the holder still takes normal damage;
-  the immunity arrives in Gen 5, which is outside this app's scope.
-
-- ~~**The Build Form's rail ends 17px below the left column in Gen 1 only.**~~
-  **OBSOLETE**: the rail is no longer measured against the stat table.
-
-- **`.tb`'s `data-generation` is the APP's generation, not the open build's.**
-  Opening a Gen 3 build while the app is set to Gen 4 gives a module wrapper
-  that says 4 and a form whose fields are all correctly gated on 3. Nothing
-  user-facing reads the attribute — the era gates read `build.generation` — but
-  anything that styles or tests off the wrapper is reading the wrong number.
-  Same class: a card whose species is not in the data bundle renders
-  `.tb-card-missing`, which carries no `data-tb="member-card"`, so a selector
-  counting members silently misses it.
-
-- **The type-run dot draws at 18px on the Build Library and Team Library
-  cards.** `.tb-type-sep` sets margin and colour and no font-size, so it
-  inherits the page's 18px body — the same defect fixed on the Team Display card
-  by giving `.tb-card-full .tb-card-facts` a size of its own. It is not
-  cosmetic-only: a baseline-aligned flex line is as tall as its tallest item, so
-  the type line measures 29.1px on the Build Library card (against its ~14px
-  leading) and 17px on the Team Library card. Both screens are signed off with
-  it on screen, and the fix is one declaration — `font-size:
-  var(--font-size-caption)` on each variant's `.tb-card-facts` — which WILL
-  change both card heights. Ask before applying it.
-
-- ~~**Shedinja's fixed 1 HP is not special-cased in the stat math.**~~
-  **FIXED** with the damage calculator: `computeStat` returns 1 for base HP 1
-  (the reference does the same). The same pass fixed `statExpBonus`, which
-  lacked the game's 255 cap on sqrt(Stat Exp) — every maxed Gen 1-2 stat was one
-  point high at level 100 (Mewtwo's Special 407, real 406; pret `CalcStat`).
-  verify-team-builder still passes.
-
-- **The Build Form does not use the shared team-build form components.** They
-  were built for the damage calculator in `components/ds/` (FormParts,
-  EvStatTable + RangeSlider, MoveSlotTile, SearchSelect); the Build Form keeps
-  its own `.tb-form-*` / SpreadControls / MoveSlots, because its layout is
-  frozen. Two copies until someone asks for the migration — it must land with
-  no visual change and verify-team-builder unchanged.
-
-- **verify-design-system fails at HEAD, independent of the calculator** (checked
-  with the calculator's changes stashed): "Tools lists its five destinations"
-  expects Calculators last and `9ac37d7` put it first, and its GRID section then
-  throws (`Cannot read properties of null (reading 'color')`) — so the static
-  scans after it (ports, shadows) do not currently run. Needs a decision on the
-  Tools order before either the nav or the assertion changes.
-## Design system (design-system/)
-Source of truth: `design-system/`. Read `PRINCIPLES.md` and `PATTERNS.md` first, then the spec in `components/<name>.md` before building or changing any UI component.
-- Never hardcode colors, font sizes, weights, spacing or radii. Use CSS variables from `design-system/dist/tokens.css` (`var(--color-text-default)`, `var(--font-style-body-size)`, `var(--d-row)`…). Components use semantic tokens only, never primitives (`--color-accent-600` etc. are off limits in components).
-- Theme: `data-theme="light|dark"` on `<html>`; density: `data-density="airy|default|compact"` on the page root.
-- Rules that are easy to break: no hover backgrounds anywhere; no underlined text; ghost buttons only; underline text fields only; accent red = active nav item and selected tab only (max 2 per screen); color a type by its name text, not a chip; no ticks on stat bars; headings and UPPERCASE labels are regular weight.
-- Do not edit `dist/tokens.css` by hand. Change `tokens.json`, run `python3 design-system/scripts/build-tokens.py` then `python3 design-system/scripts/check-contrast.py` (must show `fails: 0`).
-- A design change = update the matching `components/*.md` + CHANGELOG entry in the same commit.
-- `design-system/preview.html` is a visual reference for every component and state (open it in a browser).
+| Area | File |
+|---|---|
+| Signed-off screens (measurements, rationale), the unsaved member, Build Form saving, Team Building debt | `src/modules/team-builder/CLAUDE.md` |
+| Species detail page (proportional scale, Info locations), grid and list views, "Has evolutions" | `src/modules/pokedex/CLAUDE.md` |
+| Data layer: sprites, era resolution, Japanese names | `src/data/CLAUDE.md` |
+| Type Coverage and its selector | `src/modules/typecoverage/CLAUDE.md` |
+| Damage calculator and its selector | `src/modules/calculators/CLAUDE.md` |
+| Team Matchup, its selector, the battle engine | `src/modules/team-matchup/CLAUDE.md` |
+| Dex search / filter / sort | `src/modules/dex/CLAUDE.md` |
+| The scroll model (`ScrollArea`) | `src/components/CLAUDE.md` |
+| The back stack (`navHistory`, `navGuard`) | `src/modules/nav/CLAUDE.md` |
+| Trainer Dex and its bundle | `scripts/trainers/CLAUDE.md` |
+| Bulbapedia supplement, verification plumbing | `scripts/CLAUDE.md` |
