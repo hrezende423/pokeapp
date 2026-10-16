@@ -12,6 +12,7 @@
     "build:supplement": "node scripts/build-supplement.mjs",
     "build:item-supplement": "node scripts/build-item-supplement.mjs",
     "build:catch-data": "node scripts/build-catch-data.mjs",
+    "build:berry-data": "node scripts/build-berry-data.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
