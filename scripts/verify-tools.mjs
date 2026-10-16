@@ -47,8 +47,10 @@ const LANDING = {
   'type-coverage': '[data-testid^="tc-panel-"]',
   'team-matchup': '[data-testid="team-matchup"]',
 }
-const landingFor = (target) =>
-  target.kind === 'calculator' ? LANDING.calculator(target.tab) : LANDING[target.id] ?? `[data-testid="tool-page-${target.id}"]`
+const landingFor = (tool) =>
+  tool.target.kind === 'calculator'
+    ? LANDING.calculator(tool.target.tab)
+    : LANDING[tool.target.id] ?? `[data-testid="tool-page-${tool.key}"]`
 
 const openIndex = async (page) => {
   await page.click('[data-testid="nav-tab-tools"]')
@@ -118,7 +120,7 @@ try {
   for (const tool of registry.tools) {
     await openIndex(page)
     await page.click(`[data-testid="tool-link-${tool.key}"]`)
-    const landing = landingFor(tool.target)
+    const landing = landingFor(tool)
     const landed = await page
       .waitForSelector(landing, { timeout: 60000 })
       .then(() => true)
@@ -155,7 +157,7 @@ try {
   await selectGeneration(page, 1)
   await openIndex(page)
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.length)
-  check('on Gen 1 nothing built so far is disabled', gen1Disabled === 0, `${gen1Disabled} disabled`)
+  check('on Gen 1 only Hidden Power (Gen 2–4) is disabled', gen1Disabled === 1, `${gen1Disabled} disabled`)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -225,6 +227,87 @@ try {
   }))
   check('on Gen 5 the Stat tab says "Gen 1–4 only" instead of a form', gen5Stat.reason?.startsWith('Gen 1–4 only') && !gen5Stat.form, JSON.stringify(gen5Stat))
   await page.mouse.move(1200, 700)
+
+  // ------------------------------------------------------------------ #2
+  hr('#2 HIDDEN POWER -- against the games\' own routines')
+  /*
+    Bulbapedia did not load in the browser on 2026-10-15, so per the plan's
+    fallback the expectations are worked by hand from the pinned routines:
+      Gen 2: pokecrystal engine/battle/hidden_power.asm (HiddenPowerDamage) --
+        power = ((top bits Atk,Def,Spe,Spc as 8,4,2,1) * 5 + (Spc & 3)) / 2 + 31;
+        type = ((Atk & 3) << 2 | (Def & 3)), from Fighting, skipping Bird/unused.
+      Gen 3: pokeemerald src/battle_script_commands.c (Cmd_hiddenpowercalc) --
+        bits HP,Atk,Def,Spe,SpA,SpD; power = 40 * secondBits / 63 + 30;
+        type = 15 * lowBits / 63, from Fighting, skipping Mystery.
+  */
+  const hpMath = await page.evaluate(async () => {
+    const m = await import('/pokeapp/src/modules/tools/hidden-power/hiddenPowerMath.ts')
+    const r = (gen, raw) => {
+      const o = m.readHiddenPower(gen, raw)
+      return o.ok ? `${o.type} ${o.power}` : `reason: ${o.reason}`
+    }
+    const all = (keys, v) => Object.fromEntries(keys.map((k) => [k, String(v)]))
+    return {
+      g2max: r(2, all(m.HP_KEYS_GEN2, 15)),
+      g2min: r(2, all(m.HP_KEYS_GEN2, 0)),
+      g2rock: r(2, { attack: '13', defense: '12', speed: '15', special: '14' }),
+      g3max: r(3, all(m.HP_KEYS_GEN34, 31)),
+      g4min: r(4, all(m.HP_KEYS_GEN34, 0)),
+      g4fire: r(4, { hp: '31', attack: '30', defense: '31', speed: '30', 'special-attack': '30', 'special-defense': '31' }),
+      g1: r(1, {}),
+      empty: r(3, { ...all(m.HP_KEYS_GEN34, 31), hp: '' }),
+      high: r(2, { ...all(m.HP_KEYS_GEN2, 15), attack: '16' }),
+      half: r(3, { ...all(m.HP_KEYS_GEN34, 31), speed: '7.5' }),
+    }
+  })
+  check('Gen 2: all DVs 15 is Dark 70', hpMath.g2max === 'dark 70', hpMath.g2max)
+  check('Gen 2: all DVs 0 is Fighting 31', hpMath.g2min === 'fighting 31', hpMath.g2min)
+  check('Gen 2: Atk 13 / Def 12 / Spe 15 / Spc 14 is Rock 69', hpMath.g2rock === 'rock 69', hpMath.g2rock)
+  check('Gen 3: all IVs 31 is Dark 70', hpMath.g3max === 'dark 70', hpMath.g3max)
+  check('Gen 4: all IVs 0 is Fighting 30', hpMath.g4min === 'fighting 30', hpMath.g4min)
+  check('Gen 4: 31/30/31, Spe 30, SpA 30, SpD 31 is Fire 70', hpMath.g4fire === 'fire 70', hpMath.g4fire)
+  check('Gen 1 has no Hidden Power, and says so', hpMath.g1.includes('does not exist in Gen 1'), hpMath.g1)
+  check('an empty field is a reason naming it, not a number', hpMath.empty === 'reason: Enter the IVs for HP.', hpMath.empty)
+  check('a DV over 15 is a reason, not a number', hpMath.high.startsWith('reason: Attack DV must be'), hpMath.high)
+  check('a fractional IV is a reason, not a number', hpMath.half.startsWith('reason: Enter the IVs for Speed'), hpMath.half)
+
+  const openHp = async (gen) => {
+    await selectGeneration(page, gen)
+    await openIndex(page)
+    await page.click('[data-testid="tool-link-2"]')
+    await page.waitForSelector('[data-testid="tool-page-2"]', { timeout: 60000 })
+  }
+  await openHp(2)
+  const hpG2 = await page.evaluate(() => ({
+    fields: [...document.querySelectorAll('[data-testid^="hp-input-"]')].map((el) => el.dataset.testid.replace('hp-input-', '')),
+    result: document.querySelector('[data-testid="hp-result"]')?.innerText.trim(),
+    areas: getComputedStyle(document.querySelector('[data-layout="tool-body"]')).gridTemplateAreas,
+  }))
+  const toolsActive = await page.$eval('[data-testid="nav-tab-tools"]', (el) => el.getAttribute('aria-current'))
+  check('on a tool page the Tools tab reads as "you are here"', toolsActive === 'page', String(toolsActive))
+  check('Gen 2 asks for four DVs, no HP field', JSON.stringify(hpG2.fields) === '["attack","defense","speed","special"]', hpG2.fields.join(','))
+  check('and opens on the maxed spread: Dark 70', hpG2.result?.toLowerCase() === 'dark 70', hpG2.result)
+  check('the body is laid out by named areas: inputs, result', hpG2.areas.includes('inputs') && hpG2.areas.includes('result'), hpG2.areas)
+  await openHp(4)
+  for (const [k, v] of Object.entries({ hp: '31', attack: '30', defense: '31', speed: '30', 'special-attack': '30', 'special-defense': '31' })) {
+    await page.fill(`[data-testid="hp-input-${k}"]`, v)
+  }
+  const hpG4 = await page.$eval('[data-testid="hp-result"]', (el) => el.innerText.trim())
+  await page.screenshot({ path: shot('tool-2-hidden-power.png') })
+  check('Gen 4 asks for six IVs, and the Fire spread reads Fire 70 on screen', hpG4.toLowerCase() === 'fire 70', hpG4)
+  await page.fill('[data-testid="hp-input-hp"]', '')
+  const hpReason = await page.$eval('[data-testid="tool-result"]', (el) => ({
+    state: el.dataset.state,
+    text: el.textContent.trim(),
+  }))
+  check('clearing a field prints the reason where the result was', hpReason.state === 'reason' && hpReason.text === 'Enter the IVs for HP.', JSON.stringify(hpReason))
+  await selectGeneration(page, 1)
+  await openIndex(page)
+  const hpGen1 = await page.evaluate(() => ({
+    disabled: document.querySelector('[data-testid="tool-link-2"]').disabled,
+    reason: document.querySelector('[data-testid="tool-reason-2"]')?.textContent,
+  }))
+  check('on Gen 1 the index lists it disabled: "this exists in Gen 2–4"', hpGen1.disabled && hpGen1.reason?.includes('Gen 2–4'), JSON.stringify(hpGen1))
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)

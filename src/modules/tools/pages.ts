@@ -10,15 +10,29 @@
  * cost nothing to a reader who never opens them.
  */
 
-import type { ComponentType } from 'react'
+import { createElement, lazy, Suspense, type ComponentType } from 'react'
 import { ToolsIndex } from './ToolsIndex'
 
-export const TOOLS_PAGES = [{ id: 'tools', label: 'Tools' }] as const
+export const TOOLS_PAGES = [
+  { id: 'tools', label: 'Tools' },
+  { id: 'tool-hidden-power', label: 'Hidden Power' },
+] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
 
+/** A tool page loaded on first open, behind a one-line fallback. */
+function lazyTool(load: () => Promise<{ default: ComponentType }>): ComponentType {
+  const Page = lazy(load)
+  return function LazyTool() {
+    return createElement(Suspense, { fallback: createElement('p', null, 'Loading…') }, createElement(Page))
+  }
+}
+
 const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   tools: ToolsIndex,
+  'tool-hidden-power': lazyTool(() =>
+    import('./hidden-power/HiddenPowerTool').then((m) => ({ default: m.HiddenPowerTool })),
+  ),
 }
 
 export function findToolsPage(

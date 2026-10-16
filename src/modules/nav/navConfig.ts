@@ -3,7 +3,7 @@ import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
 import { findTeamMatchupPage, type TeamMatchupPageId } from '../team-matchup/pages'
-import { findToolsPage, type ToolsPageId } from '../tools/pages'
+import { TOOLS_PAGES, findToolsPage, type ToolsPageId } from '../tools/pages'
 import {
   TYPE_COVERAGE_PAGES,
   findTypeCoveragePage,
@@ -68,6 +68,11 @@ export interface NavTab {
    */
   itemsTestId?: string
   entries: readonly NavEntry[]
+  /**
+   * Pages that belong to this tab without being a dropdown line: the tool pages,
+   * reached from the Tools index. The tab still reads as "you are here" on them.
+   */
+  alsoActiveFor?: readonly PageId[]
 }
 
 /** Entries from STUB_PAGES, in the order named here rather than declaration order. */
@@ -109,6 +114,7 @@ export const NAV_TABS: readonly NavTab[] = [
     /* Clicking the word opens the Tools index (owner, 2026-10-15): every tool,
        grouped. The dropdown below is unchanged. */
     destination: 'tools',
+    alsoActiveFor: TOOLS_PAGES.map((p) => p.id),
     /*
       CALCULATORS LEADS, and is a real screen now rather than a stub -- see
       calculators/pages.ts. The four small tools are tabs of ONE screen (the Type
@@ -179,6 +185,7 @@ export function entryContains(entry: NavEntry, activeId: PageId): boolean {
 
 export function tabIsActive(tab: NavTab, activeId: PageId): boolean {
   if (tab.destination === activeId) return true
+  if (tab.alsoActiveFor?.includes(activeId)) return true
   return tab.entries.some((entry) => entryContains(entry, activeId))
 }
 

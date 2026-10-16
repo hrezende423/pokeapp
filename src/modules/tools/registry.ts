@@ -68,6 +68,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'calculator', tab: 'Stat' },
   },
   {
+    key: '2',
+    n: 2,
+    label: 'Hidden Power',
+    group: 'core',
+    blurb: 'Hidden Power’s type and power from a spread — four DVs in Gen 2, six IVs from Gen 3.',
+    gate: { gens: [2, 3, 4] },
+    target: { kind: 'page', id: 'tool-hidden-power' },
+  },
+  {
     key: '3',
     n: 3,
     label: 'Damage calculator',
