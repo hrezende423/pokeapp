@@ -219,6 +219,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-blocks' },
   },
   {
+    key: '18',
+    n: 18,
+    label: 'Contest stats plan',
+    group: 'planners',
+    blurb: 'Feed Pokéblocks or Poffins in order: each condition and the sheen after, until it will not eat.',
+    gate: { gens: [3, 4], games: ['ruby-sapphire', 'emerald', 'diamond-pearl', 'platinum'] },
+    target: { kind: 'page', id: 'tool-contest' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',

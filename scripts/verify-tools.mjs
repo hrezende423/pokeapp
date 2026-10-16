@@ -158,7 +158,7 @@ try {
   await openIndex(page)
   // Named, not counted: the list grows as Gen 2+ tools land.
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
-  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus and Pokéblocks are disabled', gen1Disabled === '12,16,17,19,2', gen1Disabled)
+  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks and contests are disabled', gen1Disabled === '12,16,17,18,19,2', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1237,6 +1237,55 @@ try {
   const hgss = await page.$('[data-testid="tool-game-row-heartgold-soulsilver"]')
   check('HeartGold/SoulSilver are not offered (no Poffins)', hgss === null)
   await page.screenshot({ path: shot('tool-19-poffin.png') })
+
+  // ------------------------------------------------------------------ #18
+  hr('#18 CONTEST STATS PLAN -- Gen 3 nature acts one way per block; Gen 4 x1.1 / x0.9')
+  const con = await page.evaluate(async () => {
+    const cm = await import('/pokeapp/src/modules/tools/contest/contestMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const nat = (n) => { const x = d.listNatures().find((y) => y.name === n); return cm.tasteOf(x.likes_flavor, x.hates_flavor) }
+    const ad = nat('adamant')
+    const t = (flavors, feel = 0) => ({ flavors, feel })
+    // Platinum's sFlavorPreferences (poffin_case/main.c): [liked, disliked] as flavour indexes.
+    const PT = { adamant: [0, 1], bold: [4, 0], timid: [2, 0], modest: [1, 0], calm: [3, 0], hasty: [2, 4], lonely: [0, 4], careful: [3, 1] }
+    return {
+      tastes: Object.entries(PT).every(([n, [l, h]]) => { const x = nat(n); return x.liked === l && x.disliked === h }),
+      neutral: ['hardy', 'docile', 'serious', 'bashful', 'quirky'].every((n) => nat(n).liked === null),
+      g3liked: cm.gains('gen3', ad, t([20, 0, 0, 0, 0])),
+      g3disliked: cm.gains('gen3', ad, t([0, 20, 0, 0, 0])),
+      g3even: cm.gains('gen3', ad, t([20, 20, 0, 0, 0])),
+      g3mixed: cm.gains('gen3', ad, t([15, 25, 0, 0, 0])),
+      g4: cm.gains('gen4', ad, t([25, 25, 0, 0, 0])),
+      hardy: cm.gains('gen4', nat('hardy'), t([25, 25, 0, 0, 0])),
+      full: cm.feed('gen3', ad, { conditions: [0, 0, 0, 0, 0], sheen: 250 }, [{ treat: t([10, 0, 0, 0, 0], 20), count: 3 }]),
+      cap: cm.feed('gen4', ad, { conditions: [250, 0, 0, 0, 0], sheen: 0 }, [{ treat: t([30, 0, 0, 0, 0], 10), count: 1 }]).final.conditions[0],
+    }
+  })
+  check('nature likes and dislikes match Platinum\'s flavour table', con.tastes && con.neutral)
+  check('Gen 3: a block it likes adds 10% to the liked flavour (20 -> 22)', JSON.stringify(con.g3liked) === '[22,0,0,0,0]', JSON.stringify(con.g3liked))
+  check('Gen 3: a block it dislikes loses 10% of the disliked flavour (20 -> 18)', JSON.stringify(con.g3disliked) === '[0,18,0,0,0]', JSON.stringify(con.g3disliked))
+  check('Gen 3: a block that scores even gets no nature effect at all', JSON.stringify(con.g3even) === '[20,20,0,0,0]', JSON.stringify(con.g3even))
+  check('Gen 3: only the winning side moves (dry 25 -> 22, spicy 15 untouched)', JSON.stringify(con.g3mixed) === '[15,22,0,0,0]', JSON.stringify(con.g3mixed))
+  check('Gen 4: liked x1.1 and disliked x0.9, rounded down, together', JSON.stringify(con.g4) === '[27,22,0,0,0]', JSON.stringify(con.g4))
+  check('a neutral nature changes nothing', JSON.stringify(con.hardy) === '[25,25,0,0,0]', JSON.stringify(con.hardy))
+  check('at 255 sheen it will not eat (one of three eaten from 250)', con.full.steps.length === 1 && con.full.refused === 2 && con.full.final.sheen === 255, JSON.stringify(con.full.final))
+  check('a condition caps at 255', con.cap === 255, String(con.cap))
+
+  // From #19 to #18 in one click: a Platinum Cheri Poffin (spicy 14, smoothness 24).
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-19"]')
+  await page.click('[data-testid="tool-game-row-platinum"]').catch(() => {})
+  await page.waitForSelector('[data-testid="blk-plan"]', { timeout: 60000 })
+  await page.click('[data-testid="blk-plan"]')
+  await page.waitForSelector('[data-testid="con-table"]', { timeout: 60000 })
+  const handed = await page.$eval('[data-testid="con-row-1-f0"]', (e) => e.value)
+  await page.selectOption('[data-testid="con-nature"]', { label: 'Adamant' })
+  const cool = await page.$eval('[data-testid="con-final-cool"]', (e) => Number(e.dataset.value))
+  const sheen = await page.$eval('[data-testid="con-final-sheen"]', (e) => Number(e.dataset.value))
+  check('#19 hands its Poffin to the plan (spicy 14 arrives)', handed === '14', handed)
+  check('on the page: ten of them on an Adamant = Cool 150 (14 x 1.1 = 15 each), sheen 240', cool === 150 && sheen === 240, `cool ${cool}, sheen ${sheen}`)
+  await page.screenshot({ path: shot('tool-18-contest.png') })
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { SelectField } from '../../../components/ds/SelectField'
 import { TextField } from '../../../components/ds/TextField'
+import { useNav } from '../../nav/navContext'
+import { setContestTreat } from '../contest/contestHandoff'
+import type { Treat } from '../contest/contestMath'
 import { findTool } from '../registry'
 import { ToolInputs, ToolResult, ToolShell } from '../ToolShell'
 import {
@@ -32,6 +35,24 @@ export function BlocksTool() {
         )
       }
     </ToolShell>
+  )
+}
+
+/** Sends what was just made to #18, which reads it once on mount. */
+function PlanButton({ treat, what }: { treat: Treat; what: string }) {
+  const { setModule } = useNav()
+  return (
+    <button
+      type="button"
+      className="tools-link"
+      data-testid="blk-plan"
+      onClick={() => {
+        setContestTreat(treat)
+        setModule('tool-contest')
+      }}
+    >
+      Plan feeding with this {what}
+    </button>
   )
 }
 
@@ -158,7 +179,10 @@ function BlenderBody({ emerald }: { emerald: boolean }) {
               <span className="num">{block.feel}</span>
             </p>
             {block.flavors ? (
-              <FlavorTable flavors={block.flavors} testid="blk-flavors" />
+              <>
+                <FlavorTable flavors={block.flavors} testid="blk-flavors" />
+                <PlanButton treat={{ flavors: block.flavors, feel: block.feel }} what="Pokéblock" />
+              </>
             ) : (
               <p className="calc-result-note" data-testid="blk-black">
                 Black: the same berry twice, nothing left after the flavours cancel, or four or more
@@ -270,7 +294,13 @@ function PoffinBody() {
               smoothness <span className="num">{poffin.smoothness}</span>
             </p>
             {poffin.flavors ? (
-              <FlavorTable flavors={poffin.flavors} testid="pof-flavors" />
+              <>
+                <FlavorTable flavors={poffin.flavors} testid="pof-flavors" />
+                <PlanButton
+                  treat={{ flavors: poffin.flavors, feel: poffin.smoothness }}
+                  what="Poffin"
+                />
+              </>
             ) : (
               <p className="calc-result-note" data-testid="pof-foul">
                 Foul: {poffin.foulBecause}. The game gives it three random flavours at 2.
