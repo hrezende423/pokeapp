@@ -1023,6 +1023,58 @@ try {
   check('Gen 1 lists only Gen 1 species', g1max <= 151, String(g1max))
   await page.screenshot({ path: shot('tool-14-similarity.png') })
 
+  // ------------------------------------------------------------------ #15
+  hr('#15 TEAM THREAT FINDER -- members hit SE by a STAB type, on the generation\'s chart')
+  const thr = await page.evaluate(async () => {
+    const tm = await import('/pokeapp/src/modules/tools/threats/threatMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const sp = (n) => d.listSpecies().find((s) => s.name === n)
+    const types = (g, n) => tm.typesOf(g, tm.varietyOf(sp(n)))
+    const hit = (g, a, b) => tm.stabHit(g, types(g, a), types(g, b))
+    const gen1 = d.listSpecies().filter((s) => s.id <= 151)
+    const team = [{ speciesId: sp('pidgeot').id }, { speciesId: sp('gyarados').id }]
+    const ranked = tm.teamThreats(1, team, gen1, d.getSpecies, 200)
+    return {
+      ghost: [hit(1, 'gengar', 'alakazam'), hit(2, 'gengar', 'alakazam')?.multiplier],
+      bug: [hit(1, 'beedrill', 'venusaur')?.multiplier, hit(2, 'beedrill', 'venusaur')],
+      electric: hit(1, 'magnemite', 'gyarados'),
+      top: ranked.slice(0, 3).map((t) => `${t.speciesId}:${t.hits.length}:${t.bst}`),
+      ordered: ranked.every((t, i) => i === 0 || ranked[i - 1].hits.length > t.hits.length || (ranked[i - 1].hits.length === t.hits.length && ranked[i - 1].bst >= t.bst)),
+      allHit: ranked.every((t) => t.hits.length > 0),
+      empty: tm.teamThreats(1, [], gen1, d.getSpecies).length,
+    }
+  })
+  check('Gen 1 Ghost does nothing to Psychic; from Gen 2 it is super-effective', thr.ghost[0] === null && thr.ghost[1] === 2, JSON.stringify(thr.ghost))
+  check('Gen 1 Bug is ×4 on Grass/Poison (Bug beat Poison); Gen 2 not a threat', thr.bug[0] === 4 && thr.bug[1] === null, JSON.stringify(thr.bug))
+  check('Electric is ×4 on Water/Flying', thr.electric?.multiplier === 4, JSON.stringify(thr.electric))
+  check('ranked by members hit, then base stat total', thr.ordered && thr.allHit, thr.top.join(' '))
+  check('no team, no threats', thr.empty === 0)
+
+  // A saved Gen 1 team loads into the slots.
+  await page.evaluate(async () => {
+    const store = await import('/pokeapp/src/modules/team-builder/store.ts')
+    const facts = await import('/pokeapp/src/modules/team-builder/buildFacts.ts')
+    const a = store.createBuild(facts.newBuildInit(1, 18))
+    const b = store.createBuild(facts.newBuildInit(1, 130))
+    store.createTeam(1, [a.id, b.id], { name: 'Threat test' })
+  })
+  await selectGeneration(page, 1)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-15"]')
+  await page.waitForSelector('[data-testid="thr-member-1"]', { timeout: 60000 })
+  const thrEmpty = await page.textContent('[data-testid="tool-reason"]').catch(() => null)
+  check('with no members the result is a reason', /at least one team member/i.test(thrEmpty ?? ''), String(thrEmpty))
+  const teamValue = await page.$eval('[data-testid="thr-team"] option:nth-child(2)', (o) => o.value)
+  await page.selectOption('[data-testid="thr-team"]', teamValue)
+  await page.waitForSelector('[data-testid="thr-rank-1"]', { timeout: 60000 })
+  const loaded = await page.$$eval('[data-testid^="thr-member-"]', (els) => els.map((e) => e.value).filter(Boolean))
+  check('a saved team fills the member slots', JSON.stringify(loaded) === '["18","130"]', JSON.stringify(loaded))
+  const top = await page.$eval('[data-testid="thr-rank-1"]', (e) => ({ hits: e.dataset.hits, text: e.textContent }))
+  check('the top threat hits both members, ×4 on Gyarados shown', top.hits === '2', top.text)
+  const thrMax = await page.$$eval('[data-testid="thr-rows"] li', (els) => Math.max(...els.map((e) => Number(e.dataset.species))))
+  check('Gen 1 lists only Gen 1 species', thrMax <= 151, String(thrMax))
+  await page.screenshot({ path: shot('tool-15-threats.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)

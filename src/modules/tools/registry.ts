@@ -183,6 +183,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-similarity' },
   },
   {
+    key: '15',
+    n: 15,
+    label: 'Team threat finder',
+    group: 'reference',
+    blurb: 'The Pokémon whose own types hit the most of your team super-effectively.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'tool-threats' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
