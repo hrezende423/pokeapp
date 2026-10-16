@@ -980,6 +980,49 @@ try {
   check('best values are set heavier, not coloured', bestCells.length > 0 && bestCells.every((w) => Number(w) >= 600), bestCells.slice(0, 3).join(','))
   await page.screenshot({ path: shot('tool-13-compare.png') })
 
+  // ------------------------------------------------------------------ #14
+  hr('#14 SIMILARITY FINDER -- a stated formula, as of the generation')
+  const sim = await page.evaluate(async () => {
+    const sm = await import('/pokeapp/src/modules/tools/similarity/similarityMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const sp = (n) => d.listSpecies().find((s) => s.name === n)
+    const gen1 = d.listSpecies().filter((s) => s.id <= 151)
+    const a = sm.profileOf(4, sp('garchomp'))
+    const b = sm.profileOf(4, sp('salamence'))
+    const ab = sm.similarity(a, b).parts
+    const ba = sm.similarity(b, a).parts
+    return {
+      self: sm.similarity(a, a).score,
+      symmetric: ['shape', 'defences', 'size'].every((k) => Math.abs(ab[k] - ba[k]) < 1e-12),
+      nidoking: sm.mostSimilar(1, sp('nidoking'), gen1, 5).map((h) => h.speciesId),
+      nidoqueen: sp('nidoqueen').id,
+      gen1Stats: sm.profileOf(1, sp('mewtwo')).stats.length,
+      gen2Stats: sm.profileOf(2, sp('mewtwo')).stats.length,
+      magnemite: [1, 2].map((g) => sm.profileOf(g, sp('magnemite')).defence.join('')),
+      excludesSelf: !sm.mostSimilar(1, sp('pikachu'), gen1).some((h) => h.speciesId === sp('pikachu').id),
+    }
+  })
+  check('a Pokémon scores 100 against itself', Math.abs(sim.self - 100) < 1e-9, String(sim.self))
+  check('stat shape, defences and size are symmetric', sim.symmetric)
+  check('Gen 1 Nidoqueen is in Nidoking\'s top five', sim.nidoking.includes(sim.nidoqueen), sim.nidoking.join(','))
+  check('Gen 1 compares five stats (one Special), Gen 2 six', sim.gen1Stats === 5 && sim.gen2Stats === 6, `${sim.gen1Stats}/${sim.gen2Stats}`)
+  check('the generation changes the defensive profile (Magnemite gains Steel in Gen 2)', sim.magnemite[0] !== sim.magnemite[1], sim.magnemite.join(' | '))
+  check('the target is never in its own list', sim.excludesSelf)
+
+  await selectGeneration(page, 1)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-14"]')
+  await page.waitForSelector('[data-testid="sim-rank-1"]', { timeout: 60000 })
+  const simRows = await page.$$eval('[data-testid="sim-rows"] li', (els) => els.length)
+  check('twenty matches, with the formula printed', simRows === 20 && (await page.$('[data-testid="sim-formula"]')) !== null, String(simRows))
+  await page.selectOption('[data-testid="sim-species"]', String(34))
+  await page.waitForFunction(() => document.querySelector('[data-testid="sim-rank-1"]')?.getAttribute('data-species') !== null)
+  const simIds = await page.$$eval('[data-testid="sim-rows"] li', (els) => els.slice(0, 5).map((e) => Number(e.dataset.species)))
+  check('picking Nidoking on the page lists Nidoqueen near the top', simIds.includes(sim.nidoqueen), simIds.join(','))
+  const g1max = await page.$$eval('[data-testid="sim-rows"] li', (els) => Math.max(...els.map((e) => Number(e.dataset.species))))
+  check('Gen 1 lists only Gen 1 species', g1max <= 151, String(g1max))
+  await page.screenshot({ path: shot('tool-14-similarity.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)

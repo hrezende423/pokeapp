@@ -174,6 +174,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'compare-pokemon' },
   },
   {
+    key: '14',
+    n: 14,
+    label: 'Similarity finder',
+    group: 'reference',
+    blurb: 'The Pokémon most like another — stat shape, defences, size and types, by a stated formula.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'tool-similarity' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
