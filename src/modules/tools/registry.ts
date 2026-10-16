@@ -228,6 +228,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-contest' },
   },
   {
+    key: '20',
+    n: 20,
+    label: 'Battle Palace odds',
+    group: 'frontier',
+    blurb: 'In the Battle Palace your Pokémon picks its own moves: the odds by nature, above and below half HP.',
+    gate: { gens: [3], games: ['emerald'] },
+    target: { kind: 'page', id: 'tool-palace' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',

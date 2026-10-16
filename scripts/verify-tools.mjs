@@ -117,7 +117,14 @@ try {
   check('the Tools dropdown still opens, Calculators first', dropdownFirst.startsWith('Calculators'), dropdownFirst)
   await page.mouse.move(700, 900)
 
+  // Each tool in a generation it exists in: the Palace is Emerald-only, Gen 3.
+  let loopGen = null
   for (const tool of registry.tools) {
+    const gen = tool.gate ? Math.max(...tool.gate.gens) : 4
+    if (gen !== loopGen) {
+      await selectGeneration(page, gen)
+      loopGen = gen
+    }
     await openIndex(page)
     await page.click(`[data-testid="tool-link-${tool.key}"]`)
     const landing = landingFor(tool)
@@ -158,7 +165,7 @@ try {
   await openIndex(page)
   // Named, not counted: the list grows as Gen 2+ tools land.
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
-  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks and contests are disabled', gen1Disabled === '12,16,17,18,19,2', gen1Disabled)
+  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests and the Palace are disabled', gen1Disabled === '12,16,17,18,19,2,20', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1286,6 +1293,59 @@ try {
   check('#19 hands its Poffin to the plan (spicy 14 arrives)', handed === '14', handed)
   check('on the page: ten of them on an Adamant = Cool 150 (14 x 1.1 = 15 each), sheen 240', cool === 150 && sheen === 240, `cool ${cool}, sheen ${sheen}`)
   await page.screenshot({ path: shot('tool-18-contest.png') })
+
+  // ------------------------------------------------------------------ #20
+  hr('#20 BATTLE PALACE -- the nature picks the group, the AI the move; the fallback bug kept')
+  const pal = await page.evaluate(async () => {
+    const pm = await import('/pokeapp/src/modules/tools/palace/palaceMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const em = (await import('/pokeapp/src/modules/battle/battleData.ts')).loadBattleData
+    const moves = (await em('emerald')).moves
+    const id = (n) => d.listMoves().find((m) => m.name === n).id
+    const grp = (n) => pm.palaceGroup(moves[id(n)].tg, moves[id(n)].p)
+    const pmv = (n) => ({ id: id(n), group: grp(n) })
+    const api = d.listNatures().every((n) => {
+      const p = Object.fromEntries(n.move_battle_style_preferences.map((q) => [q.move_battle_style, q]))
+      const hi = pm.styleOf(n.name, false), lo = pm.styleOf(n.name, true)
+      return hi[0] === p.attack.high_hp_preference && hi[1] === p.defense.high_hp_preference && hi[2] === p.support.high_hp_preference
+        && lo[0] === p.attack.low_hp_preference && lo[1] === p.defense.low_hp_preference && lo[2] === p.support.low_hp_preference
+    })
+    const full = pm.palaceOdds('adamant', ['tackle', 'swords-dance', 'growl', 'protect'].map(pmv), false)
+    const attackers = pm.palaceOdds('adamant', ['tackle', 'ember'].map(pmv), false)
+    const bug = pm.palaceOdds('adamant', ['growl', 'leer', 'swords-dance'].map(pmv), false)
+    const low = pm.palaceOdds('adamant', ['tackle', 'swords-dance', 'growl'].map(pmv), true)
+    return {
+      api,
+      groups: ['tackle', 'swords-dance', 'protect', 'growl', 'spikes', 'counter', 'earthquake', 'haze', 'curse'].map(grp).join(','),
+      full: [full.groups.map((g) => g.chance).join(','), full.fallback.size, full.idle],
+      attackers: [[...attackers.fallback.values()].map((x) => Math.round(x * 1e6) / 1e6).join(','), Math.round(attackers.idle * 1e6) / 1e6],
+      bug: [[...bug.fallback.keys()].map((k) => d.getMove(k).name).sort().join(','), Math.round(bug.idle * 1e6) / 1e6],
+      low: low.groups.map((g) => g.chance).join(','),
+    }
+  })
+  check('the nature table matches PokéAPI\'s battle-style preferences, all 25, both HP bands', pal.api)
+  check('move groups are the game\'s: user-only = Defense; status on target or field = Support', pal.groups === 'attack,defense,defense,support,support,support,attack,defense,support', pal.groups)
+  check('Adamant above half HP: Attack 38 / Defense 31 / Support 31, nothing idle', pal.full[0] === '0.38,0.31,0.31' && pal.full[1] === 0 && pal.full[2] === 0, JSON.stringify(pal.full))
+  check('no Defense or Support move: those 62% fall back to the attacks, half of it idle', pal.attackers[0] === '0.155,0.155' && pal.attackers[1] === 0.31, JSON.stringify(pal.attackers))
+  check('the Support-count bug: two Support moves are not preferred, so Swords Dance is in the fallback', pal.bug[0] === 'growl,leer,swords-dance' && pal.bug[1] === 0.19, JSON.stringify(pal.bug))
+  check('at or below half HP the second pair applies (Adamant Attack 70)', pal.low === '0.7,0.15,0.15', pal.low)
+
+  await selectGeneration(page, 3)
+  await page.evaluate(() => document.querySelector('[data-testid="nav-trainerdex"]').click())
+  await page.click('[data-testid="trainerdex-game-emerald"]').catch(() => {})
+  await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
+  await page.locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Spenser")').first().click()
+  await page.waitForSelector('[data-testid="trainerdex-tool-link"]', { timeout: 30000 })
+  await page.click('[data-testid="trainerdex-tool-link"]')
+  await page.waitForSelector('[data-testid="pal-nature"]', { timeout: 60000 })
+  check('Spenser\'s Trainer Dex entry links to the Palace tool', true)
+  await page.selectOption('[data-testid="pal-move-1"]', { label: 'Tackle' })
+  await page.selectOption('[data-testid="pal-move-2"]', { label: 'Swords Dance' })
+  await page.selectOption('[data-testid="pal-nature"]', 'adamant')
+  const palAtk = await page.$eval('[data-testid="pal-group-attack"] td', (e) => Number(e.dataset.chance))
+  const palIdle = await page.$eval('[data-testid="pal-idle"] td', (e) => Number(e.dataset.chance))
+  check('on the page: Adamant, Tackle + Swords Dance -- Attack 38%, idle 15.5% (no Support move)', palAtk === 0.38 && Math.abs(palIdle - 0.155) < 1e-9, `${palAtk} / ${palIdle}`)
+  await page.screenshot({ path: shot('tool-20-palace.png') })
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
