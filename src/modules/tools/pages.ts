@@ -24,6 +24,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-status', label: 'Status move finder' },
   { id: 'tool-targeting', label: 'Doubles targeting guide' },
   { id: 'compare-pokemon', label: 'Compare Pokemon' },
+  { id: 'tool-similarity', label: 'Similarity finder' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -32,7 +33,11 @@ export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
 function lazyTool(load: () => Promise<{ default: ComponentType }>): ComponentType {
   const Page = lazy(load)
   return function LazyTool() {
-    return createElement(Suspense, { fallback: createElement('p', null, 'Loading…') }, createElement(Page))
+    return createElement(
+      Suspense,
+      { fallback: createElement('p', null, 'Loading…') },
+      createElement(Page),
+    )
   }
 }
 
@@ -54,11 +59,18 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   'tool-moveset': lazyTool(() =>
     import('./moveset/MovesetTool').then((m) => ({ default: m.MovesetTool })),
   ),
-  'tool-status': lazyTool(() => import('./status/StatusTool').then((m) => ({ default: m.StatusTool }))),
+  'tool-status': lazyTool(() =>
+    import('./status/StatusTool').then((m) => ({ default: m.StatusTool })),
+  ),
   'tool-targeting': lazyTool(() =>
     import('./targeting/TargetingTool').then((m) => ({ default: m.TargetingTool })),
   ),
-  'compare-pokemon': lazyTool(() => import('./compare/CompareTool').then((m) => ({ default: m.CompareTool }))),
+  'compare-pokemon': lazyTool(() =>
+    import('./compare/CompareTool').then((m) => ({ default: m.CompareTool })),
+  ),
+  'tool-similarity': lazyTool(() =>
+    import('./similarity/SimilarityTool').then((m) => ({ default: m.SimilarityTool })),
+  ),
 }
 
 export function findToolsPage(
