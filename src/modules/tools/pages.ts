@@ -29,6 +29,7 @@ export const TOOLS_PAGES = [
   { id: 'breeding-planner', label: 'Breeding Planner' },
   { id: 'tool-pokerus', label: 'Pokérus spread' },
   { id: 'tool-blocks', label: 'Pokéblocks and Poffins' },
+  { id: 'tool-contest', label: 'Contest stats plan' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -86,6 +87,9 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   ),
   'tool-blocks': lazyTool(() =>
     import('./blocks/BlocksTool').then((m) => ({ default: m.BlocksTool })),
+  ),
+  'tool-contest': lazyTool(() =>
+    import('./contest/ContestTool').then((m) => ({ default: m.ContestTool })),
   ),
 }
 
