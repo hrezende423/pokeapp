@@ -18,6 +18,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-hidden-power', label: 'Hidden Power' },
   { id: 'tool-speed-tiers', label: 'Speed tiers' },
   { id: 'tool-speed-minimizer', label: 'Speed EV minimizer' },
+  { id: 'tool-bulk', label: 'Defensive bulk' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -41,6 +42,7 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   'tool-speed-minimizer': lazyTool(() =>
     import('./speed-minimizer/SpeedMinimizerTool').then((m) => ({ default: m.SpeedMinimizerTool })),
   ),
+  'tool-bulk': lazyTool(() => import('./bulk/BulkTool').then((m) => ({ default: m.BulkTool }))),
 }
 
 export function findToolsPage(

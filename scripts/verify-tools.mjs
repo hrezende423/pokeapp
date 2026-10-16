@@ -493,6 +493,91 @@ try {
   check('the page answers on open, and does not ask for the Speed effort it solves for', Boolean(minScreen.headline) && !minScreen.effortField, JSON.stringify(minScreen).slice(0, 140))
   await page.screenshot({ path: shot('tool-6-speed-minimizer.png') })
 
+  // ------------------------------------------------------------------ #7
+  hr('#7 DEFENSIVE BULK -- the solver against an exhaustive search of the whole grid')
+  const bulk = await page.evaluate(async () => {
+    const bm = await import('/pokeapp/src/modules/tools/bulk/bulkMath.ts')
+    const st = await import('/pokeapp/src/modules/calculators/damageCalcState.ts')
+    const eng = await import('/pokeapp/src/modules/calculators/damage/index.ts')
+    const stat = await import('/pokeapp/src/modules/team-builder/statMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const sp = (n) => d.listSpecies().find((s) => s.name === n).id
+    const mv = (n) => d.listMoves().find((m) => m.name === n)
+    const res = []
+    const cases = [
+      { gen: 4, atk: 'garchomp', def: 'metagross', move: 'earthquake' },
+      { gen: 4, atk: 'gengar', def: 'blissey', move: 'thunderbolt' },
+      { gen: 1, atk: 'tauros', def: 'snorlax', move: 'body-slam' },
+      { gen: 2, atk: 'zapdos', def: 'skarmory', move: 'thunderbolt' },
+      { gen: 2, atk: 'machamp', def: 'snorlax', move: 'cross-chop' },
+      { gen: 2, atk: 'heracross', def: 'espeon', move: 'megahorn' },
+    ]
+    const KEEPS = [0, 30, 60, 85]
+    for (const c of cases) {
+      const attacker = st.toCalcPokemon(st.newSide(sp(c.atk), c.gen))
+      const defBase = st.toCalcPokemon(st.newSide(sp(c.def), c.gen))
+      // Start the defender with no HP / defence effort, so every answer is a real search.
+      const defender = { ...defBase, effort: { ...defBase.effort, hp: 0, defense: 0, special: 0, 'special-defense': 0 } }
+      const field = st.fieldFor(st.emptyDualField(), 0)
+      const first = bm.readBulk({ gen: c.gen, attacker, defender, move: mv(c.move), isCrit: false, field, keepPct: 0 })
+      if (!first.ok) { res.push({ c, error: first.reason }); continue }
+      // Exhaustive: every step pair, once, then every keep level read off the same grid.
+      const steps = bm.effortSteps(c.gen, c.gen <= 2 ? 65535 : 252)
+      const budget = c.gen >= 3 ? 510 - Object.entries(defender.effort).filter(([k]) => k !== 'hp' && k !== first.defKey).reduce((x, [, v]) => x + (v ?? 0), 0) : Infinity
+      const grid = []
+      for (const hp of steps) for (const df of steps) {
+        if (hp + df > budget) continue
+        const p = { ...defender, effort: { ...defender.effort, hp, [first.defKey]: df } }
+        const r = eng.calculateDamage(c.gen, attacker, p, { move: mv(c.move), isCrit: false, hits: null, powerOverride: null }, field, { koText: false })
+        const maxHp = eng.computeRawStats(p, c.gen).hp
+        grid.push({ hp, def: df, total: hp + df, maxHp, left: maxHp - r.range[1] })
+      }
+      for (const keep of KEEPS) {
+        let best = null
+        for (const g of grid) {
+          if (g.left < bm.hpToKeep(g.maxHp, keep)) continue
+          if (!best || g.total < best.total || (g.total === best.total && g.left > best.left)) best = { hp: g.hp, def: g.def, total: g.total, left: g.left }
+        }
+        const o = bm.readBulk({ gen: c.gen, attacker, defender, move: mv(c.move), isCrit: false, field, keepPct: keep })
+        res.push({ c: { ...c, keep }, solver: o.ok && o.best ? { hp: o.best.hp, def: o.best.def, total: o.best.total, left: o.best.left } : null, brute: best, defLabel: first.defLabel })
+      }
+    }
+    // The Stat Exp steps are exactly where the bonus rises.
+    const stepsOk = bm.effortSteps(1, 65535).every((e, b) => stat.statExpBonus(e) === b && (b === 0 || stat.statExpBonus(e - 1) === b - 1))
+    const status = (() => {
+      const a = st.toCalcPokemon(st.newSide(sp('garchomp'), 4))
+      const o = bm.readBulk({ gen: 4, attacker: a, defender: a, move: mv('swords-dance'), isCrit: false, field: st.fieldFor(st.emptyDualField(), 0), keepPct: 0 })
+      return o.ok ? 'ok' : o.reason
+    })()
+    return { res, stepsOk, status }
+  })
+  for (const r of bulk.res) {
+    const label = `Gen ${r.c.gen}: ${r.c.def} vs ${r.c.atk} ${r.c.move}, keep ${r.c.keep}%`
+    if (r.error) { check(label, false, r.error); continue }
+    check(`${label}: the least total equals the exhaustive search`, JSON.stringify(r.solver) === JSON.stringify(r.brute), `solver ${JSON.stringify(r.solver)} / exhaustive ${JSON.stringify(r.brute)} (${r.defLabel})`)
+  }
+  for (const gen of [1, 2, 4]) {
+    const real = bulk.res.filter((r) => r.c.gen === gen && r.solver && r.solver.total > 0)
+    check(`Gen ${gen}: at least one answer is a real investment, not 0 or impossible`, real.length > 0, real.map((r) => `${r.c.keep}%: ${r.solver.hp}/${r.solver.def}`).join(' '))
+  }
+  check('Gen 1-2 Stat Exp steps are exactly where the bonus rises', bulk.stepsOk)
+  check('a status move is a reason, not a spread', bulk.status.startsWith('Pick a damaging move'), bulk.status)
+
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-7"]')
+  await page.waitForSelector('[data-testid="bulk-current"]', { timeout: 60000 })
+  const bulkScreen = await page.evaluate(() => ({
+    best: document.querySelector('[data-testid="bulk-best"]')?.innerText.trim(),
+    current: document.querySelector('[data-testid="bulk-current"]')?.innerText.trim(),
+  }))
+  check('the page answers on open with the Damage Calculator’s own panels', Boolean(bulkScreen.best) && bulkScreen.current.startsWith('As set:'), JSON.stringify(bulkScreen).slice(0, 160))
+  await page.fill('[data-testid="bulk-keep"]', '120')
+  const bulkReason = await page.$eval('[data-testid="tool-result"]', (el) => el.innerText.trim())
+  check('a share of 120% is a reason, not a number', bulkReason.startsWith('The HP to keep must be'), bulkReason)
+  await page.fill('[data-testid="bulk-keep"]', '0')
+  await page.screenshot({ path: shot('tool-7-bulk.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)
