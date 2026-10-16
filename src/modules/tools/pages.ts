@@ -22,6 +22,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-ev-remaining', label: 'EV / Stat Exp remaining' },
   { id: 'tool-moveset', label: 'Moveset searcher' },
   { id: 'tool-status', label: 'Status move finder' },
+  { id: 'tool-targeting', label: 'Doubles targeting guide' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -53,6 +54,9 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
     import('./moveset/MovesetTool').then((m) => ({ default: m.MovesetTool })),
   ),
   'tool-status': lazyTool(() => import('./status/StatusTool').then((m) => ({ default: m.StatusTool }))),
+  'tool-targeting': lazyTool(() =>
+    import('./targeting/TargetingTool').then((m) => ({ default: m.TargetingTool })),
+  ),
 }
 
 export function findToolsPage(

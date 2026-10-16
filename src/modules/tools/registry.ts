@@ -156,6 +156,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-status' },
   },
   {
+    key: '12',
+    n: 12,
+    label: 'Doubles targeting guide',
+    group: 'reference',
+    blurb: 'What every move hits in a double battle — one target, both foes, everyone adjacent — as the game has it.',
+    gate: { gens: [3, 4] },
+    target: { kind: 'page', id: 'tool-targeting' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
