@@ -700,6 +700,77 @@ try {
   check('Gen 1 reads with its own routine', (await engineOf()) === 'gen1')
   await page.screenshot({ path: shot('tool-8-catch.png') })
 
+  // ------------------------------------------------------------------ #9 + Collection
+  hr('#9 EV / STAT EXP REMAINING and the COLLECTION it reads')
+  const col = await page.evaluate(async () => {
+    const rm = await import('/pokeapp/src/modules/tools/ev-remaining/remainingMath.ts')
+    const cm = await import('/pokeapp/src/modules/collection/collectionMath.ts')
+    const sync = await import('/pokeapp/src/sync/teamSync.ts')
+    const store = await import('/pokeapp/src/modules/team-builder/store.ts')
+    const g4 = rm.remaining(4, { hp: 100, speed: 252 }, { hp: 252, speed: 200, attack: 4 })
+    const g2 = rm.remaining(2, { hp: 1000, special: 65535 }, { hp: 65535, special: 65535 })
+    const draft = (effort) => ({ speciesId: 1, nickname: '', level: '50', natureId: null, effort, buildId: null })
+    const merged = sync.mergeDocs(
+      { builds: [{ id: 'b1' }], teams: [], nextBuildSeq: 2, nextTeamSeq: 1, collection: [{ id: 'c1', seq: 1, buildId: 'b1' }], nextEntrySeq: 2 },
+      { builds: [{ id: 'b1' }], teams: [], nextBuildSeq: 2, nextTeamSeq: 1, collection: [{ id: 'c1', seq: 1, buildId: 'b1' }, { id: 'c2', seq: 2, buildId: null }], nextEntrySeq: 3 },
+    )
+    const old = store.normalise({ builds: [], teams: [], nextBuildSeq: 1, nextTeamSeq: 1 })
+    return {
+      g4: g4.rows.map((r) => `${r.key}:${r.left}/${r.over}`),
+      g4total: g4.totalLeft,
+      g2: [g2.totalLeft, g2.rows.find((r) => r.key === 'special').left],
+      over510: cm.checkEntry(4, draft({ hp: '252', attack: '252', speed: '8' })),
+      g2cap: cm.checkEntry(2, draft({ hp: '65536' })),
+      g2ok: cm.checkEntry(2, draft({ hp: '65535' })).ok,
+      merged: merged.collection.map((c) => `${c.id}->${c.buildId}`),
+      nextEntry: merged.nextEntrySeq,
+      old: [old.collection.length, old.nextEntrySeq],
+    }
+  })
+  check('Gen 4: 152 HP and 4 Atk to go, Speed 52 over (reported as over, not negative)', JSON.stringify(col.g4) === '["hp:152/0","attack:4/0","defense:0/0","special-attack:0/0","special-defense:0/0","speed:0/52"]' && col.g4total === 156, JSON.stringify(col.g4))
+  check('Gen 2 reads Stat Exp on the five Gen 1-2 keys', col.g2[0] === 64535 && col.g2[1] === 0, JSON.stringify(col.g2))
+  check('an entry over 510 EVs is a reason', !col.over510.ok && col.over510.reason.includes('510'), col.over510.reason)
+  check('Gen 2 Stat Exp tops out at 65535', !col.g2cap.ok && col.g2ok, col.g2cap.reason)
+  check('a first sync renumbers device entries after the cloud\'s and re-points their build', JSON.stringify(col.merged) === '["c1->b1","c2->b2","c3->null"]' && col.nextEntry === 4, JSON.stringify(col.merged))
+  check('a document from before the Collection reads as an empty one', JSON.stringify(col.old) === '[0,1]', JSON.stringify(col.old))
+
+  // The screen, end to end: a build, an entry trained toward it, what is left.
+  await selectGeneration(page, 4)
+  await page.evaluate(async () => {
+    const store = await import('/pokeapp/src/modules/team-builder/store.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const garchomp = d.listSpecies().find((s) => s.name === 'garchomp')
+    store.createBuild({
+      generation: 4, speciesId: garchomp.id, pokemonId: garchomp.varieties[0].pokemon_id, nickname: 'Target', gender: null, shiny: false,
+      level: 100, friendship: 70, itemId: null, abilityId: null, natureId: null, moveIds: [null, null, null, null],
+      effort: { hp: 4, attack: 252, speed: 252 }, individual: {}, tags: [], notes: '',
+    })
+  })
+  await goToPage(page, 'team-building', 'collection')
+  await page.waitForSelector('[data-testid="col-species"]', { timeout: 60000 })
+  const gid = await page.evaluate(async () => (await import('/pokeapp/src/data/index.ts')).listSpecies().find((s) => s.name === 'garchomp').id)
+  await page.selectOption('[data-testid="col-species"]', String(gid))
+  await page.fill('[data-testid="col-nickname"]', 'Chompy')
+  await page.fill('[data-testid="col-effort-attack"]', '100')
+  await page.fill('[data-testid="col-effort-speed"]', '252')
+  const buildValue = await page.$eval('[data-testid="col-build"]', (el) => [...el.options].find((o) => o.textContent.startsWith('Target'))?.value)
+  await page.selectOption('[data-testid="col-build"]', buildValue)
+  await page.click('[data-testid="col-save"]')
+  const listed = await page.$eval('[data-testid="col-list"]', (el) => el.innerText)
+  check('the entry is listed with its EVs and its target', listed.includes('Chompy') && listed.includes('100 Atk / 252 Spe') && listed.includes('Target'), listed.slice(0, 120))
+  const tbActive = await page.$eval('[data-testid="nav-tab-team-building"]', (el) => el.getAttribute('aria-current'))
+  check('the Collection lives in the Team Building tab', tbActive === 'page', String(tbActive))
+  await page.click('[data-testid^="col-remaining-"]')
+  await page.waitForSelector('[data-testid="rem-total"]', { timeout: 60000 })
+  const rem = await page.evaluate(() => ({
+    total: document.querySelector('[data-testid="rem-total"]').innerText.trim(),
+    atk: document.querySelector('[data-testid="rem-left-attack"]')?.innerText,
+    hp: document.querySelector('[data-testid="rem-left-hp"]')?.innerText,
+    speed: document.querySelector('[data-testid="rem-left-speed"]')?.innerText ?? null,
+  }))
+  check('"What’s left to train" opens #9 on that entry: 152 Atk + 4 HP = 156 EVs to go', rem.total === '156 EVs to go' && rem.atk === '152' && rem.hp === '4' && rem.speed === null, JSON.stringify(rem))
+  await page.screenshot({ path: shot('tool-9-remaining.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)

@@ -120,6 +120,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-bulk' },
   },
   {
+    key: '9',
+    n: 9,
+    label: 'EV / Stat Exp remaining',
+    group: 'core',
+    blurb: 'What a Pokémon in your Collection still has to gain to match the Build it is trained toward.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'tool-ev-remaining' },
+  },
+  {
     key: '8',
     n: 8,
     label: 'Catch rate',
