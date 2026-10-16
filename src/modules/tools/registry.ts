@@ -111,6 +111,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-speed-minimizer' },
   },
   {
+    key: '7',
+    n: 7,
+    label: 'Defensive bulk',
+    group: 'core',
+    blurb: 'The least HP and Defense or Sp. Def effort that survives one hit, keeping the HP you ask for.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'tool-bulk' },
+  },
+  {
     key: '8',
     n: 8,
     label: 'Catch rate',

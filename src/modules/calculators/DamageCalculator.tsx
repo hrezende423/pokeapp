@@ -5,9 +5,7 @@ import { useGameMoveTable } from './useGameMoveTable'
 import {
   getAbility,
   getMove,
-  getType,
   resolveArtworkUrl,
-  resolveTypesForGeneration,
 } from '../../data'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
@@ -16,8 +14,6 @@ import { calculateDamage } from './damage'
 import {
   DEFAULT_ATTACKER_ID,
   DEFAULT_DEFENDER_ID,
-  MOVE_SLOT_COUNT,
-  defaultMoves,
   emptyDualField,
   fieldFor,
   newSide,
@@ -37,6 +33,7 @@ import { useDamageCalcScope } from './useDamageCalcScope'
 import { clearDamageCalcPrefill, peekDamageCalcPrefill } from './damageCalcHandoff'
 import { generationOfGame } from '../version-group/games'
 import { useGenerationLearnset } from './useGenerationLearnset'
+import { useSideMoves } from './useSideMoves'
 import '../../components/ds/ds.css'
 import './calculators.css'
 
@@ -251,16 +248,6 @@ export function DamageCalculatorPage() {
   )
 }
 
-/** A side's four slots: its own once edited, otherwise the learnset's defaults. */
-function useSideMoves(side: SideState, learnRows: number[] | null, gen: number) {
-  const variety = varietyOf(side)
-  return useMemo<(number | null)[]>(() => {
-    if (side.moves) return side.moves
-    if (!learnRows) return Array(MOVE_SLOT_COUNT).fill(null)
-    const types = resolveTypesForGeneration(variety, gen).map((t) => getType(t.type_id)?.name ?? '')
-    return defaultMoves(learnRows, gen, types)
-  }, [side.moves, learnRows, gen, variety])
-}
 
 /**
  * The Pokemon's official artwork between the two move lists, as KinglerCalc
