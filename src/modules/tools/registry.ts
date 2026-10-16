@@ -201,6 +201,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'breeding-planner' },
   },
   {
+    key: '17',
+    n: 17,
+    label: 'Pokérus spread',
+    group: 'planners',
+    blurb: 'How Pokérus spreads through your party, battle by battle, by each game’s own routine.',
+    gate: { gens: [2, 3, 4] },
+    target: { kind: 'page', id: 'tool-pokerus' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',

@@ -158,7 +158,7 @@ try {
   await openIndex(page)
   // Named, not counted: the list grows as Gen 2+ tools land.
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
-  check('on Gen 1 only Hidden Power, the doubles guide and breeding are disabled', gen1Disabled === '12,16,2', gen1Disabled)
+  check('on Gen 1 only Hidden Power, the doubles guide, breeding and Pokérus are disabled', gen1Disabled === '12,16,17,2', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1129,6 +1129,49 @@ try {
   await goToPage(page, 'tools', 'breeding-planner')
   const brdGen1 = await page.textContent('[data-testid="tool-reason"]').catch(() => null)
   check('Gen 1 has no breeding: the page says so', /Gen 2/.test(brdGen1 ?? ''), String(brdGen1))
+
+  // ------------------------------------------------------------------ #17
+  hr('#17 POKERUS -- each game\'s spread routine, solved exactly')
+  const pkr = await page.evaluate(async () => {
+    const pm = await import('/pokeapp/src/modules/tools/pokerus/pokerusMath.ts')
+    const A = 'active', N = 'none', C = 'cured'
+    const r = (x) => Math.round(x * 1e6) / 1e6
+    return {
+      rules: ['gold-silver', 'crystal', 'ruby-sapphire', 'emerald', 'firered-leafgreen', 'platinum', 'heartgold-soulsilver'].map(pm.rulesFor).join(','),
+      g3one: r(pm.chancesAfter('gen34', [A, N], 1)[1]),
+      g3pair: r(pm.settle('gen34', [A, N]).battles),
+      g3six: r(pm.settle('gen34', [A, N, N, N, N, N]).battles),
+      g3both: r(pm.settle('gen34', [N, A, N]).battles),
+      g3cured: pm.settle('gen34', [A, C, N]),
+      g2one: r(pm.chancesAfter('gen2', [A, N], 1)[1]),
+      g2pair: r(pm.settle('gen2', [A, N]).battles),
+      g2last: r(pm.settle('gen2', [N, A]).battles),
+      g2d1: pm.settle('gen2', [A, N, N], 1).reached.join(','),
+      g2d4: pm.settle('gen2', [A, N, N], 4).reached.join(','),
+      frlg: pm.chancesAfter('none', [A, N], 50)[1],
+    }
+  })
+  check('Gold/Silver/Crystal run the Gen 2 routine, FRLG none, the rest Gen 3-4', pkr.rules === 'gen2,gen2,gen34,gen34,none,gen34,gen34', pkr.rules)
+  check('Gen 3-4: a neighbour catches it 1 battle in 3', pkr.g3one === 0.333333 && pkr.g3pair === 3, `${pkr.g3one} / ${pkr.g3pair}`)
+  check('Gen 3-4: slot 1 to slot 6 takes five spreads, 15 battles on average', pkr.g3six === 15, String(pkr.g3six))
+  check('Gen 3-4: one spread reaches both neighbours', pkr.g3both === 3, String(pkr.g3both))
+  check('a cured member is a wall: slot 3 never catches it', JSON.stringify(pkr.g3cured.reached) === '["always","never","never"]' && pkr.g3cured.battles === 0, JSON.stringify(pkr.g3cured))
+  check('Gen 2: one side per spread -- from slot 1, 1 battle in 6 (6 on average)', pkr.g2one === 0.166667 && pkr.g2pair === 6, `${pkr.g2one} / ${pkr.g2pair}`)
+  check('Gen 2: the last member always spreads backward (3 on average)', pkr.g2last === 3, String(pkr.g2last))
+  check('Gen 2: a 4-day strain stalls behind the first member it infects', pkr.g2d1 === 'always,always,always' && pkr.g2d4 === 'always,always,never', `${pkr.g2d1} | ${pkr.g2d4}`)
+  check('FireRed/LeafGreen never spread it', pkr.frlg === 0, String(pkr.frlg))
+
+  await selectGeneration(page, 3)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-17"]')
+  await page.click('[data-testid="tool-game-row-emerald"]').catch(() => {})
+  await page.waitForSelector('[data-testid="pkr-table"]', { timeout: 60000 })
+  const pkrRow2 = await page.$eval('[data-testid="pkr-row-2"]', (e) => Number(e.dataset.chance))
+  check('on the page: Emerald, slot 2 after 10 battles = 1 - (2/3)^10', Math.abs(pkrRow2 - (1 - (2 / 3) ** 10)) < 1e-9, String(pkrRow2))
+  await page.screenshot({ path: shot('tool-17-pokerus.png') })
+  await page.click('[data-testid="tool-game-row-firered-leafgreen"]')
+  const pkrFrlg = await page.textContent('[data-testid="tool-reason"]').catch(() => null)
+  check('FireRed/LeafGreen says why there is nothing to simulate', /FireRed and LeafGreen never/.test(pkrFrlg ?? ''), String(pkrFrlg))
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
