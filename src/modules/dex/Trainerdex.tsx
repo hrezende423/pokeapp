@@ -28,6 +28,8 @@ import type {
 } from '../../data/trainers'
 import { TypeAbbr, TypeLabel } from '../../components/ds/TypeLabel'
 import { useDexSelection, useNav } from '../nav/navContext'
+import { BrainToolLink } from '../tools/BrainToolLink'
+import { hasBrainTool } from '../tools/brainTools'
 import { useVersionGroup } from '../version-group/context'
 import { GameRow } from '../version-group/GameRow'
 import { DataTable, ProseCell, type Column } from '../../components/DataTable'
@@ -400,6 +402,11 @@ function TrainerDetail({
             {t.ai.length > 0 && (
               <Fact label="AI" testId="trainerdex-ai">
                 {t.ai.map(AI_LABEL).join(', ')}
+              </Fact>
+            )}
+            {hasBrainTool(t.class_id) && (
+              <Fact label="Tool" testId="trainerdex-tool">
+                <BrainToolLink classId={t.class_id} />
               </Fact>
             )}
             {t.versions && (

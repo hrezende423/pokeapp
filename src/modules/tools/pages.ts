@@ -30,6 +30,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-pokerus', label: 'Pokérus spread' },
   { id: 'tool-blocks', label: 'Pokéblocks and Poffins' },
   { id: 'tool-contest', label: 'Contest stats plan' },
+  { id: 'tool-palace', label: 'Battle Palace odds' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -90,6 +91,9 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   ),
   'tool-contest': lazyTool(() =>
     import('./contest/ContestTool').then((m) => ({ default: m.ContestTool })),
+  ),
+  'tool-palace': lazyTool(() =>
+    import('./palace/PalaceTool').then((m) => ({ default: m.PalaceTool })),
   ),
 }
 
