@@ -102,6 +102,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-speed-tiers' },
   },
   {
+    key: '6',
+    n: 6,
+    label: 'Speed EV minimizer',
+    group: 'core',
+    blurb: 'The least Speed EVs (Stat Exp in Gen 1–2) that move your Pokémon before a target, and the lowest level that would.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'tool-speed-minimizer' },
+  },
+  {
     key: '8',
     n: 8,
     label: 'Catch rate',

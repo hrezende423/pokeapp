@@ -22,6 +22,42 @@ import type { Weather } from '../../calculators/damage'
 
 export type Side = 'mine' | 'theirs'
 
+/** Items that move a Speed stat or the turn order, by slug; offered where they exist. */
+export const SPEED_ITEMS = [
+  'choice-scarf',
+  'macho-brace',
+  'iron-ball',
+  'power-weight',
+  'power-bracer',
+  'power-belt',
+  'power-lens',
+  'power-band',
+  'power-anklet',
+  'quick-powder',
+  'quick-claw',
+  'lagging-tail',
+  'full-incense',
+]
+
+let seq = 0
+export const newRow = (side: Side, speciesId: number | null, ctx: GameContext): TierRow => ({
+  key: `row-${++seq}`,
+  side,
+  speciesId,
+  level: '100',
+  speedIndividual: String(ctx.maxIndividual),
+  speedEffort: String(ctx.maxEffort === 65535 ? 65535 : 252),
+  nature: 'neutral',
+  itemId: null,
+  abilityId: null,
+  moves: [],
+  stage: 0,
+  paralyzed: false,
+  statused: false,
+  unburden: false,
+  slowStart: false,
+})
+
 /** A nature's effect on Speed: the only part of a nature turn order reads. */
 export type SpeedNature = 'up' | 'neutral' | 'down'
 
@@ -77,6 +113,74 @@ function wholeIn(text: string, lo: number, hi: number): number | null {
   return Number.isInteger(n) && n >= lo && n <= hi ? n : null
 }
 
+/** One row -> the engine's battler and its Speed modifiers, or why it cannot be read. */
+export function rowToSpec(
+  ctx: GameContext,
+  row: TierRow,
+  n: number,
+  field: TierField,
+  /** How a reason names the row: "Row 2" on the ladder, "The target" elsewhere. */
+  who = `Row ${n}`,
+): { ok: true; spec: BattlerSpec; mods: SpeedMods } | { ok: false; reason: string } {
+  const gen = ctx.generation
+  const word = gen <= 2 ? { iv: 'DV', ev: 'Stat Exp' } : { iv: 'IV', ev: 'EV' }
+  const mods: SpeedMods = {
+    stage: row.stage,
+    paralyzed: row.paralyzed,
+    statused: row.statused || row.paralyzed,
+    weather: field.weather,
+    tailwind: ctx.tailwind && field.tailwind[row.side],
+    unburden: row.unburden,
+    slowStart: row.slowStart,
+  }
+  if (row.build) return { ok: true, spec: { ...row.build, key: row.key, side: row.side }, mods }
+  const species = row.speciesId != null ? getSpecies(row.speciesId) : undefined
+  if (!species) return { ok: false, reason: `${who}: pick a Pokémon.` }
+  const level = wholeIn(row.level, 1, 100)
+  if (level == null)
+    return { ok: false, reason: `${who}: level must be a whole number from 1 to 100.` }
+  const iv = wholeIn(row.speedIndividual, 0, ctx.maxIndividual)
+  if (iv == null) {
+    return {
+      ok: false,
+      reason: `${who}: Speed ${word.iv} must be a whole number from 0 to ${ctx.maxIndividual}.`,
+    }
+  }
+  const ev = wholeIn(row.speedEffort, 0, ctx.maxEffort)
+  if (ev == null) {
+    return {
+      ok: false,
+      reason: `${who}: Speed ${word.ev} must be a whole number from 0 to ${ctx.maxEffort}.`,
+    }
+  }
+  const variety = species.varieties.find((v) => v.is_default) ?? species.varieties[0]
+  return {
+    ok: true,
+    spec: {
+      key: row.key,
+      side: row.side,
+      source: 'custom',
+      label: species.display_name,
+      speciesId: species.id,
+      varietyName: variety.name,
+      level,
+      spreadMode: 'current',
+      scenarioId: null,
+      spread: exactSpread(
+        gen,
+        { speed: iv },
+        { speed: ev },
+        gen >= 3 ? natureIdFor(row.nature) : null,
+      ),
+      moves: row.moves,
+      itemId: ctx.hasItems ? row.itemId : null,
+      abilityId: ctx.hasAbilities ? row.abilityId : null,
+      gender: 'N',
+    },
+    mods,
+  }
+}
+
 /** Rows -> the engine's ladder, or the first reason a row cannot be read. */
 export function readTiers(
   ctx: GameContext,
@@ -85,56 +189,11 @@ export function readTiers(
   field: TierField,
 ): TiersOutcome {
   if (rows.length < 2) return { ok: false, reason: 'Add at least two Pokémon to compare.' }
-  const gen = ctx.generation
-  const word = gen <= 2 ? { iv: 'DV', ev: 'Stat Exp' } : { iv: 'IV', ev: 'EV' }
   const entries: { spec: BattlerSpec; mods: SpeedMods }[] = []
   for (const [i, row] of rows.entries()) {
-    const n = i + 1
-    const mods: SpeedMods = {
-      stage: row.stage,
-      paralyzed: row.paralyzed,
-      statused: row.statused || row.paralyzed,
-      weather: field.weather,
-      tailwind: ctx.tailwind && field.tailwind[row.side],
-      unburden: row.unburden,
-      slowStart: row.slowStart,
-    }
-    if (row.build) {
-      entries.push({ spec: { ...row.build, key: row.key, side: row.side }, mods })
-      continue
-    }
-    const species = row.speciesId != null ? getSpecies(row.speciesId) : undefined
-    if (!species) return { ok: false, reason: `Pick a Pokémon for row ${n}.` }
-    const level = wholeIn(row.level, 1, 100)
-    if (level == null) return { ok: false, reason: `Row ${n}: level must be a whole number from 1 to 100.` }
-    const iv = wholeIn(row.speedIndividual, 0, ctx.maxIndividual)
-    if (iv == null) {
-      return { ok: false, reason: `Row ${n}: Speed ${word.iv} must be a whole number from 0 to ${ctx.maxIndividual}.` }
-    }
-    const ev = wholeIn(row.speedEffort, 0, ctx.maxEffort)
-    if (ev == null) {
-      return { ok: false, reason: `Row ${n}: Speed ${word.ev} must be a whole number from 0 to ${ctx.maxEffort}.` }
-    }
-    const variety = species.varieties.find((v) => v.is_default) ?? species.varieties[0]
-    entries.push({
-      spec: {
-        key: row.key,
-        side: row.side,
-        source: 'custom',
-        label: species.display_name,
-        speciesId: species.id,
-        varietyName: variety.name,
-        level,
-        spreadMode: 'current',
-        scenarioId: null,
-        spread: exactSpread(gen, { speed: iv }, { speed: ev }, gen >= 3 ? natureIdFor(row.nature) : null),
-        moves: row.moves,
-        itemId: ctx.hasItems ? row.itemId : null,
-        abilityId: ctx.hasAbilities ? row.abilityId : null,
-        gender: 'N',
-      },
-      mods,
-    })
+    const r = rowToSpec(ctx, row, i + 1, field)
+    if (!r.ok) return r
+    entries.push({ spec: r.spec, mods: r.mods })
   }
   return { ok: true, rows: speedLadder(ctx, data, entries, new Set(), field.trickRoom) }
 }
