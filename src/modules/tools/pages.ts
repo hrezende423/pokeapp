@@ -25,6 +25,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-targeting', label: 'Doubles targeting guide' },
   { id: 'compare-pokemon', label: 'Compare Pokemon' },
   { id: 'tool-similarity', label: 'Similarity finder' },
+  { id: 'tool-threats', label: 'Team threat finder' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -70,6 +71,9 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   ),
   'tool-similarity': lazyTool(() =>
     import('./similarity/SimilarityTool').then((m) => ({ default: m.SimilarityTool })),
+  ),
+  'tool-threats': lazyTool(() =>
+    import('./threats/ThreatTool').then((m) => ({ default: m.ThreatTool })),
   ),
 }
 
