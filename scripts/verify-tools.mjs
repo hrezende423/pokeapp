@@ -578,6 +578,128 @@ try {
   await page.fill('[data-testid="bulk-keep"]', '0')
   await page.screenshot({ path: shot('tool-7-bulk.png') })
 
+  // ------------------------------------------------------------------ #8
+  hr('#8 CATCH RATE -- each game\'s own routine, worked by hand and emulated roll by roll')
+  /*
+    Worked by hand from the routines catchRateMath.ts cites:
+      Gen 1 Mewtwo L70 (HP DV 15 -> 249 HP), full HP, rate 3, Poke Ball:
+        W = floor(floor(249*255/12)/floor(249/4)) = floor(5291/62) = 85;
+        Rand1 0..255 must be <= 3 (4 values), Rand2 <= 85 (86 values):
+        4*86 / (256*256) = 344/65536.  Great Ball: W = floor(7936/62) = 128,
+        Rand1 0..200: 4*129 / (201*256).  Asleep, Poke: (25 + 4*86/256)/256.
+      Gen 2 Snorlax L5 (HP DV 15 -> 32 HP), full HP, Heavy Ball, rate 25:
+        weight 1014.0 lb -> 10140: half 5070, -316, -158 = 4596, high byte 17
+        -> +40 = 65; 3*32 = 96, 2*32 = 64: floor(65*32/96) = 21 -> 22/256.
+      Gen 3 Rayquaza (rate 3), Ultra Ball, 1 HP, asleep:
+        floor(floor(3*20/10)*(3M-2)/3M) = 5, x2 = 10; 16711680/10 = 1671168,
+        isqrt 1292, isqrt 35, 1048560/35 = 29958 -> (29958/65536)^4.
+      Gen 4 Platinum Gible (rate 45), Dusk Ball at night, full HP:
+        floor(45*35/10) = 157, floor(157*M/3M) = 52; 16711680/52 = 321378,
+        isqrt 566, isqrt 23, 1048560/23 = 45589 -> (45589/65536)^4.
+      HGSS Snorlax (460.0 kg, rate 25), Heavy Ball, full HP: 25+40 = 65,
+        floor(65/3) = 21; 16711680/21 = 795794, isqrt 892, isqrt 29,
+        1048560/29 = 36157 -> (36157/65536)^4.  Pikachu (6.0 kg, rate 190):
+        the bug's -20 -> 170.
+  */
+  const catchCases = await page.evaluate(async () => {
+    const m = await import('/pokeapp/src/modules/calculators/catchRateMath.ts')
+    const t = (o) => ({ speciesId: 1, catchRate: 45, level: 50, maxHp: 100, currentHp: 100, status: 'none', types: ['normal'], baseSpeed: 50, weightHg: 100, gen2WeightLb10: 100, gender: 'male', ...o })
+    const p = (engine, target, ball, ctx = {}) => m.catchChance(engine, t(target), ball, { ...m.NEUTRAL_CONTEXT, ...ctx })
+    const mew = { speciesId: 150, catchRate: 3, level: 70, maxHp: 249, currentHp: 249, gender: 'genderless' }
+    // Literal emulation: every random value the routine can draw.
+    const emu1 = (tg, ball) => {
+      const cap = ball === 'poke-ball' ? 255 : ball === 'great-ball' ? 200 : 150
+      const S = tg.status === 'sleep' || tg.status === 'freeze' ? 25 : tg.status === 'none' ? 0 : 12
+      let hits = 0
+      for (let r1 = 0; r1 <= cap; r1++) for (let r2 = 0; r2 <= 255; r2++) {
+        if (r1 < S) { hits++; continue }
+        if (r1 - S > tg.catchRate) continue
+        const W = Math.floor(Math.floor((tg.maxHp * 255) / (ball === 'great-ball' ? 8 : 12)) / Math.max(Math.floor(tg.currentHp / 4), 1))
+        if (W > 255 || r2 <= W) hits++
+      }
+      return hits / ((cap + 1) * 256)
+    }
+    const emu2final = (final) => { let h = 0; for (let r = 0; r <= 255; r++) if (r <= final) h++; return h / 256 }
+    let worst1 = 0
+    let worst2 = 0
+    for (let i = 0; i < 60; i++) {
+      const maxHp = 20 + ((i * 37) % 600)
+      const tg = t({ catchRate: [3, 45, 120, 190, 255][i % 5], maxHp, currentHp: 1 + ((i * 53) % maxHp), status: ['none', 'sleep', 'paralysis'][i % 3] })
+      for (const ball of ['poke-ball', 'great-ball', 'ultra-ball']) worst1 = Math.max(worst1, Math.abs(m.catchChance('gen1', tg, ball).probability - emu1(tg, ball)))
+      const r2 = m.catchChance('gen2', tg, 'poke-ball')
+      worst2 = Math.max(worst2, Math.abs(r2.probability - emu2final(r2.value)))
+    }
+    return {
+      g1poke: p('gen1', mew, 'poke-ball').probability,
+      g1great: p('gen1', mew, 'great-ball').probability,
+      g1sleep: p('gen1', { ...mew, status: 'sleep' }, 'poke-ball').probability,
+      g2heavy: p('gen2', { speciesId: 143, catchRate: 25, level: 5, maxHp: 32, currentHp: 32, gen2WeightLb10: 10140 }, 'heavy-ball'),
+      g2love: p('gen2', { speciesId: 25, catchRate: 190, maxHp: 50, currentHp: 50, gender: 'male' }, 'love-ball', { yourSpeciesId: 25, yourGender: 'male' }),
+      g2loveOpposite: p('gen2', { speciesId: 25, catchRate: 190, maxHp: 50, currentHp: 50, gender: 'male' }, 'love-ball', { yourSpeciesId: 25, yourGender: 'female' }).value,
+      g2para: p('gen2', { maxHp: 50, currentHp: 50, status: 'paralysis' }, 'poke-ball'),
+      g2fast: [81, 25].map((id) => p('gen2', { speciesId: id, catchRate: 100, maxHp: 50, currentHp: 50 }, 'fast-ball').value),
+      g2moon: p('gen2', { speciesId: 35, catchRate: 150, maxHp: 50, currentHp: 50 }, 'moon-ball').note,
+      g3ray: p('gen3', { speciesId: 384, catchRate: 3, maxHp: 300, currentHp: 1, status: 'sleep' }, 'ultra-ball').probability,
+      g4dusk: p('gen4', { speciesId: 443, catchRate: 45, maxHp: 60, currentHp: 60 }, 'dusk-ball', { nightOrCave: true }).probability,
+      g4duskDay: p('gen4', { speciesId: 443, catchRate: 45, maxHp: 60, currentHp: 60 }, 'dusk-ball').value,
+      hgHeavy: p('hgss', { speciesId: 143, catchRate: 25, maxHp: 300, currentHp: 300, weightHg: 4600 }, 'heavy-ball').probability,
+      hgHeavyBug: p('hgss', { speciesId: 25, catchRate: 190, maxHp: 90, currentHp: 90, weightHg: 60 }, 'heavy-ball'),
+      hgMoon: [35, 25].map((id) => p('hgss', { speciesId: id, catchRate: 150, maxHp: 90, currentHp: 90 }, 'moon-ball').value),
+      master: ['gen1', 'gen2', 'gen3', 'gen4', 'hgss'].map((e) => p(e, mew, 'master-ball').guaranteed),
+      apricornsOnlyHgss: { gen4: m.ballsFor('gen4').includes('fast-ball'), hgss: m.ballsFor('hgss').includes('fast-ball'), gen2Safari: m.ballsFor('gen2').includes('safari-ball') },
+      worst1,
+      worst2,
+    }
+  })
+  const near = (a, b) => Math.abs(a - b) < 1e-12
+  check('Gen 1 Mewtwo, Poké Ball: 344/65536', near(catchCases.g1poke, 344 / 65536), catchCases.g1poke)
+  check('Gen 1 Mewtwo, Great Ball: 4*129/(201*256)', near(catchCases.g1great, (4 * 129) / (201 * 256)), catchCases.g1great)
+  check('Gen 1 Mewtwo asleep, Poké Ball: (25 + 4*86/256)/256', near(catchCases.g1sleep, (25 + (4 * 86) / 256) / 256), catchCases.g1sleep)
+  check('Gen 2 Snorlax, Heavy Ball: final byte 21, 22/256', catchCases.g2heavy.value === 21 && near(catchCases.g2heavy.probability, 22 / 256), JSON.stringify(catchCases.g2heavy))
+  // 190 x8 caps at 255, then the full-HP step: floor(255/3) = 85; unboosted floor(190/3) = 63.
+  check('Gen 2 Love Ball boosts the SAME gender (the game\'s bug): 85 against 63, and says so', catchCases.g2love.note?.includes('SAME gender') && catchCases.g2love.value === 85 && catchCases.g2loveOpposite === 63, `${catchCases.g2love.value} / ${catchCases.g2loveOpposite}`)
+  check('Gen 2 paralysis adds nothing (the game\'s bug), and says so', catchCases.g2para.note?.includes('add nothing'), catchCases.g2para.note)
+  check('Gen 2 Fast Ball boosts Magnemite x4 and not Pikachu', catchCases.g2fast[0] > catchCases.g2fast[1] && catchCases.g2fast[1] > 0, JSON.stringify(catchCases.g2fast))
+  check('Gen 2 Moon Ball never boosts, and says why', catchCases.g2moon?.includes('never boosts'), catchCases.g2moon)
+  check('Gen 3 Rayquaza, Ultra Ball, 1 HP, asleep: (29958/65536)^4', near(catchCases.g3ray, (29958 / 65536) ** 4), catchCases.g3ray)
+  check('Gen 4 Gible, Dusk Ball at night: (45589/65536)^4', near(catchCases.g4dusk, (45589 / 65536) ** 4), catchCases.g4dusk)
+  check('and by day the Dusk Ball is a Poké Ball (a = 15)', catchCases.g4duskDay === 15, String(catchCases.g4duskDay))
+  check('HGSS Snorlax, Heavy Ball: (36157/65536)^4', near(catchCases.hgHeavy, (36157 / 65536) ** 4), catchCases.hgHeavy)
+  check('HGSS Heavy Ball bug: Pikachu loses 20 (a = floor(170/3) = 56) and it says so', catchCases.hgHeavyBug.value === 56 && catchCases.hgHeavyBug.note?.includes('−20'), JSON.stringify(catchCases.hgHeavyBug).slice(0, 140))
+  check('HGSS Moon Ball: Clefairy x4, Pikachu not', catchCases.hgMoon[0] > catchCases.hgMoon[1], JSON.stringify(catchCases.hgMoon))
+  check('the Master Ball always catches, in every game', catchCases.master.every(Boolean), JSON.stringify(catchCases.master))
+  check('Apricorn balls only in Gen 2 and HGSS; no Safari Ball in Gen 2', !catchCases.apricornsOnlyHgss.gen4 && catchCases.apricornsOnlyHgss.hgss && !catchCases.apricornsOnlyHgss.gen2Safari, JSON.stringify(catchCases.apricornsOnlyHgss))
+  check('Gen 1 closed form equals the roll-by-roll emulation (60 inputs x 3 balls)', catchCases.worst1 < 1e-12, String(catchCases.worst1))
+  check('Gen 2 equals one random byte <= the final value (60 inputs)', catchCases.worst2 < 1e-12, String(catchCases.worst2))
+
+  // The screen: Gen 4 has a game row; only HeartGold/SoulSilver offers the Apricorn balls.
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-8"]')
+  await page.waitForSelector('[data-testid="calc-catch-rate"]', { timeout: 60000 })
+  const ballsShown = () => page.$$eval('[data-testid="catch-ball"] option', (els) => els.map((e) => e.value))
+  const engineOf = () => page.$eval('[data-testid="calc-catch-rate"]', (el) => el.dataset.engine)
+  await page.click('[data-testid="catch-game-row-platinum"]')
+  const ptBalls = await ballsShown()
+  const ptEngine = await engineOf()
+  await page.click('[data-testid="catch-game-row-heartgold-soulsilver"]')
+  const hgBalls = await ballsShown()
+  const hgEngine = await engineOf()
+  check('Platinum reads with its routine and offers no Fast Ball', ptEngine === 'gen4' && !ptBalls.includes('fast-ball'), `${ptEngine} ${ptBalls.length} balls`)
+  check('HeartGold/SoulSilver reads with its own and offers the Apricorn balls', hgEngine === 'hgss' && hgBalls.includes('fast-ball') && hgBalls.includes('sport-ball'), `${hgEngine} ${hgBalls.length} balls`)
+  await page.fill('[data-testid="catch-hp"]', '0')
+  const catchReason = await page.$eval('[data-testid="tool-result"]', (el) => el.innerText.trim())
+  check('0 HP is a reason, not a percentage', catchReason.startsWith('Current HP must be'), catchReason)
+  await page.fill('[data-testid="catch-hp"]', '')
+  const catchPct = await page.$eval('[data-testid="catch-percent"]', (el) => el.innerText.trim())
+  check('cleared, it reads the full-HP chance', /%|Guaranteed/.test(catchPct), catchPct)
+  await selectGeneration(page, 1)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-8"]')
+  await page.waitForSelector('[data-testid="calc-catch-rate"]', { timeout: 60000 })
+  check('Gen 1 reads with its own routine', (await engineOf()) === 'gen1')
+  await page.screenshot({ path: shot('tool-8-catch.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)
