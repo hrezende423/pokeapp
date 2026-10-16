@@ -218,6 +218,13 @@ Deliberately left alone; the cheap fix is usually the wrong one.
   the owner to decide whether 214 is the new reference. `npm run check` passes it
   only while exactly these 12 fail (`KNOWN_FAILING` in `scripts/check.mjs`).
 
+- **verify-scroll-nav §2 is flaky: ~1 run in 3 the Pokédex grid comes back at
+  1455 instead of 900** after opening a species and going back. It predates the
+  tools work (it failed at HEAD before any of it). Ruled out on 2026-10-15:
+  coalesced scroll events swallowing the reader's scroll, and CSS scroll
+  anchoring. `npm run check` retries it up to three times (`FLAKY` in
+  `scripts/check.mjs`) and prints every failed attempt. Needs a real diagnosis.
+
 ## Module rules live beside the module
 
 A nested CLAUDE.md loads on the first read of a file under its directory.
