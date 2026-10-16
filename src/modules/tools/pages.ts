@@ -21,6 +21,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-bulk', label: 'Defensive bulk' },
   { id: 'tool-ev-remaining', label: 'EV / Stat Exp remaining' },
   { id: 'tool-moveset', label: 'Moveset searcher' },
+  { id: 'tool-status', label: 'Status move finder' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -51,6 +52,7 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   'tool-moveset': lazyTool(() =>
     import('./moveset/MovesetTool').then((m) => ({ default: m.MovesetTool })),
   ),
+  'tool-status': lazyTool(() => import('./status/StatusTool').then((m) => ({ default: m.StatusTool }))),
 }
 
 export function findToolsPage(

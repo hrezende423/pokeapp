@@ -841,6 +841,58 @@ try {
   await page.click('[data-testid="tool-game-row-crystal"]')
   await page.screenshot({ path: shot('tool-10-moveset.png') })
 
+  // ------------------------------------------------------------------ #11
+  hr('#11 STATUS MOVE FINDER -- every game\'s own effect table, complete and per era')
+  const st = await page.evaluate(async () => {
+    const sm = await import('/pokeapp/src/modules/tools/status/statusMath.ts')
+    const bd = await import('/pokeapp/src/modules/battle/battleData.ts')
+    const GAMES = { 'red-blue': 1, yellow: 1, 'gold-silver': 2, crystal: 2, 'ruby-sapphire': 3, emerald: 3, 'firered-leafgreen': 3, 'diamond-pearl': 4, platinum: 4, 'heartgold-soulsilver': 4 }
+    const STATUSY = /SLEEP|POISON|TOXIC|PARALY|BURN|FREEZE|CONFUS|FLINCH|ATTRACT|INFATU|TRI_ATTACK|SWAGGER|FLATTER|TEETER|YAWN|WILL_O|THUNDER|TWISTER|STOMP|SNORE|FAKE_OUT|BLAZE_KICK|SKY_ATTACK|SECRET_POWER|BOUNCE|CHATTER|TWINEEDLE/
+    const gaps = []
+    for (const [game, gen] of Object.entries(GAMES)) {
+      const data = await bd.loadBattleData(game)
+      const table = sm.tableFor(gen)
+      for (const e of new Set(Object.values(data.moves).map((m) => m.e))) {
+        if (STATUSY.test(e) && !table[e] && !sm.NOT_INFLICTING.has(e)) gaps.push(`${game}:${e}`)
+      }
+    }
+    const f = async (game, gen, id) => {
+      const data = await bd.loadBattleData(game)
+      return sm.inflictsOf(gen, bd.gameMove(data, id), id).map((x) => `${x.ailment}:${x.chance ?? 'status'}`)
+    }
+    return {
+      gaps,
+      triAttack1: await f('red-blue', 1, 161),
+      triAttack2: await f('crystal', 2, 161),
+      skyAttack2: await f('crystal', 2, 143),
+      skyAttack3: await f('emerald', 3, 143),
+      toxic1: await f('red-blue', 1, 92),
+      blizzard1: await f('red-blue', 1, 59),
+      bodySlam: await f('platinum', 4, 34),
+      fireFang: await f('platinum', 4, 424),
+      thunderWave: await f('emerald', 3, 86),
+      yawn: await f('platinum', 4, 281),
+    }
+  })
+  check('every status-looking effect in all ten games is mapped or listed as not inflicting', st.gaps.length === 0, st.gaps.slice(0, 6).join(', '))
+  check('Gen 1 Tri Attack adds nothing; Gen 2\'s is 20% burn / freeze / paralysis', st.triAttack1.length === 0 && JSON.stringify(st.triAttack2) === '["burn:20","freeze:20","paralysis:20"]', `${JSON.stringify(st.triAttack1)} / ${JSON.stringify(st.triAttack2)}`)
+  check('Sky Attack: no flinch in Gen 2, 30% from Gen 3', st.skyAttack2.length === 0 && JSON.stringify(st.skyAttack3) === '["flinch:30"]', `${JSON.stringify(st.skyAttack2)} / ${JSON.stringify(st.skyAttack3)}`)
+  check('Gen 1 Toxic badly poisons; Gen 1 Blizzard freezes 10%', JSON.stringify(st.toxic1) === '["badly-poison:status"]' && JSON.stringify(st.blizzard1) === '["freeze:10"]', `${st.toxic1} / ${st.blizzard1}`)
+  check('Body Slam paralyses 30%; Thunder Wave is a status move; Yawn makes drowsy', JSON.stringify(st.bodySlam) === '["paralysis:30"]' && JSON.stringify(st.thunderWave) === '["paralysis:status"]' && JSON.stringify(st.yawn) === '["drowsy:status"]', `${st.bodySlam} / ${st.thunderWave} / ${st.yawn}`)
+  check('Fire Fang (Gen 4): burn 10% and flinch 10%, separately', JSON.stringify(st.fireFang) === '["burn:10","flinch:10"]', JSON.stringify(st.fireFang))
+
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-11"]')
+  await page.waitForSelector('[data-testid="status-rows"]', { timeout: 60000 })
+  const paraRows = await page.$$eval('[data-testid^="status-move-"]', (els) => els.map((e) => [Number(e.dataset.testid.replace('status-move-', '')), e.dataset.chance]))
+  const has = (id, chance) => paraRows.some(([m, c]) => m === id && String(c) === String(chance))
+  check('by status (paralysis): Thunder Wave as the move\'s effect, Thunderbolt at 10%', has(86, 'status') && has(85, 10), `${paraRows.length} rows`)
+  await page.selectOption('[data-testid="status-kind"]', 'guaranteed')
+  const guaranteedOnly = await page.$$eval('[data-testid^="status-move-"]', (els) => els.every((e) => e.dataset.chance === 'status'))
+  check('"Status moves" keeps only moves whose effect IS the status', guaranteedOnly)
+  await page.screenshot({ path: shot('tool-11-status.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)

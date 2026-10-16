@@ -1,17 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SelectField } from '../../../components/ds/SelectField'
 import { Toggle } from '../../../components/ds/Toggle'
-import {
-  getMove,
-  getSpecies,
-  isSpeciesInGeneration,
-  loadLearnsets,
-  type LearnRow,
-} from '../../../data'
+import { getMove, getSpecies, isSpeciesInGeneration } from '../../../data'
 import { moveEntries } from '../../dex/entrySources'
 import { findTool } from '../registry'
 import { ToolInputs, ToolResult, ToolShell } from '../ToolShell'
 import { METHOD_LABEL, searchMovesets, type MethodGroup } from './movesetMath'
+import { useLearnRows } from '../useLearnRows'
 
 const TOOL = findTool('10')!
 const GROUPS: MethodGroup[] = ['level-up', 'machine', 'tutor', 'egg', 'special']
@@ -31,25 +26,6 @@ export function MovesetTool() {
   )
 }
 
-function useLearnRows(game: string): { rows: LearnRow[] | null; error: string | null } {
-  const [loaded, setLoaded] = useState<{
-    game: string
-    rows: LearnRow[] | null
-    error: string | null
-  } | null>(null)
-  useEffect(() => {
-    let alive = true
-    loadLearnsets(game).then(
-      (p) => alive && setLoaded({ game, rows: p.rows, error: null }),
-      (e: unknown) =>
-        alive && setLoaded({ game, rows: null, error: e instanceof Error ? e.message : String(e) }),
-    )
-    return () => {
-      alive = false
-    }
-  }, [game])
-  return loaded?.game === game ? loaded : { rows: null, error: null }
-}
 
 function MovesetBody({ generation, game }: { generation: number; game: string }) {
   const moves = useMemo(

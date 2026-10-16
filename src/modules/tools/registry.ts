@@ -147,6 +147,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-moveset' },
   },
   {
+    key: '11',
+    n: 11,
+    label: 'Status move finder',
+    group: 'reference',
+    blurb: 'Moves that put a status on the target — by status or by Pokémon — and whether it is the move’s effect or a chance.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'tool-status' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
