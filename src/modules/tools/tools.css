@@ -145,3 +145,40 @@
   margin: 0;
   color: var(--color-text-default);
 }
+
+/* ------------------------------------------------------- #13 compare table */
+
+/* Wide comparisons scroll sideways inside the result, never the page. */
+.tools-compare-scroll {
+  overflow-x: auto;
+}
+
+/* Hairline rows and no row gap: the hairline-band rule. */
+.tools-compare {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.tools-compare th,
+.tools-compare td {
+  padding: var(--calc-2) var(--calc-3);
+  border-bottom: 1px solid var(--color-border-hairline);
+  text-align: left;
+  font-weight: var(--font-weight-regular);
+  vertical-align: baseline;
+}
+
+.tools-compare th[scope='row'] {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.tools-compare td.num {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The highest number in a row: weight, never colour. */
+.tools-compare td[data-best] {
+  font-weight: var(--font-weight-semibold);
+}

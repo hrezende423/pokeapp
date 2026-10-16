@@ -1880,7 +1880,7 @@ try {
   })
   log('  team items: ' + JSON.stringify(team))
   check(
-    'Team Building lists its four destinations, in order (Pokemon Collection removed 2026-09-27)',
+    'Team Building lists its five destinations, in order (the Collection back, as a real screen, 2026-10-15)',
     /* "Team Library", which is what the design system called it all along. It
        spent a while as "My Teams" while the screen was being built and is back
        to sitting beside "Build Library", which is the pair it belongs to. The
@@ -1891,13 +1891,16 @@ try {
         'New Build',
         'Team Library',
         'Build Library',
+        // The old "Pokemon Collection" stub left on 2026-09-27; the owner placed the
+        // minimal Collection here on 2026-10-15 (docs/tools/PLAN.md).
+        'Collection',
       ]),
     team.labels.join(','),
   )
   // They lead to stub pages, but they are real destinations now, so nothing is
   // inert and nothing needs aria-disabled to stay keyboard-reachable.
   check(
-    'all four are live destinations, none inert',
+    'all five are live destinations, none inert',
     team.noneDisabled,
     JSON.stringify(team.testids),
   )

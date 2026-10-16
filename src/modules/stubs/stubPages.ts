@@ -15,9 +15,9 @@ export const STUB_PAGES = [
     it is a real screen now, registered in ../calculators/pages.ts. This is the
     graduation the note above describes -- the entries left this list and the nav
     resolves them from that registry instead. Battle Simulator graduated as Team
-    Matchup (../team-matchup/pages.ts).
+    Matchup (../team-matchup/pages.ts). Compare Pokemon graduated as Tools #13
+    (../tools/pages.ts), keeping its id so the dropdown line is unchanged.
   */
-  { id: 'compare-pokemon', label: 'Compare Pokemon' },
   { id: 'training-optimization', label: 'Training and Optimization' },
   { id: 'breeding-planner', label: 'Breeding Planner' },
 ] as const

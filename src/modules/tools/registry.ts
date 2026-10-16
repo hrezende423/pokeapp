@@ -165,6 +165,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-targeting' },
   },
   {
+    key: '13',
+    n: 13,
+    label: 'Compare Pokémon',
+    group: 'reference',
+    blurb: 'Two to six Pokémon side by side — types, abilities, stats and the rest, as of the generation.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'compare-pokemon' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
