@@ -40,7 +40,9 @@ const SUITES_BY_PATH = [
   ['src/modules/dex/', ['dexes', 'dex-filters', 'movedex']],
   ['src/modules/pokedex/evo', ['evo-icons', 'ux']],
   ['src/modules/pokedex/', ['pokedex', 'species-page', 'eggmoves']],
-  ['src/modules/nav/', ['scroll-nav', 'dexes', 'tools']],
+  // verify-design-system asserts every tab's dropdown, line by line.
+  ['src/modules/nav/', ['scroll-nav', 'dexes', 'tools', 'ds']],
+  ['src/modules/stubs/', ['ds']],
   ['src/components/', ['scroll-nav', 'ds']],
   ['src/modules/design-system/', ['ds']],
   ['src/data/moveEra', ['legal-moveset', 'movedex']],

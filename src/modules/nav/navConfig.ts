@@ -138,7 +138,8 @@ export const NAV_TABS: readonly NavTab[] = [
       },
       ...TYPE_COVERAGE_PAGES.map((p) => ({ id: p.id, label: p.label })),
       /* Team Matchup graduated the Battle Simulator stub, in its place. */
-      ...stubs('compare-pokemon'),
+      /* Graduated as Tools #13; same id, same line. */
+      { id: 'compare-pokemon', label: 'Compare Pokemon' },
       { id: 'team-matchup', label: 'Team Matchup' },
       ...stubs('training-optimization', 'breeding-planner'),
     ],

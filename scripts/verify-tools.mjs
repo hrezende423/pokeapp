@@ -938,6 +938,48 @@ try {
   check('"Changed since Gen 3" lists Surf and not Reflect', changed.includes(57) && !changed.includes(115), `${changed.length} moves`)
   await page.screenshot({ path: shot('tool-12-targeting.png') })
 
+  // ------------------------------------------------------------------ #13
+  hr('#13 COMPARE POKEMON -- every field as of the generation; the stub graduated')
+  const cmp = await page.evaluate(async () => {
+    const cm = await import('/pokeapp/src/modules/tools/compare/compareMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const sp = (n) => d.listSpecies().find((s) => s.name === n)
+    const row = (fields, key) => fields.find((f) => f.key === key)
+    const g1 = cm.compareSpecies(1, [sp('magnemite'), sp('gengar')])
+    const g2 = cm.compareSpecies(2, [sp('magnemite'), sp('gengar')])
+    const g3 = cm.compareSpecies(3, [sp('magnemite'), sp('gengar')])
+    return {
+      g1types: row(g1, 'types').values,
+      g2types: row(g2, 'types').values,
+      g1special: Boolean(row(g1, 'stat-special')) && !row(g1, 'stat-special-attack'),
+      g2split: Boolean(row(g2, 'stat-special-attack')) && !row(g2, 'stat-special'),
+      abilities: [Boolean(row(g2, 'abilities')), Boolean(row(g3, 'abilities'))],
+      eggs: [Boolean(row(g1, 'eggs')), Boolean(row(g2, 'eggs'))],
+      best: [[...cm.bestOf([1, 3, 3])], [...cm.bestOf([2, 2])], [...cm.bestOf([5, null])]],
+    }
+  })
+  check('Gen 1 Magnemite is Electric; from Gen 2 Electric / Steel', JSON.stringify(cmp.g1types) === '["Electric","Ghost / Poison"]' && cmp.g2types[0] === 'Electric / Steel', `${cmp.g1types} | ${cmp.g2types}`)
+  check('Gen 1 shows one Special; Gen 2 splits it', cmp.g1special && cmp.g2split)
+  check('abilities only from Gen 3; egg groups only from Gen 2', JSON.stringify(cmp.abilities) === '[false,true]' && JSON.stringify(cmp.eggs) === '[false,true]', JSON.stringify(cmp))
+  check('the best number is marked, ties all marked, an all-equal row not at all', JSON.stringify(cmp.best) === '[[1,2],[],[]]', JSON.stringify(cmp.best))
+
+  await selectGeneration(page, 4)
+  await goToPage(page, 'tools', 'compare-pokemon')
+  await page.waitForSelector('[data-testid="cmp-table"]', { timeout: 60000 })
+  const cmpCols = await page.$$eval('[data-testid="cmp-table"] thead th[scope="col"]', (els) => els.length)
+  check('the Tools dropdown\'s "Compare Pokemon" opens the tool (no placeholder)', cmpCols === 2 && (await page.$('[data-stub-id]')) === null, `${cmpCols} columns`)
+  // Continue from the index: the dropdown keeps focus (and so stays open) after a click.
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-13"]')
+  await page.waitForSelector('[data-testid="cmp-table"]', { timeout: 60000 })
+  await page.click('[data-testid="cmp-add"]')
+  await page.selectOption('[data-testid="cmp-species-3"]', { index: 6 })
+  const cmp3 = await page.$$eval('[data-testid="cmp-table"] thead th[scope="col"]', (els) => els.length)
+  check('a third Pokémon adds a third column', cmp3 === 3, String(cmp3))
+  const bestCells = await page.$$eval('[data-testid="cmp-table"] td[data-best]', (els) => els.map((e) => getComputedStyle(e).fontWeight))
+  check('best values are set heavier, not coloured', bestCells.length > 0 && bestCells.every((w) => Number(w) >= 600), bestCells.slice(0, 3).join(','))
+  await page.screenshot({ path: shot('tool-13-compare.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)

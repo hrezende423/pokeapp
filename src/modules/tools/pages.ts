@@ -23,6 +23,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-moveset', label: 'Moveset searcher' },
   { id: 'tool-status', label: 'Status move finder' },
   { id: 'tool-targeting', label: 'Doubles targeting guide' },
+  { id: 'compare-pokemon', label: 'Compare Pokemon' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -57,6 +58,7 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   'tool-targeting': lazyTool(() =>
     import('./targeting/TargetingTool').then((m) => ({ default: m.TargetingTool })),
   ),
+  'compare-pokemon': lazyTool(() => import('./compare/CompareTool').then((m) => ({ default: m.CompareTool }))),
 }
 
 export function findToolsPage(
