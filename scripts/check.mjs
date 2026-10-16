@@ -74,6 +74,16 @@ const KNOWN_FAILING = {
   },
 };
 
+/**
+ * Suites that fail INTERMITTENTLY for an undiagnosed reason, retried up to three
+ * times. Every failed attempt is still printed; a pass is labelled with the
+ * attempt it took. Each entry is deferred debt (CLAUDE.md), not a fix.
+ */
+const FLAKY = {
+  'scroll-nav':
+    '§2 scroll memory comes back at 1455 instead of 900 in ~1 run in 3, at HEAD before the tools work too; not coalesced scroll events, not scroll anchoring (both tested 2026-10-15)',
+};
+
 const ALL_SUITES = Object.keys(
   JSON.parse(execSync('npm pkg get scripts', { encoding: 'utf8' })),
 )
@@ -185,10 +195,19 @@ if (suites.size) {
   results.push(['build', built]);
   if (built.ok) {
     for (const s of [...suites].sort()) {
-      results.push([
-        `verify:${s}`,
-        KNOWN_FAILING[s] ? runKnown(s) : run(`verify:${s}`, 'npm', ['run', `verify:${s}`]),
-      ]);
+      if (KNOWN_FAILING[s]) {
+        results.push([`verify:${s}`, runKnown(s)]);
+        continue;
+      }
+      const attempts = FLAKY[s] ? 3 : 1;
+      let r = { ok: false };
+      let attempt = 0;
+      while (!r.ok && attempt < attempts) {
+        attempt++;
+        r = run(`verify:${s}${attempts > 1 ? ` (attempt ${attempt}/${attempts})` : ''}`, 'npm', ['run', `verify:${s}`]);
+      }
+      if (FLAKY[s] && attempt > 1) r.note = `flaky, ${r.ok ? `passed on attempt ${attempt}` : 'failed every attempt'}: ${FLAKY[s]}`;
+      results.push([`verify:${s}`, r]);
     }
   }
 }
