@@ -158,7 +158,7 @@ try {
   await openIndex(page)
   // Named, not counted: the list grows as Gen 2+ tools land.
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
-  check('on Gen 1 only Hidden Power, the doubles guide, breeding and Pokérus are disabled', gen1Disabled === '12,16,17,2', gen1Disabled)
+  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus and Pokéblocks are disabled', gen1Disabled === '12,16,17,19,2', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1172,6 +1172,71 @@ try {
   await page.click('[data-testid="tool-game-row-firered-leafgreen"]')
   const pkrFrlg = await page.textContent('[data-testid="tool-reason"]').catch(() => null)
   check('FireRed/LeafGreen says why there is nothing to simulate', /FireRed and LeafGreen never/.test(pkrFrlg ?? ''), String(pkrFrlg))
+
+  // ------------------------------------------------------------------ #19
+  hr('#19 POKEBLOCKS AND POFFINS -- the Blender and the pot, hand-worked from the routines')
+  const blk = await page.evaluate(async () => {
+    const bm = await import('/pokeapp/src/modules/tools/blocks/blockMath.ts')
+    const bf = await import('/pokeapp/src/data/berryFlavors.ts')
+    const sm = (name, t) => t.find((r) => r[0] === name)
+    return {
+      // Cheri + Chesto, 0 RPM: dry 10 - 0 = 10, sour 0 - 10 < 0 (one negative), so dry 9; feel 50/2 - 2.
+      pair: bm.blend([1, 2], 0),
+      // Same at 100 RPM: factor 10000/333 + 100 = 130, so 9 * 130 / 10 = 117 -> 11.7 -> 12.
+      fast: bm.blend([1, 2], 100).flavors,
+      twice: bm.blend([1, 1], 50).color,
+      // Figy (#11) takes the second table's set 0: Cheri, Pecha, Rawst.
+      npcFigy: bm.opponentBerries(11, 4, 'npc'),
+      npcCheri: bm.opponentBerries(1, 4, 'npc'),
+      masterCheri: bm.opponentBerries(1, 2, 'master'),
+      masterSpelon: bm.opponentBerries(31, 2, 'master'),
+      // One Cheri, 60 s: spicy 10 - 1 (one negative) = 9; 40 s: 9 * 1.5 = 13.5 -> 14.
+      cheri60: bm.cook(['cheri'], { seconds: 60, spills: 0, burns: 0, inStep: 0 }),
+      cheri40: bm.cook(['cheri'], { seconds: 40, spills: 0, burns: 0, inStep: 0 }),
+      cheriSpill: bm.cook(['cheri'], { seconds: 60, spills: 2, burns: 1, inStep: 0 }).level,
+      dupe: bm.cook(['cheri', 'cheri'], { seconds: 60, spills: 0, burns: 0, inStep: 0 }),
+      inStep: [0, 10, 25].map((s) => bm.cook(['spelon', 'pamtre'], { seconds: 60, spills: 0, burns: 0, inStep: s }).smoothness),
+      spelon: [sm('spelon', bf.GEN3_BERRIES), sm('spelon', bf.GEN4_BERRIES)],
+      enigmaOffered: bm.gen3Choices.some((b) => b.name === 'enigma'),
+    }
+  })
+  check('Gen 3: Cheri + Chesto at 0 RPM is a Blue block, dry 9, feel 23', blk.pair.color === 'Blue' && JSON.stringify(blk.pair.flavors) === '[0,9,0,0,0]' && blk.pair.feel === 23 && blk.pair.level === 9, JSON.stringify(blk.pair))
+  check('Gen 3: top speed multiplies (100 RPM: dry 9 -> 12)', JSON.stringify(blk.fast) === '[0,12,0,0,0]', JSON.stringify(blk.fast))
+  check('Gen 3: the same berry twice is a Black block', blk.twice === 'Black', blk.twice)
+  check('Gen 3: the computer players\' berries follow the game\'s table', JSON.stringify(blk.npcFigy) === '[1,3,4]' && JSON.stringify(blk.npcCheri) === '[5,4,3]', `${blk.npcFigy} | ${blk.npcCheri}`)
+  check('Emerald: the Blend Master brings Spelon -- Tamato if you brought Spelon', JSON.stringify(blk.masterCheri) === '[31]' && JSON.stringify(blk.masterSpelon) === '[26]', `${blk.masterCheri} | ${blk.masterSpelon}`)
+  check('Gen 4: one Cheri for 60 s is a Spicy Poffin, level 9, smoothness 24', blk.cheri60.type.kind === 'flavor' && blk.cheri60.type.main === 0 && blk.cheri60.level === 9 && blk.cheri60.smoothness === 24, JSON.stringify(blk.cheri60))
+  check('Gen 4: a 40 s cook is 1.5x (9 -> 14, rounded half up)', blk.cheri40.level === 14, String(blk.cheri40.level))
+  check('Gen 4: spills and burns come straight off (9 - 3 = 6)', blk.cheriSpill === 6, String(blk.cheriSpill))
+  check('Gen 4: two cooks with the same berry make a Foul Poffin', blk.dupe.type.kind === 'Foul' && /same berry/.test(blk.dupe.foulBecause), JSON.stringify(blk.dupe))
+  check('Gen 4: stirring in step takes off up to 10 smoothness', blk.inStep[0] - blk.inStep[1] === 10 && blk.inStep[1] === blk.inStep[2], JSON.stringify(blk.inStep))
+  check('each generation reads its own berry table (Spelon smoothness 70 in Gen 3, 35 in Gen 4)', blk.spelon[0][2] === 70 && blk.spelon[1][2] === 35, JSON.stringify(blk.spelon))
+  check('the e-Reader Enigma Berry is not offered in Gen 3', !blk.enigmaOffered)
+
+  await selectGeneration(page, 3)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-19"]')
+  await page.click('[data-testid="tool-game-row-emerald"]').catch(() => {})
+  await page.waitForSelector('[data-testid="blk-result"]', { timeout: 60000 })
+  const frlgOffered = await page.$('[data-testid="tool-game-row-firered-leafgreen"]')
+  check('FireRed/LeafGreen are not offered (no Blender)', frlgOffered === null)
+  const masterOpt = await page.$$eval('[data-testid="blk-mode"] option', (os) => os.map((o) => o.value))
+  check('Emerald offers the Blend Master', masterOpt.includes('master'), masterOpt.join(','))
+  await page.screenshot({ path: shot('tool-19-blender.png') })
+  await page.click('[data-testid="tool-game-row-ruby-sapphire"]')
+  await page.waitForSelector('[data-testid="blk-mode"]')
+  const rsOpt = await page.$$eval('[data-testid="blk-mode"] option', (os) => os.map((o) => o.value))
+  check('Ruby/Sapphire have no Blend Master', !rsOpt.includes('master'), rsOpt.join(','))
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-19"]')
+  await page.click('[data-testid="tool-game-row-platinum"]').catch(() => {})
+  await page.waitForSelector('[data-testid="pof-result"]', { timeout: 60000 })
+  const pofType = await page.$eval('[data-testid="pof-result"]', (e) => e.dataset.type)
+  check('on the page: a Cheri Berry for 40 s is a Spicy Poffin', pofType === 'Spicy Poffin', String(pofType))
+  const hgss = await page.$('[data-testid="tool-game-row-heartgold-soulsilver"]')
+  check('HeartGold/SoulSilver are not offered (no Poffins)', hgss === null)
+  await page.screenshot({ path: shot('tool-19-poffin.png') })
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)

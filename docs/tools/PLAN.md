@@ -28,7 +28,7 @@ Progress lives in `docs/tools/PROGRESS.md`.
 | 15 | Team threat finder | 1–4 | — | Members hit SE by a STAB type, ties by BST — printed on the page |
 | 16 | Breeding chain | 2–4 | yes | Graduates the `breeding-planner` nav stub |
 | 17 | Pokérus simulation | 2–4 | — | |
-| 19 | Pokéblock / Poffin | RSE (3), DPPt (4) | yes | Built BEFORE #18. Poffin cooking may need Bulbapedia (minigame not found in the decomp) |
+| 19 | Pokéblock / Poffin | RSE (3), DPPt (4) | yes | Built BEFORE #18. Poffin cooking found in the decomp after all: pokeplatinum overlay 83 `ov83_0223FFD4` + `src/poffin.c` |
 | 18 | Contest stats plan | RSE (3), DPPt (4) | yes | FRLG and HGSS have no contests |
 | 20 | Battle Palace odds | Emerald | — | Linked from Spenser's Trainer Dex entry |
 | 21 | Battle Arena scoring | Emerald | — | Linked from Greta's Trainer Dex entry |

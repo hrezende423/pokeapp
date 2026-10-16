@@ -125,11 +125,15 @@ export const BATTLE_PATHS = {
   pokegold: ['/data/moves/', '/data/items/', '/data/battle/ai/'],
   pokecrystal: ['/data/moves/', '/data/items/', '/data/battle/ai/'],
   pokeruby: [
+    // Tools #19: berry flavours (scripts/build-berry-data.mjs).
+    '/src/berry.c',
     '/data/battle_ai_scripts.s',
     '/include/macros/battle_ai_script.inc',
     '/src/battle_ai_script_commands.c',
   ],
   pokeemerald: [
+    // Tools #19: berry flavours (scripts/build-berry-data.mjs).
+    '/src/berry.c',
     '/data/battle_ai_scripts.s',
     '/asm/macros/battle_ai_script.inc',
     '/src/battle_ai_script_commands.c',

@@ -210,6 +210,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-pokerus' },
   },
   {
+    key: '19',
+    n: 19,
+    label: 'Pokéblocks and Poffins',
+    group: 'planners',
+    blurb: 'What your berries make: the Berry Blender’s Pokéblock (RSE), the Poffin pot’s Poffin (DPPt).',
+    gate: { gens: [3, 4], games: ['ruby-sapphire', 'emerald', 'diamond-pearl', 'platinum'] },
+    target: { kind: 'page', id: 'tool-blocks' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
