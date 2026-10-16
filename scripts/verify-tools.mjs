@@ -346,6 +346,28 @@ try {
   await page.screenshot({ path: shot('tool-3-damage-doubles.png') })
   await page.click('[data-toggle="dcalc-battle"] [role="switch"]')
 
+  // ------------------------------------------------------------------ #4
+  hr('#4 MULTI-MOVE COMPARISON -- the Damage page\'s top row, every move of both Pokemon')
+  for (const gen of [1, 4]) {
+    await selectGeneration(page, gen)
+    await openIndex(page)
+    await page.click('[data-testid="tool-link-4"]')
+    await page.waitForSelector('[data-testid="calc-damage"]', { timeout: 60000 })
+    await page.waitForSelector('[data-testid="dcalc-p2-result-3"]', { timeout: 60000 })
+    const rows = await page.evaluate(() =>
+      [1, 2].map((p) =>
+        [0, 1, 2, 3].map((slot) => document.querySelector(`[data-testid="dcalc-p${p}-result-${slot}"]`)?.innerText.replace(/\s+/g, ' ').trim() ?? null),
+      ),
+    )
+    const filled = rows.flat().filter((t) => t && /\d|no effect|not calculated/i.test(t)).length
+    check(`Gen ${gen}: both Pokemon's four moves each carry a result (${filled}/8)`, filled === 8, JSON.stringify(rows).slice(0, 160))
+    // Picking another move in the row puts ITS full line underneath.
+    const before = await page.$eval('[data-testid="calc-damage-result"]', (el) => el.innerText)
+    await page.click('[data-testid="dcalc-p2-result-1"]')
+    const after = await page.$eval('[data-testid="calc-damage-result"]', (el) => el.innerText)
+    check(`Gen ${gen}: choosing a move in the row shows its own line below`, before !== after, after.slice(0, 70))
+  }
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)
