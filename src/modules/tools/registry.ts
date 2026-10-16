@@ -124,7 +124,7 @@ export const TOOLS: readonly ToolEntry[] = [
     n: 8,
     label: 'Catch rate',
     group: 'core',
-    blurb: 'The chance one ball catches, from species, HP, status and ball.',
+    blurb: 'One throw’s chance as the game computes it — every ball the game has, with its bugs.',
     gate: GEN_1_4,
     target: { kind: 'calculator', tab: 'Catch Rate' },
   },
