@@ -433,6 +433,66 @@ try {
   check('an empty level is a reason where the ladder was', tiersReason.startsWith('Row 1: level must be'), tiersReason)
   await page.screenshot({ path: shot('tool-5-speed-tiers.png') })
 
+  // ------------------------------------------------------------------ #6
+  hr('#6 SPEED EV MINIMIZER -- the solver against brute force over every value')
+  const minimizer = await page.evaluate(async () => {
+    const mm = await import('/pokeapp/src/modules/tools/speed-minimizer/speedMinimizerMath.ts')
+    const tm = await import('/pokeapp/src/modules/tools/speed-tiers/speedTiersMath.ts')
+    const sp = await import('/pokeapp/src/modules/battle/speed.ts')
+    const g = await import('/pokeapp/src/modules/battle/game.ts')
+    const bd = await import('/pokeapp/src/modules/battle/battleData.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const id = (name) => d.listSpecies().find((s) => s.name === name).id
+    const field = { weather: null, tailwind: { mine: false, theirs: false }, trickRoom: false }
+    const out = []
+    const cases = [
+      { game: 'platinum', mine: 'garchomp', target: 'jolteon', tIv: '31', tEv: '0', tNature: 'neutral', mNature: 'neutral', mLevel: '100', expect: 228 },
+      { game: 'emerald', mine: 'salamence', target: 'gengar', tIv: '31', tEv: '0', tNature: 'neutral', mNature: 'neutral', mLevel: '100', expect: 84 },
+      { game: 'crystal', mine: 'alakazam', target: 'starmie', tIv: '15', tEv: '65535', tNature: 'neutral', mNature: 'neutral', mLevel: '100', expect: 46226 },
+      { game: 'red-blue', mine: 'alakazam', target: 'starmie', tIv: '15', tEv: '65535', tNature: 'neutral', mNature: 'neutral', mLevel: '100', expect: 46226 },
+    ]
+    for (const c of cases) {
+      const ctx = g.gameContext(c.game)
+      const data = await bd.loadBattleData(c.game)
+      const iv = String(ctx.maxIndividual)
+      const mine = { ...tm.newRow('mine', id(c.mine), ctx), speedIndividual: iv, speedEffort: '0', nature: c.mNature, level: c.mLevel }
+      const target = { ...tm.newRow('theirs', id(c.target), ctx), speedIndividual: c.tIv, speedEffort: c.tEv, nature: c.tNature }
+      const o = mm.readMinimizer(ctx, data, mine, target, field)
+      if (!o.ok) { out.push({ game: c.game, error: o.reason }); continue }
+      // Brute force: every effort value through the same Speed routine.
+      const goal = (() => { const t = tm.rowToSpec(ctx, target, 2, field); return sp.effectiveSpeed(ctx, data, t.spec, 'high', t.mods, new Set()) })()
+      const speedWith = (effort) => { const r = tm.rowToSpec(ctx, { ...mine, speedEffort: String(effort) }, 1, field); return sp.effectiveSpeed(ctx, data, r.spec, 'high', r.mods, new Set()) }
+      let brute = null
+      for (let e = 0; e <= ctx.maxEffort; e++) if (speedWith(e) > goal) { brute = e; break }
+      let bruteLevel = null
+      for (let lv = 1; lv <= 100; lv++) { const r = tm.rowToSpec(ctx, { ...mine, level: String(lv) }, 1, field); if (sp.effectiveSpeed(ctx, data, r.spec, 'high', r.mods, new Set()) > goal) { bruteLevel = lv; break } }
+      out.push({ game: c.game, mine: c.mine, target: c.target, goal, solver: o.threshold.minEffort, brute, expect: c.expect, solverLevel: o.threshold.minLevel, bruteLevel })
+    }
+    const ctx = g.gameContext('platinum')
+    const data = await bd.loadBattleData('platinum')
+    const bad = mm.readMinimizer(ctx, data, { ...tm.newRow('mine', id('garchomp'), ctx), level: '' }, tm.newRow('theirs', id('jolteon'), ctx), field)
+    return { out, bad: bad.ok ? 'ok' : bad.reason }
+  })
+  for (const r of minimizer.out) {
+    if (r.error) { check(`${r.game}: solver answers`, false, r.error); continue }
+    check(`${r.game}: ${r.mine} needs exactly the brute-force minimum to pass ${r.target} (${r.goal})`, r.solver === r.brute, `solver ${r.solver} / brute ${r.brute}`)
+    check(`${r.game}: which is the hand-worked ${r.expect}`, r.solver === r.expect, String(r.solver))
+    check(`${r.game}: and the lowest level matches brute force`, r.solverLevel === r.bruteLevel, `solver ${r.solverLevel} / brute ${r.bruteLevel}`)
+  }
+  check('an empty level names "Your Pokémon"', minimizer.bad.startsWith('Your Pokémon: level must be'), minimizer.bad)
+
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-6"]')
+  await page.waitForSelector('[data-testid="min-detail"]', { timeout: 60000 })
+  const minScreen = await page.evaluate(() => ({
+    headline: document.querySelector('[data-testid="min-headline"]')?.innerText.trim(),
+    detail: document.querySelector('[data-testid="min-detail"]')?.innerText.trim(),
+    effortField: Boolean(document.querySelector('[data-testid="tiers-ev-1"]')),
+  }))
+  check('the page answers on open, and does not ask for the Speed effort it solves for', Boolean(minScreen.headline) && !minScreen.effortField, JSON.stringify(minScreen).slice(0, 140))
+  await page.screenshot({ path: shot('tool-6-speed-minimizer.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)
