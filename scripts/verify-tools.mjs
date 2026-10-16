@@ -157,7 +157,7 @@ try {
   await selectGeneration(page, 1)
   await openIndex(page)
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.length)
-  check('on Gen 1 only Hidden Power (Gen 2–4) is disabled', gen1Disabled === 1, `${gen1Disabled} disabled`)
+  check('on Gen 1 only Hidden Power and the doubles guide are disabled', gen1Disabled === 2, `${gen1Disabled} disabled`)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -892,6 +892,51 @@ try {
   const guaranteedOnly = await page.$$eval('[data-testid^="status-move-"]', (els) => els.every((e) => e.dataset.chance === 'status'))
   check('"Status moves" keeps only moves whose effect IS the status', guaranteedOnly)
   await page.screenshot({ path: shot('tool-11-status.png') })
+
+  // ------------------------------------------------------------------ #12
+  hr('#12 DOUBLES TARGETING -- every target constant known; the Gen 3 -> 4 changes')
+  const tg = await page.evaluate(async () => {
+    const tm = await import('/pokeapp/src/modules/tools/targeting/targetingMath.ts')
+    const bd = await import('/pokeapp/src/modules/battle/battleData.ts')
+    const unknown = []
+    for (const g of ['ruby-sapphire', 'emerald', 'firered-leafgreen', 'diamond-pearl', 'platinum', 'heartgold-soulsilver']) {
+      const data = await bd.loadBattleData(g)
+      for (const [id, m] of Object.entries(data.moves)) if (!tm.isKnownTarget(m.tg)) unknown.push(`${g}:${id}:${m.tg}`)
+    }
+    const em = await bd.loadBattleData('emerald')
+    const pt = await bd.loadBattleData('platinum')
+    const t = (data, id) => tm.targetOf(bd.gameMove(data, id)?.tg)
+    return {
+      unknown,
+      surf: [t(em, 57), t(pt, 57)],
+      eq: [t(em, 89), t(pt, 89)],
+      reflect: [t(em, 115), t(pt, 115), tm.hitClass(t(em, 115)) === tm.hitClass(t(pt, 115))],
+      helpingHand: t(pt, 270),
+      acupressure: t(pt, 367),
+      outrage: t(pt, 200),
+      spikes: t(em, 191),
+    }
+  })
+  check('every target constant in the six Gen 3-4 games is mapped', tg.unknown.length === 0, tg.unknown.slice(0, 4).join(', '))
+  check('Surf: both foes in Gen 3, both foes AND the ally from Gen 4', JSON.stringify(tg.surf) === '["both-foes","all-adjacent"]', JSON.stringify(tg.surf))
+  check('Earthquake hits everyone adjacent in both', JSON.stringify(tg.eq) === '["all-adjacent","all-adjacent"]', JSON.stringify(tg.eq))
+  check('Reflect moves from "itself" to "its side" without counting as a change', tg.reflect[0] === 'self' && tg.reflect[1] === 'user-side' && tg.reflect[2] === true, JSON.stringify(tg.reflect))
+  check('Helping Hand targets the ally; Acupressure itself or the ally; Outrage a random foe; Spikes the foes\' side', tg.helpingHand === 'ally' && tg.acupressure === 'user-or-ally' && tg.outrage === 'random' && tg.spikes === 'foe-side', JSON.stringify(tg))
+
+  await selectGeneration(page, 2)
+  await openIndex(page)
+  const tgGen2 = await page.$eval('[data-testid="tool-reason-12"]', (el) => el.textContent)
+  check('on Gen 2 it is listed, disabled: doubles start in Gen 3', tgGen2.includes('Gen 3–4'), tgGen2)
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-12"]')
+  await page.click('[data-testid="tool-game-row-platinum"]').catch(() => {})
+  await page.waitForSelector('[data-testid="tg-rows"]', { timeout: 60000 })
+  await page.selectOption('[data-testid="tg-kind"]', 'changed')
+  await page.waitForFunction(() => document.querySelector('[data-testid="tg-move-57"]'), null, { timeout: 30000 }).catch(() => {})
+  const changed = await page.$$eval('[data-testid^="tg-move-"]', (els) => els.map((e) => Number(e.dataset.testid.replace('tg-move-', ''))))
+  check('"Changed since Gen 3" lists Surf and not Reflect', changed.includes(57) && !changed.includes(115), `${changed.length} moves`)
+  await page.screenshot({ path: shot('tool-12-targeting.png') })
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
