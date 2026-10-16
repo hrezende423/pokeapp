@@ -40,6 +40,8 @@ export interface RawDesc {
   isBurned?: boolean
   isSwitching?: boolean
   isCharge?: boolean
+  /** Doubles: the attacker's partner used Helping Hand (the reference prints it after the name). */
+  isHelpingHand?: boolean
   moveBP?: number
   moveType?: string
   hits?: number
@@ -114,6 +116,7 @@ export function buildDescription(desc: RawDesc, attacker: Combatant, defender: C
   out = appendIfSet(out, desc.rivalry)
   if (desc.isBurned) out += 'burned '
   out += `${desc.attackerName} `
+  if (desc.isHelpingHand) out += 'Helping Hand '
   if (desc.isSwitching) out += 'switching boosted '
   if (desc.isCharge) out += 'Charge boosted '
   out += `${desc.moveName} `

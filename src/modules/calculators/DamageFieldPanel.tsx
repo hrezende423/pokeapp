@@ -1,8 +1,14 @@
 import { FormSectionLabel } from '../../components/ds/FormParts'
 import { SelectField } from '../../components/ds/SelectField'
 import { Toggle } from '../../components/ds/Toggle'
+import { ToggleSwitch } from '../../components/ToggleSwitch'
 import { FIELD_RULES, type SideConditions, type Weather } from './damage'
-import type { DualField } from './damageCalcState'
+import {
+  DOUBLES_INTRODUCED_IN_GENERATION,
+  emptyDoubles,
+  type DoublesSetting,
+  type DualField,
+} from './damageCalcState'
 
 /**
  * The Field column, between the two Pokemon as in the reference: weather and
@@ -16,6 +22,10 @@ import type { DualField } from './damageCalcState'
  *
  * Every toggle is a binary state -- the ds Toggle, the accent's second sanctioned
  * use.
+ *
+ * SINGLES OR DOUBLES (Gen 3-4) is a two-position choice, so a ToggleSwitch. In a
+ * double battle each side adds whether its partner is still standing and whether
+ * that partner used Helping Hand; the move's range comes from the game itself.
  */
 
 const WEATHER_LABEL: Record<Weather, string> = {
@@ -38,6 +48,13 @@ export function DamageFieldPanel({
   onChange: (next: DualField) => void
 }) {
   const rules = FIELD_RULES[gen]
+  const canDouble = gen >= DOUBLES_INTRODUCED_IN_GENERATION
+  const setDoubles = (i: 0 | 1, key: keyof DoublesSetting, v: boolean) => {
+    if (!field.doubles) return
+    const pair: [boolean, boolean] = [...field.doubles[key]]
+    pair[i] = v
+    onChange({ ...field, doubles: { ...field.doubles, [key]: pair } })
+  }
   const setSide = (i: 0 | 1, patch: Partial<SideConditions>) => {
     const sides: DualField['sides'] = [...field.sides]
     sides[i] = { ...sides[i], ...patch }
@@ -47,6 +64,17 @@ export function DamageFieldPanel({
   return (
     <div className="dcalc-panel dcalc-field" data-layout="dcalc-field" data-testid="dcalc-field">
       <FormSectionLabel>Field</FormSectionLabel>
+
+      {canDouble && (
+        <ToggleSwitch
+          id="dcalc-battle"
+          label="Battle"
+          offLabel="Singles"
+          onLabel="Doubles"
+          checked={Boolean(field.doubles)}
+          onChange={(v) => onChange({ ...field, doubles: v ? emptyDoubles() : undefined })}
+        />
+      )}
 
       {(rules.weathers.length > 0 || rules.gravity) && (
         <div className="dcalc-field-shared">
@@ -98,6 +126,20 @@ export function DamageFieldPanel({
                 />
               )}
               <div className="dcalc-field-toggles" data-testid={`dcalc-field-toggles-${i + 1}`}>
+                {field.doubles && (
+                  <Toggle
+                    on={field.doubles.partner[i]}
+                    label="Partner standing"
+                    onChange={(v) => setDoubles(i, 'partner', v)}
+                  />
+                )}
+                {field.doubles?.partner[i] && (
+                  <Toggle
+                    on={field.doubles.helpingHand[i]}
+                    label="Helping Hand"
+                    onChange={(v) => setDoubles(i, 'helpingHand', v)}
+                  />
+                )}
                 {rules.stealthRock && (
                   <Toggle
                     on={s.stealthRock}
