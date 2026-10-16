@@ -1,4 +1,5 @@
 import { findCalculatorsPage, type CalculatorsPageId } from '../calculators/pages'
+import { findCollectionPage, type CollectionPageId } from '../collection/pages'
 import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
@@ -41,6 +42,7 @@ export type PageId =
   | CalculatorsPageId
   | TeamMatchupPageId
   | ToolsPageId
+  | CollectionPageId
   | StubPageId
 
 export interface NavEntry {
@@ -106,7 +108,11 @@ export const NAV_TABS: readonly NavTab[] = [
       list screen first. The two list screens follow, then the one entry here
       that is still a stub.
     */
-    entries: [...teamBuilding('new-team', 'new-build', 'my-teams', 'build-library')],
+    entries: [
+      ...teamBuilding('new-team', 'new-build', 'my-teams', 'build-library'),
+      /* The Collection (owner, 2026-10-15): caught Pokemon as they stand now. */
+      { id: 'collection', label: 'Collection' },
+    ],
   },
   {
     id: 'tools',
@@ -168,6 +174,8 @@ export function findPage(id: PageId): ResolvedPage {
   if (calc) return { id: calc.id, label: calc.label, Component: calc.Component }
   const tm = findTeamMatchupPage(id)
   if (tm) return { id: tm.id, label: tm.label, Component: tm.Component }
+  const col = findCollectionPage(id)
+  if (col) return { id: col.id, label: col.label, Component: col.Component }
   const tool = findToolsPage(id)
   if (tool) return { id: tool.id, label: tool.label, Component: tool.Component }
   const stub = findStub(id)

@@ -26,6 +26,7 @@ import {
   padSlots,
   teamsUsingBuild,
   type Build,
+  type CollectionEntry,
   type Team,
   type TeamBuilderData,
 } from './model'
@@ -47,6 +48,8 @@ export function normalise(raw: unknown): TeamBuilderData {
     teams: teams.map((t) => ({ ...t, memberIds: padSlots(t.memberIds ?? [], TEAM_SIZE, null) })),
     nextBuildSeq: doc.nextBuildSeq ?? builds.length + 1,
     nextTeamSeq: doc.nextTeamSeq ?? teams.length + 1,
+    collection: Array.isArray(doc.collection) ? doc.collection : [],
+    nextEntrySeq: doc.nextEntrySeq ?? (Array.isArray(doc.collection) ? doc.collection.length : 0) + 1,
   }
 }
 
@@ -135,6 +138,8 @@ export function deleteBuild(id: string) {
       ...t,
       memberIds: t.memberIds.map((m) => (m === id ? null : m)),
     })),
+    // A Collection entry trained toward it keeps its numbers, loses the target.
+    collection: (data.collection ?? []).map((c) => (c.buildId === id ? { ...c, buildId: null } : c)),
   }))
 }
 
@@ -309,6 +314,27 @@ export function reorderTeam(teamId: string, from: number, to: number) {
       return { ...t, memberIds: padSlots(filled, TEAM_SIZE, null) }
     }),
   }))
+}
+
+// ------------------------------------------------------------- Collection
+
+export function createEntry(init: Omit<CollectionEntry, 'id' | 'seq'>): CollectionEntry {
+  const data = readData()
+  const seq = data.nextEntrySeq ?? 1
+  const entry: CollectionEntry = { ...init, id: `c${seq}`, seq }
+  write({ ...data, collection: [...(data.collection ?? []), entry], nextEntrySeq: seq + 1 })
+  return entry
+}
+
+export function updateEntry(id: string, patch: Partial<CollectionEntry>) {
+  update((data) => ({
+    ...data,
+    collection: (data.collection ?? []).map((c) => (c.id === id ? { ...c, ...patch, id: c.id, seq: c.seq } : c)),
+  }))
+}
+
+export function deleteEntry(id: string) {
+  update((data) => ({ ...data, collection: (data.collection ?? []).filter((c) => c.id !== id) }))
 }
 
 export { teamsUsingBuild }

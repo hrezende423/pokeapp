@@ -105,11 +105,35 @@ export const TEAM_PURPOSES = [
 export const purposeLabel = (value: string | undefined): string | null =>
   TEAM_PURPOSES.find((p) => p.value === value)?.label ?? null
 
+/**
+ * One caught Pokemon as it stands now -- the minimal Collection (owner,
+ * 2026-10-15): enough for #9 "EV/Stat Exp remaining" to compare it with the
+ * Build it is being trained toward. Team Matchup's `collectionId` link fields
+ * were shaped for this.
+ */
+export interface CollectionEntry {
+  id: string
+  seq: number
+  generation: number
+  speciesId: number
+  nickname: string
+  level: number
+  /** Gen 3+ only. */
+  natureId: number | null
+  /** Its EVs (Gen 3-4) or Stat Exp (Gen 1-2) as of now. */
+  effort: StatNumbers
+  /** The Build it is being trained toward, if any. */
+  buildId: string | null
+}
+
 export interface TeamBuilderData {
   builds: Build[]
   teams: Team[]
   nextBuildSeq: number
   nextTeamSeq: number
+  /** The Collection; absent in documents written before it existed. */
+  collection: CollectionEntry[]
+  nextEntrySeq: number
 }
 
 export const EMPTY_DATA: TeamBuilderData = {
@@ -117,6 +141,8 @@ export const EMPTY_DATA: TeamBuilderData = {
   teams: [],
   nextBuildSeq: 1,
   nextTeamSeq: 1,
+  collection: [],
+  nextEntrySeq: 1,
 }
 
 const GEN1_STAT_KEYS: readonly StatKey[] = ['hp', 'attack', 'defense', 'special', 'speed']

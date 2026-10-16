@@ -111,7 +111,8 @@ export function useSyncState(): SyncState {
 
 // ------------------------------------------------------------------ merge
 
-const isEmpty = (d: TeamBuilderData) => d.builds.length === 0 && d.teams.length === 0
+const isEmpty = (d: TeamBuilderData) =>
+  d.builds.length === 0 && d.teams.length === 0 && (d.collection ?? []).length === 0
 
 /**
  * The cloud document plus this device's, the device's records renumbered after
@@ -136,11 +137,20 @@ export function mergeDocs(cloud: TeamBuilderData, device: TeamBuilderData): Team
       memberIds: t.memberIds.map((m) => (m == null ? null : (buildId.get(m) ?? null))),
     }
   })
+  // Collection entries the same way, their target build through the same map
+  // (documents from before the Collection have none).
+  let entrySeq = Math.max(cloud.nextEntrySeq ?? 1, 1)
+  const entries = (device.collection ?? []).map((c) => {
+    const seq = entrySeq++
+    return { ...c, id: `c${seq}`, seq, buildId: c.buildId == null ? null : (buildId.get(c.buildId) ?? null) }
+  })
   return {
     builds: [...cloud.builds, ...builds],
     teams: [...cloud.teams, ...teams],
     nextBuildSeq: buildSeq,
     nextTeamSeq: teamSeq,
+    collection: [...(cloud.collection ?? []), ...entries],
+    nextEntrySeq: entrySeq,
   }
 }
 
