@@ -18,7 +18,7 @@
  * Usage: node scripts/verify-tools.mjs
  */
 
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { startDevServer } from './lib/devServer.mjs'
@@ -770,6 +770,76 @@ try {
   }))
   check('"What’s left to train" opens #9 on that entry: 152 Atk + 4 HP = 156 EVs to go', rem.total === '156 EVs to go' && rem.atk === '152' && rem.hp === '4' && rem.speed === null, JSON.stringify(rem))
   await page.screenshot({ path: shot('tool-9-remaining.png') })
+
+  // ------------------------------------------------------------------ #10
+  hr('#10 MOVESET SEARCHER -- against a direct scan of each game\'s learnset file')
+  const MAXDEX = { 1: 151, 2: 251, 3: 386, 4: 493 }
+  const GROUP = (m) => (m === 'light-ball-egg' ? 'egg' : ['level-up', 'machine', 'tutor', 'egg'].includes(m) ? m : 'special')
+  const scan = (game, gen, moveNames, methods) => {
+    const rows = JSON.parse(readFileSync(`public/data/learnsets/${game}.json`, 'utf8'))
+    const list = Array.isArray(rows) ? rows : (rows.rows ?? Object.values(rows).find(Array.isArray))
+    const ids = moveNames.map((n) => MOVE_ID[n])
+    const per = new Map()
+    for (const r of list) {
+      if (!ids.includes(r.move_id) || r.species_id > MAXDEX[gen] || !methods.includes(GROUP(r.method))) continue
+      if (!per.has(r.pokemon_id)) per.set(r.pokemon_id, new Set())
+      per.get(r.pokemon_id).add(r.move_id)
+    }
+    return [...per].filter(([, s]) => ids.every((i) => s.has(i))).map(([p]) => p).sort((a, b) => a - b)
+  }
+  const MOVE_ID = Object.fromEntries(
+    Object.values(JSON.parse(readFileSync('public/data/moves.json', 'utf8'))).map((m) => [m.name, m.id]),
+  )
+  const ALL = ['level-up', 'machine', 'tutor', 'egg', 'special']
+  const queries = [
+    { game: 'red-blue', gen: 1, moves: ['thunderbolt', 'surf'], methods: ['machine'] },
+    { game: 'crystal', gen: 2, moves: ['spore'], methods: ALL },
+    { game: 'crystal', gen: 2, moves: ['thunderbolt'], methods: ['tutor'] },
+    { game: 'gold-silver', gen: 2, moves: ['thunderbolt'], methods: ['tutor'] },
+    { game: 'emerald', gen: 3, moves: ['baton-pass', 'swords-dance'], methods: ALL },
+    { game: 'platinum', gen: 4, moves: ['earthquake', 'ice-beam'], methods: ['level-up', 'machine'] },
+    { game: 'heartgold-soulsilver', gen: 4, moves: ['volt-tackle'], methods: ['egg'] },
+  ]
+  const tool = await page.evaluate(async (qs) => {
+    const m = await import('/pokeapp/src/modules/tools/moveset/movesetMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const out = []
+    for (const q of qs) {
+      const p = await d.loadLearnsets(q.game)
+      const ids = q.moves.map((n) => d.listMoves().find((x) => x.name === n).id)
+      const o = m.searchMovesets(p.rows, ids, new Set(q.methods), (id) => d.isSpeciesInGeneration(id, q.gen))
+      out.push(o.ok ? o.hits.map((h) => h.pokemonId).sort((a, b) => a - b) : o.reason)
+    }
+    return out
+  }, queries)
+  queries.forEach((q, i) => {
+    const want = scan(q.game, q.gen, q.moves, q.methods)
+    check(`${q.game}: ${q.moves.join(' + ')} by ${q.methods.length === 5 ? 'any method' : q.methods.join('/')} -- ${want.length} Pokémon, same as the file`, JSON.stringify(tool[i]) === JSON.stringify(want), `tool ${JSON.stringify(tool[i]).slice(0, 60)} / scan ${JSON.stringify(want).slice(0, 60)}`)
+  })
+  check('Crystal\'s tutor teaches Thunderbolt and Gold/Silver has no tutor at all', tool[2].length > 0 && tool[3].length === 0, `${tool[2].length} / ${tool[3].length}`)
+  check('HGSS Volt Tackle comes from the Light Ball egg, filed under Egg', tool[6].length > 0, JSON.stringify(tool[6]))
+
+  await selectGeneration(page, 2)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-10"]')
+  await page.waitForSelector('[data-testid="ms-move-1"]', { timeout: 60000 })
+  const noMove = await page.$eval('[data-testid="tool-result"]', (el) => el.innerText.trim())
+  check('no move picked is a reason, not an empty list', noMove === 'Pick at least one move.', noMove)
+  await page.selectOption('[data-testid="ms-move-1"]', String(MOVE_ID.thunderbolt))
+  await page.click('.ds-toggle:has-text("Level-up")')
+  await page.click('.ds-toggle:has-text("TM/HM")')
+  await page.click('.ds-toggle:has-text("Egg")')
+  await page.click('.ds-toggle:has-text("Special")')
+  const countIn = async (game) => {
+    await page.click(`[data-testid="tool-game-row-${game}"]`)
+    await page.waitForSelector('[data-testid="ms-count"]', { timeout: 60000 })
+    return page.$eval('[data-testid="ms-count"]', (el) => Number(el.innerText.split(' ')[0]))
+  }
+  const crys = await countIn('crystal')
+  const gs = await countIn('gold-silver')
+  check('on screen, the game row changes the answer: Thunderbolt by tutor in Crystal, none in Gold/Silver', crys > 0 && gs === 0, `${crys} / ${gs}`)
+  await page.click('[data-testid="tool-game-row-crystal"]')
+  await page.screenshot({ path: shot('tool-10-moveset.png') })
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
