@@ -7,6 +7,7 @@ import type { ToolsPageId } from './pages'
  */
 export const BRAIN_TOOLS: Readonly<Record<string, { page: ToolsPageId; label: string }>> = {
   TRAINER_CLASS_PALACE_MAVEN: { page: 'tool-palace', label: 'Battle Palace odds' },
+  TRAINER_CLASS_ARENA_TYCOON: { page: 'tool-arena', label: 'Battle Arena scoring' },
 }
 
 export const hasBrainTool = (classId: string | null | undefined): boolean =>

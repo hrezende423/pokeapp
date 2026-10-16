@@ -134,6 +134,8 @@ export const BATTLE_PATHS = {
   pokeemerald: [
     // Tools #19: berry flavours (scripts/build-berry-data.mjs).
     '/src/berry.c',
+    // Tools #21: Battle Arena mind ratings (scripts/build-arena-data.mjs).
+    '/src/battle_arena.c',
     '/data/battle_ai_scripts.s',
     '/asm/macros/battle_ai_script.inc',
     '/src/battle_ai_script_commands.c',

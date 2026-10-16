@@ -165,7 +165,7 @@ try {
   await openIndex(page)
   // Named, not counted: the list grows as Gen 2+ tools land.
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
-  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests and the Palace are disabled', gen1Disabled === '12,16,17,18,19,2,20', gen1Disabled)
+  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests, the Palace and the Arena are disabled', gen1Disabled === '12,16,17,18,19,2,20,21', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1346,6 +1346,59 @@ try {
   const palIdle = await page.$eval('[data-testid="pal-idle"] td', (e) => Number(e.dataset.chance))
   check('on the page: Adamant, Tackle + Swords Dance -- Attack 38%, idle 15.5% (no Support move)', palAtk === 0.38 && Math.abs(palIdle - 0.155) < 1e-9, `${palAtk} / ${palIdle}`)
   await page.screenshot({ path: shot('tool-20-palace.png') })
+
+  // ------------------------------------------------------------------ #21
+  hr('#21 BATTLE ARENA -- Mind, Skill and Body as battle_arena.c judges them')
+  const arn = await page.evaluate(async () => {
+    const am = await import('/pokeapp/src/modules/tools/arena/arenaMath.ts')
+    const r = await import('/pokeapp/src/data/arenaMindRatings.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const id = (n) => d.listMoves().find((m) => m.name === n).id
+    const side = (moves, skills, hpEnd, hpStart = 100, stopped = 0) => ({ moves: moves.map((m) => (m ? id(m) : null)), skills, stopped, hpStart, hpEnd })
+    const entries = Object.values(r.ARENA_MIND_RATING)
+    const win = am.judge(
+      side(['tackle', 'tackle', 'tackle'], ['super', 'super', 'super'], 100),
+      side(['protect', 'swords-dance', 'tackle'], ['protected-self', 'hit', 'resisted'], 40),
+    )
+    const same = side(['tackle', 'growl', null], ['hit', 'hit', null], 50)
+    const draw = am.judge(same, same)
+    const body = am.judge(side([], [], 2, 3), side([], [], 199, 300))
+    const stopped = am.judge(side(['thunderbolt'], ['no-effect'], 100, 100, 1), side([], [], 100))
+    return {
+      counts: [entries.length, entries.filter((x) => x < 0).length],
+      ratings: ['tackle', 'protect', 'detect', 'endure', 'fake-out', 'swords-dance', 'thunderbolt'].map((n) => am.mindRating(id(n))).join(','),
+      win: [win.mind.join('/'), win.skill.join('/'), win.body.join('/'), win.total.join('-'), win.result],
+      draw: [draw.total.join('-'), draw.result],
+      body: [body.body.join('/'), body.marks.body.join('/')],
+      stopped: stopped.skill[0],
+    }
+  })
+  check('Mind ratings come from sMindRatings: 216 listed, 4 negative', arn.counts[0] === 216 && arn.counts[1] === 4, JSON.stringify(arn.counts))
+  check('  Tackle +1; Protect, Detect, Endure, Fake Out -1; Swords Dance 0; Thunderbolt +1', arn.ratings === '1,-1,-1,-1,-1,0,1', arn.ratings)
+  check('three super-effective Tackles against Protect / Swords Dance / a resisted Tackle: 6-0', JSON.stringify(arn.win) === '["3/0","6/0","100/40","6-0","you"]', JSON.stringify(arn.win))
+  check('identical turns are a draw, 3-3 -- both are knocked out', JSON.stringify(arn.draw) === '["3-3","draw"]', JSON.stringify(arn.draw))
+  check('Body is a whole percentage: 2/3 and 199/300 are both 66, a tie', JSON.stringify(arn.body) === '["66/66","tie/tie"]', JSON.stringify(arn.body))
+  check('a move stopped by an ability costs 3 on top of its result (-2 - 3)', arn.stopped === -5, String(arn.stopped))
+
+  await selectGeneration(page, 3)
+  await page.evaluate(() => document.querySelector('[data-testid="nav-trainerdex"]').click())
+  await page.click('[data-testid="trainerdex-game-emerald"]').catch(() => {})
+  // The Trainer Dex reopens on the last entry (Spenser, above): back to the list.
+  await page.waitForSelector('[data-testid="trainerdex-rows"], [data-testid="entity-back"]', { timeout: 60000 })
+  if (await page.$('[data-testid="entity-back"]')) await page.click('[data-testid="entity-back"]')
+  await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
+  await page.locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Greta")').first().click()
+  await page.waitForSelector('[data-testid="trainerdex-tool-link"]', { timeout: 30000 })
+  await page.click('[data-testid="trainerdex-tool-link"]')
+  await page.waitForSelector('[data-testid="arn-0-move-1"] option:nth-child(3)', { state: 'attached', timeout: 60000 })
+  check('Greta\'s Trainer Dex entry links to the Arena tool', true)
+  await page.selectOption('[data-testid="arn-0-move-1"]', String(33)) // Tackle
+  await page.selectOption('[data-testid="arn-0-skill-1"]', 'super')
+  await page.fill('[data-testid="arn-1-hp-end"]', '30')
+  const arnResult = await page.$eval('[data-testid="arn-verdict"]', (e) => e.dataset.result)
+  const arnMind = await page.$eval('[data-testid="arn-mind"] td', (e) => e.dataset.value)
+  check('on the page: one super-effective Tackle and more HP left wins all three, 6-0', arnResult === 'you' && arnMind === '1', `${arnResult}, mind ${arnMind}`)
+  await page.screenshot({ path: shot('tool-21-arena.png') })
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
