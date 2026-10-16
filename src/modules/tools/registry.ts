@@ -237,6 +237,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-palace' },
   },
   {
+    key: '21',
+    n: 21,
+    label: 'Battle Arena scoring',
+    group: 'frontier',
+    blurb: 'The Battle Arena referee’s verdict after three turns: Mind, Skill and Body, as the game scores them.',
+    gate: { gens: [3], games: ['emerald'] },
+    target: { kind: 'page', id: 'tool-arena' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
