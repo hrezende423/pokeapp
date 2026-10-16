@@ -156,8 +156,9 @@ try {
   check('under "All" a gated tool asks for a generation', allReason.startsWith('Pick a generation'), allReason)
   await selectGeneration(page, 1)
   await openIndex(page)
-  const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.length)
-  check('on Gen 1 only Hidden Power and the doubles guide are disabled', gen1Disabled === 2, `${gen1Disabled} disabled`)
+  // Named, not counted: the list grows as Gen 2+ tools land.
+  const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
+  check('on Gen 1 only Hidden Power, the doubles guide and breeding are disabled', gen1Disabled === '12,16,2', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1074,6 +1075,60 @@ try {
   const thrMax = await page.$$eval('[data-testid="thr-rows"] li', (els) => Math.max(...els.map((e) => Number(e.dataset.species))))
   check('Gen 1 lists only Gen 1 species', thrMax <= 151, String(thrMax))
   await page.screenshot({ path: shot('tool-15-threats.png') })
+
+  // ------------------------------------------------------------------ #16
+  hr('#16 BREEDING CHAIN -- father-only egg moves, shortest chains, one fixture per generation')
+  const brd = await page.evaluate(async () => {
+    const bm = await import('/pokeapp/src/modules/tools/breeding/breedingMath.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const sp = (n) => d.listSpecies().find((s) => s.name === n)
+    const mv = (n) => d.listMoves().find((m) => m.name === n).id
+    const pool = (g) => d.listSpecies().filter((s) => d.isSpeciesInGeneration(s.id, g))
+    const rows = {}
+    for (const g of ['crystal', 'emerald', 'platinum']) rows[g] = (await d.loadLearnsets(g)).rows
+    const run = (game, gen, s, m) => bm.breedingChain(rows[game], pool(gen), sp(s).id, mv(m))
+    const names = (ids) => ids.map((id) => d.getSpecies(id).name)
+    const summary = (r) =>
+      r.ok ? { steps: r.steps, via: r.chains.map((c) => names(c.via).join('>')), src: [...new Set(r.chains.flatMap((c) => names(c.sources.map((x) => x.speciesId))))] } : { reason: r.reason }
+    const shares = (r, target) => r.chains.filter((c) => c.via.length === 0).every((c) => c.sources.every((x) => d.getSpecies(x.speciesId).egg_group_ids.some((g) => target.egg_group_ids.includes(g))))
+    const larv = run('platinum', 4, 'larvitar', 'dragon-dance')
+    return {
+      g2: summary(run('crystal', 2, 'charmander', 'belly-drum')),
+      g3: summary(run('emerald', 3, 'bagon', 'dragon-dance')),
+      g4: summary(larv),
+      g3share: shares(run('emerald', 3, 'bagon', 'dragon-dance'), sp('bagon')),
+      larvViaShares: larv.ok && larv.chains.every((c) => d.getSpecies(c.via[0]).egg_group_ids.some((g) => sp('larvitar').egg_group_ids.includes(g)) || d.getSpecies(c.via[0]).evolution_chain_id != null),
+      toto: [bm.eggMovesOf(rows.emerald, sp('totodile').id).has(mv('dragon-dance')), bm.eggMovesOf(rows.platinum, sp('totodile').id).has(mv('dragon-dance'))],
+      tyrogue: run('platinum', 4, 'tyrogue', 'mach-punch'),
+      pichu: run('platinum', 4, 'pichu', 'volt-tackle'),
+      notEgg: run('platinum', 4, 'larvitar', 'tackle'),
+    }
+  })
+  check('Gen 2 Crystal: Charmander gets Belly Drum straight from Snorlax', brd.g2.steps === 1 && brd.g2.src.includes('snorlax'), JSON.stringify(brd.g2))
+  check('Gen 3 Emerald: Bagon gets Dragon Dance from Gyarados or Altaria, in one breeding', brd.g3.steps === 1 && brd.g3.src.includes('gyarados') && brd.g3.src.includes('altaria'), JSON.stringify(brd.g3).slice(0, 200))
+  check('  every direct father shares an egg group with the mother', brd.g3share)
+  check('Gen 4 Platinum: Larvitar needs a chain for Dragon Dance (via a male Charmander)', brd.g4.steps === 2 && brd.g4.via.includes('charmander'), JSON.stringify(brd.g4).slice(0, 200))
+  check('the game changes the answer: Dragon Dance is a Totodile egg move in Platinum, not Emerald', JSON.stringify(brd.toto) === '[false,true]', JSON.stringify(brd.toto))
+  check('a male-only line is a reason (Ditto passes nothing)', !brd.tyrogue.ok && /Ditto/.test(brd.tyrogue.reason), brd.tyrogue.reason)
+  check('Volt Tackle is the Light Ball egg, no father', brd.pichu.ok && brd.pichu.lightBall, JSON.stringify(brd.pichu).slice(0, 120))
+  check('a move that is not an egg move is a reason', !brd.notEgg.ok, brd.notEgg.reason)
+
+  await selectGeneration(page, 4)
+  await goToPage(page, 'tools', 'breeding-planner')
+  await page.waitForSelector('[data-testid="brd-species"]', { timeout: 60000 })
+  check('the Tools dropdown\'s "Breeding Planner" opens the tool (no placeholder)', (await page.$('[data-stub-id]')) === null)
+  await page.click('[data-testid="tool-game-row-platinum"]').catch(() => {})
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="brd-species"] option').length > 50, null, { timeout: 60000 })
+  await page.selectOption('[data-testid="brd-species"]', { label: 'Larvitar' })
+  await page.selectOption('[data-testid="brd-move"]', { label: 'Dragon Dance' })
+  await page.waitForSelector('[data-testid="brd-result"]', { timeout: 60000 })
+  const brdSteps = await page.$eval('[data-testid="brd-result"]', (e) => e.dataset.steps)
+  check('on the page: Larvitar + Dragon Dance in Platinum is two breedings', brdSteps === '2', String(brdSteps))
+  await page.screenshot({ path: shot('tool-16-breeding.png') })
+  await selectGeneration(page, 1)
+  await goToPage(page, 'tools', 'breeding-planner')
+  const brdGen1 = await page.textContent('[data-testid="tool-reason"]').catch(() => null)
+  check('Gen 1 has no breeding: the page says so', /Gen 2/.test(brdGen1 ?? ''), String(brdGen1))
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)

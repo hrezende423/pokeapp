@@ -192,6 +192,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-threats' },
   },
   {
+    key: '16',
+    n: 16,
+    label: 'Breeding chain',
+    group: 'planners',
+    blurb: 'Which fathers pass an egg move on, directly or through the fewest breedings.',
+    gate: { gens: [2, 3, 4] },
+    target: { kind: 'page', id: 'breeding-planner' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
