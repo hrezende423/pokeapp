@@ -138,6 +138,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'calculator', tab: 'Catch Rate' },
   },
   {
+    key: '10',
+    n: 10,
+    label: 'Moveset searcher',
+    group: 'reference',
+    blurb: 'Every Pokémon that can know all the moves you pick in one game, and how it learns each.',
+    gate: GEN_1_4,
+    target: { kind: 'page', id: 'tool-moveset' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
