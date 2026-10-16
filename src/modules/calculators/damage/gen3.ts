@@ -407,7 +407,10 @@ function calculateFinalModsADV(
     desc.isCharge = true
   }
 
-  if (field.doubles?.helpingHand) baseDamage = Math.floor((baseDamage * 15) / 10)
+  if (field.doubles?.helpingHand) {
+    baseDamage = Math.floor((baseDamage * 15) / 10)
+    desc.isHelpingHand = true
+  }
 
   if (attacker.types.includes(move.type)) baseDamage = Math.floor(baseDamage * 1.5)
   return baseDamage

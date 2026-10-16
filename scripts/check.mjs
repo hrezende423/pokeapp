@@ -27,6 +27,8 @@ const SUITES_BY_PATH = [
   ['src/modules/team-builder/statMath', ['damage-calc']],
   ['src/modules/team-builder/', ['team-builder', 'legal-moveset']],
   ['src/sync/', ['team-builder']],
+  // The damage engine is shared with Team Matchup's battles.
+  ['src/modules/calculators/damage/', ['team-matchup']],
   ['src/modules/calculators/', ['damage-calc', 'tools']],
   ['src/modules/tools/', ['tools']],
   ['src/modules/battle/', ['team-matchup']],

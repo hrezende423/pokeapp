@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { gameMove } from '../battle/battleData'
+import { spreadOf } from '../battle/engine/doubles'
+import { useGameMoveTable } from './useGameMoveTable'
 import {
   getAbility,
   getMove,
@@ -124,6 +127,9 @@ export function DamageCalculatorPage() {
 
   const moves0 = useSideMoves(sides[0], rows0, gen)
   const moves1 = useSideMoves(sides[1], rows1, gen)
+  // A double battle needs each move's range IN ITS GAME (Surf hits both foes in
+  // Gen 3 and every adjacent battler in Gen 4), from the game's own move table.
+  const moveTable = useGameMoveTable(field.doubles ? scope.versionGroup : null)
 
   const results = useMemo(() => {
     const mons = [toCalcPokemon(sides[0]), toCalcPokemon(sides[1])]
@@ -132,6 +138,17 @@ export function DamageCalculatorPage() {
         const move = id != null ? getMove(id) : undefined
         if (!move) return null
         const side = sides[i]
+        let spread: 'single' | 'both-foes' | 'all-adjacent' = 'single'
+        if (field.doubles) {
+          if (moveTable.status !== 'ready') {
+            const error =
+              moveTable.status === 'error'
+                ? `This game’s move targets did not load: ${moveTable.message}`
+                : 'Loading this game’s move targets…'
+            return { name: move.display_name, result: null, error }
+          }
+          spread = spreadOf(gameMove(moveTable.data, move.id))
+        }
         try {
           return {
             name: move.display_name,
@@ -146,7 +163,7 @@ export function DamageCalculatorPage() {
                 hits: side.hits[slot],
                 powerOverride: side.power[slot],
               },
-              fieldFor(field, i),
+              fieldFor(field, i, spread),
             ),
           }
         } catch (err) {
@@ -158,7 +175,7 @@ export function DamageCalculatorPage() {
         }
       })
     return [run(0, moves0), run(1, moves1)] as const
-  }, [sides, field, gen, moves0, moves1])
+  }, [sides, field, gen, moves0, moves1, moveTable])
 
   const hasRivalry = sides.some(
     (s) => gen >= 4 && s.abilityId != null && getAbility(s.abilityId)?.name === 'rivalry',

@@ -38,6 +38,7 @@ import {
   type Boosts,
   type CalcField,
   type CalcPokemon,
+  type DoublesField,
   type SideConditions,
   type StatusId,
   type Weather,
@@ -260,19 +261,59 @@ export interface DualField {
   weather: Weather | null
   gravity: boolean
   sides: [SideConditions, SideConditions]
+  /** Set for a double battle (Gen 3-4); absent = singles. */
+  doubles?: DoublesSetting
+}
+
+/**
+ * A double battle as the screen holds it: per side, whether that Pokemon's
+ * partner is still standing and whether the partner used Helping Hand this turn.
+ * The counts the formula needs (battlers on the defender's side, battlers other
+ * than the defender) follow from it; a Helping Hand needs a partner to use it.
+ */
+export interface DoublesSetting {
+  partner: [boolean, boolean]
+  helpingHand: [boolean, boolean]
+}
+
+/** Doubles exist from Gen 3 (Ruby/Sapphire); Gen 1-2 have no double battles. */
+export const DOUBLES_INTRODUCED_IN_GENERATION = 3
+
+export function emptyDoubles(): DoublesSetting {
+  return { partner: [true, true], helpingHand: [false, false] }
 }
 
 export function emptyDualField(): DualField {
   return { weather: null, gravity: false, sides: [emptySide(), emptySide()] }
 }
 
-/** The engine's field for Pokemon `attacker` (0 or 1) attacking the other. */
-export function fieldFor(field: DualField, attacker: 0 | 1): CalcField {
+/**
+ * The engine's field for Pokemon `attacker` (0 or 1) attacking the other. In a
+ * double battle `spread` is the move's range in its game (`spreadOf` on the
+ * game's own move table), which the caller looks up per move.
+ */
+export function fieldFor(
+  field: DualField,
+  attacker: 0 | 1,
+  spread: DoublesField['spread'] = 'single',
+): CalcField {
+  const defender = attacker === 0 ? 1 : 0
+  const d = field.doubles
   return {
     weather: field.weather,
     gravity: field.gravity,
     attackerSide: field.sides[attacker],
-    defenderSide: field.sides[attacker === 0 ? 1 : 0],
+    defenderSide: field.sides[defender],
+    doubles: d
+      ? {
+          defenderSideAlive: d.partner[defender] ? 2 : 1,
+          // Gen 4 counts every battler standing but the defender: the attacker,
+          // its partner and the defender's partner.
+          othersAlive: 1 + (d.partner[attacker] ? 1 : 0) + (d.partner[defender] ? 1 : 0),
+          spread,
+          helpingHand: d.partner[attacker] && d.helpingHand[attacker],
+        }
+      : undefined,
   }
 }
 
@@ -290,6 +331,7 @@ export function normalizeField(field: DualField, gen: number): DualField {
     weather: field.weather && rules.weathers.includes(field.weather) ? field.weather : null,
     gravity: rules.gravity && field.gravity,
     sides: [side(field.sides[0]), side(field.sides[1])],
+    doubles: gen >= DOUBLES_INTRODUCED_IN_GENERATION ? field.doubles : undefined,
   }
 }
 

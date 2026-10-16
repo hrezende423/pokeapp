@@ -48,6 +48,33 @@ function check(label, ok, detail = '') {
  * defaults: level 100; Gen 1-2 max DVs and Stat Exp; Gen 3-4 31 IVs, 0 EVs,
  * Serious nature, first ability).
  */
+/**
+ * DOUBLES, from the live calc (#3 of the tools brief): run 2026-10-15 on
+ * calc.pokemonshowdown.com through its own `window.calc`, Field({ gameType:
+ * 'Doubles' }) -- two battlers a side -- and the calc's default spreads. Our side
+ * reads each move's range from the game's own move table (Emerald, Platinum):
+ * Surf is MOVE_TARGET_BOTH in Gen 3 and RANGE_ALL_ADJACENT in Gen 4.
+ */
+const LIVE_DOUBLES = [
+  { case: { gen: 3, attacker: { species: 'starmie' }, defender: { species: 'blastoise' }, move: 'surf', field: { doubles: { game: 'emerald' } } },
+    damage: [25, 25, 26, 26, 26, 27, 27, 27, 27, 28, 28, 28, 29, 29, 29, 30],
+    text: '0 SpA Starmie Surf vs. 0 HP / 0 SpD Blastoise: 25-30 (8.3 - 10%)' },
+  { case: { gen: 4, attacker: { species: 'starmie' }, defender: { species: 'blastoise' }, move: 'surf', field: { doubles: { game: 'platinum' } } },
+    damage: [37, 37, 38, 38, 39, 39, 39, 40, 40, 41, 42, 42, 42, 42, 43, 44],
+    text: '0 SpA Starmie Surf vs. 0 HP / 0 SpD Blastoise: 37-44 (12.3 - 14.7%) -- possible 7HKO' },
+  { case: { gen: 4, attacker: { species: 'garchomp' }, defender: { species: 'charizard' }, move: 'rock-slide', field: { doubles: { game: 'platinum' } } },
+    damage: [248, 252, 256, 260, 260, 264, 268, 272, 272, 276, 280, 284, 284, 288, 292, 296],
+    text: '0 Atk Garchomp Rock Slide vs. 0 HP / 0 Def Charizard: 248-296 (83.5 - 99.6%) -- guaranteed 2HKO' },
+  { case: { gen: 4, attacker: { species: 'garchomp' }, defender: { species: 'charizard' }, move: 'rock-slide', field: { doubles: { game: 'platinum', helpingHand: true } } },
+    damage: [372, 376, 380, 384, 388, 396, 400, 404, 408, 412, 416, 420, 424, 428, 432, 440],
+    text: '0 Atk Garchomp Helping Hand Rock Slide vs. 0 HP / 0 Def Charizard: 372-440 (125.2 - 148.1%) -- guaranteed OHKO' },
+  { case: { gen: 3, attacker: { species: 'raichu' }, defender: { species: 'gyarados' }, move: 'thunderbolt', field: { doubles: { game: 'emerald', helpingHand: true } } },
+    damage: [571, 577, 584, 591, 598, 604, 611, 618, 624, 631, 638, 645, 651, 658, 665, 672],
+    text: '0 SpA Raichu Helping Hand Thunderbolt vs. 0 HP / 0 SpD Gyarados: 571-672 (172.5 - 203%) -- guaranteed OHKO' },
+]
+// The same Surf in singles, from the same session: the doubles line must be the halved one, not a coincidence.
+const LIVE_SINGLES_SURF_G3 = [49, 49, 50, 51, 51, 52, 52, 53, 53, 54, 55, 55, 56, 56, 57, 58]
+
 const LIVE = [
   {
     case: { gen: 1, attacker: { species: 'tauros' }, defender: { species: 'chansey' }, move: 'body-slam' },
@@ -134,7 +161,7 @@ async function runCases(page, cases) {
         pct: p.curHPpct,
       }
     }
-    return cases.map((c) => {
+    return Promise.all(cases.map(async (c) => {
       try {
         const a = mk(c, c.attacker)
         const d = mk(c, c.defender)
@@ -155,12 +182,24 @@ async function runCases(page, cases) {
         })
         field.attackerSide.charge = !!f.charge
         const move = data.listMoves().find((m) => m.name === c.move)
+        if (f.doubles) {
+          // The move's range comes from the GAME's own move table, as on the page.
+          const bd = await import('/pokeapp/src/modules/battle/battleData.ts')
+          const db = await import('/pokeapp/src/modules/battle/engine/doubles.ts')
+          const table = await bd.loadBattleData(f.doubles.game)
+          field.doubles = {
+            defenderSideAlive: f.doubles.defenderSideAlive ?? 2,
+            othersAlive: f.doubles.othersAlive ?? 3,
+            spread: db.spreadOf(bd.gameMove(table, move.id)),
+            helpingHand: !!f.doubles.helpingHand,
+          }
+        }
         const r = eng.calculateDamage(c.gen, a, d, { move, isCrit: !!c.crit, hits: c.hits ?? null, powerOverride: null }, field)
         return { damage: r.damage, text: r.fullText, range: r.range, reason: r.noDamageReason }
       } catch (e) {
         return { error: String(e?.stack ?? e) }
       }
-    })
+    }))
   }, cases)
 }
 
@@ -250,6 +289,16 @@ try {
   hr('3. LIVE CALC -- calc.pokemonshowdown.com, 2026-09-26, lines quoted verbatim')
   const live = await runCases(page, LIVE.map((l) => l.case))
   LIVE.forEach((l, i) => check(`[G${l.case.gen}] ${l.text.slice(0, 60)}...`, live[i].text === l.text, live[i].text === l.text ? '' : `ours: ${live[i].text}`))
+
+  hr('3b. LIVE CALC, DOUBLES -- 2026-10-15, every roll')
+  const dbl = await runCases(page, [...LIVE_DOUBLES.map((l) => l.case), { ...LIVE_DOUBLES[0].case, field: {} }])
+  LIVE_DOUBLES.forEach((l, i) => {
+    const c = l.case
+    const label = `[G${c.gen}] ${c.attacker.species} ${c.move} vs ${c.defender.species}, doubles${c.field.doubles.helpingHand ? ' + Helping Hand' : ''}`
+    check(label, JSON.stringify(dbl[i].damage) === JSON.stringify(l.damage), dbl[i].error ? dbl[i].error.split('\n')[0] : `ours ${JSON.stringify(dbl[i].damage)}`)
+    check(`${label}: the line, verbatim`, dbl[i].text === l.text, dbl[i].text === l.text ? '' : `ours: ${dbl[i].text}`)
+  })
+  check('[G3] the same Surf in singles matches the live singles line', JSON.stringify(dbl[LIVE_DOUBLES.length].damage) === JSON.stringify(LIVE_SINGLES_SURF_G3), JSON.stringify(dbl[LIVE_DOUBLES.length].damage))
 
   // ------------------------------------------------------------------ 4
   hr('4. DATA THE ENGINE LEANS ON')

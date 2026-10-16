@@ -309,6 +309,43 @@ try {
   }))
   check('on Gen 1 the index lists it disabled: "this exists in Gen 2–4"', hpGen1.disabled && hpGen1.reason?.includes('Gen 2–4'), JSON.stringify(hpGen1))
 
+  // ------------------------------------------------------------------ #3
+  hr('#3 DAMAGE -- doubles on the page (the engine\'s live-calc doubles fixtures are in verify-damage-calc §3b)')
+  const openDamage = async (gen) => {
+    await selectGeneration(page, gen)
+    await openIndex(page)
+    await page.click('[data-testid="tool-link-3"]')
+    await page.waitForSelector('[data-testid="calc-damage"]', { timeout: 60000 })
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="calc-damage"] .dcalc-move-result, [data-testid^="dcalc-result-"]').length > 0, null, { timeout: 60000 }).catch(() => {})
+  }
+  await openDamage(2)
+  check('Gen 2 offers no doubles: they start in Gen 3', (await page.$('[data-toggle="dcalc-battle"]')) === null)
+  await openDamage(4)
+  const resultText = () => page.$eval('[data-testid="calc-damage"] [data-layout="dcalc-results"]', (el) => el.innerText)
+  const singlesText = await resultText()
+  await page.click('[data-toggle="dcalc-battle"] [role="switch"]')
+  await page.waitForFunction(
+    () => !document.querySelector('[data-layout="dcalc-results"]')?.innerText.includes('Loading this game’s move targets'),
+    null,
+    { timeout: 60000 },
+  )
+  const dbl = await page.evaluate(() => ({
+    partners: [...document.querySelectorAll('[data-testid="dcalc-field"] .ds-toggle')].filter((b) => b.textContent.includes('Partner standing')).length,
+    helping: [...document.querySelectorAll('[data-testid="dcalc-field"] .ds-toggle')].filter((b) => b.textContent.includes('Helping Hand')).length,
+  }))
+  check('Gen 4 doubles adds "Partner standing" and "Helping Hand" to each side', dbl.partners === 2 && dbl.helping === 2, JSON.stringify(dbl))
+  const doublesText = await resultText()
+  check('the move targets load and every result reads as a number again', !doublesText.includes('did not load') && !doublesText.includes('Loading'), doublesText.slice(0, 80))
+  // Helping Hand on Pokemon 1's side changes Pokemon 1's damaging moves.
+  const hh = await page.$$('[data-testid="dcalc-field-toggles-1"] .ds-toggle')
+  for (const b of hh) if ((await b.textContent()).includes('Helping Hand')) await b.click()
+  const hhText = await resultText()
+  check('Helping Hand changes the numbers', hhText !== doublesText, '')
+  check('and singles numbers were different from doubles-with-Helping-Hand ones', singlesText !== hhText)
+  await page.$eval('[data-testid="dcalc-field"]', (el) => el.scrollIntoView({ block: 'center' }))
+  await page.screenshot({ path: shot('tool-3-damage-doubles.png') })
+  await page.click('[data-toggle="dcalc-battle"] [role="switch"]')
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)
