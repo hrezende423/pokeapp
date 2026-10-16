@@ -368,6 +368,71 @@ try {
     check(`Gen ${gen}: choosing a move in the row shows its own line below`, before !== after, after.slice(0, 70))
   }
 
+  // ------------------------------------------------------------------ #5
+  hr('#5 SPEED TIERS -- the engine\'s ladder from typed-in rows')
+  /*
+    Expectations worked from the Stat formula (Bulbapedia "Stat", read 2026-10-15)
+    and the turn-order routines battle/speed.ts cites:
+      Gen 4 Jolteon L100, 31 IV, 252 EV, +Spe: floor((260+31+63)*100/100)+5 = 359,
+        x1.1 = 394; Choice Scarf x15/10 = 591; paralysis /4 = 98.
+      Gen 1 Electrode L100, DV 15, Stat Exp 65535: (140+15)*2+63 = 373, +5 = 378;
+        paralysis >>2 = 94; +2 stage x2/1 = 756.
+  */
+  const tiers = await page.evaluate(async () => {
+    const m = await import('/pokeapp/src/modules/tools/speed-tiers/speedTiersMath.ts')
+    const g = await import('/pokeapp/src/modules/battle/game.ts')
+    const bd = await import('/pokeapp/src/modules/battle/battleData.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const sp = (name) => d.listSpecies().find((s) => s.name === name).id
+    const item = (name) => d.listItems().find((i) => i.name === name).id
+    const row = (key, side, name, extra = {}) => ({
+      key, side, speciesId: sp(name), level: '100', speedIndividual: '31', speedEffort: '252', nature: 'up',
+      itemId: null, abilityId: null, moves: [], stage: 0, paralyzed: false, statused: false, unburden: false, slowStart: false, ...extra,
+    })
+    const field = { weather: null, tailwind: { mine: false, theirs: false }, trickRoom: false }
+    const pt = g.gameContext('platinum')
+    const ptData = await bd.loadBattleData('platinum')
+    const speeds = (o) => (o.ok ? o.rows.map((r) => `${r.key}:${r.speed.min}`) : [`reason: ${o.reason}`])
+    const rb = g.gameContext('red-blue')
+    const rbData = await bd.loadBattleData('red-blue')
+    const g1 = (key, extra) => ({ ...row(key, 'mine', 'electrode', extra), speedIndividual: '15', speedEffort: '65535', nature: 'neutral' })
+    return {
+      g4: speeds(m.readTiers(pt, ptData, [
+        row('plain', 'mine', 'jolteon'),
+        row('scarf', 'theirs', 'jolteon', { itemId: item('choice-scarf') }),
+        row('para', 'theirs', 'jolteon', { paralyzed: true }),
+      ], field)),
+      g4tr: speeds(m.readTiers(pt, ptData, [row('plain', 'mine', 'jolteon'), row('para', 'theirs', 'jolteon', { paralyzed: true })], { ...field, trickRoom: true })),
+      tie: (() => {
+        const o = m.readTiers(pt, ptData, [row('a', 'mine', 'jolteon'), row('b', 'theirs', 'jolteon')], field)
+        return o.ok ? o.rows[0].ties : null
+      })(),
+      g1: speeds(m.readTiers(rb, rbData, [g1('plain'), g1('para', { paralyzed: true }), g1('up2', { stage: 2 })], field)),
+      one: speeds(m.readTiers(pt, ptData, [row('a', 'mine', 'jolteon')], field)),
+      badLevel: speeds(m.readTiers(pt, ptData, [row('a', 'mine', 'jolteon', { level: '101' }), row('b', 'mine', 'jolteon')], field)),
+    }
+  })
+  check('Gen 4: +Spe Jolteon 394; Choice Scarf 591; paralysed 98, in that order', JSON.stringify(tiers.g4) === '["scarf:591","plain:394","para:98"]', JSON.stringify(tiers.g4))
+  check('Gen 4 Trick Room: the slower one moves first', JSON.stringify(tiers.g4tr) === '["para:98","plain:394"]', JSON.stringify(tiers.g4tr))
+  check('two identical Jolteon are an exact tie (50/50)', JSON.stringify(tiers.tie) === '["b"]', JSON.stringify(tiers.tie))
+  check('Gen 1: Electrode 378; +2 stage 756; paralysed 94', JSON.stringify(tiers.g1) === '["up2:756","plain:378","para:94"]', JSON.stringify(tiers.g1))
+  check('one Pokemon is a reason, not a ladder', tiers.one[0] === 'reason: Add at least two Pokémon to compare.', tiers.one[0])
+  check('level 101 is a reason naming the row', tiers.badLevel[0].startsWith('reason: Row 1: level must be'), tiers.badLevel[0])
+
+  await selectGeneration(page, 4)
+  await openIndex(page)
+  await page.click('[data-testid="tool-link-5"]')
+  await page.waitForSelector('[data-testid="tiers-ladder"]', { timeout: 60000 })
+  const ladderBefore = await page.$$eval('[data-testid^="tiers-rank-"]', (els) => els.map((e) => e.dataset.key))
+  check('the page opens on a two-row ladder', ladderBefore.length === 2, ladderBefore.join(','))
+  await page.click('.ds-toggle:has-text("Trick Room")')
+  const ladderTr = await page.$$eval('[data-testid^="tiers-rank-"]', (els) => els.map((e) => e.dataset.key))
+  check('Trick Room reverses it on screen', JSON.stringify(ladderTr) === JSON.stringify([...ladderBefore].reverse()), ladderTr.join(','))
+  await page.fill('[data-testid="tiers-level-1"]', '')
+  const tiersReason = await page.$eval('[data-testid="tool-result"]', (el) => el.innerText.trim())
+  check('an empty level is a reason where the ladder was', tiersReason.startsWith('Row 1: level must be'), tiersReason)
+  await page.screenshot({ path: shot('tool-5-speed-tiers.png') })
+
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
   await openIndex(page)

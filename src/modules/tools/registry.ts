@@ -95,11 +95,11 @@ export const TOOLS: readonly ToolEntry[] = [
   {
     key: '5',
     n: 5,
-    label: 'Speed and turn order',
+    label: 'Speed tiers',
     group: 'core',
-    blurb: 'Who moves first: priority, then Speed after paralysis, items and Trick Room.',
+    blurb: 'Any set of Pokémon — typed in or loaded from a team — in the order they move, ties and priority marked.',
     gate: GEN_1_4,
-    target: { kind: 'calculator', tab: 'Speed' },
+    target: { kind: 'page', id: 'tool-speed-tiers' },
   },
   {
     key: '8',

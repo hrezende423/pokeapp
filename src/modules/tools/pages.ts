@@ -16,6 +16,7 @@ import { ToolsIndex } from './ToolsIndex'
 export const TOOLS_PAGES = [
   { id: 'tools', label: 'Tools' },
   { id: 'tool-hidden-power', label: 'Hidden Power' },
+  { id: 'tool-speed-tiers', label: 'Speed tiers' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -32,6 +33,9 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
   tools: ToolsIndex,
   'tool-hidden-power': lazyTool(() =>
     import('./hidden-power/HiddenPowerTool').then((m) => ({ default: m.HiddenPowerTool })),
+  ),
+  'tool-speed-tiers': lazyTool(() =>
+    import('./speed-tiers/SpeedTiersTool').then((m) => ({ default: m.SpeedTiersTool })),
   ),
 }
 

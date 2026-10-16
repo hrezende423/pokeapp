@@ -123,6 +123,22 @@
   grid-area: result;
 }
 
+/* Wide windows: the answer beside the question, and it stays in view while a
+   long form scrolls. Swapping two words in the template is the whole change. */
+@media (min-width: 1100px) {
+  .tool-body {
+    max-width: none;
+    grid-template-columns: minmax(0, 720px) minmax(280px, 1fr);
+    grid-template-areas: 'inputs result';
+    align-items: start;
+  }
+
+  .tool-result {
+    position: sticky;
+    top: 0;
+  }
+}
+
 /* An answer that is a sentence, not a number: the default text colour, never
    the accent (its two uses are the active nav item and the selected tab). */
 .tool-reason {
