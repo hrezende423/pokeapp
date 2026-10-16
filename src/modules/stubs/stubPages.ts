@@ -19,7 +19,6 @@ export const STUB_PAGES = [
     (../tools/pages.ts), keeping its id so the dropdown line is unchanged.
   */
   { id: 'training-optimization', label: 'Training and Optimization' },
-  { id: 'breeding-planner', label: 'Breeding Planner' },
 ] as const
 
 export type StubPageId = (typeof STUB_PAGES)[number]['id']

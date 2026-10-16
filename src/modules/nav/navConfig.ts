@@ -141,7 +141,9 @@ export const NAV_TABS: readonly NavTab[] = [
       /* Graduated as Tools #13; same id, same line. */
       { id: 'compare-pokemon', label: 'Compare Pokemon' },
       { id: 'team-matchup', label: 'Team Matchup' },
-      ...stubs('training-optimization', 'breeding-planner'),
+      ...stubs('training-optimization'),
+      /* Graduated as Tools #16; same id, same line. */
+      { id: 'breeding-planner', label: 'Breeding Planner' },
     ],
   },
 ]
