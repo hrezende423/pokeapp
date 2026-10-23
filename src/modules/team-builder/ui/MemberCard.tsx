@@ -46,6 +46,7 @@ import {
   type MoveRow,
 } from '../buildFacts'
 import { spreadStatKeys, statKeysForGeneration, type Build } from '../model'
+import { altSpriteFor } from '../altSprites'
 
 export type MemberCardVariant = 'compact' | 'full' | 'library' | 'rail'
 
@@ -168,6 +169,7 @@ export function MemberCard({
      them, and `resolveArtworkUrl` answers null rather than inventing a URL --
      so a species without one shows its artwork instead of a broken image. */
   const art =
+    (animated ? altSpriteFor(species.id, build.shiny) : null) ??
     (animated ? resolveArtworkUrl(species, variety, { ...view, motion: 'animated' }) : null) ??
     resolveArtworkUrl(species, variety, { ...view, motion: 'static' })
 
