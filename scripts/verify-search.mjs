@@ -283,7 +283,7 @@ try {
 
   await page.goto(APP_URL, { waitUntil: 'load' })
 
-  const { openControls, withControls } = controls(page)
+  const { withControls } = controls(page)
   await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
   // ---------------------------------------------------------------- helpers
@@ -312,10 +312,9 @@ try {
     await page.waitForTimeout(180)
   }
   const setTerm = async (term) => {
-    // The cross-dex search lives in the controls panel now, so it has to be open
-    // to type into -- and stays open afterwards, because the results dropdown
-    // this suite reads is nested inside that same panel.
-    await openControls()
+    // The cross-dex search is in the app bar on every page, outside the
+    // Sort/Filter panel, so it is typed into directly -- even where that menu is
+    // disabled (the Naturedex).
     await page.fill('[data-testid="global-search"]', term)
     await page.waitForTimeout(160)
   }
@@ -428,7 +427,11 @@ try {
   await selectGame('heartgold-soulsilver')
   for (const id of registryIds) {
     await goTo(id)
-    const present = (await page.$$('[data-testid="global-search"]')).length === 1
+    // VISIBLE, not merely mounted: a box inside a closed or disabled menu is in
+    // the DOM but cannot be reached, which is how the Naturedex lost it.
+    const present =
+      (await page.$$('[data-testid="global-search"]')).length === 1 &&
+      (await page.isVisible('[data-testid="global-search"]'))
     check(`reachable with the ${id} tab active`, present)
   }
 
