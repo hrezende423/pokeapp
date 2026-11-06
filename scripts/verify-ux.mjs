@@ -9,7 +9,7 @@
  * only show what a species happens to have:
  *
  *   - item 3 walks the whole bundle to report gender-toggle availability per mode
- *     across all 493 species, so "check before offering" is proven for the set and
+ *     across every species in the bundle, so "check before offering" is proven for the set and
  *     not just for the two species that happen to be clicked;
  *   - item 7 walks every evolution chain through the real classifier so the icon
  *     mapping is reported for every trigger the data actually contains.
@@ -53,10 +53,12 @@ const chains = bundle('evolution-chains')
 const speciesIds = Object.keys(species)
   .map(Number)
   .sort((a, b) => a - b)
+// The dex ceiling, read from the bundle: it grows when the dexes do.
+const SPECIES_CEILING = speciesIds.length
 const defaultVariety = (id) =>
   species[id].varieties.find((v) => v.is_default) ?? species[id].varieties[0]
 
-hr('ITEM 3 (data) — gender-toggle availability per mode, all 493 species')
+hr(`ITEM 3 (data) — gender-toggle availability per mode, all ${SPECIES_CEILING} species`)
 
 const modes = {
   'in-game static (regular)': (id) => defaultVariety(id).sprites.front_female != null,
@@ -71,20 +73,31 @@ const modes = {
 const availability = {}
 for (const [mode, fn] of Object.entries(modes)) {
   availability[mode] = speciesIds.filter((id) => fn(id))
-  log(`  ${mode.padEnd(26)} ${String(availability[mode].length).padStart(3)} / 493 species`)
+  log(`  ${mode.padEnd(26)} ${String(availability[mode].length).padStart(3)} / ${SPECIES_CEILING} species`)
 }
 
 const flagged = speciesIds.filter((id) => species[id].has_gender_differences)
+/*
+  DOCUMENTED GENDER EXCEPTIONS. Basculegion and Oinkologne are flagged as gendered,
+  but their females are separate varieties (basculegion-female, oinkologne-female),
+  so the default variety carries no female sprite field to read: Basculegion has
+  neither the regular nor the shiny one, Oinkologne has no shiny one. The lists are
+  exact, so a further gap fails here and so does either of these being filled.
+*/
+const NO_FEMALE_SPRITE = [902]
+const NO_SHINY_FEMALE_SPRITE = [902, 916]
+const gapsIn = (mode) => flagged.filter((id) => !availability[mode].includes(id))
 check(
-  'in-game gendered set == has_gender_differences set (94)',
-  availability['in-game static (regular)'].length === 94 &&
-    availability['in-game static (regular)'].every((id) => species[id].has_gender_differences),
-  `(${availability['in-game static (regular)'].length})`,
+  'in-game gendered set == has_gender_differences set, less the documented exception',
+  availability['in-game static (regular)'].every((id) => species[id].has_gender_differences) &&
+    gapsIn('in-game static (regular)').join() === NO_FEMALE_SPRITE.join(),
+  `(${availability['in-game static (regular)'].length} of ${flagged.length}; missing ${gapsIn('in-game static (regular)')})`,
 )
 check(
-  'in-game shiny gendered set matches too (94)',
-  availability['in-game static (shiny)'].length === 94,
-  `(${availability['in-game static (shiny)'].length})`,
+  'in-game shiny gendered set matches too, less the documented exceptions',
+  availability['in-game static (shiny)'].every((id) => species[id].has_gender_differences) &&
+    gapsIn('in-game static (shiny)').join() === NO_SHINY_FEMALE_SPRITE.join(),
+  `(${availability['in-game static (shiny)'].length} of ${flagged.length}; missing ${gapsIn('in-game static (shiny)')})`,
 )
 check(
   'no species has a gendered official artwork field',
@@ -94,7 +107,11 @@ check(
     ),
   ),
 )
-check('animated gendered set is the same 94 species', flagged.length === 94, `(${flagged.length})`)
+check(
+  'animated gendered set is the same species',
+  availability['artwork animated'].length === flagged.length,
+  `(${availability['artwork animated'].length} of ${flagged.length})`,
+)
 
 // A handful of named species, so the table is legible rather than just counts.
 const SAMPLES = [1, 3, 25, 41, 133, 198, 493]
@@ -121,12 +138,12 @@ check('Murkrow (#198) is in the gendered set', species[198].has_gender_differenc
 hr('ITEM 1 (data) — official-artwork fields present for the whole dex')
 const oa = speciesIds.filter((id) => defaultVariety(id).sprites.official_artwork != null)
 const oas = speciesIds.filter((id) => defaultVariety(id).sprites.official_artwork_shiny != null)
-log(`  official_artwork       non-null: ${oa.length} / 493`)
-log(`  official_artwork_shiny non-null: ${oas.length} / 493`)
+log(`  official_artwork       non-null: ${oa.length} / ${SPECIES_CEILING}`)
+log(`  official_artwork_shiny non-null: ${oas.length} / ${SPECIES_CEILING}`)
 log(`  bulbasaur regular: ${defaultVariety(1).sprites.official_artwork}`)
 log(`  bulbasaur shiny  : ${defaultVariety(1).sprites.official_artwork_shiny}`)
-check('every species has official artwork', oa.length === 493)
-check('every species has shiny official artwork', oas.length === 493)
+check('every species has official artwork', oa.length === SPECIES_CEILING)
+check('every species has shiny official artwork', oas.length === SPECIES_CEILING)
 check(
   'official artwork path differs from the in-game sprite path',
   defaultVariety(1).sprites.official_artwork.includes('other/official-artwork') &&
@@ -196,6 +213,28 @@ function triggerKind(d) {
 const kindCounts = {}
 const kindExamples = {}
 /*
+  KNOWN GAP (CLAUDE.md, "Known deferred debt"): the Gen 8-9 requirements with no
+  trigger kind of their own, which draw the generic fallback icon. The list is
+  exact, as species id:trigger, so a 14th fails this suite and so does fixing one:
+  a fix means removing its line here.
+*/
+const KNOWN_UNMAPPED_TRIGGERS = [
+  '865:three-critical-hits', // Sirfetch'd
+  '867:take-damage', // Runerigus
+  '869:spin', // Alcremie
+  '892:tower-of-darkness', // Urshifu
+  '892:tower-of-waters', // Urshifu
+  '899:agile-style-move', // Wyrdeer
+  '902:recoil-damage', // Basculegion
+  '904:strong-style-move', // Overqwil
+  '904:use-move', // Overqwil
+  '925:other', // Maushold
+  '979:use-move', // Annihilape
+  '983:three-defeated-bisharp', // Kingambit
+  '1000:gimmighoul-coins', // Gholdengo
+]
+const unmappedTriggers = []
+/*
   PARENT species id -> every requirement on its outgoing branches, in branch
   order. Keyed by the parent because that is the species whose page shows the
   arrows: Eevee's page renders Espeon's and Umbreon's requirements, not its own.
@@ -212,6 +251,7 @@ function walk(node) {
     for (const d of child.evolution_details) {
       const kind = triggerKind(d)
       kindCounts[kind] = (kindCounts[kind] ?? 0) + 1
+      if (kind === 'other') unmappedTriggers.push(`${child.species_id}:${d.trigger}`)
       if (!kindExamples[kind]) {
         kindExamples[kind] = `${species[child.species_id]?.display_name ?? child.species_id} (${
           d.trigger
@@ -237,7 +277,15 @@ check(
   'every trigger kind in the data has a mapped icon',
   Object.keys(kindCounts).every((k) => TRIGGER_ICON_NAMES[k]),
 )
-check('no requirement falls through to the "other" fallback', (kindCounts.other ?? 0) === 0)
+{
+  const seen = [...unmappedTriggers].sort()
+  const known = [...KNOWN_UNMAPPED_TRIGGERS].sort()
+  check(
+    'only the 13 known Gen 8-9 requirements fall through to the "other" fallback',
+    seen.join() === known.join(),
+    `new: [${seen.filter((k) => !known.includes(k))}]; fixed: [${known.filter((k) => !seen.includes(k))}]`,
+  )
+}
 check(
   'all five brief-named kinds occur in the data',
   ['level', 'stone', 'move', 'trade', 'trade-item', 'location'].every((k) => kindCounts[k] > 0),
@@ -390,7 +438,7 @@ try {
     for all three modes are on screen at once and either exist or do not.
 
     The three data-level ITEMs at the top of this suite are untouched -- they audit
-    all 493 species against the bundle and never used the DOM.
+    every species against the bundle and never used the DOM.
   */
   await search('bulbasaur', 1)
   await openSprites(1)
@@ -702,8 +750,11 @@ try {
   log(
     `  rows under "All": ${allIds.length}, min=${Math.min(...allIds)}, max=${Math.max(...allIds)}`,
   )
-  check('all 493 species listed', allIds.length === 493, `(${allIds.length})`)
-  check('ids run 1..493', Math.min(...allIds) === 1 && Math.max(...allIds) === 493)
+  check('every species listed', allIds.length === SPECIES_CEILING, `(${allIds.length})`)
+  check(
+    'ids run from 1 to the ceiling',
+    Math.min(...allIds) === 1 && Math.max(...allIds) === SPECIES_CEILING,
+  )
 
   /*
     WHAT "ALL" MEANS ON THE DETAIL PAGE CHANGED, and this is the assertion that

@@ -225,6 +225,14 @@ Deliberately left alone; the cheap fix is usually the wrong one.
   anchoring. `npm run check` retries it up to three times (`FLAKY` in
   `scripts/check.mjs`) and prints every failed attempt. Needs a real diagnosis.
 
+- **13 Gen 8-9 evolution requirements have no trigger kind** and draw the generic
+  fallback icon: Sirfetch'd, Runerigus, Alcremie, Urshifu (2), Wyrdeer, Basculegion,
+  Overqwil (2), Maushold, Annihilape, Kingambit, Gholdengo. `KNOWN_UNMAPPED_TRIGGERS`
+  in `scripts/verify-ux.mjs` is exact: a 14th fails it, and so does fixing one.
+- **Basculegion and Oinkologne are documented gender-sprite exceptions.** Their
+  females are separate varieties, so the default variety has no female sprite field
+  (Basculegion regular and shiny, Oinkologne shiny). Exact lists in `verify-ux.mjs`.
+
 ## Module rules live beside the module
 
 A nested CLAUDE.md loads on the first read of a file under its directory.
