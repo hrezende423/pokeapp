@@ -197,6 +197,16 @@ hr('7. PHONE SHELL')
   check('the mockup is in public/ (so it is reachable on the preview)', tracked.includes('public/mockups/phone-shell.html'))
 }
 
+hr('8. OFFLINE')
+{
+  const vite = read('vite.config.ts')
+  check('the precache globs include the partition list', /globPatterns: \[[^\]]*PARTITION_GLOB/.test(vite))
+  check('the partition list is read from the bundle (version-groups.json), not typed by hand', /version-groups\.json/.test(vite) && /PRECACHE_MAX_GENERATION/.test(vite))
+  check('the mechanics-scope limit is Gen 4', /export const PRECACHE_MAX_GENERATION = 4/.test(read('src/data/manifest.ts')))
+  check('sprites are never precached (no sprite host or image glob for artwork)', !/globPatterns: \[[^\]]*(webp|gif|sprites)/.test(vite))
+  check('the Gen 5+ learnsets are warmed after boot', /scheduleWarmup\(\)/.test(read('src/App.tsx')))
+}
+
 hr('SUMMARY')
 if (failures.length) {
   console.log(`${failures.length} FAILED:\n  - ${failures.join('\n  - ')}`)
