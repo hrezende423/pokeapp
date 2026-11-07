@@ -165,7 +165,7 @@ try {
   await openIndex(page)
   // Named, not counted: the list grows as Gen 2+ tools land.
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
-  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests, the Palace and the Arena are disabled', gen1Disabled === '12,16,17,18,19,2,20,21', gen1Disabled)
+  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests and the three Frontier tools are disabled', gen1Disabled === '12,16,17,18,19,2,20,21,22', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1399,6 +1399,66 @@ try {
   const arnMind = await page.$eval('[data-testid="arn-mind"] td', (e) => e.dataset.value)
   check('on the page: one super-effective Tackle and more HP left wins all three, 6-0', arnResult === 'you' && arnMind === '1', `${arnResult}, mind ${arnMind}`)
   await page.screenshot({ path: shot('tool-21-arena.png') })
+
+  // ------------------------------------------------------------------ #22
+  hr('#22 RENTAL SET COMPARATOR -- the Factory pools and IVs, Emerald and Platinum')
+  const rnt = await page.evaluate(async () => {
+    const rm = await import('/pokeapp/src/modules/tools/rental/rentalMath.ts')
+    const tr = await import('/pokeapp/src/data/trainers.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    const em = (await tr.loadTrainers('emerald')).facilities.find((f) => f.id === 'battle-frontier').sets
+    const pt = (await tr.loadTrainers('platinum')).facilities.find((f) => f.id === 'battle-frontier').sets
+    const p = (...a) => {
+      const x = rm.rentalPool(...a)
+      return `${x.from}-${x.to}/${x.iv}/L${x.level}`
+    }
+    // Platinum set 1 (bulbasaur_1) at Level 50, IV 0, by hand:
+    // Modest, 255 Sp. Atk / 255 Sp. Def EVs. HP (90 + 0 + 0) * 50/100 + 60 = 105;
+    // Atk 98 * .5 + 5 = 54, x0.9 = 48; Def 49 + 5 = 54; SpA (130 + 63) * .5 = 96 + 5 = 101, x1.1 = 111;
+    // SpD 96 + 5 = 101; Spe 90 * .5 + 5 = 50.
+    const b = pt[0]
+    const sp = d.getSpecies(b.species_id)
+    const base = Object.fromEntries(d.resolveStatsForGeneration(sp.varieties[0], 4).map((x) => [x.stat, x.base_stat]))
+    const nat = d.getNature(b.nature_id)
+    const stats = rm.rentalStats(base, b.evs, { increased: nat.increased_stat, decreased: nat.decreased_stat }, 50, 0)
+    return {
+      emKeys: [em[110].key, em[199].key, em[372].key, em.length],
+      em: [p('emerald', false, 1, false), p('emerald', false, 1, true), p('emerald', true, 1, false), p('emerald', false, 8, false), p('emerald', false, 8, true), p('emerald', false, 9, false), p('emerald', false, 10, false)],
+      pt: [p('platinum', false, 1, false), p('platinum', false, 1, true), p('platinum', true, 1, false), p('platinum', false, 8, true), p('platinum', false, 12, false)],
+      ptKey: pt[0].key,
+      nature: nat.name,
+      stats: stats.join(','),
+      upgrade8: rm.canUpgrade('platinum', false, 8),
+    }
+  })
+  check('Emerald pool edges are the decomp\'s: #110 Grimer, #199 Furret, #372 Dugtrio, 882 sets', rnt.emKeys[0] === 'FRONTIER_MON_GRIMER' && rnt.emKeys[1] === 'FRONTIER_MON_FURRET_1' && rnt.emKeys[2] === 'FRONTIER_MON_DUGTRIO_1' && rnt.emKeys[3] === 882, JSON.stringify(rnt.emKeys))
+  check('Emerald round 1: sets 110-199 at IV 3; the better range is round 2\'s at IV 6; Open Level starts at 372, level 100', JSON.stringify(rnt.em.slice(0, 3)) === '["110-199/3/L50","162-266/6/L50","372-467/3/L100"]', rnt.em.slice(0, 3).join(' '))
+  check('Emerald round 8 is the top range at IV 31; its better rentals read past the IV table (random)', rnt.em[3] === '372-849/31/L50' && rnt.em[4] === '372-849/random/L50', `${rnt.em[3]} ${rnt.em[4]}`)
+  check('Emerald round 9 also reads past the table (random IVs); round 10 is 31 again', rnt.em[5] === '372-849/random/L50' && rnt.em[6] === '372-849/31/L50', `${rnt.em[5]} ${rnt.em[6]}`)
+  check('Platinum round 1: set IDs 1-150 at IV 0; upgraded = round 2\'s 151-250 at IV 4; Open starts at 351', JSON.stringify(rnt.pt.slice(0, 3)) === '["0-149/0/L50","150-249/4/L50","350-485/0/L100"]', rnt.pt.slice(0, 3).join(' '))
+  check('Platinum round 8 (49+) is sets 351-950 at IV 31, not upgradable, and later rounds stay there', rnt.pt[3] === '350-949/31/L50' && rnt.pt[4] === '350-949/31/L50' && rnt.upgrade8 === false, `${rnt.pt[3]} ${rnt.pt[4]}`)
+  check('Platinum set 1 (Bulbasaur, Modest, 255 SpA/SpD) at L50, IV 0: 105/48/54/111/101/50, by hand', rnt.ptKey === 'bulbasaur_1' && rnt.nature === 'modest' && rnt.stats === '105,48,54,111,101,50', `${rnt.ptKey} ${rnt.nature} ${rnt.stats}`)
+
+  const openBrain = async (gen, game, name) => {
+    await selectGeneration(page, gen)
+    await page.evaluate(() => document.querySelector('[data-testid="nav-trainerdex"]').click())
+    await page.click(`[data-testid="trainerdex-game-${game}"]`).catch(() => {})
+    await page.waitForSelector('[data-testid="trainerdex-rows"], [data-testid="entity-back"]', { timeout: 60000 })
+    if (await page.$('[data-testid="entity-back"]')) await page.click('[data-testid="entity-back"]')
+    await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
+    await page.locator(`[data-testid="trainerdex-rows"] tbody tr:has-text("${name}")`).first().click()
+    return page.waitForSelector('[data-testid="trainerdex-tool-link"]', { timeout: 30000 }).then(() => true).catch(() => false)
+  }
+  check('Noland\'s Trainer Dex entry links to the rental comparator', await openBrain(3, 'emerald', 'Noland'))
+  await page.click('[data-testid="trainerdex-tool-link"]')
+  await page.waitForSelector('[data-testid="rnt-set-1"] option:nth-child(3)', { state: 'attached', timeout: 60000 })
+  await page.selectOption('[data-testid="rnt-set-1"]', { index: 1 })
+  await page.selectOption('[data-testid="rnt-set-2"]', { index: 2 })
+  const rntCols = await page.$$eval('[data-testid="rnt-table"] thead th[scope="col"]', (els) => els.length)
+  const rntHp = await page.$$eval('[data-testid="rnt-stat-hp"] td', (els) => els.map((e) => e.dataset.value))
+  check('on the page: two Emerald round-1 sets side by side with their stats', rntCols === 2 && rntHp.every((v) => Number(v) > 0), `${rntCols} cols, HP ${rntHp}`)
+  await page.screenshot({ path: shot('tool-22-rental.png') })
+  check('Thorton\'s Trainer Dex entry links to it too (Platinum)', await openBrain(4, 'platinum', 'Thorton'))
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)

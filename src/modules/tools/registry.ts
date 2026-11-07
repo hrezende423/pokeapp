@@ -246,6 +246,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-arena' },
   },
   {
+    key: '22',
+    n: 22,
+    label: 'Rental set comparator',
+    group: 'frontier',
+    blurb: 'The Battle Factory’s rental pool for a round, and its sets side by side at the stats you would rent them with.',
+    gate: { gens: [3, 4], games: ['emerald', 'platinum', 'heartgold-soulsilver'] },
+    target: { kind: 'page', id: 'tool-rental' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',

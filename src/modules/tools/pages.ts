@@ -32,6 +32,7 @@ export const TOOLS_PAGES = [
   { id: 'tool-contest', label: 'Contest stats plan' },
   { id: 'tool-palace', label: 'Battle Palace odds' },
   { id: 'tool-arena', label: 'Battle Arena scoring' },
+  { id: 'tool-rental', label: 'Rental set comparator' },
 ] as const
 
 export type ToolsPageId = (typeof TOOLS_PAGES)[number]['id']
@@ -97,6 +98,9 @@ const COMPONENTS: Record<ToolsPageId, ComponentType> = {
     import('./palace/PalaceTool').then((m) => ({ default: m.PalaceTool })),
   ),
   'tool-arena': lazyTool(() => import('./arena/ArenaTool').then((m) => ({ default: m.ArenaTool }))),
+  'tool-rental': lazyTool(() =>
+    import('./rental/RentalTool').then((m) => ({ default: m.RentalTool })),
+  ),
 }
 
 export function findToolsPage(
