@@ -84,13 +84,16 @@ function effortText(generation: number, effort: StatNumbers): SdSpread {
     }
     return out
   }
-  const special = evFromStatExp(effort.special ?? 0)
+  /* THE BUILD FORM STORES GEN 2 SPECIAL IN TWO KEYS: its stat rows are Sp. Atk and
+     Sp. Def, while the battle code and the Collection use `special`. */
   const all: SdSpread = {
     HP: evFromStatExp(effort.hp ?? 0),
     Atk: evFromStatExp(effort.attack ?? 0),
     Def: evFromStatExp(effort.defense ?? 0),
-    SpA: special,
-    ...(generation === 2 ? { SpD: special } : {}),
+    SpA: evFromStatExp(effort['special-attack'] ?? effort.special ?? 0),
+    ...(generation === 2
+      ? { SpD: evFromStatExp(effort['special-defense'] ?? effort.special ?? 0) }
+      : {}),
     Spe: evFromStatExp(effort.speed ?? 0),
   }
   const shown = Object.fromEntries(Object.entries(all).filter(([, v]) => v > 0)) as SdSpread
@@ -211,12 +214,21 @@ function readEffort(set: ShowdownSet, generation: number, notes: string[]): Stat
     return effort
   }
   // No EVs line means full Stat Exp, which is how Showdown treats Gen 1-2.
-  const read = (stat: SdStat) => statExpFromEv(set.evs ? (set.evs[stat] ?? 0) : MAX_EV)
+  const read = (stat: SdStat) => {
+    const raw = set.evs ? (set.evs[stat] ?? 0) : MAX_EV
+    if (raw > MAX_EV) notes.push(`${stat} EVs lowered to ${MAX_EV}, the most a stat can hold.`)
+    return statExpFromEv(raw)
+  }
   effort.hp = read('HP')
   effort.attack = read('Atk')
   effort.defense = read('Def')
   effort.speed = read('Spe')
   effort.special = read('SpA')
+  if (generation === 2) {
+    // One value, in every key a reader of a Gen 2 Build uses.
+    effort['special-attack'] = effort.special
+    effort['special-defense'] = effort.special
+  }
   if (set.evs?.SpD != null && set.evs.SpD !== set.evs.SpA) {
     notes.push('Separate Sp. Def EVs ignored: this generation has one Special.')
   }
@@ -257,7 +269,7 @@ async function readMoves(
   for (const text of set.moves) {
     const id = /^hidden\s*power/i.test(text) ? byId.get('hiddenpower') : byId.get(toId(text))
     if (id == null) {
-      notes.push(`${text} left empty: not learnable in Gen ${build.generation}.`)
+      notes.push(`${text} left out: not learnable in Gen ${build.generation}.`)
       continue
     }
     if (moveIds.includes(id)) continue
@@ -266,6 +278,11 @@ async function readMoves(
       continue
     }
     moveIds.push(id)
+    const named = /^hidden\s*power\s*\[?\s*([a-z]+)/i.exec(text)?.[1]
+    const actual = hiddenPower(build.generation, build.individual).type
+    if (named && named.toLowerCase() !== actual.toLowerCase()) {
+      notes.push(`Hidden Power is ${titleCase(actual)} with these IVs, not ${titleCase(named)}.`)
+    }
   }
   while (moveIds.length < MOVE_SLOTS) moveIds.push(null)
   return moveIds
@@ -278,7 +295,9 @@ function readItem(set: ShowdownSet, generation: number, notes: string[]): number
     return null
   }
   const held = new Set(itemOptionsFor(generation).map((o) => o.value))
-  const found = listItems().find((i) => toId(i.display_name) === toId(set.item!))
+  // By slug too: older games and other tools say Stick where the bundle says Leek.
+  const wanted = toId(set.item)
+  const found = listItems().find((i) => toId(i.display_name) === wanted || toId(i.name) === wanted)
   if (!found || !held.has(found.id)) {
     notes.push(`${set.item} dropped: not a held item in Gen ${generation}.`)
     return null
@@ -314,7 +333,10 @@ async function readSet(
   generation: number,
   index: ReturnType<typeof speciesIndex>,
 ): Promise<ImportItem> {
-  const hit = index.get(toId(set.species))
+  const exact = index.get(toId(set.species))
+  /* A form the bundle has no variety for (Gastrodon-East, Unown-B, Arceus-Fire), or
+     one the generation lacks (Garchomp-Mega), reads as the species, and says so. */
+  const hit = exact ?? index.get(toId(set.species.split('-')[0]))
   if (!hit) {
     return {
       label: set.species,
@@ -324,7 +346,9 @@ async function readSet(
   }
   const { species, variety } = hit
   const notes: string[] = []
+  if (!exact) notes.push(`${set.species} read as ${species.display_name}: no such form here.`)
   const init = newBuildInit(generation, species.id)
+  const formAbility = abilityOptionsFor(variety, generation)[0]?.value ?? null
   const level = Math.min(100, Math.max(1, set.level == null || !set.level ? 100 : set.level))
   const nickname = set.nickname.slice(0, NICKNAME_MAX)
   if (set.nickname.length > NICKNAME_MAX) {
@@ -364,7 +388,7 @@ async function readSet(
     itemId: readItem(set, generation, notes),
     abilityId:
       generation >= 3
-        ? readAbility(set, variety, generation, init.abilityId, species.display_name, notes)
+        ? readAbility(set, variety, generation, formAbility, species.display_name, notes)
         : null,
     natureId: generation >= 3 ? readNature(set, notes) : null,
     effort: readEffort(set, generation, notes),

@@ -117,6 +117,16 @@ try {
     const text2 = si.exportBuilds([gen2])
     const back2 = (await si.resolveImport(text2, 2, 'build')).items[0].build
 
+    const formGen2 = si.exportBuilds([{
+      ...gen2,
+      effort: { hp: 0, attack: 0, defense: 0, speed: 0, 'special-attack': 65535, 'special-defense': 65535 },
+    }])
+    const special = (await si.resolveImport('Snorlax\nEVs: 252 SpA / 252 SpD', 2, 'build')).items[0].build.effort
+    const oldForms = await si.resolveImport(['Gastrodon-East', '', 'Unown-B', '', 'Arceus-Fire', '', 'Garchomp-Mega', '', 'Shaymin-Sky'].join('\n'), 4, 'team')
+    const skyAbility = d.getAbility(oldForms.items[4].build.abilityId)?.name
+    const stick = await si.resolveImport("Farfetch'd @ Stick", 4, 'build')
+    const hpIce = await si.resolveImport('Snorlax\n- Hidden Power [Ice]', 4, 'build')
+    const big = await si.resolveImport('Snorlax\nEVs: 255 HP', 2, 'build')
     const paste = [
       '=== [gen4ou] Sand Crew ===',
       '',
@@ -161,6 +171,13 @@ try {
       seven: { n: seven.items.length, notes: seven.notes },
       over: { hp: over.items[0].build.effort.hp, n: over.items[0].notes },
       nothing: nothing.items.length,
+      formGen2,
+      special,
+      oldForms: oldForms.items.map((i) => ({ l: i.label, ok: i.build != null, n: i.notes })),
+      skyAbility,
+      stick: { id: stick.items[0].build.itemId, want: item('stick'), n: stick.items[0].notes },
+      hpIce: hpIce.items[0].notes,
+      big: { hp: big.items[0].build.effort.hp, n: big.items[0].notes },
     }
   })
   log(r.text4)
@@ -180,7 +197,7 @@ try {
 
   const [tyr2, chomp2] = r.gen2
   check('on Gen 2 ability and nature drop, and are reported', tyr2.ok && tyr2.a == null && tyr2.nat == null && tyr2.n.some((n) => /Ability and nature dropped/.test(n)), JSON.stringify(tyr2.n))
-  check('an illegal move leaves its slot empty and is reported', tyr2.m.filter(Boolean).length === 1 && tyr2.n.some((n) => /Dragon Dance left empty/.test(n)))
+  check('an illegal move is left out and reported', tyr2.m.filter(Boolean).length === 1 && tyr2.n.some((n) => /Dragon Dance left out/.test(n)))
   check('a species outside the generation is refused and reported', !chomp2.ok && /not in Gen 2/.test(chomp2.n[0]), JSON.stringify(chomp2))
   const chomp4 = r.gen4[1]
   check('a hidden ability is refused in Gen 4 and reported', chomp4.ok && chomp4.a === chomp4.sand && chomp4.n.some((n) => /Rough Skin dropped/.test(n)), JSON.stringify(chomp4))
@@ -192,6 +209,13 @@ try {
   check('an EV over 252 is lowered and said so', r.over.hp === 252 && r.over.n.some((n) => /lowered/.test(n)), JSON.stringify(r.over))
   check('an EV total over 510 is kept and said so', r.over.n.some((n) => /over the 510/.test(n)))
   check('empty text gives an empty plan, not a crash', r.nothing === 0)
+  check('Stat Exp in the Build Form\'s Gen 2 keys exports on both halves', /252 SpA/.test(r.formGen2) && /252 SpD/.test(r.formGen2), r.formGen2)
+  check('Gen 2 import fills every Special key', r.special.special === 65535 && r.special['special-attack'] === 65535 && r.special['special-defense'] === 65535, JSON.stringify(r.special))
+  check('a form with no variety reads as its species, and says so', r.oldForms.every((f) => f.ok) && r.oldForms.slice(0, 4).every((f) => f.n.some((n) => /no such form/.test(n))), JSON.stringify(r.oldForms))
+  check('a form with its own abilities gets one of them', r.skyAbility === 'serene-grace', r.skyAbility)
+  check('an item matches by its slug too', r.stick.id === r.stick.want && r.stick.n.length === 0, JSON.stringify(r.stick))
+  check('Hidden Power of another type than the IVs give is reported', r.hpIce.some((n) => /Hidden Power is .* not Ice/.test(n)), JSON.stringify(r.hpIce))
+  check('a Gen 2 EV over 252 is reported', r.big.hp === 65535 && r.big.n.some((n) => /lowered/.test(n)), JSON.stringify(r.big))
 
   // ------------------------------------------------------------------ 2
   hr('2. IMPORT ON SCREEN, never overwriting')
@@ -220,6 +244,8 @@ try {
       b('b1', 445, { nickname: 'Rocky', tags: ['Sweeper', 'sand'] }),
       b('b2', 373, { name: 'Dragon Dancer', tags: ['Sweeper'] }),
       b('b3', 143, { tags: ['Wall'], generation: 2, level: 100 }),
+      b('b4', 25, { generation: 1, gender: null }),
+      b('b5', 150, { generation: 1, gender: null }),
     ],
     teams: [{ id: 't1', seq: 1, generation: 4, memberIds: ['b1', 'b2', null, null, null, null], notes: '' }],
     nextBuildSeq: 4,
@@ -242,7 +268,7 @@ try {
   await page.click('[data-testid="tb-import-check"]')
   await page.waitForSelector('[data-testid="tb-import-report"]')
   const before = await store()
-  check('checking writes nothing', before.builds.length === 3 && before.teams.length === 1)
+  check('checking writes nothing', before.builds.length === 5 && before.teams.length === 1)
   const report = await page.textContent('[data-testid="tb-import-report"]')
   check('the report names each drop', /Rough Skin dropped/.test(report) && /Not imported/.test(report), report)
   check('the button says how many will land', (await page.textContent('[data-testid="tb-import-confirm"]')).includes('1'))
@@ -250,10 +276,10 @@ try {
   await page.click('[data-testid="tb-import-confirm"]')
   await page.waitForSelector('[data-testid="tb-team-viewer"], .tb-team-viewer')
   const after = await store()
-  check('import makes one new Build and one new team', after.builds.length === 4 && after.teams.length === 2, `${after.builds.length}/${after.teams.length}`)
-  check('in the app generation', after.teams[1].generation === 4 && after.builds[3].generation === 4)
-  check('and existing records are untouched', JSON.stringify(after.builds.slice(0, 3)) === JSON.stringify(doc.builds) && JSON.stringify(after.teams[0]) === JSON.stringify(doc.teams[0]))
-  check('the new team holds it', after.teams[1].memberIds[0] === after.builds[3].id)
+  check('import makes one new Build and one new team', after.builds.length === 6 && after.teams.length === 2, `${after.builds.length}/${after.teams.length}`)
+  check('in the app generation', after.teams[1].generation === 4 && after.builds[5].generation === 4)
+  check('and existing records are untouched', JSON.stringify(after.builds.slice(0, 5)) === JSON.stringify(doc.builds) && JSON.stringify(after.teams[0]) === JSON.stringify(doc.teams[0]))
+  check('the new team holds it', after.teams[1].memberIds[0] === after.builds[5].id)
 
   await page.evaluate(() => document.querySelector('[data-testid="tb-viewer-info"]')?.click())
   await page.waitForSelector('[data-testid="tb-viewer-export"]')
@@ -352,6 +378,18 @@ try {
   await page.click('[data-testid="tb-compare-back"]')
   await page.waitForSelector('[data-testid="tb-build-library"]')
   check('back returns to the library', true)
+
+  await page.click('[data-testid="tb-builds-select"]')
+  await tick('b4')
+  await tick('b5')
+  await page.waitForFunction(() => !document.querySelector('[data-testid="tb-builds-compare"]')?.disabled)
+  await page.click('[data-testid="tb-builds-compare"]')
+  await page.waitForSelector('[data-testid="tb-compare"]')
+  const rowLabels = await page.$$eval('[data-testid^="tb-compare-row-"]', (els) => els.map((e) => e.dataset.testid.replace('tb-compare-row-', '')))
+  check('two Gen 1 Builds show one Special and no split rows', rowLabels.includes('Special') && !rowLabels.includes('Sp. Atk') && !rowLabels.includes('Sp. Def'), rowLabels.join())
+  check('and no row Gen 1 lacks', !rowLabels.some((l) => ['Gender', 'Ability', 'Nature', 'Item'].includes(l)), rowLabels.join())
+  await page.click('[data-testid="tb-compare-back"]')
+  await page.waitForSelector('[data-testid="tb-build-library"]')
 
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 } finally {

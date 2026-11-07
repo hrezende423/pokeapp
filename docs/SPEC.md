@@ -1,6 +1,6 @@
 # Build phase spec: Team transfer, gender fixes, Collection v2
 
-Written 2026-11-06 from the owner's autonomous brief. Choices the brief left open are logged as "Decision: X because Y" in `docs/status/PROGRESS.md`. Work items and their pass state: `docs/features.json`.
+Written 2026-11-06 from the owner's autonomous brief. Work items and their pass state: `docs/features.json`. The latest task's result, including the choices it made, is in `docs/status/results.md`, which each task overwrites.
 
 ## Goal
 
@@ -67,7 +67,8 @@ Other parsing:
 
 - Species and forms match on a normalised id, so `Nidoran-F`, `Mr. Mime`, `Farfetch'd`, `Deoxys-Attack`, `Rotom-Wash` resolve.
 - A species outside the generation rejects that Pokémon, with a line in the report.
-- A move the species cannot learn in that generation leaves the slot empty, with a note. `Hidden Power [Ice]` and `Hidden Power Ice` both resolve to Hidden Power.
+- A move the species cannot learn in that generation is left out, with a note, and the moves after it close up: that is `clearMoveSlot`'s rule everywhere in the module. `Hidden Power [Ice]` and `Hidden Power Ice` both resolve to Hidden Power; a named type the IVs do not give is noted.
+- A form the bundle has no variety for, or the generation lacks, reads as the species, with a note. Items match by display name or slug, so `Stick` finds Leek.
 - Missing `Level` is 100 and missing `Happiness` is 255, as in Showdown.
 - An EV above 252 is clamped with a note. A total over 510 is kept and noted; the Build Form already shows it as over.
 - `=== [gen4ou] Name ===` headers are read as the team name. Only the first team is imported; a Pokémon past the sixth, or a further team, is noted.

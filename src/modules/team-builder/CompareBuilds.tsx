@@ -35,6 +35,33 @@ const STATS = [
   { key: 'speed', label: 'Speed' },
 ] as const
 
+const isGen1 = (row: BuildRow) => row.build.generation === 1
+const SPLIT: readonly string[] = ['special-attack', 'special-defense']
+
+/*
+  GEN 1 HAS ONE SPECIAL, and a BuildRow fills both halves with it. So a Gen 1 Build
+  shows a Special row and dashes in the split rows, and two Gen 1 Builds have no
+  split rows at all.
+*/
+function statRows(a: BuildRow, b: BuildRow): Row[] {
+  const rows: Row[] = []
+  for (const { key, label } of STATS) {
+    const split = SPLIT.includes(key)
+    if (key === 'special-attack' && (isGen1(a) || isGen1(b))) {
+      rows.push({
+        label: 'Special',
+        values: [isGen1(a) ? a.stats[key] : null, isGen1(b) ? b.stats[key] : null],
+      })
+    }
+    if (split && isGen1(a) && isGen1(b)) continue
+    rows.push({
+      label,
+      values: [split && isGen1(a) ? null : a.stats[key], split && isGen1(b) ? null : b.stats[key]],
+    })
+  }
+  return rows
+}
+
 const fieldsFor = (b: Build) => ({
   gender: b.generation >= 2 ? genderGlyph(b.gender) : null,
   ability: b.generation >= 3 && b.abilityId != null ? abilityName(b.abilityId) : null,
@@ -67,7 +94,7 @@ function rowsFor(a: BuildRow, b: BuildRow): Row[] {
   movesA.forEach((move, i) =>
     rows.push({ label: `Move ${i + 1}`, values: [move?.name ?? null, movesB[i]?.name ?? null] }),
   )
-  for (const { key, label } of STATS) rows.push({ label, values: [a.stats[key], b.stats[key]] })
+  rows.push(...statRows(a, b))
   rows.push({ label: 'Base stat total', values: [a.bst, b.bst] })
   return rows
 }
