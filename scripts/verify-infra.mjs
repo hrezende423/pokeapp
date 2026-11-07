@@ -207,6 +207,23 @@ hr('8. OFFLINE')
   check('the Gen 5+ learnsets are warmed after boot', /scheduleWarmup\(\)/.test(read('src/App.tsx')))
 }
 
+hr('9. PERSISTENCE AND SYNC')
+{
+  const sql = tracked.filter((p) => /^supabase\/migrations\/.+\.sql$/.test(p))
+  check('the user_documents migration is a tracked FILE', sql.length === 1, sql.join(', '))
+  const text = sql[0] ? read(sql[0]) : ''
+  check('it says it is NOT applied and awaits the owner', /NOT APPLIED/.test(text))
+  check('RLS is enabled on the table', /alter table public\.user_documents enable row level security/i.test(text))
+  for (const op of ['select', 'insert', 'update', 'delete']) {
+    const policy = text.split(/create policy/i).find((block) => new RegExp(`for ${op} `, 'i').test(block)) ?? ''
+    check(`an own-row ${op} policy (auth.uid() = user_id)`, /auth\.uid\(\)\)? = user_id/.test(policy))
+  }
+  const { suitesFor } = await import('./lib/suiteMap.mjs')
+  check('src/store/ changes run verify:store and the Team Builder suites', ['store', 'team-builder', 'collection'].every((s) => suitesFor(['src/store/documentStore.ts']).has(s)))
+  check('verify:store is browser-free in the gate', /'store'/.test(/const BROWSERLESS = new Set\(\[[^\]]*\]/.exec(read('scripts/check.mjs'))?.[0] ?? ''))
+  check('the Team Builder keeps its key', /'pokeapp:team-builder:v1'/.test(read('src/modules/team-builder/store.ts')))
+}
+
 hr('SUMMARY')
 if (failures.length) {
   console.log(`${failures.length} FAILED:\n  - ${failures.join('\n  - ')}`)

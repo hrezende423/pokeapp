@@ -180,8 +180,7 @@ Deliberately left alone (the cheap fix is usually wrong); detail beside each mod
 
 ## Module rules live beside the module
 
-A nested CLAUDE.md loads on the first read of a file under its directory.
-**Read the matching file before changing anything in that area.**
+A nested CLAUDE.md loads on the first read of a file under its directory. **Read it first.**
 
 | Area | File |
 |---|---|
@@ -195,6 +194,7 @@ A nested CLAUDE.md loads on the first read of a file under its directory.
 | Dex search / filter / sort | `src/modules/dex/CLAUDE.md` |
 | The scroll model (`ScrollArea`) | `src/components/CLAUDE.md` |
 | The back stack (`navHistory`, `navGuard`) | `src/modules/nav/CLAUDE.md` |
+| Saved documents (versioned store, migrations, export/import) and their sync | `src/store/CLAUDE.md` |
 | Trainer Dex and its bundle | `scripts/trainers/CLAUDE.md` |
 | Tokens build, contrast check, CHANGELOG | `design-system/CLAUDE.md` |
 | Bulbapedia supplement, verification plumbing, worktrees, CI | `scripts/CLAUDE.md` |

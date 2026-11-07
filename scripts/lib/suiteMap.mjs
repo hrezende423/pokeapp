@@ -9,7 +9,10 @@ export const SUITES_BY_PATH = [
   ['src/modules/team-builder/statMath', ['damage-calc']],
   ['src/modules/team-builder/', ['team-builder', 'team-transfer', 'legal-moveset', 'collection']],
   ['src/modules/collection/', ['collection', 'tools']],
-  ['src/sync/', ['team-builder', 'collection']],
+  ['src/sync/', ['team-builder', 'collection', 'store']],
+  // The generic document store, and the Team Builder document that now lives on it.
+  ['src/store/', ['store', 'team-builder', 'collection', 'tools', 'team-transfer']],
+  ['supabase/', ['infra']],
   // The damage engine is shared with Team Matchup's battles.
   ['src/modules/calculators/damage/', ['team-matchup']],
   ['src/modules/calculators/', ['damage-calc', 'tools', 'collection']],
