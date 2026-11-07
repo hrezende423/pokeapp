@@ -6,10 +6,10 @@
   {"id": "A5", "slice": "A", "category": "functional", "description": "Build-vs-Build comparison from the library's selection mode", "steps": ["Select two Builds", "Compare", "See differing rows marked"], "passes": true},
   {"id": "B1", "slice": "B", "category": "functional", "description": "Gen 1 has no gender anywhere", "steps": ["Open a Gen 1 Build", "See no field, glyph or export gender"], "passes": true},
   {"id": "B2", "slice": "B", "category": "functional", "description": "Gen 2 gender derives from the Attack DV", "steps": ["Step the Attack DV across the threshold", "See the gender change"], "passes": true},
-  {"id": "C1", "slice": "C", "category": "functional", "description": "Schema v2 with a lossless, idempotent migration from v1, sync-compatible", "steps": ["Load a v1 document", "Normalise twice", "Merge v1 with v2"], "passes": false},
-  {"id": "C2", "slice": "C", "category": "functional", "description": "Entry form shows exactly each generation's fields", "steps": ["Open the form in Gen 1, 2, 3 and 4", "Compare to the field table"], "passes": false},
-  {"id": "C3", "slice": "C", "category": "functional", "description": "Collection search and filters", "steps": ["Search", "Filter by method, Pokerus, shiny and Fits"], "passes": false},
-  {"id": "C4", "slice": "C", "category": "functional", "description": "Fits and Exact candidate flags", "steps": ["Link builds of match, mismatch and empty fields", "Read the flags"], "passes": false},
-  {"id": "C5", "slice": "C", "category": "functional", "description": "Collection entries feed the Damage calculator", "steps": ["Pick an entry on a side", "See its stats, moves, item and ability"], "passes": false},
-  {"id": "C6", "slice": "C", "category": "functional", "description": "Collection entries feed Team Matchup", "steps": ["Choose Source Collection", "Pick entries", "Run a matchup"], "passes": false}
+  {"id": "C1", "slice": "C", "category": "functional", "description": "Schema v2 with a lossless, idempotent migration from v1, sync-compatible", "steps": ["Load a v1 document", "Normalise twice", "Merge v1 with v2"], "passes": true},
+  {"id": "C2", "slice": "C", "category": "functional", "description": "Entry form shows exactly each generation's fields", "steps": ["Open the form in Gen 1, 2, 3 and 4", "Compare to the field table"], "passes": true},
+  {"id": "C3", "slice": "C", "category": "functional", "description": "Collection search and filters", "steps": ["Search", "Filter by method, Pokerus, shiny and Fits"], "passes": true},
+  {"id": "C4", "slice": "C", "category": "functional", "description": "Fits and Exact candidate flags", "steps": ["Link builds of match, mismatch and empty fields", "Read the flags"], "passes": true},
+  {"id": "C5", "slice": "C", "category": "functional", "description": "Collection entries feed the Damage calculator", "steps": ["Pick an entry on a side", "See its stats, moves, item and ability"], "passes": true},
+  {"id": "C6", "slice": "C", "category": "functional", "description": "Collection entries feed Team Matchup", "steps": ["Choose Source Collection", "Pick entries", "Run a matchup"], "passes": true}
 ]
