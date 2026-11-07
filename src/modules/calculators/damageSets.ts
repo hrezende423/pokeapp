@@ -34,7 +34,7 @@ import {
 import type { SearchOption } from '../../components/ds/SearchSelect'
 import { orderedBuilds, listedTeams, uiId, type Build, type TeamBuilderData } from '../team-builder/model'
 import type { StatNumbers } from '../team-builder/statMath'
-import { MAX_IV } from '../team-builder/statMath'
+import { MAX_IV, specialStatExp } from '../team-builder/statMath'
 import { speciesEntries } from '../dex/entrySources'
 import {
   MOVE_SLOT_COUNT,
@@ -216,7 +216,13 @@ function applyBuild(
     abilityId:
       gen >= 3 && abilities.some((a) => a.ability.id === b.abilityId) ? b.abilityId : next.abilityId,
     gender: gen >= 4 ? (b.gender === 'male' ? 'M' : b.gender === 'female' ? 'F' : 'N') : 'N',
-    effort: { ...zeroEffort(gen), ...b.effort },
+    // A Gen 2 Build keeps its Special Stat Exp under the split keys; the
+    // calculator reads `special` (statMath.specialStatExp).
+    effort: {
+      ...zeroEffort(gen),
+      ...b.effort,
+      ...(gen <= 2 ? { special: specialStatExp(b.effort, gen) } : {}),
+    },
     individual: { ...b.individual },
   }
 }

@@ -21,6 +21,7 @@ import type {
 } from '../../data/trainers'
 import { trainerLabel } from '../../data/trainers'
 import type { Build } from '../team-builder/model'
+import { specialStatExp } from '../team-builder/statMath'
 import { exactSpread, spreadKeys, type BattlerSpec, type SpreadSpec } from './battler'
 import type { TrainerInfo } from './session'
 import type { GameContext } from './game'
@@ -66,7 +67,14 @@ export function buildToSpec(b: Build, ctx: GameContext, slot: number): BattlerSp
     level: b.level,
     spreadMode: 'current',
     scenarioId: null,
-    spread: exactSpread(gen, b.individual, b.effort, gen >= 3 ? b.natureId : null),
+    // A Gen 2 Build keeps its Special Stat Exp under the split keys; the spread
+    // reads `special` (statMath.specialStatExp).
+    spread: exactSpread(
+      gen,
+      b.individual,
+      gen <= 2 ? { ...b.effort, special: specialStatExp(b.effort, gen) } : b.effort,
+      gen >= 3 ? b.natureId : null,
+    ),
     moves: pad4(b.moveIds),
     itemId: gen >= 2 ? b.itemId : null,
     abilityId: gen >= 3 ? b.abilityId : null,

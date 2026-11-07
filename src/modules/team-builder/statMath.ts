@@ -74,9 +74,34 @@ export function hpDvFrom(individual: StatNumbers): number {
   )
 }
 
-/** The DV for one stat, with HP resolved through the parity rule. */
+/**
+ * The DV for one stat, with HP resolved through the parity rule.
+ *
+ * GEN 2 SPLIT THE SPECIAL STAT, NOT ITS DV: Sp. Atk and Sp. Def both read the one
+ * `special` DV, which is the only key a Gen 2 Build stores (`spreadStatKeys`).
+ * Reading `individual['special-attack']` there gave 0 and understated both stats.
+ * The split key is the fallback for callers that pass one value per row.
+ */
 export function dvFor(individual: StatNumbers, key: StatKey): number {
-  return key === 'hp' ? hpDvFrom(individual) : at(individual, key)
+  if (key === 'hp') return hpDvFrom(individual)
+  if (key === 'special-attack' || key === 'special-defense') {
+    return individual.special ?? at(individual, key)
+  }
+  return at(individual, key)
+}
+
+/**
+ * A Gen 1-2 Build's Special Stat Exp, from the key the Build Form stored it in.
+ *
+ * Gen 1's form edits `special`; Gen 2's shows six stat rows, so it stores the
+ * value under `special-attack` (and `special-defense`). The battle code and the
+ * damage calculator read the unsplit `special`, so they go through this. Sp. Atk
+ * wins in Gen 2, as in the Showdown export; `special` is the fallback for a Build
+ * that never had the split keys (a Gen 1 Build moved to Gen 2).
+ */
+export function specialStatExp(effort: StatNumbers, generation: number): number {
+  if (generation <= 1) return at(effort, 'special')
+  return effort['special-attack'] ?? effort.special ?? 0
 }
 
 /**

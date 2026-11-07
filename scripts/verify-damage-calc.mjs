@@ -347,6 +347,55 @@ try {
   check('Low Kick is 50 in Gen 1-2, weight-based (null) from Gen 3', JSON.stringify(facts.lowKick) === '[50,50,null]', JSON.stringify(facts.lowKick))
   check('Tackle is 35 in Gen 4', facts.tackle === 35, String(facts.tackle))
 
+  // ------------------------------------------------------------------ 4b
+  /*
+    A GEN 2 BUILD STORES ITS SPECIAL IN MIXED KEYS: the DV under `special`
+    (spreadStatKeys) and the Stat Exp under `special-attack`/`special-defense`
+    (the Build Form's six rows). Every reader has to find both. Snorlax, Gen 2,
+    L100, base Sp. Atk 65 / Sp. Def 110, Special DV 15, Stat Exp 65535 (bonus 63):
+      Sp. Atk = ((65 + 15) * 2 + 63) * 100 / 100 + 5 = 223 + 5 = 228
+      Sp. Def = ((110 + 15) * 2 + 63) * 100 / 100 + 5 = 313 + 5 = 318
+    Reading the DV from `special-attack` gave 0: (130 + 63) + 5 = 198.
+  */
+  hr('4b. GEN 2 SPECIAL: THE KEYS A BUILD ACTUALLY STORES')
+  const gen2 = await page.evaluate(async () => {
+    const stat = await import('/pokeapp/src/modules/team-builder/statMath.ts')
+    const facts = await import('/pokeapp/src/modules/team-builder/buildFacts.ts')
+    const sets = await import('/pokeapp/src/modules/calculators/damageSets.ts')
+    const st = await import('/pokeapp/src/modules/calculators/damageCalcState.ts')
+    const eng = await import('/pokeapp/src/modules/calculators/damage/index.ts')
+    const sources = await import('/pokeapp/src/modules/battle/sources.ts')
+    const game = await import('/pokeapp/src/modules/battle/game.ts')
+    const neutral = { increased: null, decreased: null }
+    const dvs = { attack: 15, defense: 15, speed: 15, special: 15 }
+    const exp = { 'special-attack': 65535, 'special-defense': 65535 }
+    const build = {
+      ...facts.newBuildInit(2, 143),
+      id: 'b-gen2-special',
+      level: 100,
+      individual: dvs,
+      effort: exp,
+    }
+    const data = { builds: [build], teams: [], nextBuildSeq: 2, nextTeamSeq: 1, collection: [], nextEntrySeq: 1 }
+    const set = sets.setCatalog([], [], data, 2).byKey.get('b:b-gen2-special')
+    const side = set ? set.apply(st.newSide(143, 2), 2) : null
+    const raw = side ? eng.computeRawStats(st.toCalcPokemon(side), 2) : null
+    const spec = sources.buildToSpec(build, game.gameContext('crystal'), 0)
+    return {
+      spa: stat.computeStat({ generation: 2, level: 100, base: 65, key: 'special-attack', effort: exp, individual: dvs, nature: neutral }),
+      spd: stat.computeStat({ generation: 2, level: 100, base: 110, key: 'special-defense', effort: exp, individual: dvs, nature: neutral }),
+      calcSpecialEffort: side ? side.effort.special : null,
+      calcSpa: raw ? raw.spa : null,
+      calcSpd: raw ? raw.spd : null,
+      battleSpecialEffort: spec.spread.effort.special ?? null,
+    }
+  })
+  check('[G2] Build Sp. Atk reads the `special` DV: 228, not 198', gen2.spa === 228, String(gen2.spa))
+  check('[G2] Build Sp. Def reads the `special` DV: 318', gen2.spd === 318, String(gen2.spd))
+  check('[G2] a Build loaded into the calculator keeps its Special Stat Exp (65535)', gen2.calcSpecialEffort === 65535, String(gen2.calcSpecialEffort))
+  check('[G2] ...and the calculator computes Sp. Atk 228 / Sp. Def 318 from it', gen2.calcSpa === 228 && gen2.calcSpd === 318, `${gen2.calcSpa} / ${gen2.calcSpd}`)
+  check('[G2] Team Matchup buildToSpec keeps the Special Stat Exp (65535)', gen2.battleSpecialEffort?.min === 65535 && gen2.battleSpecialEffort?.max === 65535, JSON.stringify(gen2.battleSpecialEffort))
+
   // ------------------------------------------------------------------ 5
   hr('5. THE SCREEN')
   await selectGeneration(page, 1).catch(() => {})
