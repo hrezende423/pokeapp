@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ribbon",
+  "description": "One ribbon. Per generation (from `introduced` on): its name and how it is earned. `allGenerations: true` with `all` means the same facts in every generation it exists in.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "introduced"],
+  "properties": {
+    "id": { "$ref": "#/definitions/id" },
+    "example": { "type": "boolean" },
+    "introduced": { "type": "integer", "minimum": 1, "maximum": 9 },
+    "allGenerations": { "const": true },
+    "all": { "$ref": "#/definitions/facts" },
+    "generations": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[1-9]$" },
+      "additionalProperties": { "$ref": "#/definitions/facts" }
+    }
+  },
+  "if": { "required": ["allGenerations"] },
+  "then": { "required": ["all"], "not": { "required": ["generations"] } },
+  "else": { "required": ["generations"], "not": { "required": ["all"] } },
+  "definitions": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "how"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "how": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

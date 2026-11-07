@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Glossary term",
+  "description": "One term and its definition. `generations` lists the generations it applies to, with a `note` where the meaning differs there; `allGenerations: true` means it applies, unchanged, in every generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "term", "definition"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "example": { "type": "boolean" },
+    "term": { "type": "string", "minLength": 1 },
+    "definition": { "type": "string", "minLength": 1 },
+    "allGenerations": { "const": true },
+    "generations": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[1-9]$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "note": { "type": "string", "minLength": 1 } }
+      }
+    }
+  },
+  "if": { "required": ["allGenerations"] },
+  "then": { "not": { "required": ["generations"] } },
+  "else": { "required": ["generations"] }
+}

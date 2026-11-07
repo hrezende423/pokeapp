@@ -1,0 +1,12 @@
+[
+  {
+    "id": "example-milestone",
+    "example": true,
+    "generations": {
+      "4": {
+        "diamond-pearl": { "order": 1, "title": "PLACEHOLDER milestone" },
+        "platinum": { "order": 1, "title": "PLACEHOLDER milestone" }
+      }
+    }
+  }
+]

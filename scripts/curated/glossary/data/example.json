@@ -1,0 +1,19 @@
+[
+  {
+    "id": "example-term",
+    "example": true,
+    "term": "Example term",
+    "definition": "PLACEHOLDER: not real data.",
+    "allGenerations": true
+  },
+  {
+    "id": "example-term-per-generation",
+    "example": true,
+    "term": "Example per-generation term",
+    "definition": "PLACEHOLDER: not real data.",
+    "generations": {
+      "1": { "note": "PLACEHOLDER: where the meaning differs in this generation." },
+      "2": {}
+    }
+  }
+]
