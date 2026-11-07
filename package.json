@@ -45,7 +45,8 @@
     "report:type-scale": "node scripts/report-type-scale.mjs",
     "check": "node scripts/check.mjs",
     "verify:infra": "node scripts/verify-infra.mjs",
-    "worktree": "node scripts/worktree.mjs"
+    "worktree": "node scripts/worktree.mjs",
+    "preflight": "node scripts/preflight.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
@@ -71,5 +72,8 @@
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.0",
     "vite-plugin-pwa": "^1.3.0"
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

@@ -20,6 +20,7 @@
  */
 import { execSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { browserPreflight, CHROME_HELP } from './lib/browser.mjs';
 
 /** Path prefix -> suites that exercise it. First match does NOT stop the scan. */
 const SUITES_BY_PATH = [
@@ -59,6 +60,10 @@ const SUITES_BY_PATH = [
   ['scripts/', ['infra']],
   ['vite.config.ts', ['infra']],
   ['package.json', ['infra']],
+  // A dependency change reaches every screen: at least boot the app and the PWA.
+  ['package-lock.json', ['infra', 'app']],
+  ['.nvmrc', ['infra']],
+  ['init.sh', ['infra']],
   ['.gitignore', ['infra']],
   ['.github/', ['infra']],
 ];
@@ -186,31 +191,16 @@ if (all) results.push(['lint', run('lint (all)', 'npx', ['eslint', '.'])]);
 else if (lintable.length)
   results.push(['lint', run(`lint (${lintable.length} changed files)`, 'npx', ['eslint', ...lintable.map((p) => `"${p}"`)])]);
 
-/**
- * Every browser suite launches SYSTEM Chrome (channel 'chrome'), so a Playwright
- * bundled-browser mismatch can never block the gate again (it blocked seven suites
- * on 2026-11-06). Checked once, before the build, with a message that says what to do.
- */
-async function browserPreflight() {
-  const { chromium } = await import('playwright');
-  try {
-    const browser = await chromium.launch({ channel: 'chrome' });
-    await browser.close();
-    return null;
-  } catch (e) {
-    return String(e?.message ?? e).split('\n')[0];
-  }
-}
-
+/*
+  Every browser suite launches SYSTEM Chrome (lib/browser.mjs), checked once here,
+  before the build, with a message that says what to do.
+*/
 const BROWSERLESS = new Set(['infra', 'curated', 'store']);
 if ([...suites].some((s) => !BROWSERLESS.has(s))) {
   const problem = await browserPreflight();
   if (problem) {
     console.error(
-      `\n== browser pre-flight: FAIL\n` +
-        `The verify suites drive the system Google Chrome (Playwright channel 'chrome'), and it did not start:\n  ${problem}\n` +
-        `Install Google Chrome from https://www.google.com/chrome/ (or repair it), then rerun.\n` +
-        `Nothing else needs installing: the suites never use Playwright's bundled browser.\n`,
+      `\n== browser pre-flight: FAIL\nChrome did not start:\n  ${problem}\n${CHROME_HELP}\n`,
     );
     process.exit(1);
   }
