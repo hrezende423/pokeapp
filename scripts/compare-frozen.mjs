@@ -33,6 +33,20 @@ async function capture(dir) {
       const page = await context.newPage()
       await page.goto(dev.url, { waitUntil: 'domcontentloaded' })
       await page.waitForSelector('[data-testid="boot-status"]', { timeout: 180000 })
+      // A cold dev server can reload once while it optimises dependencies: wait until
+      // the data layer answers before reading it.
+      await page.waitForFunction(
+        async () => {
+          try {
+            const data = await import('/pokeapp/src/data/index.ts')
+            return data.listMoves().length > 0
+          } catch {
+            return false
+          }
+        },
+        null,
+        { timeout: 180000, polling: 1000 },
+      )
       const ids = await page.evaluate(async () => {
         const data = await import('/pokeapp/src/data/index.ts')
         const move = Object.fromEntries(data.listMoves().map((m) => [m.name, m.id]))
@@ -75,7 +89,13 @@ async function capture(dir) {
       const shot = async (name, selector) => {
         const el = await page.waitForSelector(selector)
         await page.evaluate(() => document.fonts.ready)
-        await page.waitForTimeout(1500) // artwork and animated sprites settle
+        /* IMAGES ARE HIDDEN, in both captures. A control (the same code captured
+           twice) differed by up to 65,892 pixels on the Team Display: animated
+           sprites change frame. visibility: hidden keeps every image's box, so the
+           layout is still compared exactly; only the bitmaps are left out, and no
+           token or CSS change can alter a sprite's pixels anyway. */
+        await page.addStyleTag({ content: `${selector} img, ${selector} picture, ${selector} canvas, ${selector} video { visibility: hidden !important; }` })
+        await page.waitForTimeout(1500)
         await el.screenshot({ path: join(dir, `${name}-${theme}.png`), animations: 'disabled' })
       }
       await nav('my-teams')
