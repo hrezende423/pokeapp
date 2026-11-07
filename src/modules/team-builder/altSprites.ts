@@ -1,5 +1,6 @@
 /**
- * Alternate animated sprites, on trial in the Team Display only (2026-10-23).
+ * Alternate animated sprites, on the Team Display only (trial 2026-10-23, kept by
+ * the owner 2026-11-06).
  *
  * The stored animated artwork (`resolveArtworkUrl`, motion 'animated') is NOT
  * replaced: a species listed here wins over it, a species missing from here

@@ -49,6 +49,15 @@ imperfections are already logged there deliberately.
   `--tb-slot-line: 12px`. The facts block went 115px → 91px and all 24 of those
   pixels went to the sprite.
 
+- **Six species draw alternate animated sprites on the Team Display** (owner, kept
+  2026-11-06 after the 2026-10-23 trial): Charizard, Blastoise, Alakazam, Gengar,
+  Salamence, Garchomp, from `altSprites.ts` via `ui/MemberCard.tsx`. The stored
+  animated set stays the fallback and every other surface keeps it; a shiny build
+  keeps it too, because these files are the regular colouring. Each WebP is cropped
+  to the union of its frames (+2px), and Blastoise and Gengar carry extra margin
+  (x0.82, x0.83) to match Garchomp's fill. Uncropped copies are in
+  `assets/alt-sprites/original/`. `ALT_SPRITES_ENABLED = false` restores the old set.
+
 - **A coverage panel is placed in the app frame, not in the card.**
   `Popover` (`ui/Overlay.tsx`) portals to `document.body` and is
   `position: fixed`, placed from a measurement of the wrapper it is written

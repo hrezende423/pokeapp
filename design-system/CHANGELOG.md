@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.16 — 2026-11-06 (non-breaking)
+- Team Display: alternate animated sprites for Charizard, Blastoise, Alakazam, Gengar, Salamence and Garchomp (`team-builder/altSprites.ts`), kept by the owner after the 2026-10-23 trial. Non-shiny only; every other surface keeps the stored animated set. Card layout and sizing unchanged
 ## 2.1.14 — 2026-10-12 (non-breaking)
 - Trainer Dex party cards: 20px between cards (`--space-gap-lg`, was 14px)
 ## 2.1.13 — 2026-10-12 (non-breaking)
