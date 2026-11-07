@@ -11,6 +11,8 @@
 import { useSyncExternalStore } from 'react'
 import { emptyMatchField } from '../battle/damage'
 import { DEFAULT_FORMAT } from '../battle/format'
+import { readData } from '../team-builder/store'
+import { generationOfGame } from '../version-group/games'
 import {
   EMPTY_DOC,
   EMPTY_LINKS,
@@ -98,12 +100,18 @@ export function updateSetup(vg: string, fn: (s: MatchupSetup) => MatchupSetup) {
 
 /**
  * The Collection entry a scenario links to: the LEAD's, when my team comes from
- * the Collection; null otherwise. `lead` indexes the resolved team, which is the
- * picked ids in order (the picker offers only the game's generation).
+ * the Collection; null otherwise. `lead` indexes the RESOLVED team, which drops
+ * a picked entry that no longer exists or is of another generation, so the ids
+ * are filtered the way `resolve` filters them before indexing.
  */
-function leadEntryId(setup: MatchupSetup): string | null {
+function leadEntryId(vg: string, setup: MatchupSetup): string | null {
   if (setup.mySource !== 'collection') return null
-  const ids = setup.collectionIds ?? []
+  const gen = generationOfGame(vg)
+  const collection = readData().collection ?? []
+  const ids = (setup.collectionIds ?? []).slice(0, 6).filter((id) => {
+    const e = collection.find((x) => x.id === id)
+    return e != null && e.generation === gen
+  })
   return ids[setup.lead] ?? ids[0] ?? null
 }
 
@@ -125,7 +133,7 @@ export function saveScenario(
     updatedAt: now,
     setup: { ...setup, scenarioId: id },
     notes: prev?.notes ?? '',
-    links: { ...(prev?.links ?? EMPTY_LINKS), collectionId: leadEntryId(setup) },
+    links: { ...(prev?.links ?? EMPTY_LINKS), collectionId: leadEntryId(vg, setup) },
   }
   const scenarios = prev
     ? doc.scenarios.map((s) => (s.id === id ? scenario : s))

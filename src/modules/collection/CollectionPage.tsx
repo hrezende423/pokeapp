@@ -233,6 +233,9 @@ function CollectionBody({ generation }: { generation: number }) {
   }
   const save = () => {
     if (!check.ok || draft.speciesId == null) return
+    /* Editing spreads the stored nested objects first, so a field this form does
+       not know (written by a newer client) survives the save. */
+    const prev = editing ? (data.collection ?? []).find((c) => c.id === editing) : undefined
     const record = {
       generation,
       speciesId: draft.speciesId,
@@ -250,12 +253,22 @@ function CollectionBody({ generation }: { generation: number }) {
       individual: check.individual,
       moveIds,
       met: {
+        ...prev?.met,
         location: (draft.metLocation ?? '').trim(),
         level: check.metLevel,
         date: draft.metDate || null,
       },
-      ot: { name: (draft.otName ?? '').trim(), id: check.otId, language: draft.otLanguage ?? null },
-      acquired: { date: draft.acquiredDate || null, method: draft.acquiredMethod ?? null },
+      ot: {
+        ...prev?.ot,
+        name: (draft.otName ?? '').trim(),
+        id: check.otId,
+        language: draft.otLanguage ?? null,
+      },
+      acquired: {
+        ...prev?.acquired,
+        date: draft.acquiredDate || null,
+        method: draft.acquiredMethod ?? null,
+      },
       pokerus: draft.pokerus ?? 'none',
     }
     if (editing) updateEntry(editing, record)
@@ -268,9 +281,12 @@ function CollectionBody({ generation }: { generation: number }) {
   }
 
   /* Gen 2's derived values, from the DVs as typed: the entry as a Build, read
-     through the same functions a Build's card uses. */
+     through the same functions a Build's card uses. An Attack DV not typed is
+     UNKNOWN, so a species with both genders reads "—" rather than a guess. */
+  const genders = draftSpecies ? genderOptionsFor(draftSpecies) : null
+  const attackDvKnown = check.ok && check.individual.attack != null
   const derivedGender =
-    draftSpecies && generation === 2
+    draftSpecies && generation === 2 && (attackDvKnown || (genders?.length ?? 0) < 2)
       ? buildGender(
           entryToBuild({
             ...emptyEntryFor(generation, draft.speciesId ?? 1),
@@ -279,7 +295,6 @@ function CollectionBody({ generation }: { generation: number }) {
           draftSpecies,
         )
       : null
-  const genders = draftSpecies ? genderOptionsFor(draftSpecies) : null
   const genderOptions =
     genders == null
       ? [{ value: '', label: 'Genderless' }]
@@ -352,7 +367,11 @@ function CollectionBody({ generation }: { generation: number }) {
                       options={[
                         {
                           value: 'derived',
-                          label: derivedGender ? GENDER_LABEL[derivedGender] : 'Genderless',
+                          label: derivedGender
+                            ? GENDER_LABEL[derivedGender]
+                            : genders == null
+                              ? 'Genderless'
+                              : '—',
                         },
                       ]}
                       value="derived"

@@ -181,6 +181,18 @@ try {
 
   // ------------------------------------------------------------------ 2
   hr('2. EACH GENERATION SHOWS EXACTLY ITS ROW OF THE FIELD TABLE')
+  /* docs/SPEC.md slice C "Per-generation fields", written out as literals so a
+     wrong table in the code cannot agree with itself. */
+  const SPEC_FIELDS = (gen, game) => {
+    const all = ['species', 'nickname', 'level', 'game', 'moves', 'individual', 'effort', 'otName', 'otId', 'acquiredDate', 'acquiredMethod', 'build']
+    const rows = {
+      1: [],
+      2: ['gender', 'shiny', 'item', 'pokerus', ...(game === 'crystal' ? ['metLocation', 'metLevel'] : [])],
+      3: ['gender', 'shiny', 'nature', 'ability', 'item', 'metLocation', 'metLevel', 'otLanguage', 'pokerus'],
+      4: ['gender', 'shiny', 'nature', 'ability', 'item', 'metLocation', 'metLevel', 'metDate', 'otLanguage', 'pokerus'],
+    }
+    return [...all, ...rows[gen]].sort()
+  }
   await selectGeneration(page, 4)
   await goToPage(page, 'team-building', 'collection')
   await page.waitForSelector('[data-testid="col-species"]', { timeout: 60000 })
@@ -192,10 +204,12 @@ try {
     const got = await page.evaluate(async ([g, vg]) => {
       const schema = await import('/pokeapp/src/modules/collection/collectionSchema.ts')
       const shown = [...document.querySelectorAll('[data-layout="col-form"] [data-field]')].map((e) => e.dataset.field).sort()
-      const want = Object.keys(schema.collectionFields(g, vg)).sort()
-      return { shown, want, disabled: [...document.querySelectorAll('[data-layout="col-form"] [data-field] select:disabled')].map((e) => e.closest('[data-field]').dataset.field) }
+      const code = Object.keys(schema.collectionFields(g, vg)).sort()
+      return { shown, code, disabled: [...document.querySelectorAll('[data-layout="col-form"] [data-field] select:disabled')].map((e) => e.closest('[data-field]').dataset.field) }
     }, [gen, game])
-    check(`Gen ${gen} ${game}: the form's fields are the table's row`, JSON.stringify(got.shown) === JSON.stringify(got.want), `${got.shown.join(',')} vs ${got.want.join(',')}`)
+    const want = SPEC_FIELDS(gen, game)
+    check(`Gen ${gen} ${game}: the form's fields are the SPEC table's row`, JSON.stringify(got.shown) === JSON.stringify(want), `${got.shown.join(',')} vs ${want.join(',')}`)
+    check(`Gen ${gen} ${game}: collectionFields() agrees with the spec table`, JSON.stringify(got.code) === JSON.stringify(want), `${got.code.join(',')} vs ${want.join(',')}`)
     if (gen === 2) check(`Gen 2 ${game}: gender and shiny are derived, shown read-only`, JSON.stringify(got.disabled.sort()) === '["gender","shiny"]', got.disabled.join())
     else check(`Gen ${gen}: nothing is disabled (an era's missing field is absent)`, got.disabled.length === 0, got.disabled.join())
   }
@@ -294,6 +308,7 @@ try {
       v1Full: c.candidate(v1, build({ gender: null, abilityId: null, natureId: null, individual: six(0) })),
       g2same: c.candidate(g2(15), g2build(15)),
       g2gender: c.candidate(g2(0), g2build(15)),
+      g2unknown: c.candidate(schema.migrateEntry({ id: 'u', seq: 1, generation: 2, speciesId: ids.pikachu, nickname: '', level: 50, natureId: null, effort: {}, buildId: null }), g2build(15)),
       target: c.candidateText(c.bestCandidate({ ...entry, buildId: 'b-fits' }, [exactB, fitsB])),
       best: c.candidateText(c.bestCandidate(entry, [fitsB, exactB])),
       none: c.candidateText(c.bestCandidate(entry, [])),
@@ -307,9 +322,27 @@ try {
   check('and is Exact only when every IV is known and equal (unset reads 0)', t.emptyExact === 'exact', String(t.emptyExact))
   check('a migrated v1 entry is never Exact', t.v1Empty === 'fits' && t.v1Full === 'fits', `${t.v1Empty} ${t.v1Full}`)
   check('Gen 2: the same Attack DV fits; a DV that flips the gender does not', t.g2same === 'exact' && t.g2gender === null, `${t.g2same} ${t.g2gender}`)
+  check('Gen 2: an entry with no Attack DV is not read as DV 0, so it still fits', t.g2unknown === 'fits', String(t.g2unknown))
   check('the entry\'s own target Build is shown first when it fits', t.target === 'Fits: Fits one', t.target)
   check('otherwise Exact before Fits', t.best === 'Exact: Exact one', t.best)
   check('no Build reads "No build"', t.none === 'No build', t.none)
+
+  /* Editing an entry through the form keeps a nested field the form does not
+     know (written by a newer client). */
+  await selectGeneration(page, 4)
+  await page.evaluate(async () => {
+    const store = await import('/pokeapp/src/modules/team-builder/store.ts')
+    const e = store.readData().collection.find((x) => x.id === 'c1')
+    store.updateEntry('c1', { met: { ...e.met, region: 'Sinnoh' }, ot: { ...e.ot, future: 1 } })
+  })
+  await page.click('[data-testid="col-edit-c1"]')
+  await page.click('[data-testid="col-save"]')
+  const kept = await page.evaluate(async () => {
+    const store = await import('/pokeapp/src/modules/team-builder/store.ts')
+    const e = store.readData().collection.find((x) => x.id === 'c1')
+    return { region: e.met.region, future: e.ot.future }
+  })
+  check('saving an edit keeps unknown nested fields', kept.region === 'Sinnoh' && kept.future === 1, JSON.stringify(kept))
 
   // ------------------------------------------------------------------ 5
   hr('5. A COLLECTION ENTRY IN THE DAMAGE CALCULATOR')
@@ -401,6 +434,12 @@ try {
     return sc.links.collectionId
   })
   check('a saved scenario links the lead Collection entry', link === 'c1', String(link))
+  const shifted = await page.evaluate(async () => {
+    const ms = await import('/pokeapp/src/modules/team-matchup/store.ts')
+    const setup = ms.setupFor(ms.readDoc(), 'platinum')
+    return ms.saveScenario('platinum', 'Shifted', { ...setup, collectionIds: ['gone', 'c4', 'c2'], lead: 0 }).links.collectionId
+  })
+  check('the link follows the resolved lead, past a deleted or other-generation pick', shifted === 'c2', String(shifted))
   await page.screenshot({ path: shot('collection-matchup.png') })
 
   // ------------------------------------------------------------------ 7

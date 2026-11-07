@@ -11,8 +11,9 @@
  *          Build side reads an unset value as 0, as the Build Form does.
  *
  * GENDER BY ERA: none in Gen 1, so skipped; Gen 2 compares what `buildGender`
- * derives for each side from its Attack DV (the entry through `entryToBuild`);
- * Gen 3-4 only when the Build stores one.
+ * derives for each side from its Attack DV (the entry through `entryToBuild`),
+ * and skips the comparison when the entry's Attack DV is unknown, since an
+ * unknown DV is not 0; Gen 3-4 only when the Build stores one.
  */
 
 import { getSpecies, type Species } from '../../data'
@@ -29,7 +30,11 @@ export function candidate(
 ): Candidate {
   if (entry.generation !== build.generation || entry.speciesId !== build.speciesId) return null
   const gen = entry.generation
-  if (gen === 2 && buildGender(entryToBuild(entry), species) !== buildGender(build, species)) {
+  if (
+    gen === 2 &&
+    entry.individual.attack != null &&
+    buildGender(entryToBuild(entry), species) !== buildGender(build, species)
+  ) {
     return null
   }
   if (gen >= 3) {
