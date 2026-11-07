@@ -45,6 +45,7 @@
     "report:type-scale": "node scripts/report-type-scale.mjs",
     "check": "node scripts/check.mjs",
     "verify:infra": "node scripts/verify-infra.mjs",
+    "verify:store": "node scripts/verify-store.mjs",
     "worktree": "node scripts/worktree.mjs",
     "preflight": "node scripts/preflight.mjs",
     "status": "node scripts/status.mjs",
