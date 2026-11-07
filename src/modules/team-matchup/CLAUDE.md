@@ -39,7 +39,14 @@ D1–D5, P1–P8, O1–O4, R1–R7); the IDs are in the code comments.
 - **Nothing writes to Team Building.** "Use current" is read-only; "Customize"
   edits an override in the matchup's own store (`pokeapp:team-matchup:v1`).
   Scenarios snapshot a setup and carry link fields for Notes, Journal, the
-  Nuzlocke Tracker and the Collection, which do not exist yet (empty until then).
+  Nuzlocke Tracker and the Collection. Only `collectionId` is filled today: the
+  lead entry's id when my team comes from the Collection.
+- **"Your team" has a Source: Team or Collection** (Collection v2, 2026-11-07).
+  Collection picks up to six entries, and ONLY of the game's generation: this is
+  the matchup's existing game exception at work, not a fifth one, and seeding is
+  unchanged. Each entry is a Build through `collectionSchema.entryToBuild`
+  (`battle/sources.entryToSpec`, source `'collection'`, origin `entryId`); an
+  entry of another generation in a saved setup is a problem line, left out.
 - **Verdicts are coloured TEXT with a symbol and a word** (▲ Win, ◆ Trade,
   ◐ Roll, ▼ Lose) in `--effect-super` / `--effect-resist` / `--stat-decrease` —
   no fill, never colour alone. The batch scan's grid is the same: coloured numbers.

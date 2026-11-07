@@ -487,6 +487,13 @@
   }
 }
 
+/* Collection v2: up to six Collection entries as my team, one picker each. */
+.tm-collection-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-2) var(--tm-4);
+}
+
 .tm-roster {
   list-style: none;
   margin: 0;

@@ -1,5 +1,6 @@
 /**
- * Where battlers come from: the reader's Team Builder builds (S1) and the Trainer
+ * Where battlers come from: the reader's Team Builder builds (S1) or Collection
+ * entries (Collection v2, through `entryToBuild`), and the Trainer
  * Dex's parties (S2/S3), both turned into BattlerSpecs with EXACT values.
  *
  * TRAINER VALUES ARE THE GAME'S, AS THE BUNDLE ALREADY DERIVED THEM from the
@@ -21,7 +22,8 @@ import type {
 } from '../../data/trainers'
 import { trainerLabel } from '../../data/trainers'
 import { buildGender } from '../team-builder/buildFacts'
-import type { Build } from '../team-builder/model'
+import type { Build, CollectionEntry } from '../team-builder/model'
+import { entryToBuild } from '../collection/collectionSchema'
 import { specialStatExp } from '../team-builder/statMath'
 import { exactSpread, spreadKeys, type BattlerSpec, type SpreadSpec } from './battler'
 import type { TrainerInfo } from './session'
@@ -87,6 +89,15 @@ export function buildToSpec(b: Build, ctx: GameContext, slot: number): BattlerSp
     gender: genderCode(buildGender({ ...b, generation: gen }, species)),
     origin: { buildId: b.id },
   }
+}
+
+/**
+ * A Collection entry as a battler: the Build path exactly (`entryToBuild`), with
+ * its own source and origin so a link back finds the entry, not a Build.
+ */
+export function entryToSpec(e: CollectionEntry, ctx: GameContext, slot: number): BattlerSpec {
+  const spec = buildToSpec(entryToBuild(e), ctx, slot)
+  return { ...spec, source: 'collection', origin: { entryId: e.id } }
 }
 
 function trainerSpread(mon: TrainerPokemon, ctx: GameContext): SpreadSpec {

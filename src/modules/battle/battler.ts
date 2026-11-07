@@ -87,7 +87,7 @@ export interface BattlerSpec {
   /** Stable within a matchup: 'mine:3', 'theirs:TRAINER_CYNTHIA:0'. */
   key: string
   side: 'mine' | 'theirs'
-  source: 'build' | 'trainer' | 'facility' | 'custom'
+  source: 'build' | 'collection' | 'trainer' | 'facility' | 'custom'
   label: string
   speciesId: number
   /** Variety slug ('rotom-wash'). */
@@ -106,8 +106,14 @@ export interface BattlerSpec {
   gender: 'M' | 'F' | 'N'
   /** Gen 4 trainer whose IVs overflow into random (Platinum Volkner's Electivire). */
   ivRandom?: boolean
-  /** Where it came from, for linking back (build id, trainer id + slot). */
-  origin?: { buildId?: string; trainerId?: string; slot?: number; versionGroup?: string }
+  /** Where it came from, for linking back (build id, Collection entry id, trainer id + slot). */
+  origin?: {
+    buildId?: string
+    entryId?: string
+    trainerId?: string
+    slot?: number
+    versionGroup?: string
+  }
 }
 
 export const effectiveLevel = (b: BattlerSpec): number => b.levelOverride ?? b.level

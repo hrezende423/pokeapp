@@ -37,6 +37,8 @@ function normaliseSetup(raw: Partial<MatchupSetup> | undefined): MatchupSetup {
     format: { ...DEFAULT_FORMAT, ...(raw.format ?? {}) },
     field: raw.field?.sides ? raw.field : emptyMatchField(),
     badges: Array.isArray(raw.badges) ? raw.badges : [],
+    mySource: raw.mySource === 'collection' ? 'collection' : 'team',
+    collectionIds: Array.isArray(raw.collectionIds) ? raw.collectionIds : [],
   }
 }
 
@@ -94,6 +96,17 @@ export function updateSetup(vg: string, fn: (s: MatchupSetup) => MatchupSetup) {
 
 /* --------------------------------------------------------------- scenarios */
 
+/**
+ * The Collection entry a scenario links to: the LEAD's, when my team comes from
+ * the Collection; null otherwise. `lead` indexes the resolved team, which is the
+ * picked ids in order (the picker offers only the game's generation).
+ */
+function leadEntryId(setup: MatchupSetup): string | null {
+  if (setup.mySource !== 'collection') return null
+  const ids = setup.collectionIds ?? []
+  return ids[setup.lead] ?? ids[0] ?? null
+}
+
 export function saveScenario(
   vg: string,
   name: string,
@@ -112,7 +125,7 @@ export function saveScenario(
     updatedAt: now,
     setup: { ...setup, scenarioId: id },
     notes: prev?.notes ?? '',
-    links: prev?.links ?? { ...EMPTY_LINKS },
+    links: { ...(prev?.links ?? EMPTY_LINKS), collectionId: leadEntryId(setup) },
   }
   const scenarios = prev
     ? doc.scenarios.map((s) => (s.id === id ? scenario : s))

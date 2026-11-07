@@ -2,7 +2,8 @@
  * SCENARIOS SIDE BY SIDE (S7e), which is also how two team variants are compared
  * (R3): each scenario is a saved setup -- its own team, spreads, opponent, field
  * -- and both are computed the same way, next to each other. Scenarios keep link
- * fields for Notes, Journal, the Nuzlocke Tracker and the Collection (R7).
+ * fields for Notes, Journal, the Nuzlocke Tracker and the Collection (R7); only
+ * the Collection's is filled today, with the lead entry of a Collection team.
  */
 
 import { useMemo, useState } from 'react'
@@ -123,7 +124,12 @@ function ScenarioRow({ s }: { s: Scenario }) {
             {(Object.keys(linkLabel) as (keyof ScenarioLinks)[]).map((k) => (
               <div key={k} className="tm-fact-pair">
                 <dt>{linkLabel[k]}</dt>
-                <dd>{s.links[k] ?? 'not linked — that module is not built yet'}</dd>
+                <dd>
+                  {s.links[k] ??
+                    (k === 'collectionId'
+                      ? 'not linked — the team is not from the Collection'
+                      : 'not linked — that module is not built yet')}
+                </dd>
               </div>
             ))}
           </dl>

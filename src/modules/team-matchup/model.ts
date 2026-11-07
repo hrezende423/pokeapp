@@ -3,15 +3,17 @@
  * scenarios saved from it (S7e, R3, R7).
  *
  * A SETUP REFERS, IT DOES NOT COPY. My team is a Team Building team id and each
- * member a build id; the opponent is a trainer id (or a facility trainer, or a
- * custom team). What the matchup changes is held as OVERRIDES on top -- a
+ * member a build id -- or, with `mySource: 'collection'`, up to six Collection
+ * entry ids; the opponent is a trainer id (or a facility trainer, or a custom
+ * team). What the matchup changes is held as OVERRIDES on top -- a
  * customised spread, a what-if level, an edited move -- so "Use current spread"
  * always reads the saved build as it is now, and nothing here ever writes to
  * Team Building (S7b).
  *
  * A SCENARIO is a named snapshot of a setup, plus link fields for the Notes,
- * Journal, Nuzlocke Tracker and Collection modules (R7). Those modules do not
- * exist yet: the fields are shaped for them and stay empty until they do.
+ * Journal, Nuzlocke Tracker and Collection modules (R7). `collectionId` is filled
+ * (the lead entry's id) when the setup's team comes from the Collection; Notes,
+ * Journal and the Nuzlocke Tracker do not exist yet, so theirs stay empty.
  */
 
 import type { SpreadMode, SpreadSpec } from '../battle/battler'
@@ -56,10 +58,14 @@ export interface CustomMon {
 }
 
 export interface MatchupSetup {
+  /** Where my team comes from. Absent in setups saved before the Collection source. */
+  mySource?: 'team' | 'collection'
   teamId: string | null
+  /** With `mySource: 'collection'`: up to six entry ids, in team order. */
+  collectionIds?: string[]
   /** S7: the spread mode for all of mine, overridable per Pokemon. */
   mySpreadMode: SpreadMode
-  /** Keyed by build id. */
+  /** Keyed by build id, or by Collection entry id. */
   mine: Record<string, MonOverride>
   /** Leading Pokemon (index into my team). */
   lead: number
@@ -114,7 +120,9 @@ export interface MatchupDoc {
 
 export function emptySetup(): MatchupSetup {
   return {
+    mySource: 'team',
     teamId: null,
+    collectionIds: [],
     mySpreadMode: 'current',
     mine: {},
     lead: 0,

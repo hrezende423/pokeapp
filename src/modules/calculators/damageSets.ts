@@ -3,12 +3,14 @@
  * in one pick, the way KinglerCalc's species dropdown works -- "Abomasnow (Skier
  * Andrea | Rematch 2 | Pt)" beside the bare species.
  *
- * TWO SOURCES TODAY, ONE SHAPE FOR THE NEXT:
+ * THREE SOURCES TODAY, ONE SHAPE FOR THE NEXT:
  *   - the in-game trainers of the selected game (the Trainer Dex's bundle,
  *     data/trainers.ts), story fights and rematches -- never the unused slots;
- *   - the reader's own Team Builder builds for that generation.
- * Smogon's sets are meant to arrive as a third `CalcSet` producer; nothing here
- * assumes only two.
+ *   - the reader's own Team Builder builds for that generation;
+ *   - the reader's Collection entries for that generation, each loaded as a
+ *     Build through `collectionSchema.entryToBuild` (Collection v2).
+ * Smogon's sets are meant to arrive as another `CalcSet` producer; nothing here
+ * assumes only three.
  *
  * A SET IS WHAT THE GAME USES, NOT A GUESS. Trainer Pokemon carry no Stat Exp or
  * EVs in Gen 1-4 (LoadEnemyMon computes Gen 1-2 enemy stats with none, and Gen
@@ -37,6 +39,7 @@ import { orderedBuilds, listedTeams, uiId, type Build, type TeamBuilderData } fr
 import type { StatNumbers } from '../team-builder/statMath'
 import { MAX_IV, specialStatExp } from '../team-builder/statMath'
 import { speciesEntries } from '../dex/entrySources'
+import { entryToBuild } from '../collection/collectionSchema'
 import {
   MOVE_SLOT_COUNT,
   defaultVariety,
@@ -46,9 +49,9 @@ import {
 } from './damageCalcState'
 
 export interface CalcSet {
-  /** Option value: `t:<vg>:<trainer id>:<party index>` or `b:<build id>`. */
+  /** Option value: `t:<vg>:<trainer id>:<party index>`, `b:<build id>` or `c:<entry id>`. */
   key: string
-  source: 'trainer' | 'build'
+  source: 'trainer' | 'build' | 'collection'
   speciesId: number
   varietyName: string
   /** "Abomasnow (Skier Andrea | Rematch 2 | Pt)". */
@@ -199,6 +202,33 @@ function buildSets(data: TeamBuilderData, gen: number): CalcSet[] {
   return out
 }
 
+/**
+ * The Collection's entries of the generation, as Builds (`entryToBuild`), so a
+ * loaded entry goes through exactly the Build path: stats, moves, item, ability
+ * and Gen 2's Special Stat Exp.
+ */
+function collectionSets(data: TeamBuilderData, gen: number): CalcSet[] {
+  const out: CalcSet[] = []
+  for (const e of [...(data.collection ?? [])].sort((a, b) => a.seq - b.seq)) {
+    if (e.generation !== gen) continue
+    const species = getSpecies(e.speciesId)
+    if (!species) continue
+    const build = entryToBuild(e)
+    const variety = varietyFor(species, build.pokemonId)
+    const who = e.nickname.trim() || 'My Pokémon'
+    out.push({
+      key: `c:${e.id}`,
+      source: 'collection',
+      speciesId: species.id,
+      varietyName: variety.name,
+      label: `${species.display_name} (${who} | Collection)`,
+      hint: `Lv ${e.level}`,
+      apply: (side, g) => applyBuild(side, g, species.id, variety, build),
+    })
+  }
+  return out
+}
+
 const genderCode = (g: 'male' | 'female' | null): 'M' | 'F' | 'N' =>
   g === 'male' ? 'M' : g === 'female' ? 'F' : 'N'
 
@@ -301,7 +331,8 @@ export interface SetCatalog {
 /**
  * Species and sets as one picker, grouped by species in dex order: the bare
  * species first (the blank set, and the exact match typing its name finds), then
- * the reader's builds, then the trainers in game and walkthrough order.
+ * the reader's builds, then their Collection, then the trainers in game and
+ * walkthrough order.
  */
 export function setCatalog(
   speciesOptions: SearchOption[],
@@ -309,7 +340,11 @@ export function setCatalog(
   builds: TeamBuilderData,
   gen: number,
 ): SetCatalog {
-  const sets = [...buildSets(builds, gen), ...partitions.flatMap(trainerSets)]
+  const sets = [
+    ...buildSets(builds, gen),
+    ...collectionSets(builds, gen),
+    ...partitions.flatMap(trainerSets),
+  ]
   const byKey = new Map(sets.map((s) => [s.key, s]))
   // A set whose form the era's list does not offer (a Castform weather form)
   // files under the species' first entry rather than vanishing.
