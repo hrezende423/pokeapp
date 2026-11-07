@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.15 — 2026-10-18 (non-breaking)
+- App bar: the cross-dex search is in the bar on EVERY page, just left of the Sort/Filter trigger, no longer inside that menu. Pages with nothing to sort or filter (Naturedex, an open move or ability page, Type Coverage, the calculators, Team Matchup, the tools, Collection, Build Form) had lost it with the menu since the one-menu change (2026-10-10); the menu itself is still disabled there. The panel is Reset, View mode, Sort and the filters
 ## 2.1.14 — 2026-10-12 (non-breaking)
 - Trainer Dex party cards: 20px between cards (`--space-gap-lg`, was 14px)
 ## 2.1.13 — 2026-10-12 (non-breaking)

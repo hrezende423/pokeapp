@@ -23,10 +23,10 @@
 const PANEL = '[data-testid="app-controls"]'
 const TOGGLE = '[data-testid="controls-toggle"]'
 
-/* The cross-dex search is the one control present on every module, so its
-   visibility is what "the panel is really open" means -- not the toggle's own
-   state. (It was the game selector, until that moved to the account menu.) */
-const READY = '[data-testid="global-search"]'
+/* The panel's own visibility is what "the panel is really open" means -- not the
+   toggle's state. (It was the cross-dex search, until that moved out of the
+   panel into the bar, where it is always visible.) */
+const READY = '[data-testid="controls-panel"]'
 
 /* ------------------------------------------------------ the app's generation */
 

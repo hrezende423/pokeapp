@@ -173,7 +173,9 @@ try {
     if (await panelOpen('app-controls')) return
     await park()
     await page.click('[data-testid="controls-toggle"]')
-    await page.waitForSelector('[data-testid="global-search"]', { state: 'visible', timeout: 15000 })
+    // The panel itself, not the cross-dex search: that is in the bar and always
+    // visible, so waiting on it would not wait for the panel at all.
+    await page.waitForSelector('[data-testid="controls-panel"]', { state: 'visible', timeout: 15000 })
   }
   /* ONE MENU since 2026-10-10: Sort is a part of the Sort/Filter panel. */
   const openSort = async () => {
@@ -368,19 +370,20 @@ try {
     const y = (sel) => panel.querySelector(sel)?.getBoundingClientRect().top ?? null
     return {
       reset: y('[data-testid="controls-reset-top"]'),
-      search: y('[data-testid="global-search"]'),
       filters: y('[data-testid="species-search"]'),
+      // The cross-dex search is in the bar now, never in this panel.
+      searchInPanel: panel.querySelector('[data-testid="global-search"]') != null,
     }
   })
   log(`  menu order (y): ${JSON.stringify(menuOrder)}`)
   check(
     'Reset filters is the first thing in the menu',
-    menuOrder.reset != null && menuOrder.reset < menuOrder.search,
+    menuOrder.reset != null && menuOrder.filters != null && menuOrder.reset < menuOrder.filters,
+    `reset ${Math.round(menuOrder.reset)} · filters ${Math.round(menuOrder.filters)}`,
   )
   check(
-    'the filters follow the search input (the generation moved to the account menu)',
-    menuOrder.filters > menuOrder.search,
-    `search ${Math.round(menuOrder.search)} · filters ${Math.round(menuOrder.filters)}`,
+    'the cross-dex search is not in the menu (it is in the bar; the generation is in the account menu)',
+    !menuOrder.searchInPanel,
   )
 
   const sizes = await page.evaluate(() => {

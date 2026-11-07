@@ -15,7 +15,10 @@ import { GlobalSearch } from '../search/GlobalSearch'
  *
  *   View mode        the Pokedex's Grid/List switch     (Pokedex browse only)
  *   Sort options     field and direction                (pages with a bar sort)
- *   Search/Filter    the cross-dex search + the page's filters
+ *   Search/Filter    the page's filters
+ *
+ * THE CROSS-DEX SEARCH IS IN THE BAR, beside the trigger, on every page -- not
+ * in the panel, so a page with nothing to sort or filter still has it.
  *
  * A HAIRLINE BETWEEN PARTS AND NOWHERE ELSE. The rows inside a part are spaced,
  * not ruled -- the owner's call, and it is what makes the three parts read as
@@ -24,8 +27,7 @@ import { GlobalSearch } from '../search/GlobalSearch'
  * DISABLED, NOT HIDDEN, on a page with nothing to sort, filter or switch (Type
  * Coverage, the Naturedex's matrix, a build being edited, the calculators):
  * the same call the Sort trigger made on the list view, and for the same reason
- * -- a trigger that vanishes reads as a bug, a greyed one says "not here". The
- * cross-dex search lives in this menu, so it goes with it on those pages.
+ * -- a trigger that vanishes reads as a bug, a greyed one says "not here".
  *
  * "RESET FILTERS" IS STICKY at the top of the panel. With the filters unfolded
  * the panel scrolls, and undoing a filter should not need the scroll back up.
@@ -49,6 +51,8 @@ export function ControlsPanel() {
 
   return (
     <div className="app-controls-cluster" ref={ref}>
+      <GlobalSearch />
+
       <div className="app-controls" data-testid="app-controls" data-open={open}>
         <button
           type="button"
@@ -125,10 +129,6 @@ export function ControlsPanel() {
               data-part="filter"
               data-testid="controls-part-filter"
             >
-              <div className="app-controls-field">
-                <span className="app-controls-label">Search all dexes</span>
-                <GlobalSearch />
-              </div>
               <div className="app-controls-field" data-testid="controls-dex-filters">
                 <FilterPanel
                   dexId="dex"

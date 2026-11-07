@@ -1467,8 +1467,8 @@ try {
       shell.visibleByDefault.gameSelect === false,
     )
     check(
-      '[' + theme + '] nor is the cross-dex search, which moved into the panel',
-      shell.visibleByDefault.globalSearch === false,
+      '[' + theme + '] the cross-dex search IS on screen by default, in the bar',
+      shell.visibleByDefault.globalSearch === true,
     )
     check('[' + theme + '] and the panel itself starts closed', shell.panelOpen === false)
 
@@ -1625,12 +1625,16 @@ try {
         typeFilterButtons: [...document.querySelectorAll('.tf')].filter(visible).length,
         gameSelect: visible(document.querySelector('[data-testid="gen-select"]')),
         globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
-        insidePanel: ['species-search', 'global-search'].every(
-          (id) =>
-            document
-              .querySelector('[data-testid="' + id + '"]')
-              ?.closest('[data-testid="controls-panel"]') != null,
-        ),
+        insidePanel:
+          document
+            .querySelector('[data-testid="species-search"]')
+            ?.closest('[data-testid="controls-panel"]') != null,
+        searchInBarNotPanel: (() => {
+          const el = document.querySelector('[data-testid="global-search"]')
+          return (
+            el?.closest('.app-bar') != null && el.closest('[data-testid="controls-panel"]') == null
+          )
+        })(),
         toggleColor: getComputedStyle(document.querySelector('[data-testid="controls-toggle"]'))
           .color,
         expanded: document
@@ -1640,14 +1644,18 @@ try {
     })
     log('  [' + theme + '] opened: ' + JSON.stringify(opened))
     check(
-      '[' + theme + '] the toggle reveals the filters and the cross-dex search (the generation is in the account menu)',
+      '[' + theme + '] the toggle reveals the filters, the cross-dex search stays on screen (the generation is in the account menu)',
       opened.speciesSearch &&
         !opened.gameSelect &&
         opened.globalSearch &&
         opened.typeFilterButtons > 10,
       JSON.stringify(opened),
     )
-    check('[' + theme + '] all of them inside the revealed panel', opened.insidePanel)
+    check('[' + theme + '] the filters are inside the revealed panel', opened.insidePanel)
+    check(
+      '[' + theme + '] the cross-dex search is in the bar, outside the panel',
+      opened.searchInBarNotPanel,
+    )
     check(
       // Every navbar menu is the app's base colour since 2026-10-10 (owner).
       '[' + theme + '] the panel is --surface with a hairline border and no shadow',
@@ -1666,7 +1674,7 @@ try {
       opened.expanded === 'true' && opened.toggleColor === hexToRgb(want['--accent']),
       opened.expanded + ' / ' + opened.toggleColor,
     )
-    // The cross-dex search still works from in here.
+    // The cross-dex search still works with the panel open beside it.
     await page.fill('[data-testid="global-search"]', 'sand')
     await page.waitForSelector('[data-testid="global-search-results"]', { timeout: 15000 })
     const results = await page.evaluate(() => {
@@ -1680,7 +1688,7 @@ try {
     })
     log('  [' + theme + '] results: ' + JSON.stringify(results))
     check(
-      '[' + theme + '] the search still returns grouped results from inside the panel',
+      '[' + theme + '] the search still returns grouped results from the bar',
       results.groups > 0,
       '(' + results.groups + ' groups)',
     )
@@ -1705,8 +1713,8 @@ try {
       }
     })
     check(
-      '[' + theme + '] clicking it again hides them all again',
-      !closed.speciesSearch && !closed.gameSelect && !closed.globalSearch,
+      '[' + theme + '] clicking it again hides the filters again, the cross-dex search stays',
+      !closed.speciesSearch && !closed.gameSelect && closed.globalSearch,
       JSON.stringify(closed),
     )
     await page.screenshot({ path: SHOTS + '/shell-' + theme + '.png' })
