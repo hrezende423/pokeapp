@@ -169,10 +169,6 @@ the computed style, so a name it prints is a name in the stylesheet.
   screen. Unblocked by one answer — "can still evolve" or "is in a multi-stage
   line" — and wired by one function in `speciesQuery.ts`.
 
-- **verify-design-system: 12 species-card geometry checks fail** (both themes:
-  the card is 212 × 214 against Figma's 199-high aspect, and the text lines'
-  y-positions follow from that — the owner's 2026-09-27 looser leading). The
-  suite now runs to the end (2026-10-11: the Tools order assertion was updated
-  with Type Coverage's move, and the stale Itemdex ledger-row block that threw
-  was rewritten for the table), so the static scans after it run again. The
-  card checks need the owner to decide whether 214 is the new reference.
+- **The species card is 212 × 214, and that is the reference** (owner, 2026-11-06).
+  It was 12 failing checks against Figma's 199-high aspect, because the text lines
+  follow the owner's 2026-09-27 looser leading. The checks now read `CARD_214`.

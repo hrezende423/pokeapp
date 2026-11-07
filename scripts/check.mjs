@@ -62,21 +62,7 @@ const SUITES_BY_PATH = [
  * failure fails the run, and so does one of these disappearing -- fixed debt
  * means this list needs the line removed, not silently ignoring it.
  */
-const KNOWN_FAILING = {
-  ds: {
-    reason: 'species card 212 x 214 vs Figma 199 (owner to decide whether 214 is the reference)',
-    failures: ['light', 'dark'].flatMap((theme) =>
-      [
-        "the card keeps Figma's 497:467 aspect",
-        "its box matches Figma's 74.4% x 42.4% of the card",
-        "number+name sits at Figma's y=319/467",
-        "type row sits at Figma's y=368/467",
-        "ability sits at Figma's y=407/467",
-        'the dex number and the name share one line, as the reference shows',
-      ].map((label) => `[${theme}] ${label}`),
-    ),
-  },
-};
+const KNOWN_FAILING = {};
 
 /**
  * Suites that fail INTERMITTENTLY for an undiagnosed reason, retried up to three

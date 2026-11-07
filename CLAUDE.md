@@ -104,6 +104,19 @@ The template and the reasons are in `docs/FEATURE-BRIEF.md`.
   not "gengaa"). Never a kana-to-romaji library. Codes are lowercase
   (`ja-hrkt`) — the documented casing silently returns null.
 
+## Owner decisions (2026-11-06)
+
+- **#22 Rental stays a set-vs-set comparator**: no team, no damage.
+- **Alternate sprites stay on the Team Display** (`team-builder/altSprites.ts`).
+- **Phone layout is parked.** Leave `feature/mobile-layout` alone.
+- **Species card 212 × 214 is the reference**, replacing Figma's 199-high aspect
+  (`CARD_214` in `scripts/verify-design-system.mjs`).
+- **`design-system/dist/tokens.css` is the winning token set.** Migrate
+  `src/design-tokens.css` toward it over time, never in a feature commit.
+- **"Has evolutions" stays a stub.**
+- **HGSS rentals reuse Platinum's pool, unconfirmed**: flagged in
+  `docs/tools/PLAN.md` and on the tool's page.
+
 ## Signed off — do not touch without being asked
 
 Frozen by the owner: a change here needs a request, not a justification. They
@@ -209,15 +222,10 @@ component. `design-system/preview.html` shows every component and state.
 
 Deliberately left alone; the cheap fix is usually the wrong one.
 
-- **The Pokédex's "Has evolutions" filter is UI-only** (`stub: true`), pending
-  the owner's definition: "can still evolve" or "is in a multi-stage line".
+- **The Pokédex's "Has evolutions" filter is UI-only** (`stub: true`) and stays a
+  stub by the owner's decision (2026-11-06).
 - **Build Form does not autosave; every other screen does.** Deliberate — see
   `src/modules/team-builder/CLAUDE.md`.
-- **verify-design-system: 12 species-card geometry checks fail** (card is
-  212 × 214 vs Figma's 199-high aspect, after the owner's looser leading). Needs
-  the owner to decide whether 214 is the new reference. `npm run check` passes it
-  only while exactly these 12 fail (`KNOWN_FAILING` in `scripts/check.mjs`).
-
 - **verify-scroll-nav §2 is flaky: ~1 run in 3 the Pokédex grid comes back at
   1455 instead of 900** after opening a species and going back. It predates the
   tools work (it failed at HEAD before any of it). Ruled out on 2026-10-15:
