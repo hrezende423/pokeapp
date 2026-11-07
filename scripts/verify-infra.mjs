@@ -5,7 +5,7 @@
  * infrastructure work adds its section here, so `npm run check` keeps asserting it.
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const failures = []
@@ -118,7 +118,10 @@ hr('4. GATE HONESTY')
   check('a changed suite runs itself', routes('scripts/verify-scroll-nav.mjs').includes('scroll-nav'))
   check('any src/ change boots the app', routes('src/App.tsx').includes('app'))
   const gate = read('scripts/check.mjs')
-  check('a passing non-fast run records its HEAD for the reminder', /if \(passed && !fast\)[\s\S]*writeFileSync\(STATE_FILE/.test(gate))
+  check(
+    'a non-fast run records its results, and a passing one its HEAD for the reminder',
+    /if \(!fast\) \{[\s\S]*writeFileSync\(LAST_RUN_FILE[\s\S]*if \(passed\) writeFileSync\(STATE_FILE/.test(gate),
+  )
   check(
     'scroll-nav is out of FLAKY: its §2 clicks a card visible at the parked offset',
     !/'scroll-nav':/.test(/const FLAKY = \{[\s\S]*?\};/.exec(gate)?.[0] ?? '') &&
@@ -129,6 +132,26 @@ hr('4. GATE HONESTY')
     'the Stop hook adds the unchecked-areas reminder (with --all) without blocking',
     /check\.mjs --unchecked/.test(hook) && /systemMessage/.test(hook) && /check -- --all/.test(gate),
   )
+}
+
+hr('5. INSTRUCTIONS AND PROGRESS')
+{
+  const lines = read('CLAUDE.md').split(/\r?\n/).length - 1
+  check('the root CLAUDE.md is at most 200 lines (it loads every session)', lines <= 200, `${lines} lines`)
+  const nested = tracked.filter((p) => /(^|\/)CLAUDE\.md$/.test(p) && p !== 'CLAUDE.md')
+  const table = read('CLAUDE.md')
+  const unlisted = nested.filter((p) => !table.includes(`\`${p}\``) && p !== 'src/modules/battle/CLAUDE.md')
+  check('every nested CLAUDE.md is in the root table', unlisted.length === 0, unlisted.join(', '))
+  check(
+    'the root names the species page hook that exists (useSpeciesGameScope)',
+    /useSpeciesGameScope/.test(table) && existsSync('src/modules/pokedex/useSpeciesGameScope.ts'),
+  )
+  check('icon.md documents the 1.5px stroke the app uses', /1\.5px stroke/.test(read('design-system/components/icon.md')))
+  check('docs/PROGRESS.md exists with a table row per slice', (read('docs/PROGRESS.md').match(/^\| 20/gm) ?? []).length >= 5)
+  const status = execFileSync('node', ['scripts/status.mjs'], { encoding: 'utf8' })
+  for (const metric of ['Suites passing', 'Unlogged failures', 'Logged debt', 'Unreleased commits', 'Data coverage', 'Token adoption', 'var(--accent) references', ':hover with a background', 'Native <select>', 'PRD Must done']) {
+    check(`npm run status prints "${metric}"`, status.includes(`| ${metric}`))
+  }
 }
 
 hr('SUMMARY')

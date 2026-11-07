@@ -113,3 +113,11 @@ one line away in `speciesQuery.ts` once the reading is chosen.
   `capitalize` and drops the tracking to 0.01em. Scoped, not global: the
   five pre-redesign dexes and the design-system reference page keep their
   own typography.
+
+## Evolution triggers with no kind (logged debt, moved from the root 2026-11-07)
+
+**13 Gen 8-9 evolution requirements have no trigger kind** and draw the generic
+fallback icon: Sirfetch'd, Runerigus, Alcremie, Urshifu (2), Wyrdeer, Basculegion,
+Overqwil (2), Maushold, Annihilape, Kingambit, Gholdengo. `KNOWN_UNMAPPED_TRIGGERS`
+in `scripts/verify-ux.mjs` is exact: a 14th fails it, and so does fixing one (remove
+its line when you map it).

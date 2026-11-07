@@ -129,6 +129,7 @@ function runKnown(suite) {
   passed" can never read as "this branch is checked".
 */
 const STATE_FILE = execSync('git rev-parse --git-path pokeapp-last-check.json', { encoding: 'utf8' }).trim();
+const LAST_RUN_FILE = execSync('git rev-parse --git-path pokeapp-last-run.json', { encoding: 'utf8' }).trim();
 function readState() {
   try {
     return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
@@ -230,9 +231,19 @@ for (const [name, { ok, note }] of results) {
 }
 if (!fast && !suites.size) console.log('  (no suites matched the changed files)');
 const passed = results.every(([, r]) => r.ok);
-if (passed && !fast) {
+if (!fast) {
   const head = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
-  writeFileSync(STATE_FILE, JSON.stringify({ head, all, since, suites: [...suites].sort(), at: new Date().toISOString() }, null, 2));
+  const record = {
+    head,
+    all,
+    since,
+    suites: [...suites].sort(),
+    results: results.map(([name, r]) => ({ name, ok: r.ok })),
+    at: new Date().toISOString(),
+  };
+  // Every run, pass or fail, for `npm run status`; a passing one also for the reminder.
+  writeFileSync(LAST_RUN_FILE, JSON.stringify(record, null, 2));
+  if (passed) writeFileSync(STATE_FILE, JSON.stringify(record, null, 2));
 }
 if (fast) {
   const line = uncheckedReminder();

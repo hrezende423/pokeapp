@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.20 — 2026-11-07 (non-breaking)
+- Docs only: `components/icon.md` documented a 2px stroke; the app has drawn Tabler icons at 1.5px all along (74 of 80 `stroke=` uses). The doc now says 1.5px. No icon changed
 ## 2.1.19 — 2026-11-07 (non-breaking)
 - Collection v2 (`collection/CollectionPage.tsx`, `collection.css`, mockup `public/mockups/collection-v2.html`): the entry form is five named regions (`col-form`: identity / spread / moves / origin / record), each a FormSectionLabel over a compact field strip of the existing ds fields (SelectField, TextField, SearchSelect for the four moves). A field the generation lacks is absent, never disabled; Gen 2's gender and shininess show disabled at their DV-derived values, the Build Form's shape. The list is a `tools-compare` table (Pokémon, Lv, Effort, OT, Fits, Edit) with hairline rows and no row gap; "Exact: …" / "Fits: …" / "No build" are text, no badge. Search and filters open from the app bar's Sort/Filter menu, which is now enabled on the Collection. Team Matchup: a native Source select (Team / Collection) and up to six SearchSelects in `.tm-collection-picks`. No component, token or accent use changed
 ## 2.1.18 — 2026-11-07 (non-breaking)

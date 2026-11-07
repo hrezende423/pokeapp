@@ -65,3 +65,10 @@ Claude works in this directory. Every rule in the root file still applies here.
   trademark name for all 493 species in Gen 1–4 scope. Language codes
   are lowercase: `ja-hrkt`, not `ja-Hrkt` — the documented casing
   silently returns null rather than erroring.
+
+## Gender-sprite exceptions (logged, moved from the root 2026-11-07)
+
+**Basculegion and Oinkologne have no female sprite field on their default variety**:
+their females are separate varieties. Basculegion lacks it for regular and shiny,
+Oinkologne for shiny. The exact lists are `NO_FEMALE_SPRITE` and
+`NO_SHINY_FEMALE_SPRITE` in `scripts/verify-ux.mjs`.
