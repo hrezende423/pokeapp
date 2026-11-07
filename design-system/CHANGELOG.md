@@ -1,4 +1,10 @@
 # Changelog
+## 2.1.21 — 2026-11-07 (non-breaking)
+Recorded late: these four commits of 2026-10-15/16 changed CSS without an entry here. Each bullet is dated by its commit; nothing changed on 2026-11-07.
+- 2026-10-15 baseline (`8207a25`), `team-builder/teamBuilder.css`: the Team Display card's move-name column has a 110px floor again (`--tb-move-name-min`: the widest Gen 1-4 name, "~ High Jump Kick*", plus 12px), so the column no longer shrinks to the longest name on that card. Added in d27ba5e, lost in the Build Form redesign's revert (d59f6f0), restored
+- 2026-10-15 Tools index and the shared tool page frame (`532ee40`), new `tools/tools.css`: the index is a title over hairline rows with no row gap, each a semibold `--color-text-default` tool name (a text button; `--color-text-disabled` when the tool cannot answer in the generation, its reason beside it at caption size) and a `--color-text-muted` blurb. A tool page is a head (title, the generation in `--color-text-muted`, the game row) over a body of inputs then result; a reason printed in place of a result is `--color-text-default`, never the accent
+- 2026-10-15 #5 Speed tiers (`d5a6fe1`), `tools/tools.css`: from 1100px wide a tool page puts the result beside the inputs (inputs up to 720px, result at least 280px), and the result stays in view (sticky) while the inputs scroll. Applies to every tool page
+- 2026-10-16 #13 Compare Pokémon (`05bd61a`), `tools/tools.css`: the comparison table (`.tools-compare`): hairline rows with no row gap, regular-weight cells, row headers in `--color-text-muted`, numbers in the mono face; the highest number in a row is semibold, never coloured. A wide table scrolls sideways inside the result, not the page
 ## 2.1.20 — 2026-11-07 (non-breaking)
 - Docs only: `components/icon.md` documented a 2px stroke; the app has drawn Tabler icons at 1.5px all along (74 of 80 `stroke=` uses). The doc now says 1.5px. No icon changed
 ## 2.1.19 — 2026-11-07 (non-breaking)
