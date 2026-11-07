@@ -24,10 +24,11 @@ import type { DexQuery } from './useDexQuery'
 import type { SpeciesView } from '../../pokedex/speciesQuery'
 
 /**
- * A list the app bar's menus can drive: a dex, or one of the Team Builder's two
- * libraries (team-builder/libraryQuery.ts), which borrow the same machinery.
+ * A list the app bar's menus can drive: a dex, one of the Team Builder's two
+ * libraries (team-builder/libraryQuery.ts), or the Collection
+ * (collection/collectionQuery.ts), which borrow the same machinery.
  */
-export type QueryListId = DexModuleId | 'tb-builds' | 'tb-teams'
+export type QueryListId = DexModuleId | 'tb-builds' | 'tb-teams' | 'collection'
 
 export interface DexQueryBundle {
   /** The list the bundle describes, or null on a page that has none. */

@@ -114,11 +114,51 @@ export const TEAM_PURPOSES = [
 export const purposeLabel = (value: string | undefined): string | null =>
   TEAM_PURPOSES.find((p) => p.value === value)?.label ?? null
 
+/** How a Collection entry came to the player (Collection v2). */
+export const ACQUIRE_METHODS = [
+  { value: 'caught', label: 'Caught' },
+  { value: 'hatched', label: 'Hatched' },
+  { value: 'gift', label: 'Gift' },
+  { value: 'in-game-trade', label: 'In-game trade' },
+  { value: 'traded', label: 'Traded' },
+  { value: 'transferred', label: 'Transferred' },
+  { value: 'event', label: 'Event' },
+  { value: 'other', label: 'Other' },
+] as const
+
+export type AcquireMethod = (typeof ACQUIRE_METHODS)[number]['value']
+
+export const acquireMethodLabel = (value: string | null | undefined): string | null =>
+  ACQUIRE_METHODS.find((m) => m.value === value)?.label ?? null
+
+/** The game languages an OT can have. Korean exists from Gen 4 only. */
+export const OT_LANGUAGES = [
+  { value: 'ja', label: 'Japanese' },
+  { value: 'en', label: 'English' },
+  { value: 'fr', label: 'French' },
+  { value: 'it', label: 'Italian' },
+  { value: 'de', label: 'German' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'ko', label: 'Korean', fromGeneration: 4 },
+] as const
+
+export function otLanguagesFor(generation: number): { value: string; label: string }[] {
+  return OT_LANGUAGES.filter((l) => !('fromGeneration' in l) || generation >= l.fromGeneration).map(
+    (l) => ({ value: l.value, label: l.label }),
+  )
+}
+
+export type Pokerus = 'none' | 'infected' | 'cured'
+
 /**
- * One caught Pokemon as it stands now -- the minimal Collection (owner,
- * 2026-10-15): enough for #9 "EV/Stat Exp remaining" to compare it with the
- * Build it is being trained toward. Team Matchup's `collectionId` link fields
- * were shaped for this.
+ * One owned Pokemon as it stands now. v1 (owner, 2026-10-15) was the minimal
+ * record #9 "EV/Stat Exp remaining" needed; v2 (2026-11-07, docs/SPEC.md slice C)
+ * adds what the player knows about it, so the Damage calculator and Team Matchup
+ * can use it as a Pokemon.
+ *
+ * THE v1 FIELDS STAY EXACTLY AS THEY WERE, and no v2 field is required to
+ * exist in a stored document: `collectionSchema.migrateEntry` fills them on read.
+ * Which fields a generation has is `collectionSchema.collectionFields`.
  */
 export interface CollectionEntry {
   id: string
@@ -129,10 +169,37 @@ export interface CollectionEntry {
   level: number
   /** Gen 3+ only. */
   natureId: number | null
-  /** Its EVs (Gen 3-4) or Stat Exp (Gen 1-2) as of now. */
+  /**
+   * Its EVs (Gen 3-4) or Stat Exp (Gen 1-2) as of now, on `spreadKeys(gen).effort`:
+   * Gen 1-2 keep ONE `special`. `entryToBuild` copies it to the split keys.
+   */
   effort: StatNumbers
   /** The Build it is being trained toward, if any. */
   buildId: string | null
+  // ---- v2
+  /** The variety; null = the species' default. */
+  pokemonId: number | null
+  /** The version group it lives in. */
+  game: string | null
+  /** Stored Gen 3+. Gen 2 derives it from the Attack DV, Gen 1 has none. */
+  gender: Gender | null
+  /** Stored Gen 3+. Gen 2 derives it from the DVs. */
+  shiny: boolean
+  abilityId: number | null
+  /**
+   * IVs, or DVs in Gen 1-2, on `spreadStatKeys(gen)`. SPARSE ON PURPOSE: a key
+   * left out is UNKNOWN, which is why a migrated v1 entry is never an Exact fit.
+   */
+  individual: StatNumbers
+  itemId: number | null
+  /** Always MOVE_SLOTS long. */
+  moveIds: (number | null)[]
+  met: { location: string; level: number | null; date: string | null }
+  ot: { name: string; id: string; language: string | null }
+  acquired: { date: string | null; method: AcquireMethod | null }
+  pokerus: Pokerus
+  /** Reserved slot, no UI and no logic behind it (spec, slice C). */
+  ribbons: string[]
 }
 
 export interface TeamBuilderData {
@@ -143,6 +210,12 @@ export interface TeamBuilderData {
   /** The Collection; absent in documents written before it existed. */
   collection: CollectionEntry[]
   nextEntrySeq: number
+  /**
+   * 2 since Collection v2. Written, NEVER READ AS A GATE: a client from before
+   * it drops top-level fields it does not know, so a v2 document can come back
+   * without it -- and every entry is migrated on read regardless.
+   */
+  schemaVersion?: number
 }
 
 export const EMPTY_DATA: TeamBuilderData = {
@@ -152,6 +225,7 @@ export const EMPTY_DATA: TeamBuilderData = {
   nextTeamSeq: 1,
   collection: [],
   nextEntrySeq: 1,
+  schemaVersion: 2,
 }
 
 const GEN1_STAT_KEYS: readonly StatKey[] = ['hp', 'attack', 'defense', 'special', 'speed']

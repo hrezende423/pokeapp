@@ -27,6 +27,11 @@ import {
   teamRows,
   teamSortFields,
 } from '../../team-builder/libraryQuery'
+import {
+  collectionFilterSections,
+  collectionRows,
+  collectionSortFields,
+} from '../../collection/collectionQuery'
 import { useTeamBuilderData } from '../../team-builder/store'
 import { useTbScreen } from '../../team-builder/tbNav'
 import type { FilterSection, SortField } from './dexQuery'
@@ -146,6 +151,18 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
     if (tbList === 'tb-teams') {
       const rows = teamRows(tbData)
       return erase('tb-teams', rows, teamFilterSections(rows), teamSortFields(), 'order')
+    }
+    /* The Collection: the app generation's entries only -- it follows the
+       selector, so another generation's entries are not in the list at all. */
+    if (moduleId === 'collection') {
+      const rows = collectionRows(tbData, generation)
+      return erase(
+        'collection',
+        rows,
+        collectionFilterSections(rows, generation),
+        collectionSortFields(),
+        'order',
+      )
     }
     switch (moduleId) {
       case 'pokedex': {

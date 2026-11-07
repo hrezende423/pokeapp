@@ -30,26 +30,41 @@ import {
   type Team,
   type TeamBuilderData,
 } from './model'
+import { migrateEntry } from '../collection/collectionSchema'
 
 const KEY = 'pokeapp:team-builder:v1'
 
 let cache: TeamBuilderData | null = null
 const listeners = new Set<() => void>()
 
+/**
+ * Any stored document -> the current shape. Idempotent: normalise(normalise(x))
+ * is normalise(x).
+ *
+ * UNKNOWN FIELDS ARE KEPT, top level and per entry (`{...doc, ...known}`), so a
+ * document a NEWER client wrote survives a round trip through this one. Collection
+ * entries go through `migrateEntry` every time -- never gated on
+ * `schemaVersion`, which an older client drops (see collectionSchema.ts).
+ */
 export function normalise(raw: unknown): TeamBuilderData {
   if (!raw || typeof raw !== 'object') return EMPTY_DATA
   const doc = raw as Partial<TeamBuilderData>
   const builds = Array.isArray(doc.builds) ? doc.builds : []
   const teams = Array.isArray(doc.teams) ? doc.teams : []
+  const collection = Array.isArray(doc.collection)
+    ? doc.collection.filter((c) => c != null && typeof c === 'object' && !Array.isArray(c))
+    : []
   return {
+    ...doc,
     // Slot arrays are re-padded on read: a document written by an older shape,
     // or hand-edited in devtools, must not make a screen index past its end.
     builds: builds.map((b) => ({ ...b, moveIds: padSlots(b.moveIds ?? [], MOVE_SLOTS, null) })),
     teams: teams.map((t) => ({ ...t, memberIds: padSlots(t.memberIds ?? [], TEAM_SIZE, null) })),
     nextBuildSeq: doc.nextBuildSeq ?? builds.length + 1,
     nextTeamSeq: doc.nextTeamSeq ?? teams.length + 1,
-    collection: Array.isArray(doc.collection) ? doc.collection : [],
+    collection: collection.map(migrateEntry),
     nextEntrySeq: doc.nextEntrySeq ?? (Array.isArray(doc.collection) ? doc.collection.length : 0) + 1,
+    schemaVersion: 2,
   }
 }
 
@@ -318,10 +333,17 @@ export function reorderTeam(teamId: string, from: number, to: number) {
 
 // ------------------------------------------------------------- Collection
 
-export function createEntry(init: Omit<CollectionEntry, 'id' | 'seq'>): CollectionEntry {
+/** The v1 fields are required; any v2 field left out takes its default. */
+export type EntryInit = Pick<
+  CollectionEntry,
+  'generation' | 'speciesId' | 'nickname' | 'level' | 'natureId' | 'effort' | 'buildId'
+> &
+  Partial<Omit<CollectionEntry, 'id' | 'seq'>>
+
+export function createEntry(init: EntryInit): CollectionEntry {
   const data = readData()
   const seq = data.nextEntrySeq ?? 1
-  const entry: CollectionEntry = { ...init, id: `c${seq}`, seq }
+  const entry: CollectionEntry = migrateEntry({ ...init, id: `c${seq}`, seq })
   write({ ...data, collection: [...(data.collection ?? []), entry], nextEntrySeq: seq + 1 })
   return entry
 }

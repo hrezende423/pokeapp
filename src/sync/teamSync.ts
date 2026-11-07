@@ -144,14 +144,20 @@ export function mergeDocs(cloud: TeamBuilderData, device: TeamBuilderData): Team
     const seq = entrySeq++
     return { ...c, id: `c${seq}`, seq, buildId: c.buildId == null ? null : (buildId.get(c.buildId) ?? null) }
   })
-  return {
+  // Unknown fields survive: the device's, then the cloud's over them, and the
+  // result through `normalise` -- which migrates every entry, so a v1 side and a
+  // v2 side come out as one v2 document. Entries are spread above, so each keeps
+  // its own v2 and unknown fields.
+  return normalise({
+    ...device,
+    ...cloud,
     builds: [...cloud.builds, ...builds],
     teams: [...cloud.teams, ...teams],
     nextBuildSeq: buildSeq,
     nextTeamSeq: teamSeq,
     collection: [...(cloud.collection ?? []), ...entries],
     nextEntrySeq: entrySeq,
-  }
+  })
 }
 
 // ------------------------------------------------------------------ remote
