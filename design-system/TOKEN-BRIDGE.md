@@ -21,7 +21,11 @@ A token is aliased only when a dist token of the SAME KIND (spacing to spacing, 
 
 ## Changed on purpose: the accent
 
-`--accent` is now `var(--color-accent-default)`, which is #C91D1D in both modes. It was #d91c2c in light and #ff3b4e in dark. `--field-focus-border` and `--field-error-border`, which the app defines as `var(--accent)`, follow it. The frozen screens were compared pixel by pixel before and after: see docs/status/results.md, item 6.
+**Light: bridged.** `--accent` is `var(--color-accent-default)` (#C91D1D, was #d91c2c). `--field-focus-border` and `--field-error-border`, defined as `var(--accent)`, follow it.
+
+**Dark: NOT bridged, and why.** Dist has one accent for both modes, #C91D1D. Aliasing dark (#ff3b4e) to it changed **4 pixels of the signed-off Team Display in dark mode** (x 140-149, y 187-225 of `.tb-team-viewer`, in `scripts/compare-frozen.mjs`'s seeded team). A frozen screen may not move by one pixel without the owner asking, so the dark alias was reverted: dark keeps #ff3b4e until the owner decides. With light bridged and dark unchanged, all six frozen screenshots (three screens, two themes) are pixel-identical to the base.
+
+How it was checked: `node scripts/compare-frozen.mjs capture <dir>` on the base and on this branch, then `compare`. A control (the base captured twice) differed on the Team Display by up to 65,892 pixels, because animated sprites change frame. The tool therefore hides every image in both captures (`visibility: hidden`, so each box keeps its size), and after that the control was pixel-identical.
 
 ## No equivalent in dist yet (54)
 

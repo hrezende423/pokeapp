@@ -263,8 +263,12 @@
   --text-secondary: #8f8f95;
   --hairline: #2c2c2e;
 
-  /* Bridged to the winning set: was #ff3b4e; dist uses one accent in both modes. */
-  --accent: var(--color-accent-default);
+  /* NOT bridged in dark (2026-11-07): dist's single accent (#C91D1D) changed 4 pixels
+     of the signed-off Team Display in dark mode (x 140-149, y 187-225 of the viewer),
+     and a frozen screen may not move by one pixel without the owner asking. Light is
+     bridged; dark keeps its own value until the owner decides. See
+     design-system/TOKEN-BRIDGE.md. */
+  --accent: #ff3b4e;
 
   /* increase 6.38:1, decrease 6.87:1 against #141414; the red is 70 units from
      the dark --accent (#ff3b4e). */

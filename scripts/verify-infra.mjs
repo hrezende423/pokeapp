@@ -176,7 +176,10 @@ hr('6. DESIGN TOKENS (bridge only)')
   const distNames = new Set([...read('design-system/dist/tokens.css').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))
   const dangling = Object.values(bridge).filter((v) => !distNames.has(v))
   check('every alias target exists in dist/tokens.css', dangling.length === 0, dangling.join(', '))
-  check('the accent resolves to the dist value', (app.match(/--accent:\s*var\(--color-accent-default\)/g) ?? []).length === 2)
+  check(
+    'the light accent resolves to the dist value; dark keeps its own (it moved a frozen screen)',
+    (app.match(/--accent:\s*var\(--color-accent-default\)/g) ?? []).length === 1 && /--accent: #ff3b4e;/.test(app),
+  )
   check('the tokens with no equivalent are listed (design-system/TOKEN-BRIDGE.md)', /## No equivalent in dist yet/.test(read('design-system/TOKEN-BRIDGE.md')))
   check('the frozen-screen pixel comparison tool exists', /compare <a> <b>/.test(read('scripts/compare-frozen.mjs')))
 }

@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.22 — 2026-11-07 (non-breaking)
+- Tokens bridge (`src/design-tokens.css` → `dist/tokens.css`, owner decision 2026-11-06): eight app tokens are now `var()` aliases of same-kind dist tokens with identical values in every mode (body and title sizes, control and pill radii, the sm and xl gaps, the focus border width, medium weight), and `--font-weight-regular`/`-bold` come from dist. **The light accent is now dist's #C91D1D (was #d91c2c)**: the active nav item, the selected tab, and the field focus and error borders. The dark accent is unchanged (#ff3b4e), because dist's value moved 4 pixels of the signed-off Team Display. The list of tokens with no dist equivalent is in `TOKEN-BRIDGE.md`
 ## 2.1.21 — 2026-11-07 (non-breaking)
 Recorded late: these four commits of 2026-10-15/16 changed CSS without an entry here. Each bullet is dated by its commit; nothing changed on 2026-11-07.
 - 2026-10-15 baseline (`8207a25`), `team-builder/teamBuilder.css`: the Team Display card's move-name column has a 110px floor again (`--tb-move-name-min`: the widest Gen 1-4 name, "~ High Jump Kick*", plus 12px), so the column no longer shrinks to the longest name on that card. Added in d27ba5e, lost in the Build Form redesign's revert (d59f6f0), restored
