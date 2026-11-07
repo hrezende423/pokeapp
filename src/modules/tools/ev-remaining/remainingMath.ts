@@ -8,7 +8,7 @@
  */
 
 import { effortKeysFor } from '../../collection/collectionMath'
-import type { StatKey, StatNumbers } from '../../team-builder/statMath'
+import { specialStatExp, type StatKey, type StatNumbers } from '../../team-builder/statMath'
 
 export interface RemainingRow {
   key: StatKey
@@ -33,7 +33,8 @@ export function remaining(
 ): Remaining {
   const rows = effortKeysFor(generation).map((key) => {
     const c = current[key] ?? 0
-    const t = target[key] ?? 0
+    // The target is a Build, which keeps Gen 2 Special under the split keys.
+    const t = key === 'special' ? specialStatExp(target, generation) : (target[key] ?? 0)
     return { key, current: c, target: t, left: Math.max(0, t - c), over: Math.max(0, c - t) }
   })
   const totalLeft = rows.reduce((s, r) => s + r.left, 0)

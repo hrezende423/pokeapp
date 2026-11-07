@@ -717,6 +717,8 @@ try {
     const store = await import('/pokeapp/src/modules/team-builder/store.ts')
     const g4 = rm.remaining(4, { hp: 100, speed: 252 }, { hp: 252, speed: 200, attack: 4 })
     const g2 = rm.remaining(2, { hp: 1000, special: 65535 }, { hp: 65535, special: 65535 })
+    // A Gen 2 Build as the Build Form stores it: Special under the split keys.
+    const g2form = rm.remaining(2, { special: 1000 }, { 'special-attack': 65535, 'special-defense': 65535 })
     const draft = (effort) => ({ speciesId: 1, nickname: '', level: '50', natureId: null, effort, buildId: null })
     const merged = sync.mergeDocs(
       { builds: [{ id: 'b1' }], teams: [], nextBuildSeq: 2, nextTeamSeq: 1, collection: [{ id: 'c1', seq: 1, buildId: 'b1' }], nextEntrySeq: 2 },
@@ -727,6 +729,7 @@ try {
       g4: g4.rows.map((r) => `${r.key}:${r.left}/${r.over}`),
       g4total: g4.totalLeft,
       g2: [g2.totalLeft, g2.rows.find((r) => r.key === 'special').left],
+      g2form: g2form.rows.find((r) => r.key === 'special').left,
       over510: cm.checkEntry(4, draft({ hp: '252', attack: '252', speed: '8' })),
       g2cap: cm.checkEntry(2, draft({ hp: '65536' })),
       g2ok: cm.checkEntry(2, draft({ hp: '65535' })).ok,
@@ -737,6 +740,7 @@ try {
   })
   check('Gen 4: 152 HP and 4 Atk to go, Speed 52 over (reported as over, not negative)', JSON.stringify(col.g4) === '["hp:152/0","attack:4/0","defense:0/0","special-attack:0/0","special-defense:0/0","speed:0/52"]' && col.g4total === 156, JSON.stringify(col.g4))
   check('Gen 2 reads Stat Exp on the five Gen 1-2 keys', col.g2[0] === 64535 && col.g2[1] === 0, JSON.stringify(col.g2))
+  check('a Gen 2 Build target stored under the split Special keys still counts', col.g2form === 64535, String(col.g2form))
   check('an entry over 510 EVs is a reason', !col.over510.ok && col.over510.reason.includes('510'), col.over510.reason)
   check('Gen 2 Stat Exp tops out at 65535', !col.g2cap.ok && col.g2ok, col.g2cap.reason)
   check('a first sync renumbers device entries after the cloud\'s and re-points their build', JSON.stringify(col.merged) === '["c1->b1","c2->b2","c3->null"]' && col.nextEntry === 4, JSON.stringify(col.merged))
