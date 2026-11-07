@@ -35,6 +35,9 @@ jobs:
 
       - run: npm run lint
 
+      - name: Typecheck
+        run: npx tsc -b
+
       - run: npm run build
         env:
           # The site is served at /<repo name>/: '/pokeapp/' for this repo, and
