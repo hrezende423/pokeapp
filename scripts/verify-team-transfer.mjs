@@ -217,6 +217,63 @@ try {
   check('Hidden Power of another type than the IVs give is reported', r.hpIce.some((n) => /Hidden Power is .* not Ice/.test(n)), JSON.stringify(r.hpIce))
   check('a Gen 2 EV over 252 is reported', r.big.hp === 65535 && r.big.n.some((n) => /lowered/.test(n)), JSON.stringify(r.big))
 
+  // Slice B: gender by generation (pokecrystal GetGender: only the Attack DV decides).
+  const g = await page.evaluate(async () => {
+    const sm = await import('/pokeapp/src/modules/team-builder/statMath.ts')
+    const bf = await import('/pokeapp/src/modules/team-builder/buildFacts.ts')
+    const si = await import('/pokeapp/src/modules/team-builder/showdownImport.ts')
+    const d = await import('/pokeapp/src/data/index.ts')
+    // [gender_rate, DV on the female side, DV on the male side]
+    const edges = [[0, 0, 15], [1, 1, 2], [2, 3, 4], [4, 7, 8], [6, 11, 12], [8, 0, 15], [-1, 0, 15]]
+    const base = {
+      id: 'g',
+      nickname: '',
+      shiny: false,
+      level: 50,
+      friendship: 70,
+      itemId: null,
+      abilityId: null,
+      natureId: null,
+      moveIds: [null, null, null, null],
+      effort: {},
+      tags: [],
+      notes: '',
+    }
+    // Pikachu and Tyranitar are both gender_rate 4: female when the Attack DV is 7 or less.
+    const gen1F = { ...base, generation: 1, speciesId: 25, pokemonId: 25, gender: 'female', individual: { attack: 3 } }
+    const gen1M = { ...gen1F, gender: 'male', individual: { attack: 15 } }
+    const gen2 = { ...base, generation: 2, speciesId: 248, pokemonId: 248, gender: 'male', individual: { attack: 5, defense: 15, speed: 15, special: 15 } }
+    const conflict = (await si.resolveImport('Tyranitar (M)\nIVs: 10 Atk', 2, 'build')).items[0]
+    const agree = (await si.resolveImport('Tyranitar (F)\nIVs: 10 Atk', 2, 'build')).items[0]
+    return {
+      edges: edges.map(([rate, f, m]) => [rate, sm.gen2GenderFromAttackDv(f, rate), sm.gen2GenderFromAttackDv(m, rate)]),
+      speedIrrelevant: [0, 15].map((spe) => bf.buildGender({ ...gen2, individual: { attack: 7, speed: spe } }, d.getSpecies(248))),
+      unsetDv: bf.buildGender({ ...gen2, individual: {} }, d.getSpecies(248)),
+      gen1: bf.buildGender(gen1F, d.getSpecies(25)),
+      gen3: bf.buildGender({ ...gen2, generation: 3, gender: 'male' }, d.getSpecies(248)),
+      text1: si.exportBuilds([gen1F, gen1M]),
+      text2: si.exportBuilds([gen2]),
+      conflict: { gender: conflict.build.gender, n: conflict.notes },
+      agree: { gender: agree.build.gender, n: agree.notes },
+    }
+  })
+  const want = { 0: ['male', 'male'], 1: ['female', 'male'], 2: ['female', 'male'], 4: ['female', 'male'], 6: ['female', 'male'], 8: ['female', 'female'], [-1]: [null, null] }
+  for (const [rate, f, m] of g.edges) {
+    check(`Gen 2 gender_rate ${rate}: the Attack DVs either side of the threshold`, f === want[rate][0] && m === want[rate][1], `${f} / ${m}`)
+  }
+  check('Gen 2: the Speed DV does not decide', g.speedIrrelevant.join() === 'female,female', g.speedIrrelevant.join())
+  check('Gen 2: an unset Attack DV reads 0, so female at rate 4', g.unsetDv === 'female', String(g.unsetDv))
+  check('Gen 1: buildGender is null even with a gender stored', g.gen1 === null, String(g.gen1))
+  check('Gen 3: buildGender is the stored value', g.gen3 === 'male', String(g.gen3))
+  check('Gen 1 export writes no (M) or (F), even when stored', !/\((M|F)\)/.test(g.text1), JSON.stringify(g.text1))
+  check('Gen 2 export writes the derived gender, not the stored one', /^Tyranitar \(F\)/.test(g.text2), JSON.stringify(g.text2))
+  check(
+    'Gen 2 import of a conflicting (M): the DVs decide, and it is noted',
+    g.conflict.gender === 'female' && g.conflict.n.includes('Gender comes from the Attack DV in Gen 2: female, not male.'),
+    JSON.stringify(g.conflict),
+  )
+  check('Gen 2 import of an agreeing (F): no note', g.agree.gender === 'female' && !g.agree.n.some((n) => /Gender/.test(n)), JSON.stringify(g.agree))
+
   // ------------------------------------------------------------------ 2
   hr('2. IMPORT ON SCREEN, never overwriting')
   const b = (id, speciesId, extra = {}) => ({

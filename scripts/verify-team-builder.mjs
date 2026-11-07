@@ -4415,6 +4415,67 @@ try {
     JSON.stringify(merged),
   )
 
+  // ======================================== gender by generation, 2026-11-07
+  /*
+    Slice B (docs/SPEC.md). Gen 1 has no gender: the field is ABSENT. Gen 2's comes
+    from the Attack DV (pokecrystal GetGender), so the field shows it, disabled.
+    Pikachu is gender_rate 4: female when the Attack DV is 7 or less.
+  */
+  hr('GENDER BY GENERATION: NONE IN GEN 1, THE ATTACK DV IN GEN 2')
+  await seedStore({
+    nextBuildSeq: 4,
+    nextTeamSeq: 1,
+    builds: [
+      mkBuild('b1', { generation: 1, speciesId: 25, pokemonId: 25, gender: 'female' }),
+      mkBuild('b2', { generation: 2, speciesId: 25, pokemonId: 25, gender: 'male', individual: { attack: 7 } }),
+      mkBuild('b3', { generation: 3, speciesId: 25, pokemonId: 25, gender: 'male' }),
+    ],
+    teams: [],
+  })
+  const openGenderBuild = async (id) => {
+    await goTo('build-library')
+    await page.waitForSelector('[data-testid="tb-build-grid"]')
+    await page.click(`[data-testid="tb-build-${id}-open"]`)
+    await page.waitForSelector('[data-testid="tb-build-form"]')
+  }
+  const genderField = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('[data-testid="tb-gender"]')
+      return el ? { value: el.value, disabled: el.disabled } : null
+    })
+
+  await openGenderBuild('b1')
+  const gen1Field = await genderField()
+  check('a Gen 1 Build has no gender field, even with one stored', gen1Field === null, JSON.stringify(gen1Field))
+
+  await openGenderBuild('b2')
+  const gen2Before = await genderField()
+  check(
+    'a Gen 2 Build shows the gender its Attack DV gives (7: female), disabled',
+    gen2Before?.value === 'female' && gen2Before.disabled === true,
+    JSON.stringify(gen2Before),
+  )
+  await page.fill('[data-testid="tb-iv-attack-value"]', '8')
+  await page.waitForTimeout(100)
+  const gen2After = await genderField()
+  check(
+    'raising the Attack DV to 8 crosses the threshold: male',
+    gen2After?.value === 'male' && gen2After.disabled === true,
+    JSON.stringify(gen2After),
+  )
+  await page.fill('[data-testid="tb-iv-attack-value"]', '7')
+  await page.waitForTimeout(100)
+  const gen2Back = await genderField()
+  check('and back to 7: female again', gen2Back?.value === 'female', JSON.stringify(gen2Back))
+
+  await openGenderBuild('b3')
+  const gen3Field = await genderField()
+  check(
+    'a Gen 3 Build still sets gender by hand: the field is enabled',
+    gen3Field?.disabled === false && gen3Field.value === 'male',
+    JSON.stringify(gen3Field),
+  )
+
   check('no console or page errors', realErrors.length === 0, realErrors.slice(0, 3).join(' | '))
 
   hr(failures.length ? `FAILED — ${failures.length} check(s)` : 'ALL CHECKS PASSED')

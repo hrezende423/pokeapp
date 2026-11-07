@@ -206,6 +206,27 @@ Spec: `docs/SPEC.md`, slice A. Suite: `verify-team-transfer`.
   at its natural width dropped to a second line and made a signed-off card 32px
   taller. `verify-team-transfer` §3 asserts the height.
 
+## Gender by generation (2026-11-07)
+
+Spec: `docs/SPEC.md`, slice B. Suites: `verify-team-transfer` §1, `verify-team-builder` (last section).
+
+- **`buildGender(build, species)` (`buildFacts.ts`) is the one reader** of a Build's
+  gender: the cards, the Build Form, Compare, the Showdown export, the battle spec
+  and the Damage calculator all go through it. Gen 1: null, whatever is stored.
+  Gen 2: derived. Gen 3+: the stored value. **Stored `gender` is never rewritten**,
+  so a Build carried back to Gen 3 keeps its own.
+- **Gen 2's comes from the Attack DV alone** (`statMath.gen2GenderFromAttackDv`),
+  from pokecrystal `engine/pokemon/mon_stats.asm` `GetGender`: the byte
+  `(AttackDV << 4) | SpeedDV` against the species ratio, male if `ratio < byte`.
+  The ratios (F12_5 31, F25 63, F50 127, F75 191) all end in F, so the Speed DV
+  never decides. In PokeAPI's `gender_rate`: 1 female iff Attack DV <= 1, 2 <= 3,
+  4 <= 7, 6 <= 11; 0 always male, 8 always female, -1 genderless. An unset DV reads 0.
+- **The Build Form**: Gen 1 renders no gender field (absent, not disabled); Gen 2
+  renders it disabled at the derived value, computed at render so a DV change shows
+  at once. No layout change: this is the owner's named exception to the freeze.
+- **Import in Gen 2**: the DVs decide; a pasted `(M)`/`(F)` that disagrees keeps the
+  derived value and adds "Gender comes from the Attack DV in Gen 2: female, not male."
+
 ## The unsaved member
 
 `Build.draft` IS LEGACY. Nothing writes it; the shell prunes any it finds.

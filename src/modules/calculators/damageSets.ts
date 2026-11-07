@@ -32,6 +32,7 @@ import {
   type TrainerPokemon,
 } from '../../data/trainers'
 import type { SearchOption } from '../../components/ds/SearchSelect'
+import { buildGender } from '../team-builder/buildFacts'
 import { orderedBuilds, listedTeams, uiId, type Build, type TeamBuilderData } from '../team-builder/model'
 import type { StatNumbers } from '../team-builder/statMath'
 import { MAX_IV, specialStatExp } from '../team-builder/statMath'
@@ -198,6 +199,9 @@ function buildSets(data: TeamBuilderData, gen: number): CalcSet[] {
   return out
 }
 
+const genderCode = (g: 'male' | 'female' | null): 'M' | 'F' | 'N' =>
+  g === 'male' ? 'M' : g === 'female' ? 'F' : 'N'
+
 function applyBuild(
   side: SideState,
   gen: number,
@@ -215,7 +219,8 @@ function applyBuild(
     natureId: gen >= 3 ? (b.natureId ?? next.natureId) : null,
     abilityId:
       gen >= 3 && abilities.some((a) => a.ability.id === b.abilityId) ? b.abilityId : next.abilityId,
-    gender: gen >= 4 ? (b.gender === 'male' ? 'M' : b.gender === 'female' ? 'F' : 'N') : 'N',
+    // Gen 4 only: Rivalry is the one thing the calculator reads it for.
+    gender: gen >= 4 ? genderCode(buildGender({ ...b, generation: gen }, getSpecies(speciesId))) : 'N',
     // A Gen 2 Build keeps its Special Stat Exp under the split keys; the
     // calculator reads `special` (statMath.specialStatExp).
     effort: {

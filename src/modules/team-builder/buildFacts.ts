@@ -43,7 +43,7 @@ import type { Item, Species, StatEntry, Variety } from '../../data'
 import { itemArtworkUrl, itemIconUrl } from '../../data/itemArtwork'
 import { resolveMoveTypeNameForGeneration } from '../../data/moveEra'
 import type { Build, Gender } from './model'
-import type { NatureMods, StatKey } from './statMath'
+import { gen2GenderFromAttackDv, type NatureMods, type StatKey } from './statMath'
 
 export interface SpeciesFacts {
   species: Species
@@ -548,6 +548,29 @@ export function genderOptionsFor(species: Species): Gender[] | null {
   if (rate === 0) return ['male']
   if (rate === 8) return ['female']
   return ['male', 'female']
+}
+
+/**
+ * The gender a Build HAS, which is not always the one it stores. THE ONE READER:
+ * nothing outside this file reads `build.gender` for display, export or battle.
+ *
+ *   Gen 1: none at all -- null, whatever is stored.
+ *   Gen 2: derived from the Attack DV (`gen2GenderFromAttackDv`, pokecrystal
+ *     GetGender). An unset DV reads 0 in this app.
+ *   Gen 3+: the stored value, set by hand.
+ *
+ * Stored values are never rewritten, so a Build moved back to Gen 3 keeps its own.
+ */
+export function buildGender(
+  build: Pick<Build, 'generation' | 'gender' | 'individual'>,
+  species: Pick<Species, 'gender_rate'> | null | undefined,
+): Gender | null {
+  if (build.generation <= 1) return null
+  if (build.generation === 2) {
+    if (!species) return null
+    return gen2GenderFromAttackDv(build.individual.attack ?? 0, species.gender_rate ?? -1)
+  }
+  return build.gender
 }
 
 export function genderGlyph(gender: Gender | null): string | null {

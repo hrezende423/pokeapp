@@ -12,7 +12,16 @@
 import { IconArrowLeft } from '@tabler/icons-react'
 import { TypeLabel } from '../../components/ds/TypeLabel'
 import { GhostButton } from './ui/GhostButton'
-import { abilityName, buildLabel, buildSpecies, genderGlyph, itemName, moveRowsFor, natureName } from './buildFacts'
+import {
+  abilityName,
+  buildGender,
+  buildLabel,
+  buildSpecies,
+  genderGlyph,
+  itemName,
+  moveRowsFor,
+  natureName,
+} from './buildFacts'
 import { buildRows, type BuildRow } from './libraryQuery'
 import type { Build } from './model'
 import { useTeamBuilderData } from './store'
@@ -63,7 +72,7 @@ function statRows(a: BuildRow, b: BuildRow): Row[] {
 }
 
 const fieldsFor = (b: Build) => ({
-  gender: b.generation >= 2 ? genderGlyph(b.gender) : null,
+  gender: genderGlyph(buildGender(b, buildSpecies(b)?.species)),
   ability: b.generation >= 3 && b.abilityId != null ? abilityName(b.abilityId) : null,
   nature: b.generation >= 3 && b.natureId != null ? natureName(b.natureId) : null,
   item: b.generation >= 2 && b.itemId != null ? itemName(b.itemId) : null,

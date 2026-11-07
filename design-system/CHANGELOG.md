@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.18 — 2026-11-07 (non-breaking)
+- Team Building, gender by generation: a Gen 1 Build has no gender field in the Build Form, no glyph on its card, no `(M)`/`(F)` in its export and none in Compare. A Gen 2 Build's gender comes from its Attack DV (pokecrystal `GetGender`); the Build Form's field shows it disabled, the shape a single-gender species already takes, and it changes as the DV does. Gen 3-4 unchanged. No layout or CSS change; stored values are not rewritten
 ## 2.1.17 — 2026-11-06 (non-breaking)
 - Team Building: Showdown text in and out, in `ui/TransferModal`; a Build name beside the "#001" on the Build Library card, truncated so the card does not move; Compare in the Build Library's selection bar, opening `tb-compare`, where a differing row carries a `--color-border-strong` line on its left edge
 ## 2.1.16 — 2026-11-06 (non-breaking)

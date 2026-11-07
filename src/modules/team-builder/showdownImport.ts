@@ -18,6 +18,7 @@ import { speciesEntries } from '../dex/entrySources'
 import {
   abilityName,
   abilityOptionsFor,
+  buildGender,
   buildSpecies,
   genderOptionsFor,
   itemOptionsFor,
@@ -37,7 +38,7 @@ import {
   type SdStat,
   type ShowdownSet,
 } from './showdown'
-import { MAX_DV, MAX_EV, MAX_IV, hiddenPower, isShinyByDvs } from './statMath'
+import { MAX_DV, MAX_EV, MAX_IV, gen2GenderFromAttackDv, hiddenPower, isShinyByDvs } from './statMath'
 import type { StatKey, StatNumbers } from './statMath'
 import { createBuild, createTeam } from './store'
 
@@ -136,11 +137,12 @@ export function buildToSet(build: Build): ShowdownSet | null {
   if (!facts) return null
   const g = build.generation
   const canPickGender = (genderOptionsFor(facts.species)?.length ?? 0) === 2
+  // None in Gen 1, the Attack DV's in Gen 2, the stored one after.
+  const gender = canPickGender ? buildGender(build, facts.species) : null
   return {
     nickname: build.nickname.trim(),
     species: speciesText(facts.species, facts.variety),
-    gender:
-      g >= 2 && canPickGender && build.gender ? (build.gender === 'male' ? 'M' : 'F') : null,
+    gender: gender ? (gender === 'male' ? 'M' : 'F') : null,
     item: g >= 2 && build.itemId != null ? (getItem(build.itemId)?.display_name ?? null) : null,
     ability: g >= 3 && build.abilityId != null ? abilityName(build.abilityId) : null,
     level: build.level,
@@ -364,15 +366,23 @@ async function readSet(
   if (generation === 1 && set.shiny) notes.push('Shiny dropped: Gen 1 has none.')
   if (generation === 1 && set.happiness != null) notes.push('Happiness dropped: Gen 1 has none.')
 
+  const individual = readIndividual(set, generation, notes)
+
   const genders = genderOptionsFor(species)
   const wanted = set.gender === 'F' ? 'female' : set.gender === 'M' ? 'male' : null
   let gender = generation === 1 ? null : init.gender
-  if (generation >= 2 && wanted && genders) {
+  if (generation === 2) {
+    // In Gen 2 the DVs decide (buildFacts.buildGender); the pasted letter only checks them.
+    gender = gen2GenderFromAttackDv(individual.attack ?? 0, species.gender_rate ?? -1)
+    if (wanted && genders && !genders.includes(wanted)) {
+      notes.push(`${species.display_name} cannot be ${wanted}.`)
+    } else if (wanted && gender && wanted !== gender) {
+      notes.push(`Gender comes from the Attack DV in Gen 2: ${gender}, not ${wanted}.`)
+    }
+  } else if (generation >= 3 && wanted && genders) {
     if (genders.includes(wanted)) gender = wanted
     else notes.push(`${species.display_name} cannot be ${wanted}.`)
   }
-
-  const individual = readIndividual(set, generation, notes)
   if (generation === 2 && set.shiny && !isShinyByDvs(individual)) {
     notes.push('Shiny dropped: in Gen 2 the DVs decide, and these are not shiny.')
   }

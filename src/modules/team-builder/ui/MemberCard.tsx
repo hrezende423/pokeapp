@@ -34,6 +34,7 @@ import { TypeLabel } from '../../../components/ds/TypeLabel'
 import { resolveArtworkUrl } from '../../../data'
 import {
   abilityName,
+  buildGender,
   buildSpecies,
   categoryLabel,
   displayName,
@@ -151,7 +152,8 @@ export function MemberCard({
   }
   const { species, variety, types } = facts
   const { primary, secondary } = displayName(build, species)
-  const glyph = genderGlyph(build.gender)
+  const gender = buildGender(build, species)
+  const glyph = genderGlyph(gender)
   const moves = moveRowsFor(build)
   const spread = spreadSummary(build, statKeysForGeneration(build.generation))
   const dvSpread = spreadSummary(build, spreadStatKeys(build.generation))
@@ -163,7 +165,7 @@ export function MemberCard({
   const view = {
     source: 'artwork',
     shiny: build.shiny,
-    gender: build.gender === 'female' ? 'female' : ('male' as const),
+    gender: gender === 'female' ? 'female' : ('male' as const),
   } as const
   /* FALLS BACK TO THE STILL. The animated set covers 1,174 slots, not all of
      them, and `resolveArtworkUrl` answers null rather than inventing a URL --
@@ -330,7 +332,7 @@ export function MemberCard({
           )}
           {/* Genderless renders NOTHING -- not a symbol, not a dash. */}
           {glyph && (
-            <span className="tb-card-gender" data-gender={build.gender}>
+            <span className="tb-card-gender" data-gender={gender ?? undefined}>
               {glyph}
             </span>
           )}

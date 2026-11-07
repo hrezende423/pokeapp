@@ -20,6 +20,7 @@ import type {
   TrainerPokemon,
 } from '../../data/trainers'
 import { trainerLabel } from '../../data/trainers'
+import { buildGender } from '../team-builder/buildFacts'
 import type { Build } from '../team-builder/model'
 import { specialStatExp } from '../team-builder/statMath'
 import { exactSpread, spreadKeys, type BattlerSpec, type SpreadSpec } from './battler'
@@ -54,6 +55,9 @@ function varietyName(speciesId: number, pokemonId: number): string {
   )
 }
 
+const genderCode = (g: 'male' | 'female' | null): 'M' | 'F' | 'N' =>
+  g === 'male' ? 'M' : g === 'female' ? 'F' : 'N'
+
 export function buildToSpec(b: Build, ctx: GameContext, slot: number): BattlerSpec {
   const gen = ctx.generation
   const species = getSpecies(b.speciesId)
@@ -78,7 +82,9 @@ export function buildToSpec(b: Build, ctx: GameContext, slot: number): BattlerSp
     moves: pad4(b.moveIds),
     itemId: gen >= 2 ? b.itemId : null,
     abilityId: gen >= 3 ? b.abilityId : null,
-    gender: b.gender === 'male' ? 'M' : b.gender === 'female' ? 'F' : 'N',
+    // The battle's generation decides, as it does for the spread: none in Gen 1,
+    // the Attack DV's in Gen 2, the stored one after (buildFacts.buildGender).
+    gender: genderCode(buildGender({ ...b, generation: gen }, species)),
     origin: { buildId: b.id },
   }
 }

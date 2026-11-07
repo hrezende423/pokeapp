@@ -133,6 +133,32 @@ export function nextShinyAttackDv(value: number, direction: 1 | -1): number {
   return list[(index + direction + list.length) % list.length]
 }
 
+/**
+ * Gen 2 gender, computed from the DVs rather than stored.
+ *
+ * pokecrystal `engine/pokemon/mon_stats.asm` GetGender: the byte is
+ * `(AttackDV << 4) | SpeedDV`, and the species' ratio is compared against it --
+ * male if `ratio < byte`, else female. GENDER_UNKNOWN is genderless, GENDER_F0 is
+ * always male and GENDER_F100 always female. The ratios (`N percent` is
+ * N * 255 / 100) are F12_5 = 31, F25 = 63, F50 = 127, F75 = 191: all end in a
+ * low nibble of F, so the Speed DV can never tip the comparison and only the
+ * Attack DV decides. `genderRate` is PokeAPI's eighths female.
+ */
+const GEN2_GENDER_RATIO: Readonly<Record<number, number>> = { 1: 31, 2: 63, 4: 127, 6: 191 }
+
+export function gen2GenderFromAttackDv(
+  attackDv: number,
+  genderRate: number,
+): 'male' | 'female' | null {
+  if (genderRate < 0) return null
+  if (genderRate === 0) return 'male'
+  if (genderRate >= 8) return 'female'
+  const ratio = GEN2_GENDER_RATIO[genderRate] ?? Math.floor((genderRate * 255) / 8)
+  // The Speed DV is the byte's low nibble, read as 0: any value gives the same answer.
+  const byte = (attackDv & 0xf) << 4
+  return ratio < byte ? 'male' : 'female'
+}
+
 export interface NatureMods {
   increased: StatKey | null
   decreased: StatKey | null
