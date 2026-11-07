@@ -1,15 +1,465 @@
 [
-  {"id": "A1", "slice": "A", "category": "functional", "description": "A Build has a real name: saved, labelled, and absent names fall back without data loss", "steps": ["Open Build info", "Set a name", "See it on the library card and in the Damage set list", "Load a document with no names and see nothing change"], "passes": true},
-  {"id": "A2", "slice": "A", "category": "functional", "description": "Library search reads names and tags, and a Tag filter narrows the list", "steps": ["Search a name", "Search a tag", "Pick a tag in the filter"], "passes": true},
-  {"id": "A3", "slice": "A", "category": "functional", "description": "Showdown export for a team and a Build, correct per generation", "steps": ["Export Gen 1, 2 and 4 Builds", "Compare each to the rule table"], "passes": true},
-  {"id": "A4", "slice": "A", "category": "functional", "description": "Showdown import for a team and a Build, with a per-Pokemon report", "steps": ["Paste a Gen 4 team on Gen 4 and on Gen 2", "Read the report", "Confirm", "See new records"], "passes": true},
-  {"id": "A5", "slice": "A", "category": "functional", "description": "Build-vs-Build comparison from the library's selection mode", "steps": ["Select two Builds", "Compare", "See differing rows marked"], "passes": true},
-  {"id": "B1", "slice": "B", "category": "functional", "description": "Gen 1 has no gender anywhere", "steps": ["Open a Gen 1 Build", "See no field, glyph or export gender"], "passes": true},
-  {"id": "B2", "slice": "B", "category": "functional", "description": "Gen 2 gender derives from the Attack DV", "steps": ["Step the Attack DV across the threshold", "See the gender change"], "passes": true},
-  {"id": "C1", "slice": "C", "category": "functional", "description": "Schema v2 with a lossless, idempotent migration from v1, sync-compatible", "steps": ["Load a v1 document", "Normalise twice", "Merge v1 with v2"], "passes": true},
-  {"id": "C2", "slice": "C", "category": "functional", "description": "Entry form shows exactly each generation's fields", "steps": ["Open the form in Gen 1, 2, 3 and 4", "Compare to the field table"], "passes": true},
-  {"id": "C3", "slice": "C", "category": "functional", "description": "Collection search and filters", "steps": ["Search", "Filter by method, Pokerus, shiny and Fits"], "passes": true},
-  {"id": "C4", "slice": "C", "category": "functional", "description": "Fits and Exact candidate flags", "steps": ["Link builds of match, mismatch and empty fields", "Read the flags"], "passes": true},
-  {"id": "C5", "slice": "C", "category": "functional", "description": "Collection entries feed the Damage calculator", "steps": ["Pick an entry on a side", "See its stats, moves, item and ability"], "passes": true},
-  {"id": "C6", "slice": "C", "category": "functional", "description": "Collection entries feed Team Matchup", "steps": ["Choose Source Collection", "Pick entries", "Run a matchup"], "passes": true}
+  {
+    "id": "W0-1",
+    "slice": "W0",
+    "wave": 0,
+    "journey": null,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Green release: the gate passes",
+    "doneWhen": "npm run check -- --all passes with no unlogged failure",
+    "notDoing": null,
+    "steps": [
+      "npm run check -- --all"
+    ],
+    "passes": true,
+    "evidence": "check --all 22/22 on d211c9b (slice 1); KNOWN_FAILING and FLAKY are both empty since infra item 4"
+  },
+  {
+    "id": "W0-2",
+    "slice": "W0",
+    "wave": 0,
+    "journey": 1,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Green release: global search fix and #22 rental landed",
+    "doneWhen": "both committed on tools/integration with their suites passing",
+    "notDoing": null,
+    "steps": [
+      "verify:search",
+      "verify:tools"
+    ],
+    "passes": true,
+    "evidence": "tools/integration (PR #8): fix/global-search-always merged; #22 rental committed with a PROGRESS row"
+  },
+  {
+    "id": "W0-3",
+    "slice": "W0",
+    "wave": 0,
+    "journey": null,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Green release: Tools merged to main",
+    "doneWhen": "tools/integration is merged into main and deployed",
+    "notDoing": null,
+    "steps": [
+      "PR #8 merged by the owner"
+    ],
+    "passes": false,
+    "evidence": "PR #8 open, awaiting the owner"
+  },
+  {
+    "id": "A1",
+    "slice": "A",
+    "category": "functional",
+    "description": "A Build has a real name: saved, labelled, and absent names fall back without data loss",
+    "steps": [
+      "Open Build info",
+      "Set a name",
+      "See it on the library card and in the Damage set list",
+      "Load a document with no names and see nothing change"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #4: verify-team-transfer 61/61; check --since tools/integration PASS"
+  },
+  {
+    "id": "A2",
+    "slice": "A",
+    "category": "functional",
+    "description": "Library search reads names and tags, and a Tag filter narrows the list",
+    "steps": [
+      "Search a name",
+      "Search a tag",
+      "Pick a tag in the filter"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #4: verify-team-transfer 61/61; check --since tools/integration PASS"
+  },
+  {
+    "id": "A3",
+    "slice": "A",
+    "category": "functional",
+    "description": "Showdown export for a team and a Build, correct per generation",
+    "steps": [
+      "Export Gen 1, 2 and 4 Builds",
+      "Compare each to the rule table"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #4: verify-team-transfer 61/61; check --since tools/integration PASS"
+  },
+  {
+    "id": "A4",
+    "slice": "A",
+    "category": "functional",
+    "description": "Showdown import for a team and a Build, with a per-Pokemon report",
+    "steps": [
+      "Paste a Gen 4 team on Gen 4 and on Gen 2",
+      "Read the report",
+      "Confirm",
+      "See new records"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #4: verify-team-transfer 61/61; check --since tools/integration PASS"
+  },
+  {
+    "id": "A5",
+    "slice": "A",
+    "category": "functional",
+    "description": "Build-vs-Build comparison from the library's selection mode",
+    "steps": [
+      "Select two Builds",
+      "Compare",
+      "See differing rows marked"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #4: verify-team-transfer 61/61; check --since tools/integration PASS"
+  },
+  {
+    "id": "B1",
+    "slice": "B",
+    "category": "functional",
+    "description": "Gen 1 has no gender anywhere",
+    "steps": [
+      "Open a Gen 1 Build",
+      "See no field, glyph or export gender"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #6: verify-team-builder gender section; check --since fix/gen2-special PASS"
+  },
+  {
+    "id": "B2",
+    "slice": "B",
+    "category": "functional",
+    "description": "Gen 2 gender derives from the Attack DV",
+    "steps": [
+      "Step the Attack DV across the threshold",
+      "See the gender change"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #6: verify-team-builder gender section; check --since fix/gen2-special PASS"
+  },
+  {
+    "id": "C1",
+    "slice": "C",
+    "category": "functional",
+    "description": "Schema v2 with a lossless, idempotent migration from v1, sync-compatible",
+    "steps": [
+      "Load a v1 document",
+      "Normalise twice",
+      "Merge v1 with v2"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #7: verify-collection 74/74; check --since fix/gender-gen1-2 PASS"
+  },
+  {
+    "id": "C2",
+    "slice": "C",
+    "category": "functional",
+    "description": "Entry form shows exactly each generation's fields",
+    "steps": [
+      "Open the form in Gen 1, 2, 3 and 4",
+      "Compare to the field table"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #7: verify-collection 74/74; check --since fix/gender-gen1-2 PASS"
+  },
+  {
+    "id": "C3",
+    "slice": "C",
+    "category": "functional",
+    "description": "Collection search and filters",
+    "steps": [
+      "Search",
+      "Filter by method, Pokerus, shiny and Fits"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #7: verify-collection 74/74; check --since fix/gender-gen1-2 PASS"
+  },
+  {
+    "id": "C4",
+    "slice": "C",
+    "category": "functional",
+    "description": "Fits and Exact candidate flags",
+    "steps": [
+      "Link builds of match, mismatch and empty fields",
+      "Read the flags"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #7: verify-collection 74/74; check --since fix/gender-gen1-2 PASS"
+  },
+  {
+    "id": "C5",
+    "slice": "C",
+    "category": "functional",
+    "description": "Collection entries feed the Damage calculator",
+    "steps": [
+      "Pick an entry on a side",
+      "See its stats, moves, item and ability"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #7: verify-collection 74/74; check --since fix/gender-gen1-2 PASS"
+  },
+  {
+    "id": "C6",
+    "slice": "C",
+    "category": "functional",
+    "description": "Collection entries feed Team Matchup",
+    "steps": [
+      "Choose Source Collection",
+      "Pick entries",
+      "Run a matchup"
+    ],
+    "passes": true,
+    "wave": 1,
+    "journey": 2,
+    "priority": "Must",
+    "evidence": "PR #7: verify-collection 74/74; check --since fix/gender-gen1-2 PASS"
+  },
+  {
+    "id": "W2-1",
+    "slice": "W2",
+    "wave": 2,
+    "journey": 1,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Universal search covers berries, natures, egg groups, trainers",
+    "doneWhen": "a search for a term from each of those categories returns it, scoped to the selected generation",
+    "notDoing": "fuzzy/typo matching",
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W2-2",
+    "slice": "W2",
+    "wave": 2,
+    "journey": 1,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Offline: every partition usable before first view",
+    "doneWhen": "airplane mode after install opens any dex entry",
+    "notDoing": "precaching 648 MB of sprites",
+    "steps": [
+      "verify:offline"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W2-3",
+    "slice": "W2",
+    "wave": 2,
+    "journey": 4,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Journal: entries linked to any entity, tags, chronological browse, search, edit/delete",
+    "doneWhen": "an entry linked to a Collection Pokémon appears on that Pokémon's page and in the journal",
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W2-4",
+    "slice": "W2",
+    "wave": 2,
+    "journey": 4,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Progression Guide: per-game milestone path, level checkpoints, cross-links",
+    "doneWhen": "each Gen 1-4 game has a complete ordered path with at least 1 cross-reference per milestone",
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W2-5",
+    "slice": "W2",
+    "wave": 2,
+    "journey": 3,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Breeding gaps: compatibility checker, Ditto reference, egg move planner, per-game ruleset, egg group graph, Sketch planner (last)",
+    "doneWhen": "pick two species, get compatible/not with the reason, per game",
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W3-1",
+    "slice": "W3",
+    "wave": 3,
+    "journey": 4,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Nuzlocke Tracker: playthroughs, rulesets and presets, encounter log, clauses, Soul Link, deaths via Journal, dashboard, compare",
+    "doneWhen": "a full Emerald run can be logged end to end offline on a phone",
+    "notDoing": "randomizer, stream overlay",
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W3-2",
+    "slice": "W3",
+    "wave": 3,
+    "journey": 4,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Frontier completion: facility reference, challenge tracker, Tower/Hill, Castle pool, rental pool, rental-vs-your-team",
+    "doneWhen": null,
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null,
+    "notes": "The page gives no Done when for this row. HGSS rental stays flagged as unconfirmed (reuses Platinum)."
+  },
+  {
+    "id": "W4-1",
+    "slice": "W4",
+    "wave": 4,
+    "journey": 3,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Training: Stat Exp reference, defeat counter with caps and multipliers, commit gains to a Collection entry, route finder, friendship tips",
+    "doneWhen": "train a Collection Pokémon from 0 to a target spread and the Collection entry updates",
+    "notDoing": "Rare Candy counting",
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W4-2",
+    "slice": "W4",
+    "wave": 4,
+    "journey": 5,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Ribbons: curated Gen 3-4 ribbon data, eligibility per Pokémon, Ribbon Master progress",
+    "doneWhen": "each Collection entry shows earned vs obtainable ribbons for its game",
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W4-3",
+    "slice": "W4",
+    "wave": 4,
+    "journey": 5,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Achievements: Pokédex completion, Trainer-Card stats, curated list, badge/milestone checklist, dashboard",
+    "doneWhen": "every achievement is computed from data the app already holds (no manual ticking except badges)",
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "W4-4",
+    "slice": "W4",
+    "wave": 4,
+    "journey": 1,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Glossary: curated terms by category, search, linked from where terms appear",
+    "doneWhen": "at least 1 term per category, searchable, with Gen 1-4 differences where they exist",
+    "notDoing": "inline tooltips",
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null
+  },
+  {
+    "id": "U-1",
+    "slice": "Wnull",
+    "wave": null,
+    "journey": 2,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Settings: persisted base generation and a Settings screen (the account menu stays the quick switch)",
+    "doneWhen": null,
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null,
+    "notes": "Committed on the page (Journey 2) but in no wave, and with no Done when."
+  },
+  {
+    "id": "U-2",
+    "slice": "Wnull",
+    "wave": null,
+    "journey": 3,
+    "priority": "Must",
+    "category": "functional",
+    "description": "Hatch steps are generation-aware (currently a flat 255 per cycle)",
+    "doneWhen": null,
+    "notDoing": null,
+    "steps": [
+      "TODO: acceptance checks are written when the slice is specced"
+    ],
+    "passes": false,
+    "evidence": null,
+    "notes": "Committed on the page (Journey 3) but in no wave, and with no Done when."
+  }
 ]

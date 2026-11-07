@@ -1,4 +1,4 @@
-# Build phase spec: Team transfer, gender fixes, Collection v2
+# Spec: the build phase (slices A-C) and the roadmap (journeys and waves)
 
 Written 2026-11-06 from the owner's autonomous brief. Work items and their pass state: `docs/features.json`. The latest task's result, including the choices it made, is in `docs/status/results.md`, which each task overwrites.
 
@@ -244,3 +244,58 @@ npm run check -- --since <base> team-builder
 ```
 
 plus the slice's new suite, and a browser look with screenshots in `scripts/.verify-shots/`. The end-to-end proof for A is exporting a team, importing it on a fresh profile, and comparing. For C it is a v1 localStorage document loaded into the app, then used in the Damage calculator.
+
+---
+
+# The roadmap: journeys and waves
+
+Synced from the Notion page "Pokémon App — PRD v2 (by journey)" (draft of 2026-11-06, read 2026-11-07). The page is the source; this section mirrors it for the repo, and `docs/features.json` carries one row per commitment, with `wave`, `journey`, `passes` and `evidence`. Acceptance checks for Waves 2-4 are TODO until each slice is specced the way slices A-C are above.
+
+## Principles (from the page)
+
+- Both contexts equally: mid-game on a phone (fast, one-handed, offline, glanceable) and at the desk (planning, comparing). Every committed feature says how it behaves on each.
+- Mechanics scope Gen 1-4; dexes reach Gen 9; Gen 5+ is added by config, never by refactor.
+- Per-generation accuracy over convenience.
+- A row exists only with a Done when, a Not doing and evidence. Without evidence or a wave, it goes to the Parking lot.
+- Local-first: an offline PWA.
+
+## Journeys
+
+| # | Journey | Modules |
+|---|---|---|
+| 1 | Look something up | Poképedia, universal search, Tools reference, Glossary |
+| 2 | Build and test a team | Team Builder, Build library, Collection, Battle tools, Settings |
+| 3 | Train and breed | Breeding Planner, Training and Optimization, Collection |
+| 4 | Play a run (phone-first) | Journal, Progression Guide, Nuzlocke Tracker, Battle Frontier |
+| 5 | Track and complete | Ribbon Tracker, Achievements, Collection completion |
+
+## Waves
+
+| Wave | Contents | State (2026-11-07) |
+|---|---|---|
+| 0 | Green release: fix the gate, land search and rental, merge Tools to main | Gate and both landings done; the merge to `main` waits on PR #8 |
+| 1 | Team transfer, gender fixes, Collection v2 | Done: slices A-C above (PRs #4-#7) |
+| 2 | Journal (with the entity-link engine), Progression Guide, Breeding gaps, universal search, offline | Not started, except offline (infra item 8) and the entity-link engine (infra item 10) |
+| 3 | Nuzlocke Tracker, Frontier completion | Not started |
+| 4 | Training, Ribbons, Achievements, Glossary | Not started; the curated-data pipeline they need exists (infra item 10) |
+| Throughout | One token system (dist wins), gate hardening, CHANGELOG and design-system docs | Infra items 4-6 |
+
+## Wave 2-4 commitments
+
+Each row's Done when and Not doing are copied from the page. Acceptance: TODO.
+
+| Row | Commitment | Done when | Not doing |
+|---|---|---|---|
+| W2-1 | Universal search covers berries, natures, egg groups, trainers | a search for a term from each of those categories returns it, scoped to the selected generation | fuzzy/typo matching |
+| W2-2 | Offline: every partition usable before first view | airplane mode after install opens any dex entry | precaching 648 MB of sprites |
+| W2-3 | Journal: entries linked to any entity, tags, browse, search, edit/delete | an entry linked to a Collection Pokémon appears on that Pokémon's page and in the journal | (none given) |
+| W2-4 | Progression Guide: per-game milestones, level checkpoints, cross-links | each Gen 1-4 game has a complete ordered path with at least 1 cross-reference per milestone | (none given) |
+| W2-5 | Breeding gaps: compatibility, Ditto, egg moves, per-game rules, egg group graph, Sketch (last) | pick two species, get compatible/not with the reason, per game | (none given) |
+| W3-1 | Nuzlocke Tracker | a full Emerald run can be logged end to end offline on a phone | randomizer, stream overlay |
+| W3-2 | Frontier completion | (none given) | (none given) |
+| W4-1 | Training (needs Collection v2) | train a Collection Pokémon from 0 to a target spread and the Collection entry updates | Rare Candy counting |
+| W4-2 | Ribbons (needs Collection v2) | each Collection entry shows earned vs obtainable ribbons for its game | (none given) |
+| W4-3 | Achievements (needs Ribbons, Progression, Nuzlocke) | every achievement is computed from data the app already holds (no manual ticking except badges) | (none given) |
+| W4-4 | Glossary | at least 1 term per category, searchable, with Gen 1-4 differences where they exist | inline tooltips |
+
+Committed on the page but in no wave: a persisted base generation with a Settings screen (Journey 2), and generation-aware hatch steps (Journey 3). They are `U-1` and `U-2` in `features.json`.
