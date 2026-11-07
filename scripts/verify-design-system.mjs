@@ -2030,6 +2030,18 @@ try {
     colPitch: 518,
     rowPitch: 507,
   }
+  /*
+    THE CARD'S REFERENCE IS 212 x 214 (owner, 2026-11-06), not Figma's 497:467: the
+    owner's looser leading made it taller, and that is now the design. Only the
+    measures the extra height moved read from here; the rest stay Figma's ratios.
+  */
+  const CARD_214 = {
+    card: { w: 212, h: 214 },
+    ghostH: 84.5,
+    line: { y: 136, h: 17.5 },
+    types: { y: 156.2 },
+    ability: { y: 178.6 },
+  }
   // Tolerances: 1.5% of the card box for positions derived from a 2.23x scale
   // read off glyph advances, and 2px absolute for gaps.
   const nearRatio = (got, want, span, tolPct = 1.5) =>
@@ -2153,13 +2165,13 @@ try {
       '(' + grid.columnsInFirstRow + ')',
     )
     check(
-      '[' + theme + "] the card keeps Figma's 497:467 aspect",
-      nearRatio(grid.card.h, FIG.card.h / FIG.card.w, grid.card.w),
+      '[' + theme + '] the card keeps the 212:214 reference aspect',
+      nearRatio(grid.card.h, CARD_214.card.h / CARD_214.card.w, grid.card.w),
       grid.card.w +
         ' x ' +
         grid.card.h +
         ' (want h=' +
-        ((FIG.card.h / FIG.card.w) * grid.card.w).toFixed(1) +
+        ((CARD_214.card.h / CARD_214.card.w) * grid.card.w).toFixed(1) +
         ')',
     )
 
@@ -2191,16 +2203,16 @@ try {
         grid.card.w,
     )
     check(
-      '[' + theme + "] its box matches Figma's 74.4% x 42.4% of the card",
+      '[' + theme + "] its box is Figma's 74.4% wide and the 214 reference's 39.5% tall",
       nearRatio(grid.ghost.w, FIG.ghost.w / FIG.card.w, grid.card.w, 2) &&
-        nearRatio(grid.ghost.h, FIG.ghost.h / FIG.card.h, grid.card.h, 2),
+        nearRatio(grid.ghost.h, CARD_214.ghostH / CARD_214.card.h, grid.card.h, 2),
       grid.ghost.w.toFixed(1) +
         ' x ' +
         grid.ghost.h.toFixed(1) +
         ' (want ' +
         ((FIG.ghost.w / FIG.card.w) * grid.card.w).toFixed(1) +
         ' x ' +
-        ((FIG.ghost.h / FIG.card.h) * grid.card.h).toFixed(1) +
+        ((CARD_214.ghostH / CARD_214.card.h) * grid.card.h).toFixed(1) +
         ')',
     )
     check(
@@ -2268,16 +2280,16 @@ try {
         ((FIG.line.x / FIG.card.w) * grid.card.w).toFixed(1) +
         ')',
     )
-    for (const [label, got, figY] of [
-      ['number+name', grid.line.y, FIG.line.y],
-      ['type row', grid.types.y, FIG.types.y],
-      ['ability', grid.ability?.y, FIG.ability.y],
+    for (const [label, got, refY] of [
+      ['number+name', grid.line.y, CARD_214.line.y],
+      ['type row', grid.types.y, CARD_214.types.y],
+      ['ability', grid.ability?.y, CARD_214.ability.y],
     ]) {
       if (got == null) continue
       check(
-        '[' + theme + '] ' + label + " sits at Figma's y=" + figY + '/467',
-        nearRatio(got, figY / FIG.card.h, grid.card.h),
-        'y=' + got.toFixed(1) + ' (want ' + ((figY / FIG.card.h) * grid.card.h).toFixed(1) + ')',
+        '[' + theme + '] ' + label + ' sits at the reference y=' + refY + '/214',
+        nearRatio(got, refY / CARD_214.card.h, grid.card.h),
+        'y=' + got.toFixed(1) + ' (want ' + ((refY / CARD_214.card.h) * grid.card.h).toFixed(1) + ')',
       )
     }
 
@@ -2291,9 +2303,11 @@ try {
     )
     check(
       '[' + theme + '] the dex number and the name share one line, as the reference shows',
-      Math.abs(grid.num.y - grid.nameBox.y) <= 1 &&
+      // Two type sizes on one line: the number sits inside the name's line box.
+      grid.num.y >= grid.line.y &&
+        grid.num.y < grid.line.y + grid.line.h &&
         grid.nameBox.x > grid.num.x &&
-        nearRatio(grid.line.h, FIG.line.h / FIG.card.h, grid.card.h, 3),
+        nearRatio(grid.line.h, CARD_214.line.h / CARD_214.card.h, grid.card.h, 3),
       'number y=' +
         grid.num.y.toFixed(1) +
         ' name y=' +
