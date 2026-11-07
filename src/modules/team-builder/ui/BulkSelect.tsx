@@ -5,6 +5,7 @@
  */
 
 import { IconCircle, IconCircleCheckFilled } from '@tabler/icons-react'
+import type { ReactNode } from 'react'
 
 /** The check circle itself. Filled when selected, hollow when not. */
 export function SelectCircle({
@@ -42,7 +43,7 @@ export function SelectCircle({
 
 /**
  * The bar that appears with selection mode: what is selected, and the two ways
- * out. Delete is the only bulk action, per the spec.
+ * out. `extra` takes any further action a list offers its selection.
  */
 export function BulkBar({
   count,
@@ -50,6 +51,7 @@ export function BulkBar({
   onCancel,
   onDelete,
   testId,
+  extra,
 }: {
   count: number
   /** Singular; pluralised with a bare "s". */
@@ -57,6 +59,7 @@ export function BulkBar({
   onCancel: () => void
   onDelete: () => void
   testId?: string
+  extra?: ReactNode
 }) {
   return (
     <div className="tb-bulk-bar" data-testid={testId}>
@@ -64,6 +67,7 @@ export function BulkBar({
         {count} {noun}
         {count === 1 ? '' : 's'} selected
       </span>
+      {extra}
       <button
         type="button"
         className="tb-ghost tb-ghost-sm"

@@ -19,6 +19,7 @@
 
 import { useEffect, useRef } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
+import { CompareBuilds } from './CompareBuilds'
 import { scrollKey } from '../../components/scrollMemory'
 import { useNav } from '../nav/navContext'
 import { useVersionGroup } from '../version-group/context'
@@ -163,7 +164,10 @@ export function TeamBuilding() {
           screen.kind === 'build-form' ? screen.buildId : null,
         )}
       >
-        {screen.kind === 'my-teams' && <MyTeams creating={screen.creating ?? false} />}
+        {screen.kind === 'my-teams' && (
+          <MyTeams creating={screen.creating ?? false} generation={generation} />
+        )}
+        {screen.kind === 'compare-builds' && <CompareBuilds ids={screen.ids} />}
         {screen.kind === 'team-viewer' && <TeamViewer teamId={screen.teamId} />}
         {screen.kind === 'build-library' && (
           <BuildLibrary generation={generation} pickFor={screen.pickFor} />

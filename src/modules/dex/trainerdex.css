@@ -26,104 +26,226 @@
   color: var(--text-secondary);
 }
 
+/* The list and its game navbar share one width, so the navbar's right edge is
+   the table's. Sticky on the page's own surface while the list scrolls. */
+.trainer-list {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/*
+  A FIXED HEIGHT, so the table's frozen header can stick exactly under it
+  (--table-sticky-top). The navbar's own bottom margin is dropped here; the
+  height carries that space instead.
+*/
+.trainer-list {
+  --trainer-list-nav-h: 3rem;
+  --table-sticky-top: var(--trainer-list-nav-h);
+}
+
+.trainer-list-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: var(--trainer-list-nav-h);
+  background: var(--surface);
+}
+
+.trainer-list-nav .game-nav {
+  margin-bottom: 0;
+}
+
+/*
+  THE TRAINER PAGE'S COLUMNS (owner, 2026-10-11): the left pane narrower than the
+  Movedex's, the party three cards a row -- a full team is two rows of three, and
+  both rows fit the column without scrolling. The party column is as wide as its
+  cards, which fit their content (see PartySizer in Trainerdex.tsx).
+*/
+.trainer-detail .entity-split-cols {
+  grid-template-columns: 500px max-content;
+}
+
+/* The team navbar sits close over its cards (owner, 2026-10-12): the cards'
+   own gap, not the page navbar's. */
+.trainer-team-nav {
+  margin-bottom: var(--space-gap-sm);
+}
+
+/* No label above the party: the navbar is the column's only head. */
+.trainer-detail .entity-split-grid .entity-detail-section {
+  margin-top: 0;
+}
+
+/*
+  CARDS AS WIDE AS THEIR WIDEST LINE (owner, 2026-10-12). Three equal fractions
+  of a max-content grid: each column resolves to the widest item in ANY column,
+  so the three are one width, set by the widest card or by the sizer -- every
+  team's lines, so the width does not change with the team. The floor keeps the
+  watermark numbers (166px of letter-spaced digits) from running into each
+  other across the gap on a party of short names.
+*/
 .trainer-party {
+  --trainer-card-min: 150px;
+  /* Wider than the Pokédex grid's 9px (owner, 2026-10-12, twice: 14px, then
+     20px): these cards are text-heavy and sit closer together now they fit
+     their content. Rows and columns both. */
+  --trainer-card-gap: var(--space-gap-lg);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--space-gap-md);
-}
-
-.trainer-mon {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-gap-sm);
-  min-width: 0;
-  padding: var(--space-gap-md);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-control, 8px);
-}
-
-.trainer-mon-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-gap-sm);
-}
-.trainer-mon-head img {
-  flex: none;
-  image-rendering: pixelated;
-}
-
-.trainer-mon-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.trainer-mon-name {
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-.trainer-mon-name:hover {
-  text-decoration: underline;
-}
-
-.trainer-mon-gender {
-  color: var(--text-secondary);
-}
-
-.trainer-mon-level {
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-}
-
-.trainer-mon-types {
-  display: inline-flex;
-  gap: var(--space-gap-sm);
-}
-
-.trainer-mon-facts,
-.trainer-mon-moves {
+  grid-template-columns: repeat(3, minmax(var(--trainer-card-min), 1fr));
+  width: max-content;
+  max-width: 100%;
+  gap: var(--trainer-card-gap);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.trainer-mon-facts li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-gap-sm);
-  padding: 2px 0;
-  font-size: var(--font-size-caption);
-  border-bottom: 1px solid var(--hairline);
+@media (max-width: 800px) {
+  .trainer-party {
+    grid-template-columns: repeat(auto-fill, minmax(var(--trainer-card-min), 1fr));
+    width: auto;
+  }
 }
-.trainer-mon-facts li > span:first-child {
+
+/* Its own row under the cards, zero tall and invisible: only its width counts.
+   The negative margin takes back the row gap the extra row adds. */
+.trainer-party-sizer {
+  grid-column: 1;
+  height: 0;
+  margin-top: calc(-1 * var(--trainer-card-gap));
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.trainer-party-sizer .trainer-card-text {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* The team navbar wraps rather than overflowing: a trainer can have 16 teams. */
+.trainer-team-nav .game-nav-items {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/*
+  A PARTY POKEMON AS A POKEDEX CARD (owner, 2026-10-11): the grid card's ghost
+  number, katakana and artwork exactly as .species-card places them, then the
+  battle lines flowing under the art. The grid card's own 212px (owner, second
+  pass: the move names sat far from their type), as tall as its lines need: no
+  fixed height, no outline.
+*/
+.species-card.trainer-card {
+  width: auto;
+  height: auto;
+  min-height: 214px;
+}
+
+.trainer-card-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* 12px a side: the "comfortable margin" around the widest line. */
+  padding: 132px 12px 8px;
+  /* The card's open-species overlay sits under the text; let clicks reach it. */
+  pointer-events: none;
+}
+
+.trainer-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trainer-card-gender {
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   font-size: var(--font-size-label);
 }
 
-.trainer-mon-moves li {
+.trainer-card-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+}
+
+.trainer-card-level {
+  margin-left: 2px;
+  font-family: var(--font-numeric);
+  font-size: calc(var(--font-size-caption) * 0.92);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.trainer-card-types {
+  white-space: nowrap;
+}
+
+.trainer-card-dot {
+  color: var(--text-secondary);
+}
+
+/* Nature · Ability: values only. */
+.trainer-card-meta {
+  font-size: var(--font-size-label);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trainer-card-stats {
+  font-family: var(--font-numeric);
+  font-size: calc(var(--font-size-caption) * 0.92);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* One grid for the four moves, each line display: contents, so the type and
+   category abbreviations line up as columns down the card (the Team Display's
+   rule). The name column is as wide as its longest name, not the card's
+   leftover: they sit one gap after the name (owner, 2026-10-11). */
+.trainer-card-moves {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: minmax(0, max-content) auto auto;
+  justify-content: start;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin-top: 2px;
   align-items: baseline;
-  gap: var(--space-gap-sm);
-  padding: 2px 0;
-  font-size: var(--font-size-body);
 }
 
-.trainer-mon-note {
-  margin: 0;
-  font-size: var(--font-size-caption);
+.trainer-card-move {
+  display: contents;
+}
+
+.trainer-card-move-name {
+  font-size: var(--font-size-label);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "ELE Spe": the Build Form's move-line spelling -- mono, the type in its
+   ink, the category muted. They take the pointer so their tooltips ("Electric",
+   "Special") show through the text block's pointer-events: none. */
+.trainer-card-moves .ds-type-abbr,
+.trainer-card-move-cat {
+  font-family: var(--font-family-mono);
+  font-size: calc(var(--font-size-caption) * 0.92);
+  pointer-events: auto;
+}
+
+.trainer-card-move-cat {
   color: var(--text-secondary);
 }
 
-.trainer-credit {
-  margin: var(--space-gap-xl) 0 0;
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-}
-.trainer-credit a {
-  color: inherit;
-}

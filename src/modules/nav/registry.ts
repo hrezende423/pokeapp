@@ -26,7 +26,9 @@ export interface DexModule {
  *
  * Order is now load-bearing twice over: the FIRST entry is the nav's visible
  * trigger and destination, and the rest are the items in its dropdown, in this
- * order.
+ * order. The order itself is the owner's (2026-10-11): the species, then what a
+ * species does (moves, abilities), then what it carries (items, berries), then
+ * the reference tables, with the Breeding dex placed after the Naturedex.
  *
  * The design-system reference page is deliberately NOT registered. It was an
  * implementation aid, not a destination, so it no longer has a nav tab; it is
@@ -36,11 +38,11 @@ export interface DexModule {
  */
 export const DEX_MODULES = [
   { id: 'pokedex', label: DEX_LABELS.pokedex, Component: Pokedex },
-  { id: 'itemdex', label: DEX_LABELS.itemdex, Component: Itemdex },
-  { id: 'abilitydex', label: DEX_LABELS.abilitydex, Component: Abilitydex },
-  { id: 'naturedex', label: DEX_LABELS.naturedex, Component: Naturedex },
-  { id: 'berrydex', label: DEX_LABELS.berrydex, Component: Berrydex },
   { id: 'movedex', label: DEX_LABELS.movedex, Component: Movedex },
+  { id: 'abilitydex', label: DEX_LABELS.abilitydex, Component: Abilitydex },
+  { id: 'itemdex', label: DEX_LABELS.itemdex, Component: Itemdex },
+  { id: 'berrydex', label: DEX_LABELS.berrydex, Component: Berrydex },
+  { id: 'naturedex', label: DEX_LABELS.naturedex, Component: Naturedex },
   { id: 'breedingdex', label: DEX_LABELS.breedingdex, Component: Breedingdex },
   { id: 'trainerdex', label: DEX_LABELS.trainerdex, Component: Trainerdex },
 ] as const satisfies readonly DexModule[]

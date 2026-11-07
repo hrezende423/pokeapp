@@ -95,6 +95,7 @@ import {
   abilityEffectFor,
   abilityName,
   abilityOptionsFor,
+  buildGender,
   buildInGeneration,
   buildSpecies,
   displayName,
@@ -787,7 +788,10 @@ function BuildFormFields({
         : goTo({ kind: 'build-library' }),
     )
 
-  const genderOptions = facts ? genderOptionsFor(facts.species) : null
+  /* Gen 1 has no gender: the field is absent. Gen 2's comes from the Attack DV,
+     so the field shows it, derived at render, and cannot be set (buildGender). */
+  const genderOptions = facts && generation >= 2 ? genderOptionsFor(facts.species) : null
+  const gender = facts ? buildGender(build, facts.species) : null
   const abilityOptions = facts ? abilityOptionsFor(facts.variety, generation) : []
   const itemOptions = itemOptionsFor(generation, build.itemId)
   const natureOptions = natureOptionsFor(generation)
@@ -949,7 +953,7 @@ function BuildFormFields({
         source: 'artwork',
         motion: 'static',
         shiny: generation === 2 ? isShinyByDvs(build.individual) : build.shiny,
-        gender: build.gender === 'female' ? 'female' : 'male',
+        gender: gender === 'female' ? 'female' : 'male',
       })
     : null
 
@@ -1259,8 +1263,8 @@ function BuildFormFields({
               <Field label="Gender">
                 <select
                   className="tb-select"
-                  value={build.gender ?? ''}
-                  disabled={genderOptions.length === 1}
+                  value={gender ?? ''}
+                  disabled={genderOptions.length === 1 || generation === 2}
                   data-testid="tb-gender"
                   onChange={(e) => commit({ gender: e.target.value as 'male' | 'female' })}
                 >

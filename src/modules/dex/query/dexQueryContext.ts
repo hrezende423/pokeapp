@@ -24,10 +24,11 @@ import type { DexQuery } from './useDexQuery'
 import type { SpeciesView } from '../../pokedex/speciesQuery'
 
 /**
- * A list the app bar's menus can drive: a dex, or one of the Team Builder's two
- * libraries (team-builder/libraryQuery.ts), which borrow the same machinery.
+ * A list the app bar's menus can drive: a dex, one of the Team Builder's two
+ * libraries (team-builder/libraryQuery.ts), or the Collection
+ * (collection/collectionQuery.ts), which borrow the same machinery.
  */
-export type QueryListId = DexModuleId | 'tb-builds' | 'tb-teams'
+export type QueryListId = DexModuleId | 'tb-builds' | 'tb-teams' | 'collection'
 
 export interface DexQueryBundle {
   /** The list the bundle describes, or null on a page that has none. */
@@ -48,6 +49,12 @@ export interface DexQueryBundle {
   setView: (view: SpeciesView) => void
   /** The Grid/List switch belongs in the bar, on the Pokedex's list page only. */
   showViewToggle: boolean
+  /**
+   * The whole Sort/Filter trigger is disabled: an Abilitydex or Movedex entry
+   * page is open (owner, 2026-10-11). The menu narrows a LIST, and on an entry
+   * page there is none on screen for it to act on.
+   */
+  menuDisabled: boolean
 }
 
 export const DexQueryContext = createContext<DexQueryBundle | null>(null)

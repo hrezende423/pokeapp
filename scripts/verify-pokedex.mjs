@@ -27,7 +27,7 @@
 
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { appGeneration, controls, selectGame } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4179
@@ -38,7 +38,6 @@ const SHOTS = 'scripts/.verify-shots'
 const VERSION_GROUPS = Object.values(
   JSON.parse(readFileSync('public/data/version-groups.json', 'utf8')),
 )
-const VG_COUNT = VERSION_GROUPS.length
 const GENERATION_COUNT = new Set(VERSION_GROUPS.map((vg) => vg.generation_id)).size
 
 const failures = []
@@ -192,15 +191,8 @@ try {
   const networkFetches = (url) => attemptsFor(url).filter((a) => a.kind === 'network').length
 
   const selectVersionGroup = async (name) => {
-    await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
-    // The scope readout was removed from the page with the header block. The
-    // select holds the same state the list derives from, and both land in one
-    // React commit, so waiting for its value is waiting for the list.
-    await page.waitForFunction(
-      (n) => document.querySelector('[data-testid="vg-select"]')?.value === n,
-      name,
-      { timeout: 30000 },
-    )
+    await selectGame(page, name)
+    // selectGame waits for the generation select to hold the value itself.
   }
   /*
     THE DETAIL VIEW IS NOW THE REBUILT TABBED PAGE. `?detail` and the old
@@ -256,27 +248,21 @@ try {
 
   // ------------------------------------------------------------ SCENARIO 1
   hr('SCENARIO 1 — version-group selection drives the app, updates open detail in place')
-  const optionCount = await page.$$eval('[data-testid="vg-select"] option', (o) => o.length)
-  const optgroups = await page.$$eval('[data-testid="vg-select"] optgroup', (g) =>
-    g.map((x) => x.getAttribute('label')),
+  /* A GENERATION selector since 2026-10-10: "All" plus one option per
+     generation, and no games. */
+  const options = await page.$$eval('[data-testid="gen-select"] option', (o) =>
+    o.map((x) => x.value),
   )
-  log(`  selector options : ${optionCount}`)
-  log(`  option groups    : ${optgroups.join(', ')}`)
-  const groupedOptions = await page.$$eval(
-    '[data-testid="vg-select"] optgroup option',
-    (o) => o.length,
-  )
-  log(`  options inside optgroups: ${groupedOptions} (+1 ungrouped "All")`)
+  log(`  selector options : ${options.join(', ')}`)
   check(
-    `selector offers all ${VG_COUNT} version groups`,
-    groupedOptions === VG_COUNT,
-    `(${groupedOptions})`,
+    `selector offers "All" plus the ${GENERATION_COUNT} generations`,
+    options.length === GENERATION_COUNT + 1 && options[0] === 'all',
+    options.join(','),
   )
-  check('plus one ungrouped "All" option', optionCount === VG_COUNT + 1, `(${optionCount} total)`)
   check(
-    `grouped by generation (${GENERATION_COUNT} optgroups)`,
-    optgroups.length === GENERATION_COUNT,
-    `(${optgroups.length})`,
+    'and no games',
+    (await page.$$('[data-testid="gen-select"] optgroup')).length === 0 &&
+      options.slice(1).every((v) => /^\d+$/.test(v)),
   )
 
   /*
@@ -354,7 +340,7 @@ try {
   )
   await learnsetReady()
   const gsHeadbutt = await levelsFor(29)
-  const appStillHgss = await page.$eval('[data-testid="vg-select"]', (el) => el.value)
+  const appStillHgss = (await appGeneration(page)) === '4'
 
   log(`  scope seeded from the app selection : ${seeded}`)
   log(`  Headbutt level in HGSS       : [${hgssHeadbutt.join(', ')}]`)
@@ -366,7 +352,7 @@ try {
   check('Headbutt is NOT level 34 under heartgold-soulsilver', !hgssHeadbutt.includes('34'))
   check('Headbutt is level 34 under gold-silver', gsHeadbutt.includes('34'))
   check('learnset is grouped by method', methodSections.length >= 2, methodSections.join('/'))
-  check('and the app-wide selector was not moved by it', appStillHgss === 'heartgold-soulsilver')
+  check('and the app-wide selector was not moved by it', appStillHgss)
   await page.screenshot({ path: `${SHOTS}/scenarioE-learnset.png` })
   await backToGrid()
 

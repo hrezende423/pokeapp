@@ -1,8 +1,10 @@
 import { findCalculatorsPage, type CalculatorsPageId } from '../calculators/pages'
+import { findCollectionPage, type CollectionPageId } from '../collection/pages'
 import { StubPage } from '../stubs/StubPage'
 import { STUB_PAGES, findStub, type StubPageId } from '../stubs/stubPages'
 import { findTeamBuildingPage, type TbPageId } from '../team-builder/pages'
 import { findTeamMatchupPage, type TeamMatchupPageId } from '../team-matchup/pages'
+import { TOOLS_PAGES, findToolsPage, type ToolsPageId } from '../tools/pages'
 import {
   TYPE_COVERAGE_PAGES,
   findTypeCoveragePage,
@@ -34,7 +36,14 @@ import type { ComponentType } from 'react'
  * resolve them without a stub fallback swallowing a real screen.
  */
 export type PageId =
-  DexModuleId | TbPageId | TypeCoveragePageId | CalculatorsPageId | TeamMatchupPageId | StubPageId
+  | DexModuleId
+  | TbPageId
+  | TypeCoveragePageId
+  | CalculatorsPageId
+  | TeamMatchupPageId
+  | ToolsPageId
+  | CollectionPageId
+  | StubPageId
 
 export interface NavEntry {
   /** The page this entry opens. */
@@ -61,6 +70,11 @@ export interface NavTab {
    */
   itemsTestId?: string
   entries: readonly NavEntry[]
+  /**
+   * Pages that belong to this tab without being a dropdown line: the tool pages,
+   * reached from the Tools index. The tab still reads as "you are here" on them.
+   */
+  alsoActiveFor?: readonly PageId[]
 }
 
 /** Entries from STUB_PAGES, in the order named here rather than declaration order. */
@@ -79,17 +93,11 @@ export const NAV_TABS: readonly NavTab[] = [
     destination: 'pokedex',
     itemsTestId: 'dex-switcher',
     /*
-      THE DEXES, THEN THE SCREENS THAT ARE NOT DEXES. Type Coverage belongs on
-      this tab but is not a dex -- no entry list, no per-entry selection -- so it
-      registers in its own pages.ts rather than in DEX_MODULES, and joins here.
-      That keeps `dex-switcher` resolving to exactly the registered dexes, in
-      registry order, which is what verify-dexes asserts against the registry
-      source.
+      THE DEXES AND NOTHING ELSE, in registry order. Type Coverage sat here until
+      2026-10-11 and moved to Tools on the owner's request: it is not a dex (no
+      entry list, no per-entry selection), it is a tool you ask a question of.
     */
-    entries: [
-      ...DEX_MODULES.map((m) => ({ id: m.id, label: m.label })),
-      ...TYPE_COVERAGE_PAGES.map((p) => ({ id: p.id, label: p.label })),
-    ],
+    entries: DEX_MODULES.map((m) => ({ id: m.id, label: m.label })),
   },
   {
     id: 'team-building',
@@ -100,16 +108,27 @@ export const NAV_TABS: readonly NavTab[] = [
       list screen first. The two list screens follow, then the one entry here
       that is still a stub.
     */
-    entries: [...teamBuilding('new-team', 'new-build', 'my-teams', 'build-library')],
+    entries: [
+      ...teamBuilding('new-team', 'new-build', 'my-teams', 'build-library'),
+      /* The Collection (owner, 2026-10-15): caught Pokemon as they stand now. */
+      { id: 'collection', label: 'Collection' },
+    ],
   },
   {
     id: 'tools',
     label: 'Tools',
+    /* Clicking the word opens the Tools index (owner, 2026-10-15): every tool,
+       grouped. The dropdown below is unchanged. */
+    destination: 'tools',
+    alsoActiveFor: TOOLS_PAGES.map((p) => p.id),
     /*
       CALCULATORS LEADS, and is a real screen now rather than a stub -- see
       calculators/pages.ts. The four small tools are tabs of ONE screen (the Type
       Coverage shape); the Damage Calculator is its own page, nested under it as
       the first `children` entry the nav has used.
+
+      TYPE COVERAGE FOLLOWS IT (owner, 2026-10-11), moved here from Poképedia:
+      like the calculators it answers a question rather than listing entries.
     */
     entries: [
       {
@@ -117,10 +136,14 @@ export const NAV_TABS: readonly NavTab[] = [
         label: 'Calculators',
         children: [{ id: 'damage-calculator', label: 'Damage Calculator' }],
       },
+      ...TYPE_COVERAGE_PAGES.map((p) => ({ id: p.id, label: p.label })),
       /* Team Matchup graduated the Battle Simulator stub, in its place. */
-      ...stubs('compare-pokemon'),
+      /* Graduated as Tools #13; same id, same line. */
+      { id: 'compare-pokemon', label: 'Compare Pokemon' },
       { id: 'team-matchup', label: 'Team Matchup' },
-      ...stubs('training-optimization', 'breeding-planner'),
+      ...stubs('training-optimization'),
+      /* Graduated as Tools #16; same id, same line. */
+      { id: 'breeding-planner', label: 'Breeding Planner' },
     ],
   },
 ]
@@ -154,6 +177,10 @@ export function findPage(id: PageId): ResolvedPage {
   if (calc) return { id: calc.id, label: calc.label, Component: calc.Component }
   const tm = findTeamMatchupPage(id)
   if (tm) return { id: tm.id, label: tm.label, Component: tm.Component }
+  const col = findCollectionPage(id)
+  if (col) return { id: col.id, label: col.label, Component: col.Component }
+  const tool = findToolsPage(id)
+  if (tool) return { id: tool.id, label: tool.label, Component: tool.Component }
   const stub = findStub(id)
   if (stub) return { id: stub.id, label: stub.label, Component: StubPage }
   // Not reachable through PageId; findPage is also the shell's fallback.
@@ -169,6 +196,7 @@ export function entryContains(entry: NavEntry, activeId: PageId): boolean {
 
 export function tabIsActive(tab: NavTab, activeId: PageId): boolean {
   if (tab.destination === activeId) return true
+  if (tab.alsoActiveFor?.includes(activeId)) return true
   return tab.entries.some((entry) => entryContains(entry, activeId))
 }
 

@@ -12,27 +12,6 @@
   overflow: hidden;
 }
 
-.vg-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.vg-selector select {
-  padding: 0.4rem 0.5rem;
-  font: inherit;
-  font-size: 0.9rem;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--text-h);
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 0.35rem;
-}
-
 /* The list is a fixed 240px rail: it must not grow with the viewport, so the
    detail area absorbs all remaining width. minmax(0, 1fr) rather than 1fr so a
    wide table inside a card can scroll instead of stretching the grid. */
@@ -245,11 +224,10 @@
 /*
   A catalog number in a list, which is one of the cases --font-numeric exists for.
 
-  ONE CALLER LEFT: the global search results, inside the Search/Filter menu. Every
-  dex surface that printed an entry number -- the grid card, the rail row, the
-  ledger row, the species banner, the list view's two leading columns -- no longer
-  does. A search hit still needs it: the number is how you tell two forms of the
-  same name apart in a flat result list.
+  TWO CALLERS: the global search results, inside the Search/Filter menu, and the
+  species grid card, which got it back on 2026-10-10 (owner). The rail row, the
+  ledger row, the species banner and the list view's leading columns still print
+  none.
 
   It sets font-family as well as font-variant-numeric, which it did not always do:
   asking for tabular digits from whatever family had already applied got Plex Sans
@@ -420,7 +398,9 @@
   display: grid;
   grid-template-columns: repeat(3, 212px);
   column-gap: 9px;
-  row-gap: 17px;
+  /* The column gap, so the grid is one pitch both ways (owner, 2026-10-10).
+     It was Figma's 17px. */
+  row-gap: 9px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -584,11 +564,22 @@
   min-width: 0;
 }
 
-/* 600, not 700: across all six names in the reference the measured fit is 14.00px
-   at weight 600 against 13.82px at 700. */
+/* The card's national dex number, back on the name line (owner, 2026-10-10),
+   at the BST number's size: the stats line's .num is 0.92em of caption. */
+.species-card .dex-no {
+  flex: none;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-size: calc(var(--font-size-caption) * 0.92);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+/* Regular (owner, 2026-10-10), like the number beside it. It was 600, fitted
+   to the Figma reference's measured name widths. */
 .species-card .species-name {
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -598,9 +589,16 @@
 /* The type row is --font-size-caption, not --font-size-label: the two reference
    strings with no middot in them -- PSYCHIC and DARK, so no spacing ambiguity --
    measure 9.92px and 9.64px. Set via TypeRow's `small` prop. */
+/*
+  THE FOUR TEXT LINES ARE EVENLY SPACED (owner, 2026-10-10): 12.5px of white
+  between one line's baseline and the next line's cap height, measured in the
+  browser, for all three gaps. They were 17.8 / 11.7 / 8.0. The three margins
+  below are what produce that with these four sizes and leadings; the total is
+  unchanged, so the stats line has not moved.
+*/
 .species-card-types {
   display: block;
-  margin-top: 8px;
+  margin-top: 2.67px;
 }
 
 .species-card-ability {
@@ -615,8 +613,11 @@
     design-system suite asserts. Leading is the one dimension here that is not.
     Both lines are `white-space: nowrap`, so nothing wraps into its neighbour.
   */
-  line-height: 1;
-  margin-top: 5px;
+  /* normal, not the 1 it was set to so a fourth line fitted: at 1 the line box
+     clipped the descenders (owner, 2026-10-10). The card's 214px still holds all
+     four lines. */
+  line-height: normal;
+  margin-top: 5.83px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -640,7 +641,8 @@
   font-size: var(--font-size-caption);
   /* 11px, the last of the 63px the text block has. See the note above. */
   line-height: 11px;
-  margin-top: 5px;
+  /* Evenly spaced with the lines above; see .species-card-types. */
+  margin-top: 7.5px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -652,6 +654,8 @@
 .species-card-stats .num {
   font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
+  /* Regular (owner, 2026-10-10): the numbers read as data, not emphasis. */
+  font-weight: var(--font-weight-regular);
   font-size: 0.92em;
   line-height: inherit;
   color: var(--text-primary);
@@ -1353,6 +1357,13 @@
   justify-content: space-between;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--hairline);
+  /*
+    THE GAP BETWEEN THE BAR AND EVERY PAGE'S TITLE, in one place (owner,
+    2026-10-10). The dexes started flush under the hairline while Type Coverage,
+    the calculators and Team Matchup each padded their own top by 14px; those
+    paddings are gone and this margin is the one value all of them share.
+  */
+  margin-bottom: var(--space-gap-lg);
   background: var(--surface);
   font-family: var(--font-body);
   text-align: left;
@@ -1514,7 +1525,9 @@
   left: -12px;
   min-width: 168px;
   padding: 0;
-  background: var(--surface-raised);
+  /* The app's own base colour, not the raised tone (owner, 2026-10-10, every
+     navbar menu): the hairline border is what separates it from the page. */
+  background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-control);
 }
@@ -1747,7 +1760,8 @@
      floating panel exactly as it does to a module root. */
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
-  background: var(--surface-raised);
+  /* --surface, like the nav dropdowns: see .nav-dropdown. */
+  background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-control);
 }
@@ -1794,24 +1808,6 @@
 .app-controls-field input[type='search']:focus {
   outline: none;
   border-bottom-color: var(--accent);
-}
-
-/* The game scope, previously a permanent control in the bar. */
-.app-controls-field .vg-selector {
-  gap: 6px;
-  font-family: var(--font-body);
-  font-size: var(--font-size-label);
-  color: var(--text-secondary);
-}
-
-.app-controls-field .vg-selector select {
-  width: 100%;
-  font-family: var(--font-body);
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-control);
 }
 
 /* Inside the panel the cross-dex search is a labelled field in a column, not a
@@ -2174,6 +2170,43 @@
   overflow-x: auto;
 }
 
+/*
+  FROZEN HEADERS ON EVERY POKÉPEDIA TABLE (owner, 2026-10-11): the header row
+  sticks to the top of the page's scroller while the rows run under it.
+
+  Three things have to give way for `position: sticky` to work, each said here:
+  - THE WRAP'S overflow-x. Sticky resolves against the nearest scrolling
+    ancestor, and an overflow-x: auto wrap IS one (overflow-y computes to auto
+    with it) -- a scroller that never scrolls vertically, so the header stuck to
+    nothing. Inside Poképedia the wrap is visible, and the PAGE's scroller takes
+    the sideways scroll the Pokédex's 42-column table needs instead.
+  - border-collapse. A collapsed border belongs to the table, not the cell, so
+    it stays behind when the header cell moves; separate with no spacing looks
+    the same and lets each header carry its own rule.
+  - A background, or the rows show through.
+  --table-sticky-top is for a page with its own sticky bar above the table (the
+  Trainer Dex's game navbar).
+*/
+.pokedex .data-table-wrap {
+  overflow-x: visible;
+}
+
+.pokedex .scroll-area:has(.data-table-wrap) {
+  overflow-x: auto;
+}
+
+.pokedex .data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.pokedex .data-table thead th {
+  position: sticky;
+  top: var(--table-sticky-top, 0);
+  z-index: 1;
+  background: var(--surface);
+}
+
 /* The table no longer fills the width, so the wrap must not force it to. */
 .data-table-wrap > .data-table {
   margin-right: auto;
@@ -2230,9 +2263,12 @@
   justify-content: flex-end;
 }
 
-.data-table-sort:hover,
+.data-table-sort:not(.data-table-sort-static):hover,
 .data-table-sort.is-active {
   color: var(--text-primary);
+}
+.data-table-sort-static {
+  cursor: default;
 }
 
 .data-table-sort:focus-visible {
@@ -2249,6 +2285,11 @@
   color: var(--text-primary);
   border-bottom: 1px solid var(--hairline);
   white-space: nowrap;
+}
+/* A sentence in a cell (the Abilitydex's effect): wraps within its column. */
+.data-table-prose {
+  display: block;
+  white-space: normal;
 }
 
 /*
@@ -2352,6 +2393,22 @@
   text-align: right;
 }
 
+/* The species page's tables are text only, in two faces and three sizes (a
+   location and its area, mono level and rate): on one BASELINE per row rather
+   than each cell centred, which left the mono figures 2px below the names
+   (2026-10-11 alignment pass). */
+.species-page .data-table td {
+  vertical-align: baseline;
+}
+
+/* A BLOCK, so the middle-aligned cell centres the icon itself. Inline, it sat
+   on the text baseline with the descent space under it, 3-4px above the
+   row's text in every table (2026-10-11 alignment pass). */
+.data-table-chevron-col .row-chevron {
+  display: block;
+  margin-left: auto;
+}
+
 /* A name longer than the column gets an ellipsis rather than widening the table. */
 .data-table td:first-child {
   overflow: hidden;
@@ -2380,6 +2437,68 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 2px;
+}
+
+/*
+  THE PLAIN TABLE -- Movedex, Abilitydex and Itemdex (owner, 2026-10-11).
+
+  No hairlines at all, header included: spacing separates the rows. Header
+  labels regular (DS: "headings and UPPERCASE labels are regular weight"). The
+  rows are LIGHT at rest and the pointer's row turns REGULAR (owner, 2026-10-11;
+  it was regular -> semibold), in place of the hover fill the design system
+  forbids anyway.
+
+  `td *` inherits the cell's weight so a type label, a number or the name button
+  changes with its row rather than holding its own declared weight. The heavier
+  weight cannot push a column: every column is a declared width under
+  `table-layout: fixed` (DataTable's colgroup), so a wider glyph run grows
+  inside its own column and nothing to its right moves.
+*/
+.data-table-plain th,
+.data-table-plain td {
+  border-bottom: none;
+}
+
+.data-table-plain .data-table-sort {
+  font-weight: var(--font-weight-regular);
+}
+
+.data-table-plain td {
+  font-weight: var(--font-weight-light);
+}
+
+.data-table-plain td * {
+  font-weight: inherit;
+}
+
+.data-table-plain .data-table-row-clickable:hover {
+  background: none;
+}
+
+.data-table-plain .data-table-row-clickable:hover td {
+  font-weight: var(--font-weight-regular);
+}
+
+/*
+  The one cell that COULD move something: prose wraps, and the hover weight is
+  wider, so a sentence could gain a line and grow its row under the pointer.
+  ProseCell stacks an invisible copy at the HOVER weight in the same grid cell,
+  so the row is always as tall as its hovered self and the hover changes ink,
+  never geometry.
+*/
+.data-table-plain .data-table-prose {
+  display: grid;
+}
+
+.data-table-plain .data-table-prose > span,
+.data-table-plain .data-table-prose::after {
+  grid-area: 1 / 1;
+}
+
+.data-table-plain .data-table-prose::after {
+  content: attr(data-text);
+  font-weight: var(--font-weight-regular);
+  visibility: hidden;
 }
 
 /* ------------------------------------------------ shared entity detail page */
@@ -2464,6 +2583,452 @@
   letter-spacing: 0;
 }
 
+/*
+  THE SPLIT DETAIL PAGE -- Abilitydex and Movedex (owner, 2026-10-11).
+
+  Two columns, each its own ScrollArea, so the entity's description stays on
+  screen while its species grid scrolls. The GRID column is the grid's own
+  width and nothing else: three 212px cards and two 9px gaps (.pokedex-grid),
+  654px, so every card is the size it was on the stacked page. The info column
+  is 600px beside it, of which the right 28px is a GUTTER for the drawn scroll
+  thumb (second pass: values ran under the thumb), and the pair is centred.
+
+  IN PX, NOT REM, and the breakpoint is a CONTAINER query on the module rather
+  than a viewport one. The first pass used 34rem, and on a browser whose root
+  font is 18px that is 612px, not 544: the pair outgrew a module the viewport
+  query thought was wide enough, and centring clipped the info column's left
+  edge ("ANGE" for "RANGE"). The module's own width is the width that matters.
+*/
+.entity-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  container: entity-split / inline-size;
+}
+
+.entity-split-cols {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 600px 654px;
+  justify-content: center;
+  column-gap: var(--space-gap-xl);
+}
+
+.entity-split-info,
+.entity-split-grid {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entity-split-pad {
+  padding-bottom: var(--space-gap-xl);
+}
+
+/* The thumb is drawn 2px inside the scroller's right edge, 4px wide; 28px keeps
+   every right-aligned value well clear of it. */
+.entity-split-info .entity-split-pad {
+  padding-right: 28px;
+}
+
+/* No rules in the grid column (owner, 2026-10-11; the third pass took the
+   later sections' too): the only hairline left on a split page is the one under
+   the game navbar. A section is set off by space and its label instead. */
+.entity-split .entity-split-grid .entity-detail-section {
+  margin-top: var(--space-gap-xl);
+  padding-top: 0;
+  border-top: none;
+}
+
+.entity-split .entity-split-grid .entity-detail-section:first-of-type {
+  margin-top: 0;
+}
+
+/* Nor between the info column's label/value rows -- the Trainer Dex's facts. */
+.entity-split-info .fact-rows li {
+  border-bottom: none;
+}
+
+/* "Make all info font regular" (owner, 2026-10-11): the title and the section
+   labels were medium; the design system sets headings and UPPERCASE labels
+   regular anyway. */
+.entity-split .entity-detail-name,
+.entity-split .entity-detail-section-label {
+  font-weight: var(--font-weight-regular);
+}
+
+/* THE DATA IS LIGHT (owner, 2026-10-11, third pass): the description, the grey
+   lines and every value in the info column. The title and the uppercase labels
+   stay regular -- the design system's rule for headings and labels -- so the
+   structure reads over the data rather than through it. */
+.entity-split-info .entity-detail-desc,
+.entity-split-info .entity-detail-meta,
+.entity-split-info .fact-value,
+.entity-split-info .move-timeline-step {
+  font-weight: var(--font-weight-light);
+}
+
+/*
+  A SECTION'S SORT ARROW, after its label (owner, 2026-10-11). In the default
+  order it is invisible until the pointer is over the GRID column -- then a faint
+  down arrow -- and once a sort is on it stays, solid. Keyboard focus shows it
+  too, or a keyboard reader would be tabbing onto nothing.
+*/
+.entity-detail .entity-section-sort {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  margin: 0;
+  padding: 2px;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-control, 4px);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.entity-split-grid:hover .entity-section-sort[data-state='none'],
+.entity-detail .entity-section-sort[data-state='none']:focus-visible {
+  opacity: 0.35;
+}
+
+.entity-detail .entity-section-sort[data-state='none']:hover {
+  opacity: 0.6;
+}
+
+.entity-detail .entity-section-sort[data-state='asc'],
+.entity-detail .entity-section-sort[data-state='desc'] {
+  opacity: 1;
+}
+
+.entity-detail .entity-section-sort:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/*
+  THE CENTRED SINGLE COLUMN -- the Itemdex, Berrydex and Naturedex pages, and
+  the Breeding dex's (owner, 2026-10-11). One width for all of them: 654px, the
+  species grid's own (three 212px cards, two 9px gaps), so the Breeding dex's
+  cards keep their size and every reference page is the same column. px, for
+  the reason the split page's widths are.
+
+  NO HAIRLINES in it: the label/value rows are told apart by their rhythm.
+*/
+.entity-column,
+.entity-stack {
+  width: 100%;
+  max-width: 654px;
+  margin: 0 auto;
+}
+
+.entity-column .entity-detail-desc,
+.entity-column .fact-rows,
+.entity-column .nature-stat-pair li {
+  max-width: none;
+}
+
+.entity-column .fact-rows li,
+.entity-column .nature-stat-pair li {
+  border-bottom: none;
+}
+
+/* The Breeding dex: no rule above the grid, and the grid straight under the
+   count -- the hairline's margin and padding went with it. */
+.entity-stack .entity-detail-section {
+  margin-top: var(--space-gap-md);
+  padding-top: 0;
+  border-top: none;
+}
+
+/* The Naturedex's flavours: label and value, one row each. */
+.entity-column .nature-flavors {
+  margin-top: var(--space-gap-md);
+}
+
+/* The Naturedex page is narrower still (owner, 2026-10-11): two stats and two
+   flavours read as pairs at 400px, not as ends of a 654px line. */
+.entity-column[data-testid='naturedex-detail'] {
+  max-width: 400px;
+}
+
+/* The item page's rows: tight padding, the small gap between them (owner,
+   2026-10-11) -- the gap, not the padding, sets the rhythm. */
+.item-detail .fact-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+}
+
+.item-detail .fact-rows > li {
+  padding: 0.1rem 0;
+}
+
+/* The Breeding dex: the back link pinned to the page's top-left, the column
+   from the top beside it. */
+.entity-stack-page {
+  position: relative;
+}
+
+.entity-stack-page > .pokedex-back-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+
+.entity-stack-page .entity-detail-name {
+  margin-top: 0;
+}
+
+.entity-split .entity-detail-desc {
+  max-width: none;
+}
+
+/* The count under a learn method's label: "23 species", caption size. */
+.entity-split .entity-split-grid .entity-detail-section-label {
+  margin-bottom: 2px;
+}
+
+.entity-detail-section-sub {
+  margin: 0 0 var(--space-gap-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* The two columns cannot sit side by side: 600 + 32 + 654 = 1286px. They stack
+   and the PAIR scrolls as one column; the inner scrollers stand down. */
+@container entity-split (max-width: 1300px) {
+  .entity-split-cols {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .entity-split-info,
+  .entity-split-grid {
+    display: block;
+    max-width: 654px;
+    margin: 0 auto;
+  }
+
+  .entity-split-cols .scroll-area-outer {
+    display: block;
+  }
+
+  .entity-split-cols .scroll-area {
+    overflow: visible;
+  }
+
+  .entity-split-info .entity-split-pad {
+    padding-right: 0;
+    padding-bottom: var(--space-gap-md);
+  }
+}
+
+/*
+  THE MOVEDEX'S GAME NAVBAR (GameRow variant="nav"): right-aligned, the app
+  bar's ghost buttons, and ONE hairline -- under the buttons, as wide as they
+  are, not across the column.
+*/
+.game-nav {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-gap-lg);
+}
+
+.game-nav-items {
+  display: flex;
+  gap: var(--space-gap-md);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* The move page's sections: a label over a hairline, never folded. Two
+   classes on purpose: App.css's bare `.panel section` (0,1,1) would otherwise
+   add its own 2rem margin, padding and top rule -- the documented gotcha. */
+.entity-detail .move-section {
+  margin: var(--space-gap-lg) 0 0;
+  padding: 0;
+  border: none;
+}
+
+.entity-detail .move-section-head {
+  margin: 0;
+  padding-bottom: 6px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* The rows sit slightly in from their section's label (owner, 2026-10-11), which
+   is what groups them now that no hairline does. Scoped under .entity-detail so
+   it outranks the lists' own `padding: 0` resets further down. */
+.entity-detail .move-lanes,
+.entity-detail .move-contest-rows,
+.entity-detail .move-timeline {
+  padding-left: 12px;
+}
+
+/* Battle: one grid filled row by row, so side-by-side rows share a lane. */
+.move-lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--space-gap-lg);
+}
+
+.move-lane-list {
+  display: contents;
+}
+
+.move-lane {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-gap-md);
+  padding: 0.4rem 0;
+}
+
+.move-lane .fact-value {
+  min-width: 0;
+}
+
+/* Contest: one column, values left-aligned beside a fixed label column. */
+.move-contest-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.move-contest-rows .move-lane {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  justify-content: stretch;
+}
+
+.move-contest-rows .fact-value {
+  text-align: left;
+}
+
+/* The history: a vertical line through one dot per generation. */
+.move-timeline {
+  position: relative;
+  margin: var(--space-gap-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.move-timeline-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  column-gap: var(--space-gap-md);
+  align-items: baseline;
+  padding: 0 0 var(--space-gap-md) 20px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+}
+
+/* The line runs from this dot to the next; the last step draws none. */
+.move-timeline-step::before {
+  content: '';
+  position: absolute;
+  top: 0.55em;
+  bottom: -0.55em;
+  left: 4px;
+  border-left: 1px solid var(--color-border-strong);
+}
+
+.move-timeline-step:last-child::before {
+  display: none;
+}
+
+.move-timeline-step::after {
+  content: '';
+  position: absolute;
+  top: 0.35em;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+}
+
+.move-timeline-gen {
+  color: var(--text-secondary);
+}
+
+.move-timeline-values {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-gap-md);
+  row-gap: 2px;
+}
+
+@container entity-split (max-width: 640px) {
+  .move-lanes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The Abilitydex's number: --text-secondary like a species card's dex number,
+   at the table's own size (owner, 2026-10-11: it was caption x 0.92, which sat
+   on the name's baseline and read low). Every cell centres on the row, so a
+   two-line effect keeps the number level with the name. */
+.abilitydex-no {
+  color: var(--text-secondary);
+}
+
+[data-testid='abilitydex-rows'] td {
+  vertical-align: middle;
+}
+
+/*
+  THE MOVEDEX'S CATEGORY reads like a type label -- caption size, capitals, the
+  label tracking -- in its own colour (owner, 2026-10-11): physical a light
+  orange near the Fighting ink, special a blue near the Water ink, status the
+  muted neutral. Tokens: --color-category-text-*, contrast-checked both themes.
+*/
+.movedex-category {
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.movedex-category[data-category='physical'] {
+  color: var(--color-category-text-physical);
+}
+
+.movedex-category[data-category='special'] {
+  color: var(--color-category-text-special);
+}
+
+.movedex-category[data-category='status'] {
+  color: var(--color-category-text-status);
+}
+
+/* The number columns in the colour of their own "%" (owner, 2026-10-11), and the
+   "%" itself in the numbers' face and size, so "100%" is one figure. */
+[data-testid='movedex-rows'] td.data-table-num {
+  color: var(--text-secondary);
+}
+
+[data-testid='movedex-rows'] .move-unit-pct {
+  margin-left: 0;
+  font-family: var(--font-numeric);
+  font-size: 1em;
+}
+
 /* ---------------------------------------------- card badge + ledger metadata */
 
 /*
@@ -2471,18 +3036,19 @@
   pill, --font-numeric text: it is a number about the card's subject, which is
   what the numeric face is for. Only the level-up section sets one.
 */
+/* Plain text since 2026-10-11 (owner: "remove the background from the level
+   labels") -- the pill was the last fill on a card. Offset by the padding it
+   lost, so the text sits where it did. */
 .species-card-badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 8px;
+  left: 12px;
   z-index: 1;
-  padding: 2px 6px;
+  padding: 0;
   font-family: var(--font-numeric);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
-  background: var(--surface-raised);
-  border-radius: var(--radius-pill, 999px);
   line-height: 1.4;
 }
 
@@ -2729,6 +3295,21 @@
   color: var(--text-primary);
 }
 /*
+  EVERY PAGE TITLE TAKES THE NAV'S FACE AND TRACKING (owner, 2026-10-10): the
+  nav's own family and normal letter-spacing. Without this they inherited
+  index.css's bare `h1 { letter-spacing: -1.68px }`, the Vite template's 56px
+  hero setting, which crushed a 15px title. Listed here, in one place, so a new
+  page title is one more selector rather than a fifth copy of the fix.
+*/
+.dex-title,
+.calc-title,
+.tc-title,
+.tm-title,
+.stub-page-title {
+  font-family: var(--font-body);
+  letter-spacing: normal;
+}
+/*
   THE POKEDEX'S TITLE SITS BESIDE THE GRID, not above it: the cards keep their
   centred x and start level with the title's top. Out of flow for that, on a
   window wide enough that the centred grid clears it; in flow above the grid
@@ -2743,6 +3324,60 @@
     top: 0;
     left: 0;
     z-index: 2;
+    padding: 0;
+  }
+}
+
+/* THE LIST VIEW keeps its title in flow, on a row of its own above the table:
+   the table runs from the left edge, and its frozen header (2026-10-11) would
+   stick right under a title floating over the scroller's top-left corner. */
+.pokedex-body-list {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.pokedex-body-list .pokedex-title-row {
+  position: static;
+  padding: 0 0 var(--space-gap-sm);
+}
+
+/*
+  EVERY DEX BUT THE POKEDEX, laid out like it (owner, 2026-10-10): the list or
+  table centred, its top level with the title, and the title beside it at the
+  top-left. The Pokédex has its own markup (.pokedex-title-row) and is untouched.
+
+  1300px, not the Pokédex's 1000: the widest list here is the Movedex table at
+  about 1000px, and the title needs its own ~110px clear of it on the left. Below
+  that the title stays in flow above the list, which is still centred.
+*/
+.dex-list-center > *,
+.dex-list-center .data-table-wrap > .data-table,
+.dex-list-center .nature-matrix-wrap > .nature-matrix {
+  margin-left: auto;
+  margin-right: auto;
+}
+/* The ledger list's own top margin would leave it 8px under the title. */
+.dex-list-center > .species-rows {
+  margin-top: 0;
+}
+.dex-list-controls {
+  flex: 0 0 auto;
+  padding: 0 0 var(--space-gap-sm);
+}
+.dex-list-controls > * {
+  width: fit-content;
+}
+/* The out-of-flow title's containing block. */
+.pokedex:has(> .dex-title-beside) {
+  position: relative;
+}
+@media (min-width: 1300px) {
+  .dex-title-beside {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Above the list's sticky bars, whose opaque backgrounds start where the
+       table does -- a hair left of where this title ends ("Trainer De"). */
+    z-index: 5;
     padding: 0;
   }
 }
@@ -2941,8 +3576,6 @@
 .dex-menu .tf,
 .dex-menu .ds-field-control,
 .dex-menu .ds-search,
-.dex-menu .vg-selector,
-.dex-menu .vg-selector select,
 .dex-menu .global-search-input,
 .dex-menu input[type='search'] {
   font-size: var(--font-size-caption);
@@ -2986,16 +3619,45 @@
   margin-bottom: 0;
 }
 
-/* The reset row at the head of the filter menu: one action, no heading. */
+/*
+  THE SORT/FILTER MENU'S THREE PARTS -- View mode, Sort, Search/Filter -- and the
+  only hairlines inside the panel are the ones BETWEEN them (owner, 2026-10-10).
+  Inside a part, rows are spaced and never ruled, so the three parts read as
+  three. Text fields keep their own underline: that is the field, not a rule.
+*/
+.dex-menu .app-controls-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap-sm);
+  padding: var(--dex-menu-band) var(--space-gap-md) var(--space-gap-sm);
+}
+
+.dex-menu .app-controls-part + .app-controls-part {
+  border-top: 1px solid var(--hairline);
+  padding-top: var(--space-gap-sm);
+}
+
+.dex-menu .app-controls-part .app-controls-field {
+  padding: 0;
+  border-top: none;
+}
+
+/*
+  The reset row at the head of the menu: one action, no heading, no icon -- and
+  STICKY, so it stays at the top of the panel while the filters scroll under it.
+  It needs the panel's own background to do that, or the rows show through.
+*/
 .app-controls-reset {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
+  padding: var(--dex-menu-band) var(--space-gap-md) 0;
+  background: var(--surface);
 }
 
 .app-controls-reset .dex-filter-clear {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   font-size: var(--font-size-caption);
 }
 
@@ -3152,10 +3814,9 @@
   display: none;
   flex-direction: column;
   gap: var(--space-gap-sm);
-  /* Indented behind its own hairline so the fold reads as contained by the
-     toggle above it rather than as a continuation of the panel. */
+  /* Indented so the fold reads as contained by the chevron above it. No
+     hairline: the menu keeps its rules for the borders between its parts. */
   padding-left: var(--space-gap-sm);
-  border-left: 1px solid var(--hairline);
 }
 
 .dex-filter-more[data-open='true'] .dex-filter-more-panel {
@@ -3163,14 +3824,20 @@
 }
 
 /*
-  BOLD, and it is the only bold thing in either menu. "More filters" is not a
-  label among the labels -- it is the control that reveals the other two thirds of
-  the panel, and at --font-size-caption in a column of same-sized text it read as
-  one more section heading. Weight is the one axis available: the menu is
-  deliberately one type size throughout, and --accent is spoken for.
+  A DOWN/UP CHEVRON, not the words "More filters" (owner, 2026-10-10). The glyph
+  is the state: down while folded, up while open. Its accessible name still
+  says what it does.
 */
 .dex-filter-more-toggle {
-  font-weight: var(--font-weight-bold);
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+.dex-filter-more-toggle:hover {
+  color: var(--text-primary);
 }
 
 .dex-filter-more-toggle[data-filters-active='true'] {
@@ -3348,6 +4015,163 @@
 .fact-note {
   color: var(--text-secondary);
   font-size: var(--font-size-label);
+}
+
+/*
+  THE ITEM LIST'S ICON COLUMN: 48px, centred on the row, with no header (owner,
+  2026-10-11) -- the "Name" header sits over the names, not over the icons. The
+  slot is a fixed 48px box even when an item has no icon.
+*/
+/* A block box: inline, the image sat on the text baseline and the row grew
+   8px of descender space below it (66px rows for 48px of icon). */
+.itemdex-name-icon {
+  display: inline-flex;
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+
+[data-testid='itemdex-rows'] .itemdex-name-icon {
+  display: block;
+}
+
+.itemdex-name-icon img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  /* The 30px pixel-art icon, kept crisp rather than smeared by smooth scaling. */
+  image-rendering: pixelated;
+}
+
+.itemdex-name-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemdex-no {
+  color: var(--text-secondary);
+}
+
+/* The row is 48px of icon tall, so every cell centres on it, not on the top. */
+[data-testid='itemdex-rows'] td {
+  vertical-align: middle;
+}
+
+/*
+  THE ITEM PAGE is the shared centred column (.entity-column, the Berrydex's
+  width since the third pass). Text inside it stays left-aligned -- it is the
+  column that is centred, not the prose.
+*/
+
+/* Attributes: read-only checkboxes in TWO ROWS of four, under their label
+   (owner, 2026-10-11). Beside the label, four "Usable overworld"-length names
+   do not fit a 654px column. */
+.entity-detail .item-attr-row {
+  display: block;
+}
+
+.item-attrs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-attrs .item-attr {
+  flex: none;
+  display: flex;
+  align-items: center;
+  /* It is an <li> under .fact-rows, whose rows are space-between. */
+  justify-content: flex-start;
+  gap: var(--space-gap-sm);
+  padding: 0;
+  border: none;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  /* The disabled look (owner, 2026-10-11), label and mark alike. */
+  color: var(--color-text-disabled);
+}
+
+.item-attr-mark {
+  flex: none;
+}
+
+@media (max-width: 700px) {
+  .item-attrs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The acquisition fold: a ghost control centred in the column. */
+.item-acq {
+  margin-top: var(--space-gap-lg);
+}
+
+.item-acq-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 auto;
+  padding: 6px 8px;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.item-acq-toggle:hover,
+.item-acq-toggle[aria-expanded='true'] {
+  color: var(--text-primary);
+}
+
+.item-acq-toggle:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.item-acq-body {
+  margin-top: var(--space-gap-sm);
+}
+
+/* The column's full width: the acquisition columns are percentages of it. */
+.item-acq-body .data-table-wrap > .data-table {
+  width: 100%;
+}
+
+/* No row rules either (owner, 2026-10-11: "remove the hairlines" on the item
+   page). Not the `plain` table: its hover weight would re-wrap these cells. */
+.item-acq-body .data-table th,
+.item-acq-body .data-table td {
+  border-bottom: none;
+}
+
+.item-acq-body .data-table td {
+  vertical-align: top;
+}
+
+/* Bulbapedia's line breaks inside one method cell, one line each. */
+.item-acq-lines > span {
+  display: block;
+}
+
+.item-acq-lines > span + span {
+  margin-top: 4px;
+}
+
+.item-acq-body .list-caption {
+  text-align: center;
 }
 
 /* ================================================== berry card */

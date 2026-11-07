@@ -44,7 +44,7 @@ const PAST_IDLE = 1400
 
 const server = await startPreviewServer({ port: PORT })
 const APP_URL = server.url
-const browser = await chromium.launch()
+const browser = await chromium.launch({ channel: 'chrome' })
 
 try {
   const context = await browser.newContext({
@@ -225,7 +225,27 @@ try {
   const parked = await offsetOf(GRID)
   check('parked part-way down the grid', parked > 800, `scrollTop ${parked}`)
 
-  await page.click('[data-testid="species-open-25"]')
+  /*
+    CLICK A CARD THAT IS ON SCREEN AT THE PARKED OFFSET. This section was "flaky"
+    (~1 run in 3, back at 1455 instead of 900) for months, and the APP WAS RIGHT:
+    it clicked Pikachu, whose card sits below the fold at 900, so Playwright's
+    actionability step scrolled it into view (centred: 1891 - 872/2 = 1455) before
+    clicking, and ScrollArea saved that real scroll. Whether the scroll event
+    landed before the grid unmounted was a frame race, hence 1 in 3. A reader
+    cannot click a card they cannot see, so the test picks one that is visible;
+    the restore check below then also proves the click did not move the grid.
+    Diagnosed 2026-11-07 (docs/status/results.md, item 4).
+  */
+  const visibleCard = await page.$eval(GRID, (grid) => {
+    const box = grid.getBoundingClientRect()
+    const card = [...grid.querySelectorAll('[data-testid^="species-open-"]')].find((el) => {
+      const r = el.getBoundingClientRect()
+      return r.top >= box.top && r.bottom <= box.bottom
+    })
+    return card?.dataset.testid ?? null
+  })
+  check('a card is fully visible at the parked offset', visibleCard != null, String(visibleCard))
+  await page.click(`[data-testid="${visibleCard}"]`)
   await page.waitForSelector('[data-testid="species-page"]')
   check('opened a species, which unmounts the grid entirely', (await page.$(GRID)) === null)
 

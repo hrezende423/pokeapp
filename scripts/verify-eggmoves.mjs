@@ -24,7 +24,7 @@
 
 import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { withControlsOn } from './lib/controls.mjs'
+import { pickGameRow, selectGame, withControlsOn } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 /*
@@ -109,7 +109,10 @@ try {
       await page.click('[data-testid="species-page-back"]')
       await page.waitForSelector('[data-testid="species-rows"]', { timeout: 30000 })
     }
-    await withControlsOn(page, () => page.selectOption('[data-testid="vg-select"]', vg))
+    await selectGame(page, vg)
+    /* The app picks the GENERATION; the game inside it is the Learnset tab's own
+       row, picked when that tab opens (openTab). */
+    page.__vg = vg
     await withControlsOn(page, () =>
       page.fill('[data-testid="species-search"]', name.toLowerCase()),
     )
@@ -125,6 +128,7 @@ try {
     await page.waitForSelector(`[data-testid="species-page-panel-${tab.toLowerCase()}"]`, {
       timeout: 30000,
     })
+    if (tab === 'Learnset' && page.__vg) await pickGameRow(page, page.__vg)
   }
 
   // ============================================================ happy path

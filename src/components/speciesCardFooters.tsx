@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { genderRatio, resolveAbilitiesForGeneration, resolveStatsForGeneration } from '../data'
 import type { Species } from '../data'
+import { withGenderSigns } from './genderSigns'
 
 /**
  * The species card's bottom lines, as a type plus the implementations.
@@ -94,7 +95,7 @@ export function genderFooterLine(species: Species): ReactNode {
         : `${100 - ratio.female}% ♂ · ${ratio.female}% ♀`
   return (
     <span className="species-card-stats" data-testid={`species-card-gender-${species.id}`}>
-      {label}
+      {withGenderSigns(label)}
     </span>
   )
 }

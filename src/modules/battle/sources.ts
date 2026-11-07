@@ -1,5 +1,6 @@
 /**
- * Where battlers come from: the reader's Team Builder builds (S1) and the Trainer
+ * Where battlers come from: the reader's Team Builder builds (S1) or Collection
+ * entries (Collection v2, through `entryToBuild`), and the Trainer
  * Dex's parties (S2/S3), both turned into BattlerSpecs with EXACT values.
  *
  * TRAINER VALUES ARE THE GAME'S, AS THE BUNDLE ALREADY DERIVED THEM from the
@@ -20,7 +21,10 @@ import type {
   TrainerPokemon,
 } from '../../data/trainers'
 import { trainerLabel } from '../../data/trainers'
-import type { Build } from '../team-builder/model'
+import { buildGender } from '../team-builder/buildFacts'
+import type { Build, CollectionEntry } from '../team-builder/model'
+import { entryToBuild } from '../collection/collectionSchema'
+import { specialStatExp } from '../team-builder/statMath'
 import { exactSpread, spreadKeys, type BattlerSpec, type SpreadSpec } from './battler'
 import type { TrainerInfo } from './session'
 import type { GameContext } from './game'
@@ -53,6 +57,9 @@ function varietyName(speciesId: number, pokemonId: number): string {
   )
 }
 
+const genderCode = (g: 'male' | 'female' | null): 'M' | 'F' | 'N' =>
+  g === 'male' ? 'M' : g === 'female' ? 'F' : 'N'
+
 export function buildToSpec(b: Build, ctx: GameContext, slot: number): BattlerSpec {
   const gen = ctx.generation
   const species = getSpecies(b.speciesId)
@@ -66,13 +73,31 @@ export function buildToSpec(b: Build, ctx: GameContext, slot: number): BattlerSp
     level: b.level,
     spreadMode: 'current',
     scenarioId: null,
-    spread: exactSpread(gen, b.individual, b.effort, gen >= 3 ? b.natureId : null),
+    // A Gen 2 Build keeps its Special Stat Exp under the split keys; the spread
+    // reads `special` (statMath.specialStatExp).
+    spread: exactSpread(
+      gen,
+      b.individual,
+      gen <= 2 ? { ...b.effort, special: specialStatExp(b.effort, gen) } : b.effort,
+      gen >= 3 ? b.natureId : null,
+    ),
     moves: pad4(b.moveIds),
     itemId: gen >= 2 ? b.itemId : null,
     abilityId: gen >= 3 ? b.abilityId : null,
-    gender: b.gender === 'male' ? 'M' : b.gender === 'female' ? 'F' : 'N',
+    // The battle's generation decides, as it does for the spread: none in Gen 1,
+    // the Attack DV's in Gen 2, the stored one after (buildFacts.buildGender).
+    gender: genderCode(buildGender({ ...b, generation: gen }, species)),
     origin: { buildId: b.id },
   }
+}
+
+/**
+ * A Collection entry as a battler: the Build path exactly (`entryToBuild`), with
+ * its own source and origin so a link back finds the entry, not a Build.
+ */
+export function entryToSpec(e: CollectionEntry, ctx: GameContext, slot: number): BattlerSpec {
+  const spec = buildToSpec(entryToBuild(e), ctx, slot)
+  return { ...spec, source: 'collection', origin: { entryId: e.id } }
 }
 
 function trainerSpread(mon: TrainerPokemon, ctx: GameContext): SpreadSpec {

@@ -28,6 +28,7 @@ for bg in BG:
     for fg in ["border.strong","border.focus","data.fill"]: P.append((fg,bg,3.0))
 for bg in ["bg.canvas","bg.surface"]:
     for k in S["type-text"]: P.append((f"type-text.{k}",bg,4.5))
+    for k in S["category-text"]: P.append((f"category-text.{k}",bg,4.5))
 for a in ["action.primary","action.primary-hover","action.primary-active","action.danger","action.danger-hover"]:
     P.append(("text.on-action",a,4.5)); P.append((a,"bg.surface",3.0))
 for a in ["action.secondary","action.secondary-hover"]: P.append(("text.default",a,4.5))

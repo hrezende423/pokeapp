@@ -39,6 +39,8 @@ export function DexPageShell<T>({
   list,
   detail,
   gatedMessage,
+  controls,
+  detailScrolls = false,
 }: {
   dexId: DexModuleId
   /**
@@ -55,9 +57,30 @@ export function DexPageShell<T>({
    * Rendered when something is. OMIT for a dex with no detail page. The list
    * then simply always renders.
    */
-  detail?: (args: { entry: T; onBack: () => void }) => ReactNode
+  detail?: (args: {
+    entry: T
+    onBack: () => void
+    /**
+     * A remembered-offset key for one of the detail's OWN scrollers, when it has
+     * them (`detailScrolls`). Composed here so a self-scrolling page is keyed by
+     * exactly what the shell's own detail scroller would have been.
+     */
+    scrollKey: (part: string) => string
+  }) => ReactNode
+  /**
+   * The detail page brings its own scrollers instead of being wrapped in one --
+   * the Abilitydex and Movedex pages, whose info column and species grid scroll
+   * independently side by side (owner, 2026-10-11). The detail then fills the
+   * module's height and must contain a ScrollArea for anything that can run long.
+   */
+  detailScrolls?: boolean
   /** Shown instead of the list when `entries` is empty for era reasons. */
   gatedMessage?: string
+  /**
+   * A control row under the title, list view only -- the Trainer Dex's game row.
+   * A scope control rather than a description, so the no-header rule above holds.
+   */
+  controls?: ReactNode
 }) {
   const [selectedId, setSelectedId] = useDexSelection(dexId)
   /*
@@ -100,9 +123,14 @@ export function DexPageShell<T>({
     <div className="pokedex" data-testid={`dex-${dexId}`}>
       {selected == null ? (
         <>
-          <div className="dex-controls">
+          {/* The Pokédex's arrangement (owner, 2026-10-10): the title sits beside
+              the list on a wide window, and the list is centred with its top
+              level with the title's. The controls row, when there is one, is
+              part of the centred column rather than the title. */}
+          <div className="dex-controls dex-title-beside">
             <DexTitle dexId={dexId} count={visible.length} />
           </div>
+          {controls && <div className="dex-list-center dex-list-controls">{controls}</div>}
           {/* The query signature is part of the key for the reason the Pokedex
               grid's filters already were: a narrowed or re-ordered list is a
               different list, and an offset taken against another one means
@@ -111,15 +139,29 @@ export function DexPageShell<T>({
             testId={`${dexId}-list-scroll`}
             memoryKey={scrollKey(dexId, 'list', generation, isAll, query.signature)}
           >
-            {list({ entries: visible, onSelect: setSelectedId })}
+            <div className="dex-list-center">
+              {list({ entries: visible, onSelect: setSelectedId })}
+            </div>
           </ScrollArea>
         </>
+      ) : detailScrolls ? (
+        detail?.({
+          entry: selected,
+          onBack: () => setSelectedId(null),
+          scrollKey: (part) =>
+            scrollKey(dexId, 'detail', generation, isAll, entryId(selected), part),
+        })
       ) : (
         <ScrollArea
           testId={`${dexId}-detail-scroll`}
           memoryKey={scrollKey(dexId, 'detail', generation, isAll, entryId(selected))}
         >
-          {detail?.({ entry: selected, onBack: () => setSelectedId(null) })}
+          {detail?.({
+            entry: selected,
+            onBack: () => setSelectedId(null),
+            scrollKey: (part) =>
+              scrollKey(dexId, 'detail', generation, isAll, entryId(selected), part),
+          })}
         </ScrollArea>
       )}
     </div>

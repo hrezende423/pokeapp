@@ -25,7 +25,7 @@ import { chromium } from 'playwright'
 import { startDevServer } from './lib/devServer.mjs'
 
 const dev = await startDevServer({ port: 4185 })
-const browser = await chromium.launch()
+const browser = await chromium.launch({ channel: 'chrome' })
 const out = (label, v) => console.log(`  ${label}: ${JSON.stringify(v)}`)
 const hr = (t) => console.log(`\n${'='.repeat(74)}\n${t}\n${'='.repeat(74)}`)
 try {

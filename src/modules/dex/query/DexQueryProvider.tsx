@@ -17,7 +17,7 @@ import {
   natureEntries,
   speciesEntries,
 } from '../entrySources'
-import { trainerEntries, useTrainerPartition } from '../trainerEntries'
+import { trainerEntries, useTrainerPartition, useTrainerdexGame } from '../trainerEntries'
 import { DexQueryContext, type QueryListId } from './dexQueryContext'
 import {
   buildFilterSections,
@@ -27,21 +27,22 @@ import {
   teamRows,
   teamSortFields,
 } from '../../team-builder/libraryQuery'
+import {
+  collectionFilterSections,
+  collectionRows,
+  collectionSortFields,
+} from '../../collection/collectionQuery'
 import { useTeamBuilderData } from '../../team-builder/store'
 import { useTbScreen } from '../../team-builder/tbNav'
 import type { FilterSection, SortField } from './dexQuery'
 import {
   abilitydexSections,
-  abilitydexSorts,
   berrydexSections,
   berrydexSorts,
   breedingdexSections,
   itemdexSections,
-  itemdexSorts,
   movedexSections,
-  naturedexSections,
   trainerdexSections,
-  trainerdexSorts,
 } from './registries'
 import { useDexQuery } from './useDexQuery'
 
@@ -92,13 +93,20 @@ const erase = <T,>(
   defaultSort,
 })
 
+/** True when `id` is one of these entries' ids: the shell would show its page. */
+const isOpen = (entries: unknown[], id: number | null): boolean =>
+  id != null && entries.some((e) => (e as { id: number }).id === id)
+
 const TEAM_BUILDING_IDS = new Set(['my-teams', 'build-library', 'new-team', 'new-build'])
 
 export function DexQueryProvider({ children }: { children: ReactNode }) {
   const nav = useNav()
-  const { generation, isAll, versionGroup } = useVersionGroup()
+  const { generation, isAll } = useVersionGroup()
+  const trainerGame = useTrainerdexGame()
   const [view, setView] = useState<SpeciesView>('grid')
   const [selectedSpecies] = useDexSelection('pokedex')
+  const [selectedAbility] = useDexSelection('abilitydex')
+  const [selectedMove] = useDexSelection('movedex')
 
   const availableTypes = useMemo(() => typesInGeneration(generation), [generation])
   const moduleId = nav.moduleId
@@ -110,7 +118,7 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
     open module, so browsing elsewhere never downloads a game's trainers.
   */
   const trainerLoad = useTrainerPartition(
-    moduleId === 'trainerdex' ? (versionGroup?.name ?? null) : null,
+    moduleId === 'trainerdex' ? (trainerGame.versionGroup?.name ?? null) : null,
   )
   const trainerPartition = trainerLoad.state.status === 'ready' ? trainerLoad.state.partition : null
   const trainerRows = useMemo(
@@ -144,6 +152,18 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       const rows = teamRows(tbData)
       return erase('tb-teams', rows, teamFilterSections(rows), teamSortFields(), 'order')
     }
+    /* The Collection: the app generation's entries only -- it follows the
+       selector, so another generation's entries are not in the list at all. */
+    if (moduleId === 'collection') {
+      const rows = collectionRows(tbData, generation)
+      return erase(
+        'collection',
+        rows,
+        collectionFilterSections(rows, generation),
+        collectionSortFields(),
+        'order',
+      )
+    }
     switch (moduleId) {
       case 'pokedex': {
         const rows = buildSpeciesRows(speciesEntries(scope), generation)
@@ -162,7 +182,8 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       }
       case 'itemdex': {
         const entries = itemEntries(scope)
-        return erase('itemdex', entries, itemdexSections(entries), itemdexSorts, 'id')
+        // No sort fields: a table since 2026-10-10, its headers are its sort.
+        return erase('itemdex', entries, itemdexSections(entries), [], null)
       }
       case 'berrydex': {
         const entries = berryEntries(scope)
@@ -170,12 +191,16 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       }
       case 'abilitydex': {
         const entries = abilityEntries(scope)
-        return erase('abilitydex', entries, abilitydexSections(entries), abilitydexSorts, 'id')
+        // No sort fields: a table since 2026-10-10, its headers are its sort.
+        return erase('abilitydex', entries, abilitydexSections(entries), [], null)
       }
       case 'naturedex':
         // No sort fields: the page is a 5x5 matrix whose axes are the two stats,
         // so a cell's position is its meaning and there is nothing to re-order.
-        return erase('naturedex', natureEntries(scope), naturedexSections(), [], null)
+        // No filters either (owner, 2026-10-10): the matrix is the whole set at a
+        // glance, so the bar's Sort/Filter menu is disabled here.
+        // `naturedexSections` stays in registries.ts to wire back in.
+        return erase('naturedex', natureEntries(scope), [], [], null)
       case 'breedingdex':
         return erase('breedingdex', eggGroupEntries(scope), breedingdexSections(), [], null)
       case 'trainerdex':
@@ -183,8 +208,9 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
           'trainerdex',
           trainerRows,
           trainerdexSections(trainerRows),
-          trainerdexSorts,
-          'order',
+          // No sort fields: a table since 2026-10-10, its headers are its sort.
+          [],
+          null,
         )
       default:
         // Type Coverage, Team Building, the design-system page: not a dex, so the
@@ -216,8 +242,14 @@ export function DexQueryProvider({ children }: { children: ReactNode }) {
       // The Pokedex's browse page only: with a species open there is no list on
       // screen for the switch to describe.
       showViewToggle: config.dexId === 'pokedex' && selectedSpecies == null,
+      /* An entry page, not a list. Checked against the dex's own scoped entries,
+         the test DexPageShell uses: a selection the generation no longer has
+         shows the list, and the list keeps its menu. */
+      menuDisabled:
+        (config.dexId === 'abilitydex' && isOpen(config.entries, selectedAbility)) ||
+        (config.dexId === 'movedex' && isOpen(config.entries, selectedMove)),
     }),
-    [config, query, view, selectedSpecies],
+    [config, query, view, selectedSpecies, selectedAbility, selectedMove],
   )
 
   return <DexQueryContext.Provider value={value}>{children}</DexQueryContext.Provider>

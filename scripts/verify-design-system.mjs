@@ -26,7 +26,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { selectGame } from './lib/controls.mjs'
 import { goToDex, openTab } from './lib/nav.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
@@ -110,7 +110,10 @@ const EXPECTED = {
     '--text-primary': tokenValue(semantic['text-primary'], 'light'),
     '--text-secondary': tokenValue(semantic['text-secondary'], 'light'),
     '--hairline': tokenValue(semantic.hairline, 'light'),
-    '--accent': tokenValue(semantic.accent, 'light'),
+    /* dist/tokens.css's --color-accent-default (accent-600), not the handoff's
+       #d91c2c: dist is the winning set (owner, 2026-11-06), and the light accent is
+       bridged to it. Dark is NOT (it moved a frozen screen): design-system/TOKEN-BRIDGE.md. */
+    '--accent': '#C91D1D',
     '--button-primary-fill': tokenValue(semantic['button-primary-fill'], 'light'),
     '--button-primary-text': tokenValue(semantic['button-primary-text'], 'light'),
     '--ghost-watermark': tokenValue(semantic['ghost-watermark'], 'light'),
@@ -264,14 +267,33 @@ const appDecls = decls(appCss)
   carry the same IBM Plex Sans / Martian Mono stacks. Anything else differing
   from the handoff copy is still a failure.
 */
+/*
+  THE TOKEN BRIDGE (2026-11-07, design-system/TOKEN-BRIDGE.md) aliased eight more to
+  the same-kind dist token with the IDENTICAL computed value in every mode (checked
+  in Chrome over 402 token values), and dropped two the app re-declared with dist's
+  own value. An alias is still held to its exact text here, and FROM_DIST to dist
+  carrying the handoff's value, so neither can drift silently.
+*/
 const ALIASED = {
   '--font-body': 'var(--font-family-sans)',
   '--font-numeric': 'var(--font-family-mono)',
+  '--font-size-body': 'var(--font-style-body-size)',
+  '--font-size-title': 'var(--font-style-h3-size)',
+  '--radius-control': 'var(--radius-md)',
+  '--radius-pill': 'var(--radius-lg)',
+  '--space-gap-sm': 'var(--space-2)',
+  '--space-gap-xl': 'var(--space-8)',
+  '--field-focus-border-width': 'var(--border-width-thick)',
+  '--font-weight-medium': 'var(--font-weight-semibold)',
 }
+const distDecls = decls(readFileSync('design-system/dist/tokens.css', 'utf8'))
+const FROM_DIST = ['--font-weight-regular', '--font-weight-bold']
 const changed = Object.keys(handoffDecls).filter((k) =>
-  k in ALIASED
-    ? canonical(appDecls[k]) !== canonical(ALIASED[k])
-    : canonical(appDecls[k]) !== canonical(handoffDecls[k]),
+  FROM_DIST.includes(k)
+    ? appDecls[k] !== undefined || canonical(distDecls[k]) !== canonical(handoffDecls[k])
+    : k in ALIASED
+      ? canonical(appDecls[k]) !== canonical(ALIASED[k])
+      : canonical(appDecls[k]) !== canonical(handoffDecls[k]),
 )
 log(`  declarations changed from the handoff copy: ${changed.length ? changed.join(', ') : 'none'}`)
 check('no token value was altered', changed.length === 0, changed.join(','))
@@ -528,7 +550,6 @@ try {
   await page.goto(APP_URL, { waitUntil: 'load' })
   await page.waitForSelector('[data-testid="app-nav"]', { timeout: 60000 })
 
-  const { withControls } = controls(page)
 
   const setTheme = async (theme) => {
     await page.evaluate((t) => {
@@ -1345,7 +1366,7 @@ try {
         visibleByDefault: {
           speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
           typeFilterButtons: [...document.querySelectorAll('.tf')].filter(visible).length,
-          gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+          gameSelect: visible(document.querySelector('[data-testid="gen-select"]')),
           globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
         },
         /*
@@ -1468,8 +1489,8 @@ try {
       shell.visibleByDefault.gameSelect === false,
     )
     check(
-      '[' + theme + '] nor is the cross-dex search, which moved into the panel',
-      shell.visibleByDefault.globalSearch === false,
+      '[' + theme + '] the cross-dex search IS on screen by default, in the bar',
+      shell.visibleByDefault.globalSearch === true,
     )
     check('[' + theme + '] and the panel itself starts closed', shell.panelOpen === false)
 
@@ -1485,8 +1506,8 @@ try {
       shell.toggle?.rightInset + 'px from the bar edge',
     )
     check(
-      '[' + theme + '] it is a text-only ghost button reading "Search/Filter"',
-      shell.toggle?.text === 'Search/Filter' && shell.toggle.svgCount === 0,
+      '[' + theme + '] it is a text-only ghost button reading "Sort/Filter"',
+      shell.toggle?.text === 'Sort/Filter' && shell.toggle.svgCount === 0,
       JSON.stringify(shell.toggle),
     )
     check(
@@ -1624,14 +1645,18 @@ try {
         shadow: cs.boxShadow,
         speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
         typeFilterButtons: [...document.querySelectorAll('.tf')].filter(visible).length,
-        gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+        gameSelect: visible(document.querySelector('[data-testid="gen-select"]')),
         globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
-        insidePanel: ['species-search', 'vg-select', 'global-search'].every(
-          (id) =>
-            document
-              .querySelector('[data-testid="' + id + '"]')
-              ?.closest('[data-testid="controls-panel"]') != null,
-        ),
+        insidePanel:
+          document
+            .querySelector('[data-testid="species-search"]')
+            ?.closest('[data-testid="controls-panel"]') != null,
+        searchInBarNotPanel: (() => {
+          const el = document.querySelector('[data-testid="global-search"]')
+          return (
+            el?.closest('.app-bar') != null && el.closest('[data-testid="controls-panel"]') == null
+          )
+        })(),
         toggleColor: getComputedStyle(document.querySelector('[data-testid="controls-toggle"]'))
           .color,
         expanded: document
@@ -1641,17 +1666,22 @@ try {
     })
     log('  [' + theme + '] opened: ' + JSON.stringify(opened))
     check(
-      '[' + theme + '] the toggle reveals all three controls, plus the cross-dex search',
+      '[' + theme + '] the toggle reveals the filters, the cross-dex search stays on screen (the generation is in the account menu)',
       opened.speciesSearch &&
-        opened.gameSelect &&
+        !opened.gameSelect &&
         opened.globalSearch &&
         opened.typeFilterButtons > 10,
       JSON.stringify(opened),
     )
-    check('[' + theme + '] all of them inside the revealed panel', opened.insidePanel)
+    check('[' + theme + '] the filters are inside the revealed panel', opened.insidePanel)
     check(
-      '[' + theme + '] the panel is --surface-raised with a hairline border and no shadow',
-      opened.background === hexToRgb(want['--surface-raised']) &&
+      '[' + theme + '] the cross-dex search is in the bar, outside the panel',
+      opened.searchInBarNotPanel,
+    )
+    check(
+      // Every navbar menu is the app's base colour since 2026-10-10 (owner).
+      '[' + theme + '] the panel is --surface with a hairline border and no shadow',
+      opened.background === hexToRgb(want['--surface']) &&
         opened.border === '1px ' + hexToRgb(want['--hairline']) &&
         opened.shadow === 'none',
       opened.background + ' / ' + opened.border + ' / ' + opened.shadow,
@@ -1666,7 +1696,7 @@ try {
       opened.expanded === 'true' && opened.toggleColor === hexToRgb(want['--accent']),
       opened.expanded + ' / ' + opened.toggleColor,
     )
-    // The cross-dex search still works from in here.
+    // The cross-dex search still works with the panel open beside it.
     await page.fill('[data-testid="global-search"]', 'sand')
     await page.waitForSelector('[data-testid="global-search-results"]', { timeout: 15000 })
     const results = await page.evaluate(() => {
@@ -1680,7 +1710,7 @@ try {
     })
     log('  [' + theme + '] results: ' + JSON.stringify(results))
     check(
-      '[' + theme + '] the search still returns grouped results from inside the panel',
+      '[' + theme + '] the search still returns grouped results from the bar',
       results.groups > 0,
       '(' + results.groups + ' groups)',
     )
@@ -1700,13 +1730,13 @@ try {
       const visible = (el) => el != null && el.getClientRects().length > 0
       return {
         speciesSearch: visible(document.querySelector('[data-testid="species-search"]')),
-        gameSelect: visible(document.querySelector('[data-testid="vg-select"]')),
+        gameSelect: visible(document.querySelector('[data-testid="gen-select"]')),
         globalSearch: visible(document.querySelector('[data-testid="global-search"]')),
       }
     })
     check(
-      '[' + theme + '] clicking it again hides them all again',
-      !closed.speciesSearch && !closed.gameSelect && !closed.globalSearch,
+      '[' + theme + '] clicking it again hides the filters again, the cross-dex search stays',
+      !closed.speciesSearch && !closed.gameSelect && closed.globalSearch,
       JSON.stringify(closed),
     )
     await page.screenshot({ path: SHOTS + '/shell-' + theme + '.png' })
@@ -1776,22 +1806,21 @@ try {
     JSON.stringify(hovered.items) ===
       JSON.stringify([
         'nav-pokedex',
-        'nav-itemdex',
-        'nav-abilitydex',
-        'nav-naturedex',
-        'nav-berrydex',
         'nav-movedex',
+        'nav-abilitydex',
+        'nav-itemdex',
+        'nav-berrydex',
+        'nav-naturedex',
         'nav-breedingdex',
         'nav-trainerdex',
-        // Not a dex, but it is on this tab: Type Coverage registers in its own
-        // typecoverage/pages.ts and navConfig appends it after the dexes.
-        'nav-type-coverage',
+        // Type Coverage moved to Tools on 2026-10-11 (owner).
       ]),
     hovered.items.join(','),
   )
   check(
-    'the panel is --surface-raised, hairline border, no shadow',
-    hovered.background === hexToRgb(EXPECTED.light['--surface-raised']) &&
+    // Every navbar menu is the app's base colour since 2026-10-10 (owner).
+    'the panel is --surface, hairline border, no shadow',
+    hovered.background === hexToRgb(EXPECTED.light['--surface']) &&
       hovered.border === '1px ' + hexToRgb(EXPECTED.light['--hairline']) &&
       hovered.shadow === 'none',
     hovered.background + ' / ' + hovered.border + ' / ' + hovered.shadow,
@@ -1881,7 +1910,7 @@ try {
   })
   log('  team items: ' + JSON.stringify(team))
   check(
-    'Team Building lists its four destinations, in order (Pokemon Collection removed 2026-09-27)',
+    'Team Building lists its five destinations, in order (the Collection back, as a real screen, 2026-10-15)',
     /* "Team Library", which is what the design system called it all along. It
        spent a while as "My Teams" while the screen was being built and is back
        to sitting beside "Build Library", which is the pair it belongs to. The
@@ -1892,13 +1921,16 @@ try {
         'New Build',
         'Team Library',
         'Build Library',
+        // The old "Pokemon Collection" stub left on 2026-09-27; the owner placed the
+        // minimal Collection here on 2026-10-15 (docs/tools/PLAN.md).
+        'Collection',
       ]),
     team.labels.join(','),
   )
   // They lead to stub pages, but they are real destinations now, so nothing is
   // inert and nothing needs aria-disabled to stay keyboard-reachable.
   check(
-    'all four are live destinations, none inert',
+    'all five are live destinations, none inert',
     team.noneDisabled,
     JSON.stringify(team.testids),
   )
@@ -1913,12 +1945,13 @@ try {
   })
   log('  tools: ' + JSON.stringify(tools))
   check(
-    'Tools lists Calculators (with Damage Calculator under it) first, Team Matchup in place of the Battle Simulator stub, then the stubs',
+    'Tools lists Calculators (with Damage Calculator under it) first, then Type Coverage, Team Matchup in place of the Battle Simulator stub, then the stubs',
     tools.visible &&
       JSON.stringify(tools.labels) ===
         JSON.stringify([
           'Calculators',
           'Damage Calculator',
+          'Type Coverage',
           'Compare Pokemon',
           'Team Matchup',
           'Training and Optimization',
@@ -2018,6 +2051,18 @@ try {
     ability: { x: 128, y: 407 },
     colPitch: 518,
     rowPitch: 507,
+  }
+  /*
+    THE CARD'S REFERENCE IS 212 x 214 (owner, 2026-11-06), not Figma's 497:467: the
+    owner's looser leading made it taller, and that is now the design. Only the
+    measures the extra height moved read from here; the rest stay Figma's ratios.
+  */
+  const CARD_214 = {
+    card: { w: 212, h: 214 },
+    ghostH: 84.5,
+    line: { y: 136, h: 17.5 },
+    types: { y: 156.2 },
+    ability: { y: 178.6 },
   }
   // Tolerances: 1.5% of the card box for positions derived from a 2.23x scale
   // read off glyph advances, and 2px absolute for gaps.
@@ -2142,13 +2187,13 @@ try {
       '(' + grid.columnsInFirstRow + ')',
     )
     check(
-      '[' + theme + "] the card keeps Figma's 497:467 aspect",
-      nearRatio(grid.card.h, FIG.card.h / FIG.card.w, grid.card.w),
+      '[' + theme + '] the card keeps the 212:214 reference aspect',
+      nearRatio(grid.card.h, CARD_214.card.h / CARD_214.card.w, grid.card.w),
       grid.card.w +
         ' x ' +
         grid.card.h +
         ' (want h=' +
-        ((FIG.card.h / FIG.card.w) * grid.card.w).toFixed(1) +
+        ((CARD_214.card.h / CARD_214.card.w) * grid.card.w).toFixed(1) +
         ')',
     )
 
@@ -2180,16 +2225,16 @@ try {
         grid.card.w,
     )
     check(
-      '[' + theme + "] its box matches Figma's 74.4% x 42.4% of the card",
+      '[' + theme + "] its box is Figma's 74.4% wide and the 214 reference's 39.5% tall",
       nearRatio(grid.ghost.w, FIG.ghost.w / FIG.card.w, grid.card.w, 2) &&
-        nearRatio(grid.ghost.h, FIG.ghost.h / FIG.card.h, grid.card.h, 2),
+        nearRatio(grid.ghost.h, CARD_214.ghostH / CARD_214.card.h, grid.card.h, 2),
       grid.ghost.w.toFixed(1) +
         ' x ' +
         grid.ghost.h.toFixed(1) +
         ' (want ' +
         ((FIG.ghost.w / FIG.card.w) * grid.card.w).toFixed(1) +
         ' x ' +
-        ((FIG.ghost.h / FIG.card.h) * grid.card.h).toFixed(1) +
+        ((CARD_214.ghostH / CARD_214.card.h) * grid.card.h).toFixed(1) +
         ')',
     )
     check(
@@ -2257,16 +2302,16 @@ try {
         ((FIG.line.x / FIG.card.w) * grid.card.w).toFixed(1) +
         ')',
     )
-    for (const [label, got, figY] of [
-      ['number+name', grid.line.y, FIG.line.y],
-      ['type row', grid.types.y, FIG.types.y],
-      ['ability', grid.ability?.y, FIG.ability.y],
+    for (const [label, got, refY] of [
+      ['number+name', grid.line.y, CARD_214.line.y],
+      ['type row', grid.types.y, CARD_214.types.y],
+      ['ability', grid.ability?.y, CARD_214.ability.y],
     ]) {
       if (got == null) continue
       check(
-        '[' + theme + '] ' + label + " sits at Figma's y=" + figY + '/467',
-        nearRatio(got, figY / FIG.card.h, grid.card.h),
-        'y=' + got.toFixed(1) + ' (want ' + ((figY / FIG.card.h) * grid.card.h).toFixed(1) + ')',
+        '[' + theme + '] ' + label + ' sits at the reference y=' + refY + '/214',
+        nearRatio(got, refY / CARD_214.card.h, grid.card.h),
+        'y=' + got.toFixed(1) + ' (want ' + ((refY / CARD_214.card.h) * grid.card.h).toFixed(1) + ')',
       )
     }
 
@@ -2280,9 +2325,11 @@ try {
     )
     check(
       '[' + theme + '] the dex number and the name share one line, as the reference shows',
-      Math.abs(grid.num.y - grid.nameBox.y) <= 1 &&
+      // Two type sizes on one line: the number sits inside the name's line box.
+      grid.num.y >= grid.line.y &&
+        grid.num.y < grid.line.y + grid.line.h &&
         grid.nameBox.x > grid.num.x &&
-        nearRatio(grid.line.h, FIG.line.h / FIG.card.h, grid.card.h, 3),
+        nearRatio(grid.line.h, CARD_214.line.h / CARD_214.card.h, grid.card.h, 3),
       'number y=' +
         grid.num.y.toFixed(1) +
         ' name y=' +
@@ -2296,13 +2343,12 @@ try {
         grid.style.numColor === hexToRgb(want['--text-secondary']),
       grid.style.numText.trim() + ' / ' + grid.style.numColor,
     )
-    // 600, not 700: across all six reference names the measured fit is 14.00px at
-    // weight 600 against 13.82px at 700.
+    // Regular since 2026-10-10 (owner). It was 600, the measured fit to Figma.
     check(
-      '[' + theme + '] the name is --font-weight-medium --text-primary at --font-size-body',
+      '[' + theme + '] the name is --font-weight-regular --text-primary at --font-size-body',
       grid.style.nameColor === hexToRgb(want['--text-primary']) &&
         grid.style.nameFontSize === SCALE['--font-size-body'] &&
-        grid.style.nameWeight === SCALE['--font-weight-medium'],
+        grid.style.nameWeight === SCALE['--font-weight-regular'],
       grid.style.nameColor + ' / ' + grid.style.nameFontSize + ' / ' + grid.style.nameWeight,
     )
     // Measured off the two reference strings with no middot in them, so no
@@ -2338,10 +2384,12 @@ try {
       nearRatio(grid.colPitch, FIG.colPitch / FIG.card.w, grid.card.w, 2),
       grid.colPitch + ' (want ' + ((FIG.colPitch / FIG.card.w) * grid.card.w).toFixed(1) + ')',
     )
+    // The row gap is the column gap since 2026-10-10 (owner), no longer Figma's
+    // 40-raw: one 9px pitch both ways.
     check(
-      '[' + theme + "] row pitch matches Figma's 507:467",
-      nearRatio(grid.rowPitch, FIG.rowPitch / FIG.card.h, grid.card.h, 2),
-      grid.rowPitch + ' (want ' + ((FIG.rowPitch / FIG.card.h) * grid.card.h).toFixed(1) + ')',
+      '[' + theme + '] row gap equals the column gap',
+      grid.rowPitch - grid.card.h === grid.colPitch - grid.card.w,
+      grid.rowPitch - grid.card.h + ' vs ' + (grid.colPitch - grid.card.w),
     )
 
     await page.screenshot({ path: SHOTS + '/grid-' + theme + '.png' })
@@ -2366,7 +2414,7 @@ try {
     }
   })
   log('  baseline (all): ' + JSON.stringify(gridBaseline))
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'platinum'))
+  await selectGame(page, 'platinum')
   await page.waitForTimeout(300)
   const gen4 = await page.evaluate(() => ({
     bulbasaur:
@@ -2393,7 +2441,7 @@ try {
   )
   // Gens 1-2 had no abilities at all: the slot must be absent, and the two lines
   // above it must not move.
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'red-blue'))
+  await selectGame(page, 'red-blue')
   await page.waitForTimeout(300)
   const gen1 = await page.evaluate(() => {
     const card = document.querySelector('[data-testid="species-row-1"]')
@@ -2416,7 +2464,7 @@ try {
       gen1.cardHeight === gridBaseline.cardHeight,
     JSON.stringify(gen1) + ' vs ' + JSON.stringify(gridBaseline),
   )
-  await withControls(() => page.selectOption('[data-testid="vg-select"]', 'all'))
+  await selectGame(page, 'all')
   await page.waitForTimeout(300)
 
   // The scroll-down affordance: Figma's "icon-scrolldown" instance, centred.
@@ -2507,31 +2555,35 @@ try {
   */
   await goToDex(page, 'itemdex')
   await page.waitForSelector('[data-testid="itemdex-rows"]', { timeout: 30000 })
+  /*
+    THE ITEMDEX IS A TABLE NOW (2026-10-10), and since 2026-10-11 its icon LEADS
+    the name at 48px, centred on the name's line. The ledger-row checks this
+    replaced (.species-name / .row-icon / .dex-no) looked for markup that no
+    longer exists and threw rather than failing.
+  */
   const itemRow = await page.evaluate(() => {
     const row = document.querySelector('[data-testid="itemdex-row-1"]')
     if (!row) return null
-    const name = row.querySelector('.species-name')
-    const icon = row.querySelector('.row-icon')
+    const name = row.querySelector('.itemdex-name-text')
+    const icon = row.querySelector('[data-testid="itemdex-row-icon-1"]')
+    const n = name?.getBoundingClientRect()
+    const i = icon?.getBoundingClientRect()
     return {
       font: getComputedStyle(row).fontFamily,
-      // Sprite AFTER the name: compare left edges rather than DOM order, since
-      // what matters is where the reader sees it.
-      iconAfterName:
-        name != null &&
-        icon != null &&
-        icon.getBoundingClientRect().left > name.getBoundingClientRect().left,
+      iconBeforeName: n != null && i != null && i.right <= n.left,
+      iconSize: i ? [Math.round(i.width), Math.round(i.height)] : null,
+      centred: n != null && i != null && Math.abs(n.top + n.height / 2 - (i.top + i.height / 2)) <= 1.5,
       chevron: row.querySelector('.row-chevron') != null,
-      sub: row.querySelector('.row-sub')?.textContent?.trim() ?? null,
       category: row.querySelector('[data-testid="itemdex-row-category-1"]')?.textContent?.trim(),
       pocket: row.querySelector('[data-testid="itemdex-row-pocket-1"]')?.textContent?.trim(),
-      // The numeric face on the catalog number, which the base .dex-no rule was
-      // missing until this pass -- it set tabular-nums without a font-family.
-      dexNoFont: getComputedStyle(row.querySelector('.dex-no')).fontFamily,
+      priceFont: getComputedStyle(row.querySelector('[data-testid="itemdex-row-price-1"]')).fontFamily,
     }
   })
   log(`  itemdex row: ${JSON.stringify(itemRow)}`)
   check('itemdex still inherits Plex Sans', /IBM Plex/.test(itemRow?.font ?? ''), itemRow?.font)
-  check('itemdex puts the sprite AFTER the item name', itemRow?.iconAfterName === true)
+  check('itemdex puts the icon BEFORE the item name', itemRow?.iconBeforeName === true)
+  check('at 48px', JSON.stringify(itemRow?.iconSize) === '[48,48]', JSON.stringify(itemRow?.iconSize))
+  check('centred on the name', itemRow?.centred === true)
   check('itemdex rows end in a chevron', itemRow?.chevron === true)
   check(
     'itemdex shows category AND pocket as two distinct fields',
@@ -2541,9 +2593,9 @@ try {
     `${itemRow?.category} / ${itemRow?.pocket}`,
   )
   check(
-    'the catalog number is in --font-numeric, not just tabular-nums',
-    /Martian Mono/.test(itemRow?.dexNoFont ?? ''),
-    itemRow?.dexNoFont,
+    'the price is in --font-numeric',
+    /Martian Mono/.test(itemRow?.priceFont ?? ''),
+    itemRow?.priceFont,
   )
 
   await goToDex(page, 'berrydex')

@@ -18,7 +18,7 @@
 
 import { get as httpGet } from 'node:http'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { selectGame } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4178
@@ -38,6 +38,7 @@ const EAGER = [
   'locations.json',
   'meta.json',
   'version-groups.json',
+  'item-supplement.json',
 ]
 
 const GROUP_A = 'heartgold-soulsilver' // largest partitions, and the app default
@@ -127,15 +128,8 @@ try {
   const mark = () => requests.length
 
   const selectGroup = async (name) => {
-    await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
-    // The scope readout was removed from the page with the header block. The
-    // select holds the same state the list derives from, and both land in one
-    // React commit, so waiting for its value is waiting for the list.
-    await page.waitForFunction(
-      (n) => document.querySelector('[data-testid="vg-select"]')?.value === n,
-      name,
-      { timeout: 30000 },
-    )
+    await selectGame(page, name)
+    // selectGame waits for the generation select to hold the value itself.
   }
   /** Wait for any in-flight partition load to finish rendering. */
   const settle = () =>
@@ -233,7 +227,6 @@ try {
   const navStart = Date.now()
   await page.goto(APP_URL, { waitUntil: 'load' })
 
-  const { withControls } = controls(page)
   // The boot readout now lives inside the footer's hover-only info panel
   // (App.tsx), so it is attached but not visible until the trigger is
   // hovered/focused -- 'attached' is the right wait here, since this step only
@@ -477,18 +470,20 @@ try {
   log(`  offline ${GROUP_A} learnset rows for #${SPECIES}: ${offlineRows}`)
   check(`${GROUP_A} partitions resolve offline`, offlineRows > 0, `(${offlineRows} rows)`)
 
-  // A group never visited online must NOT be available offline — proves the
-  // partitions really are cache-on-first-use rather than precached. Asked for
-  // through the page's own control, which is what selects a partition now.
+  // Offline item: every Gen 1-4 partition is PRECACHED now, so a group never
+  // visited online still resolves offline (verify:offline covers the rest).
+  // Asked for through the page's own control, which is what selects a partition.
   await page.click('[data-testid="learnset-scope-generation-3"]')
   const neverBtn = `[data-testid="learnset-scope-game-${NEVER_VISITED}"]`
   if (await page.$(neverBtn)) await page.click(neverBtn)
-  await page.waitForSelector('[data-testid="species-page"] [role="alert"]', { timeout: 30000 })
-  const alert = await page.textContent('[data-testid="species-page"] [role="alert"]')
-  log(`  offline "${NEVER_VISITED}" (never visited online) -> ${JSON.stringify(alert)}`)
+  await page.waitForSelector('.species-learn-group', { timeout: 30000 }).catch(() => {})
+  await page.waitForTimeout(1500) // let the new group's rows replace the old ones
+  const neverRows = await learnsetRows()
+  log(`  offline "${NEVER_VISITED}" (never visited online) -> ${neverRows} rows`)
   check(
-    `un-visited group "${NEVER_VISITED}" is NOT available offline (confirms on-demand caching)`,
-    (alert ?? '').length > 0,
+    `un-visited Gen 1-4 group "${NEVER_VISITED}" resolves offline (precached)`,
+    neverRows > 0,
+    `(${neverRows} rows)`,
   )
 
   // ==================================================================

@@ -177,7 +177,8 @@
   --hairline: #e5e5e5;
 
   /* accent — reserved for active tab/nav state and binary indicators only */
-  --accent: #d91c2c;
+  /* Bridged to the winning set (owner, 2026-11-06): was #d91c2c. */
+  --accent: var(--color-accent-default);
 
   /* Stat direction on a nature. NOT --accent: that has exactly four sanctioned
      uses and "a stat went up" is none of them -- a direction arrow is not a
@@ -262,6 +263,11 @@
   --text-secondary: #8f8f95;
   --hairline: #2c2c2e;
 
+  /* NOT bridged in dark (2026-11-07): dist's single accent (#C91D1D) changed 4 pixels
+     of the signed-off Team Display in dark mode (x 140-149, y 187-225 of the viewer),
+     and a frozen screen may not move by one pixel without the owner asking. Light is
+     bridged; dark keeps its own value until the owner decides. See
+     design-system/TOKEN-BRIDGE.md. */
   --accent: #ff3b4e;
 
   /* increase 6.38:1, decrease 6.87:1 against #141414; the red is 70 units from
@@ -329,40 +335,40 @@
   --font-numeric: var(--font-family-mono);
 
   --font-size-display: 38px;
-  --font-size-title: 20px;
+  --font-size-title: var(--font-style-h3-size); /* 20px */
   /* Every page's own heading ("Pokédex", "Damage Calculator"), smaller than the
      title scale by the owner's call (2026-09-27). */
   --font-size-page-title: 15px;
-  --font-size-body: 14px;
+  --font-size-body: var(--font-style-body-size); /* 14px */
   --font-size-label: 11px;
   --font-size-caption: 10px;
   --font-size-ghost-watermark: 220px;
   --font-size-ghost-watermark-grid: 64px;
 
-  --font-weight-regular: 400;
-  --font-weight-medium: 600;
-  --font-weight-bold: 700;
+  /* regular (400) and bold (700) now come from dist/tokens.css, whose values are
+     the same. medium stays 600 here, where dist calls 600 semibold (500 medium). */
+  --font-weight-medium: var(--font-weight-semibold);
 
   /* radius */
   --radius-card: 20px;
   --radius-drawer: 28px;
-  --radius-control: 8px;
-  --radius-pill: 12px;
+  --radius-control: var(--radius-md); /* 8px */
+  --radius-pill: var(--radius-lg); /* 12px */
   --radius-badge-square: 5px; /* from radius.badge-square in design-tokens.json */
 
   /* spacing */
   --space-card-padding: 28px;
   --space-drawer-padding: 26px;
   --space-row-padding-block: 9px;
-  --space-gap-sm: 8px;
+  --space-gap-sm: var(--space-2); /* 8px */
   --space-gap-md: 14px;
   --space-gap-lg: 20px;
-  --space-gap-xl: 32px;
+  --space-gap-xl: var(--space-8); /* 32px */
 
   /* form field states — mode-agnostic: both borders are var(--accent), which
      already differs per mode, and the disabled step is a plain opacity. */
   --field-focus-border: var(--accent);
-  --field-focus-border-width: 2px;
+  --field-focus-border-width: var(--border-width-thick); /* 2px */
   --field-disabled-opacity: 0.4;
   --field-error-border: var(--accent);
   /* accent-red is now confirmed for a 3rd use: error/validation emphasis,

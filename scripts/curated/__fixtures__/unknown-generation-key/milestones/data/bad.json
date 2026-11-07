@@ -1,0 +1,10 @@
+[
+  {
+    "id": "generation-ten",
+    "example": true,
+    "generations": {
+      "4": { "platinum": { "order": 1, "title": "Fixture" } },
+      "10": { "platinum": { "order": 2, "title": "Fixture" } }
+    }
+  }
+]

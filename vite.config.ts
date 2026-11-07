@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { DATA_DIR, EAGER_DATA_FILES, PARTITION_DIRS } from './src/data/manifest.ts'
+import { readFileSync } from 'node:fs'
+import { DATA_DIR, EAGER_DATA_FILES, PARTITION_DIRS, PRECACHE_MAX_GENERATION } from './src/data/manifest.ts'
 
 // Repo is served from https://<user>.github.io/pokeapp/, so every asset URL
 // must be prefixed with the repo name. BASE_PATH overrides it for a copy served
@@ -13,6 +14,20 @@ const BASE = process.env.BASE_PATH ?? '/pokeapp/'
 // stray file landing in data/ can never be silently added to the install payload.
 const EAGER_DATA_GLOB = `${DATA_DIR}/{${EAGER_DATA_FILES.join(',')}}`
 
+// The partitions precached for offline-before-first-view (see PRECACHE_MAX_GENERATION
+// in manifest.ts): named from the bundle's own version-group list, so a rebuilt
+// bundle can never precache a file the app does not load, or miss one it does.
+const VERSION_GROUPS = Object.values(
+  JSON.parse(readFileSync(new URL('./public/data/version-groups.json', import.meta.url), 'utf8')),
+) as { generation_id: number | null; learnsets_path: string; encounters_path: string | null }[]
+const PRECACHED_PARTITIONS = [
+  ...VERSION_GROUPS.filter((v) => (v.generation_id ?? 99) <= PRECACHE_MAX_GENERATION).map((v) => v.learnsets_path),
+  ...VERSION_GROUPS.map((v) => v.encounters_path).filter((p): p is string => !!p),
+  'trainers/*.json',
+  'battle/*.json',
+]
+const PARTITION_GLOB = `${DATA_DIR}/{${PRECACHED_PARTITIONS.join(',')}}`
+
 // The per-version-group partitions are ~34 MiB raw in total, so they are fetched on
 // demand and cached on first use instead. CacheFirst is right because the files are
 // immutable for a given build: a rebuild produces new content under the same name,
@@ -22,6 +37,13 @@ const PARTITION_PATTERN = new RegExp(`/${DATA_DIR}/(${PARTITION_DIRS.join('|')})
 // https://vite.dev/config/
 export default defineConfig({
   base: BASE,
+  server: {
+    // A git worktree checked out inside the repo (agents use .claude/worktrees/)
+    // adds .html files Vite reloads the page for, even outside the module graph:
+    // the cause of the verify:team-builder flakes of 2026-11-07. Worktrees belong in
+    // ../pokeapp-worktrees/ (scripts/worktree.mjs); this guards the harness ones.
+    watch: { ignored: ['**/.claude/**'] },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -56,13 +78,16 @@ export default defineConfig({
         // woff2 is here because the design system's IBM Plex Sans is self-hosted:
         // an offline-first PWA that fetched its own font over the network would fall
         // back to the system stack the first time it opened offline.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}', EAGER_DATA_GLOB],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}', EAGER_DATA_GLOB, PARTITION_GLOB],
         // species.json is the largest precached file at ~4.2 MiB with Gen 1-9; the
         // Workbox default is 2 MiB, which would silently drop it if the bundle grew.
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         navigateFallback: `${BASE}index.html`,
         navigateFallbackDenylist: [PARTITION_PATTERN],
         cleanupOutdatedCaches: true,
+        // A message handler so the page can promote a worker left waiting --
+        // see public/sw-skip-waiting.js and src/pwa.ts.
+        importScripts: ['sw-skip-waiting.js'],
         runtimeCaching: [
           {
             // Artwork lives on other origins: PokeAPI's sprite repo for the static

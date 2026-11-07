@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Progression milestone",
+  "description": "One milestone. Per generation, per game (version group name): its `order` in that game and its `title`. `allGenerations: true` with `all` means the same order and title in every game.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "example": { "type": "boolean" },
+    "allGenerations": { "const": true },
+    "all": { "$ref": "#/definitions/step" },
+    "generations": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[1-9]$" },
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "propertyNames": { "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "additionalProperties": { "$ref": "#/definitions/step" }
+      }
+    }
+  },
+  "if": { "required": ["allGenerations"] },
+  "then": { "required": ["all"], "not": { "required": ["generations"] } },
+  "else": { "required": ["generations"], "not": { "required": ["all"] } },
+  "definitions": {
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "title"],
+      "properties": {
+        "order": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

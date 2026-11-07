@@ -1,4 +1,102 @@
 # Changelog
+## 2.1.22 — 2026-11-07 (non-breaking)
+- Tokens bridge (`src/design-tokens.css` → `dist/tokens.css`, owner decision 2026-11-06): eight app tokens are now `var()` aliases of same-kind dist tokens with identical values in every mode (body and title sizes, control and pill radii, the sm and xl gaps, the focus border width, medium weight), and `--font-weight-regular`/`-bold` come from dist. **The light accent is now dist's #C91D1D (was #d91c2c)**: the active nav item, the selected tab, and the field focus and error borders. The dark accent is unchanged (#ff3b4e), because dist's value moved 4 pixels of the signed-off Team Display. The list of tokens with no dist equivalent is in `TOKEN-BRIDGE.md`
+## 2.1.21 — 2026-11-07 (non-breaking)
+Recorded late: these four commits of 2026-10-15/16 changed CSS without an entry here. Each bullet is dated by its commit; nothing changed on 2026-11-07.
+- 2026-10-15 baseline (`8207a25`), `team-builder/teamBuilder.css`: the Team Display card's move-name column has a 110px floor again (`--tb-move-name-min`: the widest Gen 1-4 name, "~ High Jump Kick*", plus 12px), so the column no longer shrinks to the longest name on that card. Added in d27ba5e, lost in the Build Form redesign's revert (d59f6f0), restored
+- 2026-10-15 Tools index and the shared tool page frame (`532ee40`), new `tools/tools.css`: the index is a title over hairline rows with no row gap, each a semibold `--color-text-default` tool name (a text button; `--color-text-disabled` when the tool cannot answer in the generation, its reason beside it at caption size) and a `--color-text-muted` blurb. A tool page is a head (title, the generation in `--color-text-muted`, the game row) over a body of inputs then result; a reason printed in place of a result is `--color-text-default`, never the accent
+- 2026-10-15 #5 Speed tiers (`d5a6fe1`), `tools/tools.css`: from 1100px wide a tool page puts the result beside the inputs (inputs up to 720px, result at least 280px), and the result stays in view (sticky) while the inputs scroll. Applies to every tool page
+- 2026-10-16 #13 Compare Pokémon (`05bd61a`), `tools/tools.css`: the comparison table (`.tools-compare`): hairline rows with no row gap, regular-weight cells, row headers in `--color-text-muted`, numbers in the mono face; the highest number in a row is semibold, never coloured. A wide table scrolls sideways inside the result, not the page
+## 2.1.20 — 2026-11-07 (non-breaking)
+- Docs only: `components/icon.md` documented a 2px stroke; the app has drawn Tabler icons at 1.5px all along (74 of 80 `stroke=` uses). The doc now says 1.5px. No icon changed
+## 2.1.19 — 2026-11-07 (non-breaking)
+- Collection v2 (`collection/CollectionPage.tsx`, `collection.css`, mockup `public/mockups/collection-v2.html`): the entry form is five named regions (`col-form`: identity / spread / moves / origin / record), each a FormSectionLabel over a compact field strip of the existing ds fields (SelectField, TextField, SearchSelect for the four moves). A field the generation lacks is absent, never disabled; Gen 2's gender and shininess show disabled at their DV-derived values, the Build Form's shape. The list is a `tools-compare` table (Pokémon, Lv, Effort, OT, Fits, Edit) with hairline rows and no row gap; "Exact: …" / "Fits: …" / "No build" are text, no badge. Search and filters open from the app bar's Sort/Filter menu, which is now enabled on the Collection. Team Matchup: a native Source select (Team / Collection) and up to six SearchSelects in `.tm-collection-picks`. No component, token or accent use changed
+## 2.1.18 — 2026-11-07 (non-breaking)
+- Team Building, gender by generation: a Gen 1 Build has no gender field in the Build Form, no glyph on its card, no `(M)`/`(F)` in its export and none in Compare. A Gen 2 Build's gender comes from its Attack DV (pokecrystal `GetGender`); the Build Form's field shows it disabled, the shape a single-gender species already takes, and it changes as the DV does. Gen 3-4 unchanged. No layout or CSS change; stored values are not rewritten
+## 2.1.17 — 2026-11-06 (non-breaking)
+- Team Building: Showdown text in and out, in `ui/TransferModal`; a Build name beside the "#001" on the Build Library card, truncated so the card does not move; Compare in the Build Library's selection bar, opening `tb-compare`, where a differing row carries a `--color-border-strong` line on its left edge
+## 2.1.16 — 2026-11-06 (non-breaking)
+- Team Display: alternate animated sprites for Charizard, Blastoise, Alakazam, Gengar, Salamence and Garchomp (`team-builder/altSprites.ts`), kept by the owner after the 2026-10-23 trial. Non-shiny only; every other surface keeps the stored animated set. Card layout and sizing unchanged
+## 2.1.15 — 2026-10-18 (non-breaking)
+- App bar: the cross-dex search is in the bar on EVERY page, just left of the Sort/Filter trigger, no longer inside that menu. Pages with nothing to sort or filter (Naturedex, an open move or ability page, Type Coverage, the calculators, Team Matchup, the tools, Collection, Build Form) had lost it with the menu since the one-menu change (2026-10-10); the menu itself is still disabled there. The panel is Reset, View mode, Sort and the filters
+## 2.1.14 — 2026-10-12 (non-breaking)
+- Trainer Dex party cards: 20px between cards (`--space-gap-lg`, was 14px)
+## 2.1.13 — 2026-10-12 (non-breaking)
+- Trainer Dex party cards: the move type and category icons are gone (`TypeDot` and `MoveCategoryIcon` removed); a move line reads "~ Thunder  ELE  Spe" -- the Build Form's spelling, mono, type in its ink (`TypeAbbr`, type-label.md), category muted, full names as tooltips
+- Trainer Dex party cards: 14px between cards (`--space-gap-md`, was 9px)
+## 2.1.12 — 2026-10-12 (non-breaking)
+- Trainer Dex party cards: a move's type is a DOT in its ink (`TypeDot`, type-label.md -- sanctioned for these move lines only) and its category an ICON (`MoveCategoryIcon`, icon.md): physical an outlined eight-point star, special concentric circles, status an outlined yin-yang without its dots, each in the Movedex's category ink
+- Trainer Dex party cards FIT THEIR WIDEST LINE plus 12px a side (150px floor), across every team of the trainer so switching teams never resizes them: an invisible sizer in the grid holds every team's lines. Most parties come in at 150px; the widest (a held item like Bright Powder) at ~233px. The party column is as wide as its cards
+- Trainer Dex: the team navbar sits `--space-gap-sm` above the cards (was `--space-gap-lg`)
+- PWA: the open app now takes a new deploy -- a worker found waiting is told to skip waiting, and the app checks for one on returning to the foreground and hourly. The preview had been showing a build two deploys old
+## 2.1.11 — 2026-10-11 (non-breaking)
+- ROW ALIGNMENT PASS, app-wide, measured (each row item's first-line baseline from its text box and the used font's descent; icons against the text's cap-height centre):
+  - ♂ / ♀ are Tabler icons seated like a capital (`GenderSign`, `withGenderSigns`): IBM Plex has neither character, so they fell back to a system symbol font whose circle hangs below the baseline. The character stays in the DOM, visually hidden. Trainer cards, Breeding dex card gender line, Pokédex list's gender column, the gender-ratio filter options
+  - Data-table row chevron: a block, centred in its cell (it sat 3–4px high in every table)
+  - Species page tables: cells on one baseline (mono figures sat 2px low)
+  - Type Coverage: header row on a baseline (title 7px low against the view toggles); table header cells on a baseline (corner label 3px low)
+  - Damage calculator EV/IV rows: one baseline across label, numbers and the stage select; the slider stays centred
+- Left as they are, on purpose: the species page's Gender ratio row and type-matchup tiers are centred against multi-line values by design (see their CSS notes). The Build Form's copy icon (6px) is on a signed-off screen and needs the owner's word
+## 2.1.10 — 2026-10-11 (non-breaking)
+- Data table: FROZEN HEADER on every Poképedia table (Pokédex list, Movedex, Abilitydex, Itemdex, Breeding dex, Trainer Dex, species-page and item-page tables). Inside `.pokedex` the wrap no longer scrolls sideways (the page's scroller does), cells are `border-collapse: separate` with no spacing so the header carries its own rule, and the header has the surface background. `--table-sticky-top` offsets it under a page's own sticky bar
+- Pokédex list view: the title on its own row above the table, not over its corner
+- Trainer Dex: no "Party" label; cards at the grid's 212px with the move name column as wide as its longest name; lines in the owner's order -- "Name ♂ @Item Lv.N", types, "Nature · Ability", IV/EV line, moves; no "moves from the level-up table" note. Two rows of three fit the column without scrolling at 900px tall
+- Trainer Dex list: the title no longer clipped by the sticky game navbar
+## 2.1.9 — 2026-10-11 (non-breaking)
+- Trainer Dex list: ONE ROW PER TRAINER (rematches and per-starter teams fold in; the Note says "3 rematches" / "3 starter teams"); the game row is the right-aligned mini navbar, its right edge the table's, sticky over the list
+- Trainer Dex page: left pane 500px, the party in a 3-across grid of 240px cards; a mini navbar of the trainer's teams (Initial, Rematch 1…, or one per starter); the left column follows the team -- prize (a rematch's derived as class rate × last level), bag items counted ("3× Full Restore"); no Source row, no party count
+- Trainer party card: the Pokédex card's ghost number, katakana and official artwork, then the Team Display's battle lines -- name/gender/level; types | nature | ability | item; EVs/IVs/DVs only where they apply; four moves with type and category in aligned columns. No labels, no item sprite, no outline
+- Info panel ("i", bottom-right): a page can put its source credit above the boot line (the Trainer Dex's pret/Bulbapedia credit moved there). It was being clipped to nothing by the module-layout rule and is visible again
+- Itemdex list: columns sized to their longest content plus padding; 58px rows (the icon no longer sits on a text baseline)
+- Itemdex page: label/value rows at 0.1rem padding with `space.gap.sm` between them
+- Naturedex page: 400px column
+- Breeding dex page: the back link in the page's top-left corner, the content from the top
+## 2.1.8 — 2026-10-11 (non-breaking)
+- Reference detail pages lose their hairlines: Movedex (Battle/Contest lanes, section heads, between learn-method sections), Itemdex, Berrydex, Naturedex, Breeding dex and Trainer Dex. The only rule left on a split page is the one under the game navbar
+- Split pages (Abilitydex, Movedex, Trainer Dex): the info column's data -- description, grey lines, values -- is LIGHT; titles and uppercase labels stay regular
+- Movedex page: "Introduced in Generation N" above the description; Battle/Contest/history rows indented 12px under their labels; no history when the only change is the Gen 4 physical/special split; Level-up learners re-sort by level from an arrow after the label (hidden until the grid column is hovered, faint in dex order, solid when sorted; dex order → ascending → descending → dex order)
+- Species card level label: plain text, no pill
+- Centred single column (`.entity-column` / `.entity-stack`): 654px, the species grid's width -- Itemdex, Berrydex, Naturedex and Breeding dex pages
+- Itemdex list: "No." column first, the icon its own unlabelled column, a TM/HM names its move ("TM01 (Focus Punch)", per game); Fling column removed
+- Itemdex page: attributes in two rows of four under their label, drawn in the checkbox's DISABLED look (owner's call, replacing 2.1.6's read-only look)
+- Naturedex page: liked and disliked flavour as two label/value rows
+- Breeding dex and Trainer Dex lists: `plain` tables. Trainer Dex page: two columns, the party on the right
+## 2.1.7 — 2026-10-11 (non-breaking)
+- New tokens: `font.weight.light` (300); `color.category-ink.*` + semantic `color.category-text.{physical,special,status}` (physical a light orange near the Fighting ink, special a blue near the Water ink, status the muted neutral; contrast-checked both themes)
+- Data table `plain`: rows LIGHT at rest, REGULAR on hover (was regular → semibold)
+- Abilitydex list: the number at the table's size, centred on the row
+- Movedex list: Category in capitals at the type label's size, coloured by category; number columns in `--text-secondary`; "%" in the mono face at the numbers' size
+- Sort/Filter is disabled on an open Abilitydex or Movedex entry page
+- Movedex page: "Introduced in Generation N" as a grey line under the description; Battle (two columns in shared-height lanes) and Contest (one column, values left-aligned) sections that do not fold; change history as a vertical timeline ("Move changes throughout generations"); the learner total is gone and each learn method shows "N species" under its label; the game row is a right-aligned mini navbar (ghost buttons, selected in accent, one hairline under the buttons, no label); info column 600px with a 28px scrollbar gutter, stacking by a container query
+- Itemdex page: attributes on one line; acquisition lists every game from Generation 1 up to the selected one
+## 2.1.6 — 2026-10-11 (non-breaking)
+- Poképedia order: Pokédex, Movedex, Abilitydex, Itemdex, Berrydex, Naturedex, Breeding dex, Trainer Dex; Type Coverage moved to Tools (after Calculators)
+- Data table, `plain` variant (Movedex, Abilitydex, Itemdex lists): no hairlines, every cell and header regular, the hovered row semibold in place of a hover fill; columns are declared widths so nothing moves, and a prose cell reserves its semibold height
+- Itemdex list: icon before the name at 48px, centred on it; Price column (₽, selected generation's default game)
+- Itemdex page: centred column; ₽ prices grouped by game; generations as a range ("1–4"); attributes as read-only checkboxes; a centred Acquisition chevron unfolds a Games / Finite / Repeatable table
+- Abilitydex list: the number at caption × 0.92 in `--text-secondary`, as on the species card
+- Movedex list: Category at the type label's size
+- Abilitydex and Movedex pages: two columns, each scrolling on its own — info (title regular) beside the species grid at its unchanged 3 × 212px — centred; stacked below 1300px. The Movedex's facts sit in two columns under the description
+- Checkbox: a read-only state (see `components/checkbox-radio.md`)
+## 2.1.5 — 2026-10-10 (non-breaking)
+- App bar: Grid/List, Sort and Search/Filter merge into one text trigger, "Sort/Filter", whose panel has three parts (View mode · Sort · Search/Filter) with hairlines only between them; disabled on pages with nothing to sort or filter (Naturedex, Type Coverage, Build Form, calculators, Team Matchup)
+- Every navbar menu (nav dropdowns, Sort/Filter, account) is `--surface`, not `--surface-raised`
+- Filter menu: "Reset filters" sticky at the top, no icon; section resets use the plain rotate glyph (no centre dot); "More filters" is a down/up chevron
+- Type filter: every type name in its own colour, regular; selected adds bold
+- Type Coverage: no underline under the selected tab; the Matrix toggles are text labels at the tab size, selected = bold `--text-primary`
+- One gap under the app bar for every page (`--space-gap-lg` margin); the 14px top padding of Type Coverage, Calculators and Team Matchup is gone
+## 2.1.4 — 2026-10-10 (non-breaking)
+- Species grid card: the four text lines evenly spaced (12.5px baseline-to-cap); `#0001` at the BST number's size
+- Itemdex, Abilitydex (with an Ability # column), Breeding dex and Trainer Dex are sortable data tables like the Movedex; their bar Sort menu is gone
+- Data table: an unsortable column's header takes the sortable headers' face; a prose cell (`.data-table-prose`) wraps
+## 2.1.3 — 2026-10-10 (non-breaking)
+- Page titles take the nav's face and normal tracking (they inherited a -1.68px h1 letter-spacing)
+- Species grid card: row gap 9px (= column gap), `#0001` back before the name, name and BST/Speed numbers regular, ability line-height normal
+- Dex pages other than the Pokédex: list/table centred, top level with the title; title beside it at ≥1300px
+## 2.1.2 — 2026-10-10 (non-breaking)
+- Account menu: a Generation row under Theme (label left, underline select right, 112px, label-size type) replaces the game select in the Search/Filter panel
+- Game row (the species page's segmented `species-scope` buttons, game axis only) on the Trainer Dex and the Movedex detail, inside the selected generation
+- Type label: the `unknown` type reads `???`
 ## 2.1.1 — 2026-10-04 (non-breaking)
 - `font.family.sans` is IBM Plex Sans again (Manrope reverted: it breaks the Team Display's cap-height levelling); `font.family.mono` leads with Martian Mono, JetBrains Mono as fallback
 ## 2.1.0 — 2026-10-04 (non-breaking)

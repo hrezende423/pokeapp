@@ -30,3 +30,6 @@ dev-dist
 # Local cache of the PokeAPI static snapshot (see scripts/build-data.ts)
 .cache
 scripts/.verify-shots
+
+# Agent worktrees (the harness puts them here; ours go to ../pokeapp-worktrees/)
+.claude/worktrees/

@@ -10,6 +10,11 @@
     "build:trainers": "node scripts/build-trainers.mjs",
     "build:battle-data": "node scripts/build-battle-data.mjs",
     "build:supplement": "node scripts/build-supplement.mjs",
+    "build:item-supplement": "node scripts/build-item-supplement.mjs",
+    "build:catch-data": "node scripts/build-catch-data.mjs",
+    "build:berry-data": "node scripts/build-berry-data.mjs",
+    "build:arena-data": "node scripts/build-arena-data.mjs",
+    "build:curated": "node scripts/build-curated.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -32,10 +37,23 @@
     "verify:trainers": "node scripts/verify-trainers.mjs",
     "verify:team-matchup": "node scripts/verify-team-matchup.mjs",
     "verify:scroll-nav": "node scripts/verify-scroll-nav.mjs",
+    "verify:tools": "node scripts/verify-tools.mjs",
+    "verify:team-transfer": "node scripts/verify-team-transfer.mjs",
+    "verify:collection": "node scripts/verify-collection.mjs",
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
     "audit:supplement": "node scripts/audit-supplement.mjs",
     "audit:white-sprites": "node scripts/audit-white-sprites.mjs",
-    "report:type-scale": "node scripts/report-type-scale.mjs"
+    "report:type-scale": "node scripts/report-type-scale.mjs",
+    "check": "node scripts/check.mjs",
+    "verify:infra": "node scripts/verify-infra.mjs",
+    "verify:store": "node scripts/verify-store.mjs",
+    "verify:entities": "node scripts/verify-entities.mjs",
+    "verify:curated": "node scripts/verify-curated.mjs",
+    "worktree": "node scripts/worktree.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "status": "node scripts/status.mjs",
+    "verify:mobile": "node scripts/verify-mobile.mjs",
+    "verify:offline": "node scripts/verify-offline.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
@@ -49,6 +67,8 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "ajv": "^8.20.0",
+    "esbuild": "^0.28.2",
     "eslint": "^10.9.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -61,5 +81,8 @@
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.0",
     "vite-plugin-pwa": "^1.3.0"
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

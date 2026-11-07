@@ -11,6 +11,7 @@
 
 import { chromium } from 'playwright'
 import { startPreviewServer } from './lib/devServer.mjs'
+import { selectGeneration } from './lib/controls.mjs'
 
 /*
   IT HOSTS ITS OWN SERVER, like every other browser suite here, and that was a
@@ -43,7 +44,7 @@ function section(n, title) {
   return n
 }
 
-/** Opens Pokepedia's dropdown and clicks the Type Coverage entry. */
+/** Opens the Tools dropdown and clicks the Type Coverage entry (moved from Poképedia 2026-10-11). */
 async function openModule(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-testid="dex-switcher"], .nav-trigger, .panel', {
@@ -55,7 +56,7 @@ async function openModule(page, base) {
   if (!(await entry.isVisible().catch(() => false))) {
     /* The group opens on mouseenter (NavGroup), not on a trigger click -- the
        trigger click is reserved for the tab's own destination. */
-    await page.locator('[data-testid="nav-group-pokepedia"]').hover()
+    await page.locator('[data-testid="nav-group-tools"]').hover()
     await entry.waitFor({ state: 'visible', timeout: 10000 })
   }
   await entry.click()
@@ -76,7 +77,7 @@ const rowCount = (page) => page.locator('[data-testid="tc-row"]').count()
 
 async function main() {
   const preview = await startPreviewServer({ port: PORT })
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ channel: 'chrome' })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const consoleErrors = []
   page.on('console', (m) => {
@@ -561,26 +562,59 @@ async function main() {
     const token = parseFloat(
       getComputedStyle(document.querySelector('.tc')).getPropertyValue('--font-size-label'),
     )
+    const seg = document.querySelector('.tc-segment')
+    const selected = getComputedStyle(document.querySelector('.tc-segment[data-active="true"]'))
+    const tab = getComputedStyle(document.querySelector('.tc-subnav .ds-tab[aria-selected="true"]'))
     return {
       labelToken: token,
       controlLabel: px('.tc-control-label'),
       segment: px('.tc-segment'),
+      tab: px('.tc-subnav .ds-tab'),
       filter: px('.tc-filter'),
+      segmentFill: getComputedStyle(seg.parentElement).backgroundColor,
+      selectedColour: selected.color,
+      selectedWeight: selected.fontWeight,
+      accent: (() => {
+        const probe = document.createElement('span')
+        probe.style.color = 'var(--accent)'
+        document.querySelector('.tc').appendChild(probe)
+        const c = getComputedStyle(probe).color
+        probe.remove()
+        return c
+      })(),
+      tabUnderline: tab.borderBottomColor,
     }
   })
   check(
     7,
-    'every control is set below the page label token',
-    sizes.controlLabel < sizes.labelToken &&
-      sizes.segment < sizes.labelToken &&
-      sizes.filter < sizes.labelToken,
+    'the rail labels and the type filter are set below the page label token',
+    sizes.controlLabel < sizes.labelToken && sizes.filter < sizes.labelToken,
     JSON.stringify(sizes),
   )
   check(
     7,
-    'and the three controls share one size, so they read as one surface',
-    sizes.controlLabel === sizes.segment && sizes.segment === sizes.filter,
-    `${sizes.controlLabel}/${sizes.segment}/${sizes.filter}`,
+    'and share one size, so they read as one surface',
+    sizes.controlLabel === sizes.filter,
+    `${sizes.controlLabel}/${sizes.filter}`,
+  )
+  /* The toggles are text labels in the tab strip's style (owner, 2026-10-10). */
+  check(
+    7,
+    'the toggles are text labels at the tab strip size, with no pill behind them',
+    sizes.segment === sizes.tab && sizes.segmentFill === 'rgba(0, 0, 0, 0)',
+    `${sizes.segment}/${sizes.tab} fill ${sizes.segmentFill}`,
+  )
+  check(
+    7,
+    'a selected toggle is bold and NOT the accent -- both accent uses are spent',
+    Number(sizes.selectedWeight) >= 700 && sizes.selectedColour !== sizes.accent,
+    `${sizes.selectedWeight} ${sizes.selectedColour}`,
+  )
+  check(
+    7,
+    'and the selected tab has no underline on this page',
+    sizes.tabUnderline === 'rgba(0, 0, 0, 0)',
+    sizes.tabUnderline,
   )
 
   // ---------------------------------------------------------- 8. Type filter
@@ -603,13 +637,9 @@ async function main() {
 
   // ------------------------------------------------------- 9. Local generation
   section(9, 'the page generation selector is independent of the app selector')
-  /* The app-wide game selector lives inside the app bar's controls disclosure,
-     which is closed by default -- it has to be opened to be driven. */
-  const appSelect = page.locator('[data-testid="vg-select"]')
-  if (!(await appSelect.isVisible().catch(() => false))) {
-    await page.locator('[data-testid="controls-toggle"]').click()
-    await appSelect.waitFor({ state: 'visible', timeout: 10000 })
-  }
+  /* The app-wide generation select lives in the account menu; it is only read
+     here, and reading works while the menu is closed. */
+  const appSelect = page.locator('[data-testid="gen-select"]')
   const appBefore = await appSelect.inputValue()
 
   /* Existing combos really change with THIS page's selector. */
@@ -629,7 +659,7 @@ async function main() {
   )
   const other = options.find((o) => o !== appBefore)
   if (other) {
-    await appSelect.selectOption(other)
+    await selectGeneration(page, other)
     await page.waitForTimeout(200)
     const stillGen1 = await page.inputValue('[data-testid="tc-generation-select"]')
     check(9, 'the page stayed on Gen 1 when the app selector moved', stillGen1 === '1', `app now ${other}, page gen ${stillGen1}`)
@@ -640,8 +670,6 @@ async function main() {
     check(9, 'a second app selection was available to test with', false, 'none found')
   }
 
-  /* Close the disclosure again -- it overlays the module's own controls. */
-  await page.locator('[data-testid="controls-toggle"]').click()
   await page.mouse.move(4, 4)
 
   /* Gen 1's own oddity, as a real era check: Ghost does nothing to Psychic. */

@@ -227,6 +227,31 @@ export interface Item {
   sprite: string | null
 }
 
+/**
+ * One item's Bulbapedia supplement (public/data/item-supplement.json).
+ *
+ * PRICES ARE PER VERSION GROUP as [buy, sell], either side null for "N/A" -- an
+ * item sold in no shop still sells back. A group absent from the record has no
+ * price on the wiki at all.
+ *
+ * ACQUISITION ROWS keep Bulbapedia's own grouping ("DPPt" is one row), cut to
+ * Gen 1-4 version groups. `split` is false for a key item or a TM, whose table
+ * has one method column rather than finite / repeatable.
+ */
+export interface ItemSupplement {
+  title: string
+  prices: Record<string, [number | null, number | null]>
+  acquisition: {
+    split: boolean
+    rows: { games: string[]; finite: string; repeatable: string }[]
+  }
+}
+
+export interface ItemSupplementFile {
+  source: { site: string; fetched: string; license: string; generator: string }
+  items: Record<string, ItemSupplement>
+}
+
 export interface Ability {
   id: number
   name: string

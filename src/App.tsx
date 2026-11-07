@@ -1,5 +1,6 @@
 import { IconArrowLeft, IconInfoCircle } from '@tabler/icons-react'
 import { LayoutOverlay } from './components/LayoutOverlay'
+import { usePageCreditSlot } from './components/pageCredit'
 import { useEffect, useState } from 'react'
 import './App.css'
 import { getBundleMeta, getIndexCounts, initDataLayer } from './data'
@@ -11,6 +12,7 @@ import { DesignSystemPage } from './modules/design-system/DesignSystemPage'
 import { DexQueryProvider } from './modules/dex/query/DexQueryProvider'
 import { AccountControl } from './sync/AccountControl'
 import { startTeamSync } from './sync/teamSync'
+import { scheduleWarmup } from './data/offlineWarmup'
 import { ControlsPanel } from './modules/nav/ControlsPanel'
 import { NavMenu } from './modules/nav/NavMenu'
 import { NavProvider } from './modules/nav/NavProvider'
@@ -18,6 +20,8 @@ import { useNav } from './modules/nav/navContext'
 import { findPage } from './modules/nav/navConfig'
 import { VersionGroupProvider } from './modules/version-group/VersionGroupProvider'
 import './modules/pokedex/pokedex.css'
+// Last: the phone shell's one media query overrides the shell rules above it.
+import './phoneShell.css'
 
 /**
  * The design-system reference page has no nav tab any more -- it was an
@@ -110,6 +114,17 @@ function Shell() {
   )
 }
 
+/** The open page's source credit in the info panel, or nothing. */
+function PageCredit() {
+  const note = usePageCreditSlot()
+  if (!note) return null
+  return (
+    <p className="app-info-credit" data-testid="app-info-credit">
+      {note}
+    </p>
+  )
+}
+
 export default function App() {
   const [boot, setBoot] = useState<BootStats | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
@@ -120,6 +135,9 @@ export default function App() {
         setBoot(stats)
         // The optional cloud sync of the Team Builder; idle until someone signs in.
         startTeamSync()
+        // The Gen 5+ learnsets the worker does not precache, fetched quietly in the
+        // background so they work offline too (src/data/offlineWarmup.ts).
+        scheduleWarmup()
       })
       .catch((err: unknown) => setBootError(err instanceof Error ? err.message : String(err)))
   }, [])
@@ -198,24 +216,28 @@ export default function App() {
           <IconInfoCircle size={15} stroke={1.5} aria-hidden focusable="false" />
         </button>
         {/* Every figure here is a count or a measurement, so every one of them is
-            in --font-numeric -- the words between them are not. */}
-        <p className="app-info-panel" role="tooltip">
-          data layer ready in{' '}
-          <span data-testid="boot-ms" className="num">
-            {boot.ms.toFixed(0)} ms
-          </span>{' '}
-          ·{' '}
-          <span data-testid="boot-bytes" className="num">
-            {kib(boot.bytes)}
-          </span>{' '}
-          decoded · <span className="num">{counts.species.toLocaleString()}</span> species,{' '}
-          <span className="num">{counts.moves.toLocaleString()}</span> moves,{' '}
-          <span className="num">{counts.items.toLocaleString()}</span> items,{' '}
-          <span className="num">{counts.abilities}</span> abilities,{' '}
-          <span className="num">{counts.natures}</span> natures,{' '}
-          <span className="num">{counts.berries}</span> berries · dex{' '}
-          <span className="num">1–{meta.scope.max_species_id}</span>
-        </p>
+            in --font-numeric -- the words between them are not. The open page's
+            source credit, when it has one, leads the panel (pageCredit.ts). */}
+        <div className="app-info-panel" role="tooltip">
+          <PageCredit />
+          <p className="app-info-boot">
+            data layer ready in{' '}
+            <span data-testid="boot-ms" className="num">
+              {boot.ms.toFixed(0)} ms
+            </span>{' '}
+            ·{' '}
+            <span data-testid="boot-bytes" className="num">
+              {kib(boot.bytes)}
+            </span>{' '}
+            decoded · <span className="num">{counts.species.toLocaleString()}</span> species,{' '}
+            <span className="num">{counts.moves.toLocaleString()}</span> moves,{' '}
+            <span className="num">{counts.items.toLocaleString()}</span> items,{' '}
+            <span className="num">{counts.abilities}</span> abilities,{' '}
+            <span className="num">{counts.natures}</span> natures,{' '}
+            <span className="num">{counts.berries}</span> berries · dex{' '}
+            <span className="num">1–{meta.scope.max_species_id}</span>
+          </p>
+        </div>
       </div>
 
       {/* Inert until switched on; see components/LayoutOverlay.tsx. Last child

@@ -166,7 +166,11 @@ function NatureDetail({ nature, onBack }: { nature: Nature; onBack: () => void }
   const down = nature.decreased_stat as StatKey | null
 
   return (
-    <div className="entity-detail" data-testid="naturedex-detail" data-entry-id={nature.id}>
+    <div
+      className="entity-detail entity-column"
+      data-testid="naturedex-detail"
+      data-entry-id={nature.id}
+    >
       <div className="pokedex-back-row">
         <button type="button" className="pokedex-back" data-testid="entity-back" onClick={onBack}>
           <IconArrowLeft size={18} stroke={1.5} aria-hidden focusable="false" />
@@ -215,20 +219,28 @@ function NatureDetail({ nature, onBack }: { nature: Nature; onBack: () => void }
       </ul>
 
       {/*
-        The five neutral natures have likes_flavor and hates_flavor null in the
-        bundle, not a flavour pair -- so there is no preference text to show and
-        none is invented.
+        One row per flavour (owner, 2026-10-11), label and value, where it was one
+        sentence. The five neutral natures have likes_flavor and hates_flavor null
+        in the bundle, not a flavour pair -- so both rows say "None" and nothing
+        is invented.
       */}
-      <p
-        className="entity-detail-desc"
+      <ul
+        className="fact-rows nature-flavors"
         data-testid={neutral ? 'naturedex-neutral' : 'naturedex-flavor'}
       >
-        {neutral
-          ? 'This nature has no flavour preference: it neither likes nor dislikes any flavour.'
-          : `Likes ${titleCase(nature.likes_flavor)}-flavored food, dislikes ${titleCase(
-              nature.hates_flavor,
-            )}-flavored food.`}
-      </p>
+        <li>
+          <span className="fact-label">Liked flavor</span>
+          <span className="fact-value" data-testid="naturedex-likes">
+            {neutral ? 'None' : titleCase(nature.likes_flavor)}
+          </span>
+        </li>
+        <li>
+          <span className="fact-label">Disliked flavor</span>
+          <span className="fact-value" data-testid="naturedex-dislikes">
+            {neutral ? 'None' : titleCase(nature.hates_flavor)}
+          </span>
+        </li>
+      </ul>
     </div>
   )
 }

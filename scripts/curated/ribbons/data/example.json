@@ -1,0 +1,11 @@
+[
+  {
+    "id": "example-ribbon",
+    "example": true,
+    "introduced": 3,
+    "generations": {
+      "3": { "name": "Example Ribbon", "how": "PLACEHOLDER: not real data." },
+      "4": { "name": "Example Ribbon", "how": "PLACEHOLDER: not real data." }
+    }
+  }
+]

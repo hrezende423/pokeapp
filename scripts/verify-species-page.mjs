@@ -26,7 +26,7 @@
 
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
-import { controls } from './lib/controls.mjs'
+import { appGeneration, selectGame } from './lib/controls.mjs'
 import { goToDex } from './lib/nav.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
@@ -121,15 +121,9 @@ try {
     failedRequests.push({ url: r.url(), failure: r.failure()?.errorText ?? 'unknown' }),
   )
 
-  const { withControls } = controls(page)
 
   const selectVersionGroup = async (name) => {
-    await withControls(() => page.selectOption('[data-testid="vg-select"]', name))
-    await page.waitForFunction(
-      (n) => document.querySelector('[data-testid="vg-select"]')?.value === n,
-      name,
-      { timeout: 30000 },
-    )
+    await selectGame(page, name)
   }
 
   const openSpecies = async (id) => {
@@ -665,10 +659,10 @@ try {
     JSON.stringify(gen1Scope.sections) !== JSON.stringify(gen4Scope.sections),
     gen1Scope.sections.map((s) => `${s.method}:${s.rows}`).join(' '),
   )
-  const appSelection = await page.$eval('[data-testid="vg-select"]', (el) => el.value)
+  const appSelection = await appGeneration(page)
   check(
     'the app-wide selector is untouched by the page-local one',
-    appSelection === 'heartgold-soulsilver',
+    appSelection === '4',
     appSelection,
   )
 

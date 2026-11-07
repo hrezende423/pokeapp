@@ -76,17 +76,6 @@ export function abilitydexSections(entries: Ability[]): FilterSection<Ability>[]
   ]
 }
 
-/*
-  ABILITY # LEADS AND IS THE DEFAULT. The shipped list is NOT alphabetical -- it
-  is in ability-id order, which is what the #001 in every row says -- so Name as
-  the default would silently re-order a screen nobody asked to re-order, and
-  leaving the real order off the field list would leave no way back to it.
-*/
-export const abilitydexSorts: SortField<Ability>[] = [
-  { key: 'id', label: 'Ability #', value: (a) => a.id },
-  { key: 'name', label: 'Name', value: (a) => a.display_name },
-  { key: 'generation', label: 'Generation', value: (a) => a.generation_id },
-]
 
 // -------------------------------------------------------------------- berries
 
@@ -324,13 +313,6 @@ export function itemdexSections(entries: Item[]): FilterSection<Item>[] {
   ]
 }
 
-export const itemdexSorts: SortField<Item>[] = [
-  { key: 'id', label: 'Item #', value: (i) => i.id },
-  { key: 'name', label: 'Name', value: (i) => i.display_name },
-  { key: 'fling', label: 'Fling power', value: (i) => i.fling_power },
-  { key: 'pocket', label: 'Pocket', value: (i) => i.pocket },
-  { key: 'category', label: 'Category', value: (i) => i.category },
-]
 
 // -------------------------------------------------------------------- natures
 
@@ -345,6 +327,8 @@ const NATURE_STAT_LABELS: Record<string, string> = {
 
 const isNeutralNature = (n: Nature) => n.increased_stat == null || n.decreased_stat == null
 
+/* NOT WIRED (owner, 2026-10-10): the Naturedex has no Sort/Filter menu. Kept so
+   restoring it is one line in DexQueryProvider. */
 export function naturedexSections(): FilterSection<Nature>[] {
   /*
     HP IS ABSENT FROM BOTH STAT LISTS because no nature has ever affected it --
@@ -681,15 +665,3 @@ export function trainerdexSections(entries: TrainerEntry[]): FilterSection<Train
   ]
 }
 
-/*
-  WALKTHROUGH ORDER IS THE DEFAULT: the list then reads as the game plays, which
-  is what a walkthrough is. Facility trainers and anything the sources could not
-  place sort after it.
-*/
-export const trainerdexSorts: SortField<TrainerEntry>[] = [
-  { key: 'order', label: 'Walkthrough order', value: (e) => e.order },
-  { key: 'name', label: 'Name', value: (e) => e.label },
-  { key: 'class', label: 'Class', value: (e) => e.className },
-  { key: 'level', label: 'Highest level', value: (e) => e.levels?.[1] ?? null },
-  { key: 'prize', label: 'Prize money', value: (e) => e.prize },
-]

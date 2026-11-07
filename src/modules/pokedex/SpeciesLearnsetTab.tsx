@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { DataTable, type Column } from '../../components/DataTable'
 import { TypeLabel } from '../../components/ds/TypeLabel'
 import { getItem, getLearnsetsForSpecies, getMove, getType } from '../../data'
+import { moveForGeneration } from '../../data/moveEra'
 import type { LearnRow, Move, Species, Variety } from '../../data'
 import { EggMoveMarker } from './EggMoveMarker'
 import { SpeciesGameScopeControl } from './SpeciesGameScopeControl'
@@ -158,6 +159,7 @@ export function SpeciesLearnsetTab({
   onSelectMove?: (moveId: number) => void
 }) {
   const vgName = scope?.versionGroup.name ?? null
+  const generation = scope?.generation ?? null
   const learnsets = usePartitionRows<LearnRow>(getLearnsetsForSpecies, species.id, vgName)
 
   const groups = useMemo(() => {
@@ -178,7 +180,10 @@ export function SpeciesLearnsetTab({
     return ordered.map((method) => ({
       method,
       rows: (byMethod.get(method) ?? []).map((row, i): MoveRow => {
-        const move = getMove(row.move_id)
+        // The era the tables describe is the page's own scope, so a Gen 4
+        // learnset prints Charm as Normal and a Gen 3 one prints Fire Punch special.
+        const raw = getMove(row.move_id)
+        const move = raw && generation != null ? moveForGeneration(raw, generation) : raw
         const lead =
           method === 'level-up'
             ? row.level
@@ -190,7 +195,7 @@ export function SpeciesLearnsetTab({
         return { key: i, row, move, lead }
       }),
     }))
-  }, [learnsets.state, variety.pokemon_id, vgName])
+  }, [learnsets.state, variety.pokemon_id, vgName, generation])
 
   if (!scope) {
     return (

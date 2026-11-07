@@ -1,0 +1,93 @@
+/*
+  The Collection's entry form and list (Collection v2, docs/SPEC.md slice C).
+
+  NAMED REGIONS: the form is `col-form` with areas identity / spread / moves /
+  origin / record, each a FormSectionLabel over a compact field strip. Fields are
+  `.col-field` wrappers carrying `data-field`, so a strip sizes the wrapper and
+  the ds field inside fills it. Tokens from design-system/dist/tokens.css only.
+  No row in here has a border of its own except the list's table rows, which
+  have no row gap (the hairline-band rule).
+*/
+
+.col-form {
+  display: grid;
+  grid-template-areas:
+    'identity'
+    'spread'
+    'moves'
+    'origin'
+    'record';
+  row-gap: var(--space-6);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.col-region {
+  display: grid;
+  grid-template-areas:
+    'head'
+    'fields'
+    'note';
+  row-gap: var(--space-3);
+  min-width: 0;
+}
+
+.col-region-identity {
+  grid-area: identity;
+}
+.col-region-spread {
+  grid-area: spread;
+  grid-template-areas:
+    'head'
+    'individual'
+    'effort';
+}
+.col-region-moves {
+  grid-area: moves;
+}
+.col-region-origin {
+  grid-area: origin;
+}
+.col-region-record {
+  grid-area: record;
+}
+
+.col-region > [data-ds='form-section-label'] {
+  grid-area: head;
+}
+.col-region > .col-strip,
+.col-region > [data-field='moves'] {
+  grid-area: fields;
+}
+.col-region > [data-field='individual'] {
+  grid-area: individual;
+}
+.col-region > [data-field='effort'] {
+  grid-area: effort;
+}
+.col-note {
+  grid-area: note;
+}
+
+/* A field wrapper takes the strip share a bare ds field would. */
+.col-strip > .col-field {
+  flex: 1 1 calc(var(--space-8) * 3.5);
+  min-width: 0;
+}
+.col-strip > .col-field[data-field='species'] {
+  flex: 2 1 calc(var(--space-8) * 5);
+}
+.col-field > .ds-field {
+  width: 100%;
+}
+
+/* Spread and moves: a small label over their own strip. */
+.col-region > .col-field {
+  display: grid;
+  row-gap: var(--space-2);
+}
+
+.col-mono {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,24 @@
+{
+  "records": [
+    {
+      "allGenerations": true,
+      "definition": "PLACEHOLDER: not real data.",
+      "example": true,
+      "id": "example-term",
+      "term": "Example term"
+    },
+    {
+      "definition": "PLACEHOLDER: not real data.",
+      "example": true,
+      "generations": {
+        "1": {
+          "note": "PLACEHOLDER: where the meaning differs in this generation."
+        },
+        "2": {}
+      },
+      "id": "example-term-per-generation",
+      "term": "Example per-generation term"
+    }
+  ],
+  "type": "glossary"
+}

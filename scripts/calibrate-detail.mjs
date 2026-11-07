@@ -102,7 +102,7 @@ const nearestToken = (px) =>
   TOKEN_SIZES.reduce((a, b) => (Math.abs(b - px) < Math.abs(a - px) ? b : a))
 
 try {
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ channel: 'chrome' })
   const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } })
   await page.goto(APP_URL, { waitUntil: 'networkidle' })
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })

@@ -64,7 +64,30 @@ export function TypeLabel({
       data-ds="type-label"
       data-type={type}
     >
-      {type}
+      {/* The bundle's `unknown` is the games' "???" type -- Curse's type in Gen
+          2-4, now that the dexes resolve a move's type per era. */}
+      {type === 'unknown' ? '???' : type}
+    </span>
+  )
+}
+
+/**
+ * A type as its three-letter abbreviation in its colour ("ELE"), in the mono
+ * face so a column of them lines up -- the Build Form's move-line convention,
+ * used by the Trainer Dex cards' move lines (owner, 2026-10-12). Still coloured
+ * text, not a mark; the full name is the tooltip.
+ */
+export function TypeAbbr({ type }: { type: string }) {
+  const name = type === 'unknown' ? '???' : type.charAt(0).toUpperCase() + type.slice(1)
+  return (
+    <span
+      className="ds-type-abbr"
+      style={{ color: typeColorVar(type) }}
+      data-ds="type-abbr"
+      data-type={type}
+      title={name}
+    >
+      {type === 'unknown' ? '???' : type.slice(0, 3).toUpperCase()}
     </span>
   )
 }

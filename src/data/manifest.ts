@@ -33,6 +33,13 @@ export const EAGER_DATA_FILES = [
   'locations.json',
   'meta.json',
   'version-groups.json',
+  /*
+    Bulbapedia's per-game item prices and acquisition methods, which PokeAPI does
+    not carry (scripts/build-item-supplement.mjs). Eager, not a partition: the
+    Itemdex's price column reads it on the list, and offline-first means a lazy
+    file would leave that column empty until someone opened it online.
+  */
+  'item-supplement.json',
 ] as const
 
 export type EagerDataFile = (typeof EAGER_DATA_FILES)[number]
@@ -45,3 +52,14 @@ export type EagerDataFile = (typeof EAGER_DATA_FILES)[number]
  * precached at install time.
  */
 export const PARTITION_DIRS = ['learnsets', 'encounters', 'trainers', 'battle'] as const
+
+/**
+ * OFFLINE BEFORE FIRST VIEW (2026-11-07). The partitions of the mechanics scope,
+ * Gen 1-4, are PRECACHED: every encounter, trainer and battle file and the Gen 1-4
+ * learnsets (41 MiB raw), so a species page, a move page and the Trainer Dex open
+ * offline the moment the service worker has installed, never having been viewed.
+ * The Gen 5+ learnsets (the dexes reach Gen 9; 52 MiB raw) are not precached: they
+ * are warmed in the background after install (offlineWarmup.ts), into the same
+ * runtime cache a first view would fill. Sprites are never precached (648 MB).
+ */
+export const PRECACHE_MAX_GENERATION = 4

@@ -6,8 +6,24 @@ Live: https://hrezende423.github.io/pokeapp/
 
 ## Status
 
-Infrastructure phase. The app shell is scaffolded, installable, and deploying to
-GitHub Pages. No Pokémon data or features yet.
+In active development, used daily by its owner. Offline-first and installable; the data
+ships in the bundle, and an optional GitHub sign-in mirrors the Team Builder to Supabase.
+
+Built and in use:
+
+- **Pokédex** and the species page, plus the **Move, Item, Ability, Nature and Berry dexes**,
+  **Trainer Dex** and **global search**. Gen 1-4 game data; the Poké, move and ability dexes
+  and their learnsets reach Gen 9.
+- **Team Building**: Builds, teams, the Build and Team libraries, the Team Display, Showdown
+  import and export, Build comparison, and the **Collection** (v2 schema).
+- **Calculators and tools**: the Damage calculator, Type Coverage, Team Matchup (its own
+  battle engine), and the tools set #1-#22.
+
+Next: Wave 2 of the PRD (Journal, Progression Guide and the other journey modules), on the
+infrastructure finished in this phase. The spec is `docs/SPEC.md`; progress is in
+`docs/PROGRESS.md`.
+
+Setup: `./init.sh` (Node 24 and Google Chrome). The gate is `npm run check`; see `CLAUDE.md`.
 
 ## Scripts
 

@@ -72,7 +72,7 @@ let browser
 try {
   log(`dev server ready at ${APP_URL}`)
 
-  browser = await chromium.launch()
+  browser = await chromium.launch({ channel: 'chrome' })
   /* The PWA service worker would otherwise answer bundle requests from a previous
      build's precache, which is the same stale-code hazard from the other end. */
   const context = await browser.newContext({ serviceWorkers: 'block' })

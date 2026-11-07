@@ -1,6 +1,6 @@
 /**
  * From the reader's setup to the engine's BattlerSpecs: my team from Team
- * Building (S1), the opponent from the Trainer Dex (S2/S3), a facility pool (R6)
+ * Building (S1) or the Collection (Collection v2), the opponent from the Trainer Dex (S2/S3), a facility pool (R6)
  * or a custom team (S5), each with the matchup's overrides on top (S7), then the
  * format rules (S6).
  */
@@ -21,6 +21,7 @@ import { point } from '../battle/range'
 import type { TrainerInfo } from '../battle/session'
 import {
   buildToSpec,
+  entryToSpec,
   facilityPool,
   facilityTrainerInfo,
   trainerInfo,
@@ -34,7 +35,7 @@ import type { CustomMon, MatchupSetup, MonOverride } from './model'
 export interface Resolved {
   team: Team | null
   mine: BattlerSpec[]
-  /** Build id per entry of `mine` (overrides are keyed by it). */
+  /** Build id (or Collection entry id) per entry of `mine` (overrides are keyed by it). */
   mineBuildIds: string[]
   theirs: BattlerSpec[]
   trainer: TrainerInfo | null
@@ -116,9 +117,33 @@ export function resolveSetup(
   const problems: string[] = []
   const limitations: string[] = []
   // ---- mine (S1)
-  const team = setup.teamId ? (tb.teams.find((t) => t.id === setup.teamId) ?? null) : null
+  const fromCollection = setup.mySource === 'collection'
+  const team =
+    !fromCollection && setup.teamId
+      ? (tb.teams.find((t) => t.id === setup.teamId) ?? null)
+      : null
   const mine: BattlerSpec[] = []
   const mineBuildIds: string[] = []
+  if (fromCollection) {
+    // Up to six entries, in the order picked. The picker offers only this
+    // generation's entries; one of another generation (a setup saved before the
+    // reader changed it) is named and left out, as a team's Build would be.
+    const picked = (setup.collectionIds ?? []).slice(0, 6)
+    picked.forEach((id, slot) => {
+      const e = (tb.collection ?? []).find((x) => x.id === id)
+      if (!e) return
+      if (e.generation !== ctx.generation) {
+        problems.push(
+          `${e.nickname || getSpecies(e.speciesId)?.display_name} is a Gen ${e.generation} Collection entry and is left out of this Gen ${ctx.generation} matchup`,
+        )
+        return
+      }
+      mine.push(
+        applyOverride(entryToSpec(e, ctx, slot), setup.mine[e.id], setup.mySpreadMode, setup.scenarioId),
+      )
+      mineBuildIds.push(e.id)
+    })
+  }
   if (team) {
     team.memberIds.forEach((id, slot) => {
       if (!id) return

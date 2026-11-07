@@ -1,0 +1,11 @@
+[
+  {
+    "id": "no-how",
+    "example": true,
+    "introduced": 3,
+    "generations": {
+      "3": { "name": "Fixture Ribbon", "how": "Fixture." },
+      "4": { "name": "Fixture Ribbon" }
+    }
+  }
+]

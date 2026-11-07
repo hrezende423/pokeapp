@@ -22,6 +22,7 @@ import { chromium } from 'playwright'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { startDevServer } from './lib/devServer.mjs'
+import { selectGame } from './lib/controls.mjs'
 
 const PORT = 4201
 const DATA = new URL('../public/data/', import.meta.url)
@@ -240,7 +241,7 @@ const dev = await startDevServer({ port: PORT })
 let browser
 const errors = []
 try {
-  browser = await chromium.launch()
+  browser = await chromium.launch({ channel: 'chrome' })
   const ctx = await browser.newContext({
     viewport: { width: 1440, height: 1100 },
     serviceWorkers: 'block',
@@ -249,36 +250,44 @@ try {
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(dev.url, { waitUntil: 'domcontentloaded', timeout: 180000 })
-  await page.waitForSelector('[data-testid="vg-select"]', { state: 'attached', timeout: 180000 })
-  const pick = (vg) =>
-    page.evaluate((v) => {
-      const s = document.querySelector('[data-testid="vg-select"]')
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, v)
-      s.dispatchEvent(new Event('change', { bubbles: true }))
-    }, vg)
+  await page.waitForSelector('[data-testid="gen-select"]', { state: 'attached', timeout: 180000 })
+  /* The app picks a generation; the Trainer Dex picks the game inside it. */
+  const pick = (vg) => selectGame(page, vg)
 
   check('Pokepedia lists the Trainer Dex', (await page.$('[data-testid="nav-trainerdex"]')) != null)
   await pick('all')
   await page.evaluate(() => document.querySelector('[data-testid="nav-trainerdex"]').click())
   await page.waitForSelector('[data-testid="trainerdex-empty"]', { timeout: 30000 })
   check(
-    'under "All" it asks for a game',
-    /Choose a game/.test(await page.textContent('[data-testid="trainerdex-empty"]')),
+    'under "All" it asks for a generation',
+    /Choose a generation/.test(await page.textContent('[data-testid="trainerdex-empty"]')),
   )
 
   await pick('platinum')
   await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
+  check(
+    'its game row offers the three Gen 4 games, Platinum picked',
+    (await page.$$('[data-testid="trainerdex-game"] button')).length === 3 &&
+      (await page.getAttribute('[data-testid="trainerdex-game-platinum"]', 'aria-pressed')) === 'true',
+  )
   const count = Number(
     (await page.textContent('[data-testid="trainerdex-count"]')).replace(/\D/g, ''),
   )
-  const expected =
+  /* ONE ROW PER TRAINER (owner, 2026-10-11): a trainer's rematches and per-starter
+     teams fold into its row, so the list is shorter than the data's team count
+     and every row the count claims is on screen. */
+  const teamsInData =
     T.platinum.trainers.length + T.platinum.facilities.reduce((n, f) => n + f.trainers.length, 0)
-  check(
-    'Platinum lists every trainer and facility trainer',
-    count === expected,
-    `${count} vs ${expected}`,
+  const rendered = await page.$$eval(
+    '[data-testid="trainerdex-rows"] tbody tr',
+    (els) => els.length,
   )
-  const firstRow = await page.textContent('[data-testid="trainerdex-rows"] li:first-child')
+  check(
+    'Platinum lists one row per trainer: fewer rows than teams, and the count is the rows',
+    count === rendered && count < teamsInData,
+    `${count} rows, ${rendered} rendered, ${teamsInData} teams in the data`,
+  )
+  const firstRow = await page.textContent('[data-testid="trainerdex-rows"] tbody tr:first-child')
   check(
     'the list opens in walkthrough order: Barry on Route 201 first',
     /Barry/.test(firstRow) && /Route 201/.test(firstRow),
@@ -286,7 +295,7 @@ try {
   )
 
   await page
-    .locator('[data-testid="trainerdex-rows"] button:has-text("Leader Roark")')
+    .locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Leader Roark")')
     .first()
     .click()
   await page.waitForSelector('[data-testid="trainerdex-detail"]')
@@ -308,7 +317,7 @@ try {
   await page.click('[data-testid="entity-back"]')
 
   await page
-    .locator('[data-testid="trainerdex-rows"] button:has-text("Silver Print")')
+    .locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Silver Print")')
     .first()
     .click()
   await page.waitForSelector('[data-testid="trainerdex-detail"]')
@@ -322,15 +331,54 @@ try {
   await pick('red-blue')
   await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
   await page
-    .locator('[data-testid="trainerdex-rows"] button:has-text("Leader Brock")')
+    .locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Leader Brock")')
     .first()
     .click()
   await page.waitForSelector('[data-testid="trainerdex-detail"]')
   check(
     'RB Brock shows DVs and a Bide Onix',
-    /9\/8\/8\/8/.test(await page.textContent('[data-testid="trainerdex-party"]')) &&
+    /9Atk\/8Def\/8Spe\/8Spc DV/.test(await page.textContent('[data-testid="trainerdex-party"]')) &&
       /Bide/.test(await page.textContent('[data-testid="trainerdex-party"]')),
   )
+
+  await page.click('[data-testid="entity-back"]')
+
+  /* Every team on the trainer's page: HGSS Joey is four records in the data,
+     one row here, and a navbar of Initial + three rematches. A rematch's record
+     has no prize, so the page derives it -- class rate x last level, 16 x 54. */
+  await pick('heartgold-soulsilver')
+  await page.waitForSelector('[data-testid="trainerdex-rows"]', { timeout: 60000 })
+  const joeyRow = page.locator('[data-testid="trainerdex-rows"] tbody tr:has-text("Youngster Joey")')
+  check('HGSS Joey is one row', (await joeyRow.count()) === 1, String(await joeyRow.count()))
+  await joeyRow.first().click()
+  await page.waitForSelector('[data-testid="trainerdex-teams"]')
+  const teamLabels = await page.$$eval('[data-testid="trainerdex-teams"] button', (els) =>
+    els.map((e) => e.textContent.trim()),
+  )
+  check(
+    'his page offers all four teams',
+    teamLabels.join(',') === 'Initial,Rematch 1,Rematch 2,Rematch 3',
+    teamLabels.join(','),
+  )
+  await page.click('[data-testid="trainerdex-team-3"]')
+  await page.waitForTimeout(200)
+  const joeyPrize = await page.$eval('[data-testid="trainerdex-prize"] .num', (el) => ({
+    text: el.textContent,
+    derived: el.dataset.derived,
+  }))
+  check(
+    'the third rematch shows its derived prize, ₽864',
+    joeyPrize.text === '₽864' && joeyPrize.derived === 'true',
+    JSON.stringify(joeyPrize),
+  )
+  const art = (await page.getAttribute('[data-testid="trainerdex-mon-0"] img', 'src')) ?? ''
+  check('the party card shows artwork, not a game sprite', !/\/versions\//.test(art), art)
+  check(
+    'the source credit is behind the info icon, not on the page',
+    (await page.$('[data-testid="trainerdex-credit"]')) == null &&
+      /pret disassembly/.test((await page.textContent('[data-testid="app-info-credit"]')) ?? ''),
+  )
+  await page.click('[data-testid="entity-back"]')
 
   await page.setViewportSize({ width: 390, height: 1200 })
   await page.waitForTimeout(300)

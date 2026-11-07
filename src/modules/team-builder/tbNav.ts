@@ -29,6 +29,7 @@ export type TbScreen =
      popup is confirmed. */
   | { kind: 'my-teams'; creating?: boolean }
   | { kind: 'team-viewer'; teamId: string }
+  | { kind: 'compare-builds'; ids: [string, string] }
   /*
     `pickFor` turns the library into a PICKER for one team slot. Choosing "Pick
     an existing build" used to send the reader here with no memory of why, so

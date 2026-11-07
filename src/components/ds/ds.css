@@ -391,6 +391,13 @@
   align-items: baseline;
 }
 
+/* TypeAbbr: "ELE" in the type's ink, mono so a column of them lines up. The
+   size is the host's (a move line sets it). */
+.ds-type-abbr {
+  font-family: var(--font-family-mono);
+  white-space: nowrap;
+}
+
 .ds-type-sep {
   padding: 0 5px;
   color: var(--text-secondary);

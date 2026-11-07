@@ -25,6 +25,7 @@ import { readFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { startDevServer } from './lib/devServer.mjs'
+import { appGeneration, selectGeneration } from './lib/controls.mjs'
 
 const PORT = 4186
 const GAME_OF = { 1: 'red-blue', 2: 'gold-silver', 3: 'ruby-sapphire', 4: 'platinum' }
@@ -47,6 +48,33 @@ function check(label, ok, detail = '') {
  * defaults: level 100; Gen 1-2 max DVs and Stat Exp; Gen 3-4 31 IVs, 0 EVs,
  * Serious nature, first ability).
  */
+/**
+ * DOUBLES, from the live calc (#3 of the tools brief): run 2026-10-15 on
+ * calc.pokemonshowdown.com through its own `window.calc`, Field({ gameType:
+ * 'Doubles' }) -- two battlers a side -- and the calc's default spreads. Our side
+ * reads each move's range from the game's own move table (Emerald, Platinum):
+ * Surf is MOVE_TARGET_BOTH in Gen 3 and RANGE_ALL_ADJACENT in Gen 4.
+ */
+const LIVE_DOUBLES = [
+  { case: { gen: 3, attacker: { species: 'starmie' }, defender: { species: 'blastoise' }, move: 'surf', field: { doubles: { game: 'emerald' } } },
+    damage: [25, 25, 26, 26, 26, 27, 27, 27, 27, 28, 28, 28, 29, 29, 29, 30],
+    text: '0 SpA Starmie Surf vs. 0 HP / 0 SpD Blastoise: 25-30 (8.3 - 10%)' },
+  { case: { gen: 4, attacker: { species: 'starmie' }, defender: { species: 'blastoise' }, move: 'surf', field: { doubles: { game: 'platinum' } } },
+    damage: [37, 37, 38, 38, 39, 39, 39, 40, 40, 41, 42, 42, 42, 42, 43, 44],
+    text: '0 SpA Starmie Surf vs. 0 HP / 0 SpD Blastoise: 37-44 (12.3 - 14.7%) -- possible 7HKO' },
+  { case: { gen: 4, attacker: { species: 'garchomp' }, defender: { species: 'charizard' }, move: 'rock-slide', field: { doubles: { game: 'platinum' } } },
+    damage: [248, 252, 256, 260, 260, 264, 268, 272, 272, 276, 280, 284, 284, 288, 292, 296],
+    text: '0 Atk Garchomp Rock Slide vs. 0 HP / 0 Def Charizard: 248-296 (83.5 - 99.6%) -- guaranteed 2HKO' },
+  { case: { gen: 4, attacker: { species: 'garchomp' }, defender: { species: 'charizard' }, move: 'rock-slide', field: { doubles: { game: 'platinum', helpingHand: true } } },
+    damage: [372, 376, 380, 384, 388, 396, 400, 404, 408, 412, 416, 420, 424, 428, 432, 440],
+    text: '0 Atk Garchomp Helping Hand Rock Slide vs. 0 HP / 0 Def Charizard: 372-440 (125.2 - 148.1%) -- guaranteed OHKO' },
+  { case: { gen: 3, attacker: { species: 'raichu' }, defender: { species: 'gyarados' }, move: 'thunderbolt', field: { doubles: { game: 'emerald', helpingHand: true } } },
+    damage: [571, 577, 584, 591, 598, 604, 611, 618, 624, 631, 638, 645, 651, 658, 665, 672],
+    text: '0 SpA Raichu Helping Hand Thunderbolt vs. 0 HP / 0 SpD Gyarados: 571-672 (172.5 - 203%) -- guaranteed OHKO' },
+]
+// The same Surf in singles, from the same session: the doubles line must be the halved one, not a coincidence.
+const LIVE_SINGLES_SURF_G3 = [49, 49, 50, 51, 51, 52, 52, 53, 53, 54, 55, 55, 56, 56, 57, 58]
+
 const LIVE = [
   {
     case: { gen: 1, attacker: { species: 'tauros' }, defender: { species: 'chansey' }, move: 'body-slam' },
@@ -133,7 +161,7 @@ async function runCases(page, cases) {
         pct: p.curHPpct,
       }
     }
-    return cases.map((c) => {
+    return Promise.all(cases.map(async (c) => {
       try {
         const a = mk(c, c.attacker)
         const d = mk(c, c.defender)
@@ -154,12 +182,24 @@ async function runCases(page, cases) {
         })
         field.attackerSide.charge = !!f.charge
         const move = data.listMoves().find((m) => m.name === c.move)
+        if (f.doubles) {
+          // The move's range comes from the GAME's own move table, as on the page.
+          const bd = await import('/pokeapp/src/modules/battle/battleData.ts')
+          const db = await import('/pokeapp/src/modules/battle/engine/doubles.ts')
+          const table = await bd.loadBattleData(f.doubles.game)
+          field.doubles = {
+            defenderSideAlive: f.doubles.defenderSideAlive ?? 2,
+            othersAlive: f.doubles.othersAlive ?? 3,
+            spread: db.spreadOf(bd.gameMove(table, move.id)),
+            helpingHand: !!f.doubles.helpingHand,
+          }
+        }
         const r = eng.calculateDamage(c.gen, a, d, { move, isCrit: !!c.crit, hits: c.hits ?? null, powerOverride: null }, field)
         return { damage: r.damage, text: r.fullText, range: r.range, reason: r.noDamageReason }
       } catch (e) {
         return { error: String(e?.stack ?? e) }
       }
-    })
+    }))
   }, cases)
 }
 
@@ -169,7 +209,7 @@ const dev = await startDevServer({ port: PORT })
 let browser
 const consoleErrors = []
 try {
-  browser = await chromium.launch()
+  browser = await chromium.launch({ channel: 'chrome' })
   const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1440, height: 2400 } })
   context.setDefaultNavigationTimeout(180000)
   const page = await context.newPage()
@@ -250,6 +290,16 @@ try {
   const live = await runCases(page, LIVE.map((l) => l.case))
   LIVE.forEach((l, i) => check(`[G${l.case.gen}] ${l.text.slice(0, 60)}...`, live[i].text === l.text, live[i].text === l.text ? '' : `ours: ${live[i].text}`))
 
+  hr('3b. LIVE CALC, DOUBLES -- 2026-10-15, every roll')
+  const dbl = await runCases(page, [...LIVE_DOUBLES.map((l) => l.case), { ...LIVE_DOUBLES[0].case, field: {} }])
+  LIVE_DOUBLES.forEach((l, i) => {
+    const c = l.case
+    const label = `[G${c.gen}] ${c.attacker.species} ${c.move} vs ${c.defender.species}, doubles${c.field.doubles.helpingHand ? ' + Helping Hand' : ''}`
+    check(label, JSON.stringify(dbl[i].damage) === JSON.stringify(l.damage), dbl[i].error ? dbl[i].error.split('\n')[0] : `ours ${JSON.stringify(dbl[i].damage)}`)
+    check(`${label}: the line, verbatim`, dbl[i].text === l.text, dbl[i].text === l.text ? '' : `ours: ${dbl[i].text}`)
+  })
+  check('[G3] the same Surf in singles matches the live singles line', JSON.stringify(dbl[LIVE_DOUBLES.length].damage) === JSON.stringify(LIVE_SINGLES_SURF_G3), JSON.stringify(dbl[LIVE_DOUBLES.length].damage))
+
   // ------------------------------------------------------------------ 4
   hr('4. DATA THE ENGINE LEANS ON')
   const facts = await page.evaluate(async () => {
@@ -265,6 +315,22 @@ try {
       mewtwoSpecial: stat.computeStat({ generation: 1, level: 100, base: 154, key: 'special', effort: { special: 65535 }, individual: { special: 15 }, nature: { increased: null, decreased: null } }),
       bonusMax: stat.statExpBonus(65535),
       shedinja: stat.computeStat({ generation: 3, level: 100, base: 1, key: 'hp', effort: { hp: 252 }, individual: { hp: 31 }, nature: { increased: null, decreased: null } }),
+      // Level 29 is one of the eight levels where `x * (level / 100)` floored a
+      // point low: (2*50 + 0 + 0) * 29 / 100 is exactly 29, and 0.29 is not.
+      charmanderSpd29: stat.computeStat({ generation: 3, level: 29, base: 50, key: 'special-defense', effort: {}, individual: {}, nature: { increased: null, decreased: null } }),
+      gen1Atk29: stat.computeStat({ generation: 1, level: 29, base: 40, key: 'attack', effort: {}, individual: { attack: 10 }, nature: { increased: null, decreased: null } }),
+      // Every level x base x IV (Gen 3-4, 0 EVs, neutral) against integer arithmetic.
+      integerMismatches: (() => {
+        const bad = []
+        for (let level = 1; level <= 100; level++)
+          for (let base = 1; base <= 255; base++)
+            for (let iv = 0; iv <= 31; iv++) {
+              const got = stat.computeStat({ generation: 3, level, base, key: 'attack', effort: {}, individual: { attack: iv }, nature: { increased: null, decreased: null } })
+              const want = Math.floor(((2 * base + iv) * level) / 100) + 5
+              if (got !== want && bad.length < 5) bad.push(`L${level} base ${base} IV ${iv}: ${got} vs ${want}`)
+            }
+        return bad
+      })(),
       dig: [1, 2, 3, 4].map((g) => era.resolveMovePowerForGeneration(move('dig'), g)),
       lowKick: [1, 2, 3].map((g) => era.resolveMovePowerForGeneration(move('low-kick'), g)),
       tackle: era.resolveMovePowerForGeneration(move('tackle'), 4),
@@ -274,14 +340,66 @@ try {
   check('Stat Exp bonus caps at 63 (pret CalcStat: sqrt counted to $ff)', facts.bonusMax === 63, String(facts.bonusMax))
   check('Gen 1 Mewtwo max Special is 406, not 407', facts.mewtwoSpecial === 406, String(facts.mewtwoSpecial))
   check('Shedinja HP is 1 at any spread', facts.shedinja === 1, String(facts.shedinja))
+  check('Gen 3 Charmander Sp. Def at level 29 is 34, not 33 (level is multiplied, then divided)', facts.charmanderSpd29 === 34, String(facts.charmanderSpd29))
+  check('Gen 1 base 40 + DV 10 at level 29 is 34, not 33', facts.gen1Atk29 === 34, String(facts.gen1Atk29))
+  check('computeStat matches integer arithmetic at every level, base and IV', facts.integerMismatches.length === 0, facts.integerMismatches.join('; ') || 'none')
   check('Dig power by era: 100 / 60 / 60 / 80', JSON.stringify(facts.dig) === '[100,60,60,80]', JSON.stringify(facts.dig))
   check('Low Kick is 50 in Gen 1-2, weight-based (null) from Gen 3', JSON.stringify(facts.lowKick) === '[50,50,null]', JSON.stringify(facts.lowKick))
   check('Tackle is 35 in Gen 4', facts.tackle === 35, String(facts.tackle))
 
+  // ------------------------------------------------------------------ 4b
+  /*
+    A GEN 2 BUILD STORES ITS SPECIAL IN MIXED KEYS: the DV under `special`
+    (spreadStatKeys) and the Stat Exp under `special-attack`/`special-defense`
+    (the Build Form's six rows). Every reader has to find both. Snorlax, Gen 2,
+    L100, base Sp. Atk 65 / Sp. Def 110, Special DV 15, Stat Exp 65535 (bonus 63):
+      Sp. Atk = ((65 + 15) * 2 + 63) * 100 / 100 + 5 = 223 + 5 = 228
+      Sp. Def = ((110 + 15) * 2 + 63) * 100 / 100 + 5 = 313 + 5 = 318
+    Reading the DV from `special-attack` gave 0: (130 + 63) + 5 = 198.
+  */
+  hr('4b. GEN 2 SPECIAL: THE KEYS A BUILD ACTUALLY STORES')
+  const gen2 = await page.evaluate(async () => {
+    const stat = await import('/pokeapp/src/modules/team-builder/statMath.ts')
+    const facts = await import('/pokeapp/src/modules/team-builder/buildFacts.ts')
+    const sets = await import('/pokeapp/src/modules/calculators/damageSets.ts')
+    const st = await import('/pokeapp/src/modules/calculators/damageCalcState.ts')
+    const eng = await import('/pokeapp/src/modules/calculators/damage/index.ts')
+    const sources = await import('/pokeapp/src/modules/battle/sources.ts')
+    const game = await import('/pokeapp/src/modules/battle/game.ts')
+    const neutral = { increased: null, decreased: null }
+    const dvs = { attack: 15, defense: 15, speed: 15, special: 15 }
+    const exp = { 'special-attack': 65535, 'special-defense': 65535 }
+    const build = {
+      ...facts.newBuildInit(2, 143),
+      id: 'b-gen2-special',
+      level: 100,
+      individual: dvs,
+      effort: exp,
+    }
+    const data = { builds: [build], teams: [], nextBuildSeq: 2, nextTeamSeq: 1, collection: [], nextEntrySeq: 1 }
+    const set = sets.setCatalog([], [], data, 2).byKey.get('b:b-gen2-special')
+    const side = set ? set.apply(st.newSide(143, 2), 2) : null
+    const raw = side ? eng.computeRawStats(st.toCalcPokemon(side), 2) : null
+    const spec = sources.buildToSpec(build, game.gameContext('crystal'), 0)
+    return {
+      spa: stat.computeStat({ generation: 2, level: 100, base: 65, key: 'special-attack', effort: exp, individual: dvs, nature: neutral }),
+      spd: stat.computeStat({ generation: 2, level: 100, base: 110, key: 'special-defense', effort: exp, individual: dvs, nature: neutral }),
+      calcSpecialEffort: side ? side.effort.special : null,
+      calcSpa: raw ? raw.spa : null,
+      calcSpd: raw ? raw.spd : null,
+      battleSpecialEffort: spec.spread.effort.special ?? null,
+    }
+  })
+  check('[G2] Build Sp. Atk reads the `special` DV: 228, not 198', gen2.spa === 228, String(gen2.spa))
+  check('[G2] Build Sp. Def reads the `special` DV: 318', gen2.spd === 318, String(gen2.spd))
+  check('[G2] a Build loaded into the calculator keeps its Special Stat Exp (65535)', gen2.calcSpecialEffort === 65535, String(gen2.calcSpecialEffort))
+  check('[G2] ...and the calculator computes Sp. Atk 228 / Sp. Def 318 from it', gen2.calcSpa === 228 && gen2.calcSpd === 318, `${gen2.calcSpa} / ${gen2.calcSpd}`)
+  check('[G2] Team Matchup buildToSpec keeps the Special Stat Exp (65535)', gen2.battleSpecialEffort?.min === 65535 && gen2.battleSpecialEffort?.max === 65535, JSON.stringify(gen2.battleSpecialEffort))
+
   // ------------------------------------------------------------------ 5
   hr('5. THE SCREEN')
-  await page.selectOption('[data-testid="vg-select"]', { index: 1 }).catch(() => {})
-  const appSelection = await page.inputValue('[data-testid="vg-select"]').catch(() => null)
+  await selectGeneration(page, 1).catch(() => {})
+  const appSelection = await appGeneration(page).catch(() => null)
   // Tools -> Calculators -> Damage Calculator: its own page, nested in the nav.
   const nav = await page.evaluate(() => {
     const sub = document.querySelector('[data-testid="nav-subdropdown-calculators"]')
@@ -351,7 +469,7 @@ try {
 
   check(
     "the calculator's generation does not move the app's",
-    appSelection == null || (await page.inputValue('[data-testid="vg-select"]')) === appSelection,
+    appSelection == null || (await appGeneration(page)) === appSelection,
     String(appSelection),
   )
 

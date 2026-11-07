@@ -1,0 +1,20 @@
+{
+  "records": [
+    {
+      "example": true,
+      "generations": {
+        "3": {
+          "how": "PLACEHOLDER: not real data.",
+          "name": "Example Ribbon"
+        },
+        "4": {
+          "how": "PLACEHOLDER: not real data.",
+          "name": "Example Ribbon"
+        }
+      },
+      "id": "example-ribbon",
+      "introduced": 3
+    }
+  ],
+  "type": "ribbons"
+}

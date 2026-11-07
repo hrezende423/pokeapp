@@ -43,6 +43,10 @@ export function NavGroup({
   const justEscaped = useRef(false)
   const panelId = useId()
   const hasPanel = children != null
+  // Phone: the tab bar opens a sheet on a tap and nothing else. A touch fakes
+  // hover and focus (both would open it) just ahead of the click, and the fake
+  // mouseleave after it would shut it again, so those are ignored here.
+  const isPhone = () => window.matchMedia('(max-width: 639px)').matches
 
   // Focus moving *within* the group must not close it, so this checks where focus
   // actually went rather than closing on every blur.
@@ -57,11 +61,15 @@ export function NavGroup({
       data-testid={`nav-group-${id}`}
       data-open={hasPanel && open}
       onMouseEnter={() => {
+        if (isPhone()) return
         justEscaped.current = false
         if (hasPanel) setOpen(true)
       }}
-      onMouseLeave={() => setOpen(false)}
+      onMouseLeave={() => {
+        if (!isPhone()) setOpen(false)
+      }}
       onFocus={() => {
+        if (isPhone()) return
         if (justEscaped.current) {
           justEscaped.current = false
           return
@@ -85,7 +93,8 @@ export function NavGroup({
         aria-expanded={hasPanel ? open : undefined}
         aria-controls={hasPanel ? panelId : undefined}
         onClick={() => {
-          if (onActivate) onActivate()
+          if (hasPanel && isPhone()) setOpen((v) => !v)
+          else if (onActivate) onActivate()
           else if (hasPanel) setOpen((v) => !v)
         }}
       >
@@ -93,7 +102,14 @@ export function NavGroup({
       </button>
 
       {hasPanel && (
-        <div className="nav-dropdown" id={panelId} data-testid={`nav-dropdown-${id}`}>
+        <div
+          className="nav-dropdown"
+          id={panelId}
+          data-testid={`nav-dropdown-${id}`}
+          onClick={() => {
+            if (isPhone()) setOpen(false)
+          }}
+        >
           {children}
         </div>
       )}

@@ -43,7 +43,7 @@ import type { Item, Species, StatEntry, Variety } from '../../data'
 import { itemArtworkUrl, itemIconUrl } from '../../data/itemArtwork'
 import { resolveMoveTypeNameForGeneration } from '../../data/moveEra'
 import type { Build, Gender } from './model'
-import type { NatureMods, StatKey } from './statMath'
+import { gen2GenderFromAttackDv, type NatureMods, type StatKey } from './statMath'
 
 export interface SpeciesFacts {
   species: Species
@@ -550,6 +550,29 @@ export function genderOptionsFor(species: Species): Gender[] | null {
   return ['male', 'female']
 }
 
+/**
+ * The gender a Build HAS, which is not always the one it stores. THE ONE READER:
+ * nothing outside this file reads `build.gender` for display, export or battle.
+ *
+ *   Gen 1: none at all -- null, whatever is stored.
+ *   Gen 2: derived from the Attack DV (`gen2GenderFromAttackDv`, pokecrystal
+ *     GetGender). An unset DV reads 0 in this app.
+ *   Gen 3+: the stored value, set by hand.
+ *
+ * Stored values are never rewritten, so a Build moved back to Gen 3 keeps its own.
+ */
+export function buildGender(
+  build: Pick<Build, 'generation' | 'gender' | 'individual'>,
+  species: Pick<Species, 'gender_rate'> | null | undefined,
+): Gender | null {
+  if (build.generation <= 1) return null
+  if (build.generation === 2) {
+    if (!species) return null
+    return gen2GenderFromAttackDv(build.individual.attack ?? 0, species.gender_rate ?? -1)
+  }
+  return build.gender
+}
+
 export function genderGlyph(gender: Gender | null): string | null {
   if (gender === 'male') return '♂'
   if (gender === 'female') return '♀'
@@ -572,6 +595,17 @@ export function displayName(
   if (!nickname) return { primary: species.display_name, secondary: null }
   const differs = nickname.toLowerCase() !== species.display_name.toLowerCase()
   return { primary: nickname, secondary: differs ? species.display_name : null }
+}
+
+/**
+ * What a Build is called in a list: its name, then its nickname, then its species.
+ * The fallback is the whole migration: stored nicknames are never rewritten.
+ */
+export function buildLabel(
+  build: Pick<Build, 'name' | 'nickname'>,
+  species: Pick<Species, 'display_name'> | null | undefined,
+): string {
+  return build.name?.trim() || build.nickname.trim() || species?.display_name || 'Build'
 }
 
 /** "252Atk/252SpA/6Spe" -- only stats with investment, in stat order. */

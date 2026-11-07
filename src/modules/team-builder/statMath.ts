@@ -74,9 +74,34 @@ export function hpDvFrom(individual: StatNumbers): number {
   )
 }
 
-/** The DV for one stat, with HP resolved through the parity rule. */
+/**
+ * The DV for one stat, with HP resolved through the parity rule.
+ *
+ * GEN 2 SPLIT THE SPECIAL STAT, NOT ITS DV: Sp. Atk and Sp. Def both read the one
+ * `special` DV, which is the only key a Gen 2 Build stores (`spreadStatKeys`).
+ * Reading `individual['special-attack']` there gave 0 and understated both stats.
+ * The split key is the fallback for callers that pass one value per row.
+ */
 export function dvFor(individual: StatNumbers, key: StatKey): number {
-  return key === 'hp' ? hpDvFrom(individual) : at(individual, key)
+  if (key === 'hp') return hpDvFrom(individual)
+  if (key === 'special-attack' || key === 'special-defense') {
+    return individual.special ?? at(individual, key)
+  }
+  return at(individual, key)
+}
+
+/**
+ * A Gen 1-2 Build's Special Stat Exp, from the key the Build Form stored it in.
+ *
+ * Gen 1's form edits `special`; Gen 2's shows six stat rows, so it stores the
+ * value under `special-attack` (and `special-defense`). The battle code and the
+ * damage calculator read the unsplit `special`, so they go through this. Sp. Atk
+ * wins in Gen 2, as in the Showdown export; `special` is the fallback for a Build
+ * that never had the split keys (a Gen 1 Build moved to Gen 2).
+ */
+export function specialStatExp(effort: StatNumbers, generation: number): number {
+  if (generation <= 1) return at(effort, 'special')
+  return effort['special-attack'] ?? effort.special ?? 0
 }
 
 /**
@@ -106,6 +131,32 @@ export function nextShinyAttackDv(value: number, direction: 1 | -1): number {
       : ([...list].reverse().find((v) => v < value) ?? list[list.length - 1])
   }
   return list[(index + direction + list.length) % list.length]
+}
+
+/**
+ * Gen 2 gender, computed from the DVs rather than stored.
+ *
+ * pokecrystal `engine/pokemon/mon_stats.asm` GetGender: the byte is
+ * `(AttackDV << 4) | SpeedDV`, and the species' ratio is compared against it --
+ * male if `ratio < byte`, else female. GENDER_UNKNOWN is genderless, GENDER_F0 is
+ * always male and GENDER_F100 always female. The ratios (`N percent` is
+ * N * 255 / 100) are F12_5 = 31, F25 = 63, F50 = 127, F75 = 191: all end in a
+ * low nibble of F, so the Speed DV can never tip the comparison and only the
+ * Attack DV decides. `genderRate` is PokeAPI's eighths female.
+ */
+const GEN2_GENDER_RATIO: Readonly<Record<number, number>> = { 1: 31, 2: 63, 4: 127, 6: 191 }
+
+export function gen2GenderFromAttackDv(
+  attackDv: number,
+  genderRate: number,
+): 'male' | 'female' | null {
+  if (genderRate < 0) return null
+  if (genderRate === 0) return 'male'
+  if (genderRate >= 8) return 'female'
+  const ratio = GEN2_GENDER_RATIO[genderRate] ?? Math.floor((genderRate * 255) / 8)
+  // The Speed DV is the byte's low nibble, read as 0: any value gives the same answer.
+  const byte = (attackDv & 0xf) << 4
+  return ratio < byte ? 'male' : 'female'
 }
 
 export interface NatureMods {
@@ -155,6 +206,12 @@ export interface StatInput {
  * The nature multiplier applies AFTER the +5 and only in Gen 3-4, because natures
  * do not exist before Gen 3 -- passing a neutral NatureMods for an earlier
  * generation would give the same answer, but the branch says why.
+ *
+ * MULTIPLY BY THE LEVEL, THEN DIVIDE BY 100 -- never `* (level / 100)`. Level/100
+ * is not exact in binary (0.29 is 0.28999...), so the product can land just under
+ * a whole number and the floor drops a point: Charmander's Sp. Def at level 29
+ * came out 33 instead of 34. That hit levels 29, 35, 41, 57, 58, 69, 70 and 82.
+ * The integer product divided once is always exact where the true answer is whole.
  */
 export function computeStat(input: StatInput): number {
   const { generation, level, base, key, effort, individual, nature } = input
@@ -162,7 +219,7 @@ export function computeStat(input: StatInput): number {
 
   if (generation <= 2) {
     const dv = dvFor(individual, key)
-    const shared = Math.floor(((base + dv) * 2 + statExpBonus(at(effort, key))) * (level / 100))
+    const shared = Math.floor((((base + dv) * 2 + statExpBonus(at(effort, key))) * level) / 100)
     return isHp ? shared + level + 10 : shared + 5
   }
 
@@ -171,7 +228,7 @@ export function computeStat(input: StatInput): number {
   if (isHp && base === 1) return 1
 
   const shared = Math.floor(
-    (2 * base + at(individual, key) + Math.floor(at(effort, key) / 4)) * (level / 100),
+    ((2 * base + at(individual, key) + Math.floor(at(effort, key) / 4)) * level) / 100,
   )
   if (isHp) return shared + level + 10
   return Math.floor((shared + 5) * natureMultiplier(nature, key))

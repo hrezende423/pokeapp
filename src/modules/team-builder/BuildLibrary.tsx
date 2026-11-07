@@ -4,13 +4,10 @@
  * TEAM VIEWER'S GRID, WITH THREE DIFFERENCES, since it has no reference image of
  * its own and is specified as an expanded version of that screen:
  *   - OFFICIAL ARTWORK instead of the in-game sprite (the `library` card variant);
- *   - tag chips, which are the only filterable field a build has -- there is no
- *     build name anywhere in this module, only nicknames and tags;
+ *   - tag chips, and the Build's name beside its "#001";
  *   - "Used in N teams", counted live from the store.
  *
- * NO SEARCH, FILTER OR SORT. Deliberately absent, not forgotten -- the spec
- * defers all three to a later pass, and a half-wired filter row would imply
- * otherwise. Tags are stored and rendered now so the eventual filter has data.
+ * SEARCH, FILTER AND SORT open from the app bar: see ./libraryQuery.ts.
  *
  * SCROLLS AS A GRID rather than paginating: the count is bounded by how many
  * builds a person actually makes, and a pager over a handful of cards is worse
@@ -20,6 +17,7 @@
 import { useState } from 'react'
 import {
   IconCopy,
+  IconFileImport,
   IconInfoCircle,
   IconListCheck,
   IconPlus,
@@ -39,8 +37,9 @@ import { MovesetCoverage, SpeciesMatchup } from './ui/TypeMatchup'
 import { BulkBar, SelectCircle } from './ui/BulkSelect'
 import { useBulkSelect } from './ui/useBulkSelect'
 import { AddToTeamModal } from './ui/AddToTeamModal'
+import { ExportModal, ImportModal } from './ui/TransferModal'
 import { buildSpecies, typeIdsFor } from './buildFacts'
-import { orderedBuilds, teamsUsingBuild, uiId, type Build } from './model'
+import { BUILD_NAME_MAX, orderedBuilds, teamsUsingBuild, uiId, type Build } from './model'
 import {
   deleteBuild,
   duplicateBuild,
@@ -53,18 +52,19 @@ import { useDexQueryBundle } from '../dex/query/dexQueryContext'
 import type { BuildRow } from './libraryQuery'
 
 export function BuildLibrary({
+  generation,
   pickFor,
 }: {
-  /* `generation` is no longer read: the form seeds a new member itself, from
-     the team's generation when there is one. Kept in the props so the shell
-     passes the same shape to all four screens. */
-  generation?: number
+  /* Where an imported Build lands. The form seeds a new member itself, from the
+     team's generation when there is one. */
+  generation: number
   /** Set when the library was opened to fill one team slot. See tbNav. */
   pickFor?: { teamId: string; slot: number; then?: 'team' | 'form' }
 }) {
   const data = useTeamBuilderData()
   const prompt = usePrompt()
   const bulk = useBulkSelect()
+  const [importing, setImporting] = useState(false)
   const libraryBuilds = orderedBuilds(data)
   /*
     WHAT THE APP BAR'S SEARCH/FILTER AND SORT LEAVE ON SCREEN (libraryQuery.ts).
@@ -197,6 +197,12 @@ export function BuildLibrary({
                     onClick: bulk.enter,
                     testId: 'tb-builds-select',
                   },
+                  {
+                    icon: <IconFileImport size={18} stroke={1.5} />,
+                    label: 'Import a Build from Showdown text',
+                    onClick: () => setImporting(true),
+                    testId: 'tb-builds-import',
+                  },
                 ]}
               />
             </div>
@@ -211,7 +217,26 @@ export function BuildLibrary({
           onCancel={bulk.exit}
           onDelete={deleteSelected}
           testId="tb-builds-bulk"
+          extra={
+            <button
+              type="button"
+              className="tb-ghost tb-ghost-sm"
+              disabled={bulk.selected.size !== 2}
+              title="Pick exactly two Builds"
+              data-testid="tb-builds-compare"
+              onClick={() => {
+                const [first, second] = [...bulk.selected]
+                bulk.exit()
+                goTo({ kind: 'compare-builds', ids: [first, second] })
+              }}
+            >
+              Compare
+            </button>
+          }
         />
+      )}
+      {importing && (
+        <ImportModal mode="build" generation={generation} onClose={() => setImporting(false)} />
       )}
 
       {/* A MEMBER BEING BUILT RIGHT NOW IS NOT HERE. It has no record until it is
@@ -284,6 +309,7 @@ function LibraryCard({
   const [offence, setOffence] = useState(false)
   const [info, setInfo] = useState(false)
   const [addTo, setAddTo] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const facts = buildSpecies(build)
 
   return (
@@ -395,6 +421,15 @@ function LibraryCard({
             <span className="tb-build-id num" data-testid={`tb-build-${build.id}-label`}>
               {label}
             </span>
+            {build.name?.trim() && (
+              <span
+                className="tb-build-name"
+                title={build.name}
+                data-testid={`tb-build-${build.id}-name`}
+              >
+                {build.name}
+              </span>
+            )}
             <span className="tb-used-in" data-testid={`tb-build-${build.id}-used-in`}>
               Used in {usedIn} {usedIn === 1 ? 'team' : 'teams'}
             </span>
@@ -408,6 +443,17 @@ function LibraryCard({
           onClose={() => setInfo(false)}
           testId={`tb-build-${build.id}-info-modal`}
         >
+          <label className="tb-field-label" htmlFor={`name-${build.id}`}>
+            Name
+          </label>
+          <input
+            id={`name-${build.id}`}
+            className="tb-input"
+            defaultValue={build.name ?? ''}
+            maxLength={BUILD_NAME_MAX}
+            data-testid={`tb-build-${build.id}-name-input`}
+            onBlur={(e) => updateBuild(build.id, { name: e.target.value.trim() })}
+          />
           <label className="tb-field-label" htmlFor={`tags-${build.id}`}>
             Tags (comma separated)
           </label>
@@ -433,7 +479,21 @@ function LibraryCard({
             data-testid={`tb-build-${build.id}-notes`}
             onBlur={(e) => updateBuild(build.id, { notes: e.target.value })}
           />
+          <div className="tb-transfer-actions">
+            <GhostButton
+              onClick={() => {
+                setInfo(false)
+                setExporting(true)
+              }}
+              testId={`tb-build-${build.id}-export`}
+            >
+              Export as Showdown text
+            </GhostButton>
+          </div>
         </Modal>
+      )}
+      {exporting && (
+        <ExportModal title="Export this Build" builds={[build]} onClose={() => setExporting(false)} />
       )}
 
       {addTo && <AddToTeamModal buildId={build.id} onClose={() => setAddTo(false)} />}

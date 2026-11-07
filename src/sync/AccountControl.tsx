@@ -3,6 +3,7 @@ import { IconBrandGithub, IconUserCircle } from '@tabler/icons-react'
 import { listSpecies } from '../data'
 import { SearchSelect } from '../components/ds/SearchSelect'
 import { ThemeSwitcher } from '../components/ds/ThemeSwitcher'
+import { VersionGroupSelector } from '../modules/version-group/VersionGroupSelector'
 import { useDisclosureGroup } from '../modules/dex/query/useDisclosureGroup'
 import {
   signInWithGitHub,
@@ -121,6 +122,13 @@ export function AccountControl() {
         <div className="app-controls-field account-theme">
           <span className="app-controls-label">Theme</span>
           <ThemeSwitcher />
+        </div>
+
+        {/* The app-wide generation, under the theme (owner, 2026-10-10): a
+            standing preference, like the theme, not a control of one page. */}
+        <div className="app-controls-field account-theme account-generation">
+          <span className="app-controls-label">Generation</span>
+          <VersionGroupSelector />
         </div>
 
         {signedIn && (

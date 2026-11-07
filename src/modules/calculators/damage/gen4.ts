@@ -425,7 +425,10 @@ export function calculateBPModsDPP(
     desc.isCharge = true
   }
 
-  if (field.doubles?.helpingHand) basePower = Math.floor((basePower * 15) / 10)
+  if (field.doubles?.helpingHand) {
+    basePower = Math.floor((basePower * 15) / 10)
+    desc.isHelpingHand = true
+  }
 
   if (hasAbility(attacker, 'technician') && basePower <= 60) {
     basePower = Math.floor(basePower * 1.5)

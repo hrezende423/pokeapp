@@ -28,7 +28,8 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          # The one Node version: .nvmrc (package.json "engines" agrees).
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci

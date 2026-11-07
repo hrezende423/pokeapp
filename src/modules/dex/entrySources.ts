@@ -34,6 +34,7 @@ import {
   naturesExistInGeneration,
 } from '../../data'
 import type { Ability, Berry, EggGroup, Item, Move, Nature, Species } from '../../data'
+import { moveForGeneration } from '../../data/moveEra'
 
 /**
  * Which era to scope to. `isAll` is not the same as "generation 4": it means the
@@ -55,10 +56,19 @@ export function speciesEntries({ generation }: EntryScope): Species[] {
   return listSpecies().filter((s) => isSpeciesInGeneration(s.id, generation))
 }
 
-/** Moves that existed by this era; under "All", every move in the bundle. */
+/**
+ * Moves that existed by this era; under "All", every move in the bundle.
+ *
+ * AS THEY WERE IN THAT ERA: each entry is `moveForGeneration`'s copy, so Charm is
+ * Normal under Gen 1-5 and a Gen 3 Fire Punch is special. Resolving here, in the
+ * one list every move surface reads, is what keeps the table, the detail page and
+ * the type/category/power filters agreeing -- a filter on raw `type_id` beside a
+ * resolved table would hide Charm from "Normal" while its row says Normal.
+ */
 export function moveEntries({ generation, isAll }: EntryScope): Move[] {
   const all = listMoves()
-  return isAll ? all : all.filter((m) => moveExistsInGeneration(m, generation))
+  const inEra = isAll ? all : all.filter((m) => moveExistsInGeneration(m, generation))
+  return inEra.map((m) => moveForGeneration(m, generation))
 }
 
 /** Items indexed in this era; under "All", every item in the bundle. */

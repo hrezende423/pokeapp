@@ -20,6 +20,7 @@
 import { mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { goToDex } from './lib/nav.mjs'
+import { selectGame as selectAppGame } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4180
@@ -172,19 +173,17 @@ try {
     if (await panelOpen('app-controls')) return
     await park()
     await page.click('[data-testid="controls-toggle"]')
-    await page.waitForSelector('[data-testid="vg-select"]', { state: 'visible', timeout: 15000 })
+    // The panel itself, not the cross-dex search: that is in the bar and always
+    // visible, so waiting on it would not wait for the panel at all.
+    await page.waitForSelector('[data-testid="controls-panel"]', { state: 'visible', timeout: 15000 })
   }
+  /* ONE MENU since 2026-10-10: Sort is a part of the Sort/Filter panel. */
   const openSort = async () => {
-    if (await panelOpen('dex-sort')) return
-    await park()
-    await page.click('[data-testid="dex-sort-toggle"]')
+    await openFilters()
     await page.waitForTimeout(140)
   }
   const closeMenus = async () => {
-    for (const [box, trigger] of [
-      ['app-controls', 'controls-toggle'],
-      ['dex-sort', 'dex-sort-toggle'],
-    ]) {
+    for (const [box, trigger] of [['app-controls', 'controls-toggle']]) {
       if ((await page.$(`[data-testid="${box}"]`)) == null) continue
       /* A disabled trigger cannot close its panel -- and it must never have one
          open, which is what the app guarantees and section 4 asserts. */
@@ -243,14 +242,13 @@ try {
     await page.waitForTimeout(180)
   }
   const selectGame = async (vg) => {
-    await openFilters()
-    await page.selectOption('[data-testid="vg-select"]', vg)
-    await page.waitForTimeout(200)
     await closeMenus()
+    await selectAppGame(page, vg)
+    await page.waitForTimeout(200)
   }
 
   // ==================================================================
-  hr('1 — ONE CONTROL PAIR, IN THE BAR, ON EVERY POKEPEDIA PAGE')
+  hr('1 — ONE SORT/FILTER MENU, IN THE BAR, ON EVERY POKEPEDIA PAGE')
 
   const DEXES = [
     'pokedex',
@@ -261,10 +259,21 @@ try {
     'naturedex',
     'breedingdex',
   ]
-  const WITH_SORT = ['pokedex', 'itemdex', 'berrydex', 'abilitydex']
+  // The Itemdex and Abilitydex are tables since 2026-10-10: their headers sort.
+  const WITH_SORT = ['pokedex', 'berrydex']
+  // The Naturedex's matrix has nothing to sort or filter (owner, 2026-10-10).
+  const MENU_DISABLED = ['naturedex']
 
   for (const dex of DEXES) {
     await goTo(dex)
+    if (MENU_DISABLED.includes(dex)) {
+      check(
+        `[${dex}] the Sort/Filter trigger is there but disabled`,
+        (await page.$eval('[data-testid="controls-toggle"]', (e) => e.disabled)) === true,
+      )
+      check(`[${dex}] and its menu holds no part`, (await page.$('.app-controls-part')) === null)
+      continue
+    }
     check(
       `[${dex}] no control row of its own above the list`,
       (await page.$(`[data-testid="${dex}-controls-toggle"]`)) === null &&
@@ -283,9 +292,9 @@ try {
       (await page.$(`[data-testid="${searchId}"]`)) != null &&
         (await page.isVisible(`[data-testid="${searchId}"]`)) === false,
     )
-    const hasSort = (await page.$('[data-testid="dex-sort-toggle"]')) != null
+    const hasSort = (await page.$('[data-testid="controls-part-sort"]')) != null
     check(
-      `[${dex}] a Sort trigger exists exactly when the page declares sort fields`,
+      `[${dex}] the menu has a Sort part exactly when the page declares sort fields`,
       hasSort === WITH_SORT.includes(dex),
       hasSort ? 'present' : 'absent',
     )
@@ -294,8 +303,8 @@ try {
 
   await goTo('pokedex')
   check(
-    'the trigger reads "Search/Filter", which suits every page it now serves',
-    (await page.textContent('[data-testid="controls-toggle"]')).trim() === 'Search/Filter',
+    'the trigger reads "Sort/Filter": view, sort and filters are one menu',
+    (await page.textContent('[data-testid="controls-toggle"]')).trim() === 'Sort/Filter',
   )
 
   // -------------------------------------------------- open / close behaviour
@@ -312,16 +321,43 @@ try {
   check('a press anywhere outside closes it', (await panelOpen('app-controls')) === false)
 
   await openFilters()
-  await page.click('[data-testid="dex-sort-toggle"]')
-  await page.waitForTimeout(160)
-  check(
-    'opening Sort closes the filter menu',
-    (await panelOpen('dex-sort')) === true && (await panelOpen('app-controls')) === false,
+  const parts = await page.$$eval('[data-testid="controls-panel"] .app-controls-part', (els) =>
+    els.map((e) => ({
+      part: e.dataset.part,
+      ruled: getComputedStyle(e).borderTopWidth !== '0px',
+    })),
   )
-  await clickOutside()
-  check('and an outside press closes Sort too', (await panelOpen('dex-sort')) === false)
-
-  await openFilters()
+  check(
+    'the menu is three parts in order: View mode, Sort, Search/Filter',
+    parts.map((p) => p.part).join(',') === 'view,sort,filter',
+    parts.map((p) => p.part).join(','),
+  )
+  check(
+    'with a hairline between parts and none above the first',
+    parts.map((p) => p.ruled).join(',') === 'false,true,true',
+    parts.map((p) => p.ruled).join(','),
+  )
+  const innerRules = await page.$$eval(
+    [
+      '.app-controls-field',
+      '.dex-filter-section',
+      '.dex-filter-more-panel',
+      '.app-controls-reset',
+    ]
+      .map((c) => '[data-testid="controls-panel"] ' + c)
+      .join(', '),
+    (els) =>
+      els.filter((e) => {
+        const cs = getComputedStyle(e)
+        return [cs.borderTopWidth, cs.borderBottomWidth, cs.borderLeftWidth].some((w) => w !== '0px')
+      }).length,
+  )
+  check('and no other rule inside the menu', innerRules === 0, `${innerRules} ruled blocks`)
+  check(
+    '"More filters" is a chevron, not words',
+    (await page.textContent('[data-testid="dex-filter-more-toggle"]')).trim() === '' &&
+      (await page.$('[data-testid="dex-filter-more-toggle"] svg')) != null,
+  )
   check(
     '"More filters" is collapsed by default',
     (await page.$eval('[data-testid="dex-filter-more"]', (el) => el.dataset.open)) === 'false' &&
@@ -334,20 +370,20 @@ try {
     const y = (sel) => panel.querySelector(sel)?.getBoundingClientRect().top ?? null
     return {
       reset: y('[data-testid="controls-reset-top"]'),
-      search: y('[data-testid="global-search"]'),
-      game: y('[data-testid="vg-select"]'),
       filters: y('[data-testid="species-search"]'),
+      // The cross-dex search is in the bar now, never in this panel.
+      searchInPanel: panel.querySelector('[data-testid="global-search"]') != null,
     }
   })
   log(`  menu order (y): ${JSON.stringify(menuOrder)}`)
   check(
     'Reset filters is the first thing in the menu',
-    menuOrder.reset != null && menuOrder.reset < menuOrder.search,
+    menuOrder.reset != null && menuOrder.filters != null && menuOrder.reset < menuOrder.filters,
+    `reset ${Math.round(menuOrder.reset)} · filters ${Math.round(menuOrder.filters)}`,
   )
   check(
-    'and the game selector sits directly below the search input',
-    menuOrder.game > menuOrder.search && menuOrder.game < menuOrder.filters,
-    `search ${Math.round(menuOrder.search)} · game ${Math.round(menuOrder.game)} · filters ${Math.round(menuOrder.filters)}`,
+    'the cross-dex search is not in the menu (it is in the bar; the generation is in the account menu)',
+    !menuOrder.searchInPanel,
   )
 
   const sizes = await page.evaluate(() => {
@@ -418,7 +454,7 @@ try {
   )
 
   // ==================================================================
-  hr('2 — THE GRID/LIST SWITCH: in the bar, on the Pokedex browse page only')
+  hr('2 — THE GRID/LIST SWITCH: in the menu, on the Pokedex browse page only')
   for (const dex of ['movedex', 'itemdex', 'naturedex']) {
     await goTo(dex)
     check(
@@ -429,22 +465,12 @@ try {
   await goTo('pokedex')
   await selectGame('heartgold-soulsilver')
   await goTo('pokedex')
+  await openFilters()
   check(
-    '[pokedex] the view switch is in the bar',
-    await page.isVisible('[data-testid="toggle-species-view"]'),
+    '[pokedex] the view switch is in the menu, in its View mode part',
+    await page.isVisible('[data-testid="controls-part-view"] [data-testid="toggle-species-view"]'),
   )
-  const switchPos = await page.evaluate(() => {
-    const view = document
-      .querySelector('[data-testid="toggle-species-view"]')
-      .getBoundingClientRect()
-    const sort = document.querySelector('[data-testid="dex-sort-toggle"]').getBoundingClientRect()
-    return { leftOfSort: view.right <= sort.left }
-  })
-  check('to the LEFT of the Sort trigger', switchPos.leftOfSort)
-  check(
-    'and it is not inside the Sort menu any more',
-    (await page.$('[data-testid="dex-sort-panel"] [data-testid="toggle-species-view"]')) === null,
-  )
+  await closeMenus()
 
   await page.click('[data-testid="species-open-1"]')
   await page.waitForSelector('[data-testid="species-page"]', { timeout: 20000 })
@@ -486,6 +512,25 @@ try {
       columns: grid.gridTemplateColumns,
       rowGap: grid.rowGap,
       columnGap: grid.columnGap,
+      /* The white between one line's baseline and the next line's cap height,
+         for the card's four text lines -- evenly spaced since 2026-10-10. */
+      lineGaps: (() => {
+        const el = document.querySelector('[data-testid="species-row-1"]')
+        const cv = document.createElement('canvas').getContext('2d')
+        const at = (sel) => {
+          const t = el.querySelector(sel)
+          const cs = getComputedStyle(t)
+          cv.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+          const probe = document.createElement('span')
+          probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline'
+          t.appendChild(probe)
+          const base = probe.getBoundingClientRect().bottom
+          probe.remove()
+          return { base, cap: base - cv.measureText('H').actualBoundingBoxAscent }
+        }
+        const l = ['.species-name', '.species-card-types [data-ds="type-label"]', '.species-card-ability', '.species-card-stats'].map(at)
+        return [1, 2, 3].map((i) => +(l[i].cap - l[i - 1].base).toFixed(2))
+      })(),
     }
   })
   log(`  card geometry: ${JSON.stringify(cardBox)}`)
@@ -495,11 +540,16 @@ try {
     JSON.stringify(cardBox),
   )
   check(
-    'and the grid it sits in is untouched -- three 212px columns, 9px / 17px gaps',
+    'the four card lines are evenly spaced (within 1px: line boxes round per pixel ratio)',
+    Math.max(...cardBox.lineGaps) - Math.min(...cardBox.lineGaps) <= 1,
+    cardBox.lineGaps.join(' / '),
+  )
+  check(
+    'and the grid it sits in -- three 212px columns, 9px gaps both ways (row gap evened 2026-10-10)',
     cardBox.width === 212 &&
       cardBox.columns === '212px 212px 212px' &&
       cardBox.columnGap === '9px' &&
-      cardBox.rowGap === '17px',
+      cardBox.rowGap === '9px',
     `${cardBox.columns} / ${cardBox.columnGap} / ${cardBox.rowGap}`,
   )
 
@@ -533,6 +583,7 @@ try {
 
   // ==================================================================
   hr('4 — POKEDEX LIST VIEW: one fact per column, and a bar for the rest')
+  await openFilters()
   await page.click('[data-testid="toggle-species-view"]')
   await page.waitForTimeout(400)
   await closeMenus()
@@ -766,11 +817,13 @@ try {
   check('and "further evolutions" is answered', bulbaRow[41] === 'Yes', bulbaRow[41])
   await page.screenshot({ path: `${SHOTS}/dexf-pokedex-list.png` })
 
+  await openFilters()
   check(
-    'the Sort trigger is disabled here -- the column headers are the control',
-    await page.$eval('[data-testid="dex-sort-toggle"]', (e) => e.disabled),
+    'the Sort part points to the column headers here -- they are the control',
+    (await page.$('[data-testid="controls-sort-disabled"]')) != null &&
+      (await page.$('[data-testid="dex-sort-fields"]')) === null,
   )
-  check('and no Sort panel is left open under it', (await panelOpen('dex-sort')) === false)
+  await closeMenus()
   await page.click('[data-testid="species-sort-stat-speed"]')
   await page.waitForTimeout(250)
   const listSpeed = await page.$$eval(
@@ -786,6 +839,7 @@ try {
     listSpeedValues.slice(0, 8).join(','),
   )
   // Back to the grid for the sections that follow.
+  await openFilters()
   await page.click('[data-testid="toggle-species-view"]')
   await page.waitForTimeout(300)
   await closeMenus()
@@ -912,19 +966,21 @@ try {
   )
   await clearAll()
   await closeMenus()
-  await pickSort('name')
-  await closeMenus()
-  const abilityNames = await page.$$eval('[data-testid="abilitydex-rows"] .species-name', (els) =>
-    els.map((e) => e.textContent.trim()),
+  /* A table since 2026-10-10: the Name header sorts it, not the bar's menu. */
+  await page.click('[data-testid="abilitydex-sort-name"]')
+  await page.waitForTimeout(120)
+  const abilityNames = await page.$$eval(
+    '[data-testid="abilitydex-rows"] tbody tr td:nth-child(2)',
+    (els) => els.map((e) => e.textContent.trim()),
   )
   check(
-    'and sorting by Name really re-orders it',
+    'and sorting by the Name header really re-orders it',
     JSON.stringify(abilityNames) ===
       JSON.stringify([...abilityNames].sort((a, b) => a.localeCompare(b))),
     abilityNames.slice(0, 3).join(' | '),
   )
-  await pickSort('id')
-  await closeMenus()
+  await page.click('[data-testid="abilitydex-sort-id"]')
+  await page.waitForTimeout(120)
 
   await goTo('itemdex')
   const itemAll = await countOf('itemdex')
@@ -978,18 +1034,10 @@ try {
   await closeMenus()
   check('cleared', (await countOf('berrydex')) === berryAll)
 
+  // The Naturedex has no filters since 2026-10-10 -- section 1 asserts the
+  // disabled trigger, and the matrix shows all 25 natures.
   await goTo('naturedex')
-  await openMore()
-  await page.selectOption('[data-testid="dex-filter-increased"]', 'attack')
-  await page.waitForTimeout(180)
-  const attackNatures = await countOf('naturedex')
-  check(
-    'Naturedex: raised-stat matches the bundle',
-    attackNatures === natures.filter((n) => n.increased_stat === 'attack').length,
-    `(${attackNatures})`,
-  )
-  await clearAll()
-  await closeMenus()
+  check('Naturedex: all natures, unfiltered', (await countOf('naturedex')) === natures.length)
 
   await goTo('movedex')
   const moveAll = await countOf('movedex')
@@ -1030,6 +1078,8 @@ try {
       facts: Object.fromEntries(rows('movedex-facts')),
       meta: Object.fromEntries(rows('movedex-meta')),
       contest: Object.fromEntries(rows('movedex-contest')),
+      // Its own grey line under the description since 2026-10-11, not a fact row.
+      intro: document.querySelector('[data-testid="movedex-intro"]')?.textContent?.trim(),
     }
   })
   log(`  Swords Dance: ${JSON.stringify(movePage)}`)
@@ -1037,8 +1087,8 @@ try {
   check(
     'its priority and the generation it was introduced in',
     movePage.facts.Priority === String(swordsDance.priority) &&
-      movePage.facts.Introduced === `Generation ${swordsDance.generation_id}`,
-    `${movePage.facts.Priority} / ${movePage.facts.Introduced}`,
+      movePage.intro === `Introduced in Generation ${swordsDance.generation_id}`,
+    `${movePage.facts.Priority} / ${movePage.intro}`,
   )
   check(
     'the stat changes it applies',

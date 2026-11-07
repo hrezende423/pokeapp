@@ -1,10 +1,13 @@
 import { useMemo, type ReactNode } from 'react'
 import { DataTable, type Column } from '../../components/DataTable'
 import { TypeLabel } from '../../components/ds/TypeLabel'
-import { getType, listVersionGroups } from '../../data'
+import { getMove, getType, listVersionGroups } from '../../data'
 import { fixedDamage } from '../../data/moveDamage'
 import type { Move } from '../../data'
 import { useVersionGroup } from '../version-group/context'
+import { GameRow } from '../version-group/GameRow'
+import { useGameInGeneration } from '../version-group/gameInGeneration'
+import { versionGroupLabel } from '../pokedex/speciesFacts'
 import { useDexSelection, useNav } from '../nav/navContext'
 import { DexPageShell } from './DexPageShell'
 import { EntityDetailPage, type SpeciesSection } from './EntityDetailPage'
@@ -15,7 +18,7 @@ import {
   moveMetaRows,
   moveRange,
   moveRangeSort,
-  pastValueRows,
+  moveTimeline,
   statChangeLabels,
 } from './moveFacts'
 import { LEARN_SECTIONS, useMoveLearners } from './useMoveLearners'
@@ -74,7 +77,7 @@ function accuracyCell(move: Move) {
   return (
     <span className="num">
       {move.accuracy ?? '—'}
-      <span className="move-unit">%</span>
+      <span className="move-unit move-unit-pct">%</span>
     </span>
   )
 }
@@ -91,26 +94,43 @@ function accuracyCell(move: Move) {
  * learnset partition, so changing the game re-derives which methods exist. Under
  * "All" it unions all fourteen.
  */
-function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
-  const { versionGroup, generation, isAll } = useVersionGroup()
-  const vgName = versionGroup?.name ?? null
+function MoveDetail({
+  move,
+  onBack,
+  scrollKey,
+}: {
+  move: Move
+  onBack: () => void
+  scrollKey: (part: string) => string
+}) {
+  const { generation, isAll } = useVersionGroup()
+  /* "Learned by" is per GAME, and the app picks a generation: the page has its
+     own game row inside it, seeded to the generation's default game. */
+  const game = useGameInGeneration('movedex')
+  const vgName = game.versionGroup?.name ?? null
+  const vgLabel = vgName ? versionGroupLabel(vgName) : ''
   const { learners, failed, loading, error } = useMoveLearners(move, vgName, isAll)
   const [, selectSpecies] = useDexSelection('pokedex')
   const nav = useNav()
 
-  const sections: SpeciesSection[] = useMemo(
-    () =>
-      LEARN_SECTIONS.map(({ method, label }) => ({
-        label,
-        entries: learners
-          .filter((l) => l.methods.includes(method))
-          .map((l) => ({
-            species: l.species,
-            badge: method === 'level-up' && l.level != null ? `Lv.${l.level}` : undefined,
-          })),
-      })),
-    [learners],
-  )
+  const sections: SpeciesSection[] = useMemo(() => {
+    const levelOf = new Map(learners.map((l) => [l.species.id, l.level]))
+    return LEARN_SECTIONS.map(({ method, label }) => ({
+      label,
+      entries: learners
+        .filter((l) => l.methods.includes(method))
+        .map((l) => ({
+          species: l.species,
+          badge: method === 'level-up' && l.level != null ? `Lv.${l.level}` : undefined,
+        })),
+      /* Level-up learners re-sort by level from an arrow after the label
+         (owner, 2026-10-11); dex order stays the default. */
+      sort:
+        method === 'level-up'
+          ? { what: 'level', value: (e) => levelOf.get(e.species.id) ?? null }
+          : undefined,
+    }))
+  }, [learners])
 
   /*
     The count describes what this page SHOWS, which is the four sections.
@@ -162,6 +182,13 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
       title={move.display_name}
       titleTestId="movedex-name"
       meta={meta}
+      /* ABOVE the description, in the subtitle's grey (owner, 2026-10-11: the
+         second pass had it under; this one inverts them). */
+      lead={
+        <p className="entity-detail-meta" data-testid="movedex-intro">
+          Introduced in Generation <span className="num">{move.generation_id ?? '—'}</span>
+        </p>
+      }
       description={move.effect ?? move.short_effect ?? 'No effect text in the bundle.'}
       sections={sections}
       generation={generation}
@@ -171,6 +198,63 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
         selectSpecies(id)
         nav.setModule('pokedex')
       }}
+      /*
+        SPLIT (owner, 2026-10-11): the move on the left, scrolling on its own,
+        and its learners on the right. Everything about WHO learns it -- the game
+        row that scopes the learnset, loading and error lines, the count -- heads
+        the grid column, because that is what it describes.
+      */
+      layout="split"
+      infoTestId="movedex-detail-scroll"
+      scrollKey={scrollKey}
+      gridHeader={
+        <>
+          {/* A mini navbar, right-aligned, in the app bar's own treatment
+              (owner, 2026-10-11): it is the game the grid below belongs to. */}
+          <GameRow scope={game} testId="movedex-game" variant="nav" />
+          {loading && (
+            <p className="subtitle" data-testid="movedex-learners-loading">
+              {isAll ? 'Loading every version group…' : 'Loading learnset…'}
+            </p>
+          )}
+          {error && (
+            <p role="alert" data-testid="movedex-learners-error">
+              Could not load the learnset data. {error}
+            </p>
+          )}
+          {failed.length > 0 && (
+            <p role="alert" data-testid="movedex-learners-partial">
+              Incomplete: {failed.join(', ')} failed to load.
+            </p>
+          )}
+          {!loading && !error && learners.length === 0 && (
+            <p className="subtitle" data-testid="movedex-learners-none">
+              No species learns this move{isAll ? ' in any game' : ` in ${vgLabel}`}.
+            </p>
+          )}
+          {/* The total is no longer drawn (owner, 2026-10-11): each section
+              says its own count under its label. Kept for a screen reader, and
+              as the readout the suites check the page's arithmetic against. */}
+          {!loading && !error && learners.length > 0 && (
+            <p
+              className="visually-hidden"
+              data-testid="movedex-learner-count"
+              data-learner-count={shownIds.size}
+              data-excluded={excluded}
+            >
+              {shownIds.size} species{isAll ? ' across all games' : ` in ${vgLabel}`}
+            </p>
+          )}
+        </>
+      }
+      gridFooter={
+        !loading && !error && excluded > 0 ? (
+          <p className="list-caption" data-testid="movedex-learners-excluded">
+            <span className="num">{excluded}</span> more species learn it only by a method this page
+            does not group (Purification, form change, or a Stadium/Light Ball special case).
+          </p>
+        ) : undefined
+      }
     >
       {/*
         THE WHOLE MOVE, not the six fields the table shows.
@@ -189,103 +273,74 @@ function MoveDetail({ move, onBack }: { move: Move; onBack: () => void }) {
         table would be twelve dashes and one fact on most of them -- the same
         decision the shared detail page makes about empty species sections.
       */}
-      <MoveFactBlocks move={move} />
-      {loading && (
-        <p className="subtitle" data-testid="movedex-learners-loading">
-          {isAll ? 'Loading every version group…' : 'Loading learnset…'}
-        </p>
-      )}
-      {error && (
-        <p role="alert" data-testid="movedex-learners-error">
-          Could not load the learnset data. {error}
-        </p>
-      )}
-      {failed.length > 0 && (
-        <p role="alert" data-testid="movedex-learners-partial">
-          Incomplete: {failed.join(', ')} failed to load.
-        </p>
-      )}
-      {!loading && !error && learners.length === 0 && (
-        <p className="subtitle" data-testid="movedex-learners-none">
-          No species learns this move{isAll ? ' in Generations 1-4' : ` in ${vgName}`}.
-        </p>
-      )}
-      {!loading && !error && learners.length > 0 && (
-        <p
-          className="subtitle"
-          data-testid="movedex-learner-count"
-          data-learner-count={shownIds.size}
-          data-excluded={excluded}
-        >
-          <span className="num">{shownIds.size}</span> species
-          {isAll ? ' across all Generation 1-4 games' : ` in ${vgName}`}
-          {excluded > 0 && (
-            <span data-testid="movedex-learners-excluded">
-              {' · '}
-              <span className="num">{excluded}</span> more learn it only by a method this page does
-              not group (Purification, form change, or a Stadium/Light Ball special case)
-            </span>
-          )}
-        </p>
-      )}
+      <MoveFactBlocks
+        move={move}
+        versionGroup={vgName}
+        untilGeneration={isAll ? Number.POSITIVE_INFINITY : generation}
+      />
     </EntityDetailPage>
   )
 }
 
-/** Label/value rows on hairlines, the Itemdex's treatment. Nothing in a box. */
-function FactRows({
+/** A section of the move page: a label, its rows indented under it, never folded. */
+function MoveSection({
+  title,
   testId,
-  rows,
+  children,
 }: {
+  title: string
   testId: string
-  rows: { label: string; value: ReactNode }[]
+  children: ReactNode
 }) {
-  if (rows.length === 0) return null
   return (
-    <ul className="fact-rows" data-testid={testId}>
-      {rows.map((row) => (
-        <li key={row.label}>
-          <span className="fact-label">{row.label}</span>
-          <span className="fact-value">{row.value}</span>
-        </li>
-      ))}
-    </ul>
+    <section className="move-section" data-testid={testId}>
+      <h3 className="move-section-head">{title}</h3>
+      {children}
+    </section>
   )
 }
 
-function MoveFactBlocks({ move }: { move: Move }) {
-  const { isAll, versionGroup } = useVersionGroup()
+/** One label/value pair. The classes are the fact rows', which the suites read. */
+function Lane({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <li className="move-lane">
+      <span className="fact-label">{label}</span>
+      <span className="fact-value">{value}</span>
+    </li>
+  )
+}
+
+function MoveFactBlocks({
+  move,
+  versionGroup,
+  untilGeneration,
+}: {
+  move: Move
+  versionGroup: string | null
+  untilGeneration: number
+}) {
   /* Machines are per version group; under a single game only that game's TM
-     counts, under "All" every Gen 1-4 group does. */
+     counts (the page's game row), under "All" every group does. */
   const inScope = useMemo(() => {
-    if (isAll || !versionGroup) return new Set(listVersionGroups().map((vg) => vg.name))
-    return new Set([versionGroup.name])
-  }, [isAll, versionGroup])
-  /* Past values are scoped to the whole bundle rather than to one game: they
-     describe a change BETWEEN games, so narrowing them to the selected one would
-     leave nothing to compare. */
-  const allGroups = useMemo(() => new Set(listVersionGroups().map((vg) => vg.name)), [])
+    if (!versionGroup) return new Set(listVersionGroups().map((vg) => vg.name))
+    return new Set([versionGroup])
+  }, [versionGroup])
 
   const machines = machineNames(move, inScope)
   const flags = moveFlagLabels(move)
   const statChanges = statChangeLabels(move)
   const metaRows = moveMetaRows(move)
-  const pastRows = pastValueRows(move, allGroups)
+  /* The history needs the RAW move: `move` here is the selected generation's
+     resolved copy, and replaying from it would start at that generation. */
+  const raw = getMove(move.id) ?? move
+  const cap = Number.isFinite(untilGeneration)
+    ? untilGeneration
+    : Math.max(...listVersionGroups().map((vg) => vg.generation_id ?? 0))
+  const timeline = moveTimeline(raw, cap)
 
   const basics: { label: string; value: ReactNode }[] = [
     { label: 'Range', value: moveRange(move) },
     { label: 'Priority', value: <span className="num">{move.priority}</span> },
-    {
-      label: 'Introduced',
-      value:
-        move.generation_id != null ? (
-          <>
-            Generation <span className="num">{move.generation_id}</span>
-          </>
-        ) : (
-          '—'
-        ),
-    },
   ]
   if (move.effect_chance != null) {
     basics.push({
@@ -335,25 +390,75 @@ function MoveFactBlocks({ move }: { move: Move }) {
     })
   }
 
+  /*
+    BATTLE AND CONTEST, as sections that do not fold (owner, 2026-10-11).
+
+    Battle is two columns in LANES: one grid, filled row by row, so the pair of
+    rows side by side always share a height. No hairlines (third pass): the
+    lanes are told apart by their rhythm and the indent under the label. The two
+    lists inside it are `display: contents` -- the grid sees only the rows -- and
+    stay two lists because they are two sources (the move's own fields, then
+    PokeAPI's meta block).
+
+    Contest is one column with the values LEFT-aligned beside a fixed label
+    column: its values are sentences, which read badly ragged-right.
+  */
   return (
     <>
-      <FactRows testId="movedex-facts" rows={basics} />
-      <FactRows
-        testId="movedex-meta"
-        rows={metaRows.map((r) => ({ label: r.label, value: r.value }))}
-      />
-      <FactRows testId="movedex-contest" rows={contest} />
-      {pastRows.length > 0 && (
-        <>
-          <p className="list-caption" data-testid="movedex-past-caption">
-            Values in earlier games. These are recorded, not applied: the figures above are the
-            bundle&apos;s current ones.
-          </p>
-          <FactRows
-            testId="movedex-past"
-            rows={pastRows.map((r) => ({ label: r.label, value: r.value }))}
-          />
-        </>
+      <MoveSection title="Battle" testId="movedex-battle">
+        <div className="move-lanes" data-layout="move-lanes">
+          <ul className="move-lane-list" data-testid="movedex-facts">
+            {basics.map((r) => (
+              <Lane key={r.label} label={r.label} value={r.value} />
+            ))}
+          </ul>
+          {metaRows.length > 0 && (
+            <ul className="move-lane-list" data-testid="movedex-meta">
+              {metaRows.map((r) => (
+                <Lane key={r.label} label={r.label} value={r.value} />
+              ))}
+            </ul>
+          )}
+        </div>
+      </MoveSection>
+      {contest.length > 0 && (
+        <MoveSection title="Contest" testId="movedex-contest-section">
+          <ul className="move-contest-rows" data-testid="movedex-contest">
+            {contest.map((r) => (
+              <Lane key={r.label} label={r.label} value={r.value} />
+            ))}
+          </ul>
+        </MoveSection>
+      )}
+      {/*
+        THE HISTORY AS A TIMELINE: the values it was introduced with, then only
+        what changed, generation by generation. Rendered only when there is a
+        change to show -- a single "Gen 1" point is not a history.
+      */}
+      {timeline.length > 1 && (
+        <MoveSection title="Move changes throughout generations" testId="movedex-past">
+          <ol className="move-timeline">
+            {timeline.map((step) => (
+              <li
+                key={step.generation}
+                className="move-timeline-step"
+                data-generation={step.generation}
+                data-initial={step.initial}
+              >
+                <span className="move-timeline-gen">
+                  Gen <span className="num">{step.generation}</span>
+                </span>
+                <span className="move-timeline-values">
+                  {step.parts.map((p) => (
+                    <span key={p.key} className="move-timeline-value" data-field={p.key}>
+                      {p.label}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </MoveSection>
       )}
     </>
   )
@@ -408,7 +513,13 @@ export function Movedex() {
         label: 'Category',
         width: '6rem',
         sortValue: (m) => m.damage_class,
-        render: (m) => titleCase(m.damage_class),
+        // At the type label's size (owner, 2026-10-11), so the two classifying
+        // columns side by side read as one register.
+        render: (m) => (
+          <span className="movedex-category" data-category={m.damage_class ?? undefined}>
+            {titleCase(m.damage_class)}
+          </span>
+        ),
       },
       {
         key: 'power',
@@ -479,10 +590,12 @@ export function Movedex() {
           initialSort="name"
           testId="movedex-rows"
           emptyNote="No move matches those filters."
+          plain
         />
       )}
-      detail={({ entry, onBack }) => (
-        <MoveDetail key={`${entry.id}`} move={entry} onBack={onBack} />
+      detailScrolls
+      detail={({ entry, onBack, scrollKey }) => (
+        <MoveDetail key={`${entry.id}`} move={entry} onBack={onBack} scrollKey={scrollKey} />
       )}
     />
   )

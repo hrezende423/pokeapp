@@ -79,7 +79,13 @@ export function Pokedex() {
         back row here.
       */}
       {browsing ? (
-        <div className="pokedex-body pokedex-body-grid">
+        <div
+          className={
+            view === 'list'
+              ? 'pokedex-body pokedex-body-grid pokedex-body-list'
+              : 'pokedex-body pokedex-body-grid'
+          }
+        >
           <div className="pokedex-title-row">
             <DexTitle dexId="pokedex" count={pokedexCount} />
           </div>

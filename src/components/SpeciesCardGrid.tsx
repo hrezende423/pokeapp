@@ -116,16 +116,12 @@ export function SpeciesCard({
         />
       )}
       <span className="species-card-text">
-        {/*
-          THE NAME ALONE. "#0001" led this line and is gone, along with every
-          other printed entry number in the dexes: the ordinal answers nothing a
-          browsing reader asked, and the global search results -- inside the
-          Search/Filter menu -- still print it for the one case where it does.
-          The line keeps its own element rather than collapsing into the name
-          span, because the card's three text lines are y-calibrated as a block
-          and the watermark above still IS the number, decoratively.
-        */}
+        {/* The national dex number leads the name again (owner, 2026-10-10),
+            after a pass that had removed it from every dex surface. */}
         <span className="species-card-line">
+          <span className="dex-no" data-testid={`species-card-no-${species.id}`}>
+            #{String(species.id).padStart(4, '0')}
+          </span>
           <span className="species-name">{species.display_name}</span>
         </span>
         <span className="species-card-types">

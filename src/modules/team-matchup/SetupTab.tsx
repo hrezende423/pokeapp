@@ -1,8 +1,8 @@
 /**
  * SETUP: who fights whom, under which rules, on which numbers.
  *
- *   S1 my team from Team Building (the Collection does not exist yet; the setup
- *      keeps a link-ready field for it);
+ *   S1 my team from Team Building, or up to six Collection entries of the
+ *      game's generation (Collection v2: the Source choice);
  *   S2/S3 the opponent by game -> trainer -> variant, with its exact data as the
  *      disassembly gives it; facility trainers as a pool (R6);
  *   S5 a custom team, or edits to a trainer's Pokemon;
@@ -43,11 +43,34 @@ import type { Weather } from '../calculators/damage'
 export function SetupTab({ view }: { view: MatchupView }) {
   const { ctx, setup, update, resolved, tb } = view
   const teams = tb.teams.filter((t) => t.generation === ctx.generation && t.memberIds.some(Boolean))
+  const source = setup.mySource ?? 'team'
   return (
     <div className="tm-setup" data-layout="tm-setup-grid">
       <div className="tm-setup-mine" data-layout="tm-setup-mine">
         <Section title="Your team" testId="tm-setup-mine">
-          {teams.length === 0 ? (
+          <label className="tm-inline-field">
+            <span>Source</span>
+            <select
+              className="tm-select"
+              data-testid="tm-source"
+              value={source}
+              onChange={(e) =>
+                update((s) => ({
+                  ...s,
+                  mySource: e.target.value === 'collection' ? 'collection' : 'team',
+                  mine: {},
+                  lead: 0,
+                  lead2: undefined,
+                }))
+              }
+            >
+              <option value="team">Team</option>
+              <option value="collection">Collection</option>
+            </select>
+          </label>
+          {source === 'collection' ? (
+            <CollectionPicker view={view} />
+          ) : teams.length === 0 ? (
             <Note tone="warn">
               No Gen {ctx.generation} team in Team Building yet. Make one there; it appears here.
             </Note>
@@ -72,8 +95,9 @@ export function SetupTab({ view }: { view: MatchupView }) {
             </label>
           )}
           <Note>
-            From your Team Building teams. Collection: not available yet — the setup will take a
-            Collection team once that module exists.
+            {source === 'collection'
+              ? `Up to six of your Gen ${ctx.generation} Collection entries, each as it stands now.`
+              : 'From your Team Building teams.'}
           </Note>
           {resolved.problems.map((p) => (
             <Note key={p} tone="warn">
@@ -201,6 +225,63 @@ export function SetupTab({ view }: { view: MatchupView }) {
       <div className="tm-setup-rules" data-layout="tm-setup-rules">
         <FormatAndField view={view} />
       </div>
+    </div>
+  )
+}
+
+// ------------------------------------------------------- Collection source
+
+/**
+ * Up to six Collection entries, one picker per slot. ONLY THE GAME'S GENERATION
+ * is offered: the matchup's game is its own selector (the fourth sanctioned
+ * exception), and an entry of another generation cannot be picked at all.
+ */
+function CollectionPicker({ view }: { view: MatchupView }) {
+  const { ctx, setup, update, tb } = view
+  const entries = (tb.collection ?? [])
+    .filter((c) => c.generation === ctx.generation)
+    .sort((a, b) => a.seq - b.seq)
+  const picked = setup.collectionIds ?? []
+  if (entries.length === 0) {
+    return (
+      <Note tone="warn">
+        No Gen {ctx.generation} Pokémon in your Collection yet. Add them there; they appear here.
+      </Note>
+    )
+  }
+  const label = (id: string) => {
+    const c = entries.find((e) => e.id === id)
+    const species = c ? getSpecies(c.speciesId)?.display_name : undefined
+    return c ? `${c.nickname.trim() || species || `#${c.speciesId}`} (${species}, Lv ${c.level})` : id
+  }
+  const slots = Math.min(6, picked.length + 1)
+  return (
+    <div className="tm-collection-picks" data-testid="tm-collection-picks">
+      {Array.from({ length: slots }, (_, i) => {
+        const options: SearchOption[] = [
+          { value: '', label: '—' },
+          ...entries
+            .filter((e) => e.id === picked[i] || !picked.includes(e.id))
+            .map((e) => ({ value: e.id, label: label(e.id) })),
+        ]
+        return (
+          <SearchSelect
+            key={i}
+            label={`Pokémon ${i + 1}`}
+            options={options}
+            value={picked[i] ?? ''}
+            testId={`tm-col-${i}`}
+            onChange={(v) =>
+              update((s) => {
+                const ids = [...(s.collectionIds ?? [])]
+                if (v) ids[i] = v
+                else ids.splice(i, 1)
+                return { ...s, collectionIds: ids.filter(Boolean).slice(0, 6), lead: 0 }
+              })
+            }
+          />
+        )
+      })}
     </div>
   )
 }
@@ -989,9 +1070,10 @@ function FormatAndField({ view }: { view: MatchupView }) {
       {view.scenario && (
         <Section title="Scenario links" testId="tm-links">
           <Note>
-            Notes, Journal, Nuzlocke Tracker and Collection are not built yet. This scenario keeps a
-            field for each ({Object.keys(EMPTY_LINKS).join(', ')}) so it links to them once they
-            exist.
+            Collection: {view.scenario.links.collectionId ?? 'not linked'} (the lead entry, when your
+            team comes from the Collection). Notes, Journal and Nuzlocke Tracker are not built yet;
+            this scenario keeps a field for each ({Object.keys(EMPTY_LINKS).join(', ')}) so it links
+            to them once they exist.
           </Note>
         </Section>
       )}

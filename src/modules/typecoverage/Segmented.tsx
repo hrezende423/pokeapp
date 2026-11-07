@@ -7,18 +7,12 @@
  * Using it for "Custom / Standard" would spend the alarm colour on a neutral
  * layout choice and would say "on/off" about a pair of equals.
  *
- * The visual language is the one already shipped twice: the theme switcher's
- * pill (`.ds-theme-switcher`) and the species page's scope segments. A track in
- * `--hairline` with the selected segment lifted to `--surface-raised` -- a tone
- * step, never a shadow, and never an accent fill.
- *
- * SELECTION IS CARRIED BY WEIGHT AS WELL AS FILL. In dark mode the tone
- * relationship inverts (`--surface-raised` #1c1c1e is darker than `--hairline`
- * #2c2c2e), so the selected segment reads slightly recessed rather than raised.
- * That is left alone rather than papered over with a new token, for the reason
- * ThemeSwitcher records: the bold `--text-primary` label against a regular
- * `--text-secondary` one is what actually communicates the state, and relying on
- * the fill alone would have been the accessibility bug.
+ * TEXT LABELS IN THE TAB STRIP'S STYLE (owner, 2026-10-10), not the pill it
+ * was: no track and no fill, the ds Tabs' size and spacing. Selection is weight
+ * and tone -- bold `--text-primary` against regular `--text-secondary` -- and
+ * NOT the tabs' accent, which this page already spends on the nav and the tab.
+ * `data-label` lets CSS reserve each label's bold width, so selecting one does
+ * not shift its neighbour.
  *
  * `aria-pressed` on real buttons rather than radio semantics, matching the two
  * controls above: every segment stays individually tabbable and no arrow-key
@@ -54,6 +48,7 @@ export function Segmented<T extends string>({
               className="tc-segment"
               data-testid={`${testId}-${option.value}`}
               data-active={active}
+              data-label={option.label}
               aria-pressed={active}
               onClick={() => onChange(option.value)}
             >
