@@ -470,18 +470,20 @@ try {
   log(`  offline ${GROUP_A} learnset rows for #${SPECIES}: ${offlineRows}`)
   check(`${GROUP_A} partitions resolve offline`, offlineRows > 0, `(${offlineRows} rows)`)
 
-  // A group never visited online must NOT be available offline — proves the
-  // partitions really are cache-on-first-use rather than precached. Asked for
-  // through the page's own control, which is what selects a partition now.
+  // Offline item: every Gen 1-4 partition is PRECACHED now, so a group never
+  // visited online still resolves offline (verify:offline covers the rest).
+  // Asked for through the page's own control, which is what selects a partition.
   await page.click('[data-testid="learnset-scope-generation-3"]')
   const neverBtn = `[data-testid="learnset-scope-game-${NEVER_VISITED}"]`
   if (await page.$(neverBtn)) await page.click(neverBtn)
-  await page.waitForSelector('[data-testid="species-page"] [role="alert"]', { timeout: 30000 })
-  const alert = await page.textContent('[data-testid="species-page"] [role="alert"]')
-  log(`  offline "${NEVER_VISITED}" (never visited online) -> ${JSON.stringify(alert)}`)
+  await page.waitForSelector('.species-learn-group', { timeout: 30000 }).catch(() => {})
+  await page.waitForTimeout(1500) // let the new group's rows replace the old ones
+  const neverRows = await learnsetRows()
+  log(`  offline "${NEVER_VISITED}" (never visited online) -> ${neverRows} rows`)
   check(
-    `un-visited group "${NEVER_VISITED}" is NOT available offline (confirms on-demand caching)`,
-    (alert ?? '').length > 0,
+    `un-visited Gen 1-4 group "${NEVER_VISITED}" resolves offline (precached)`,
+    neverRows > 0,
+    `(${neverRows} rows)`,
   )
 
   // ==================================================================
