@@ -215,7 +215,7 @@ function CollectionBody({ generation }: { generation: number }) {
   const moveOptions = useMemo<SearchOption[]>(() => {
     const legal = moveset.moves.map((m) => ({ value: String(m.move_id), label: m.name }))
     // A stored move the legal list does not offer still reads as itself.
-    const extra = moveIds
+    const extra = [...new Set(moveIds)]
       .filter((id): id is number => id != null && !legal.some((o) => o.value === String(id)))
       .map((id) => ({ value: String(id), label: getMove(id)?.display_name ?? `#${id}` }))
     return [{ value: '', label: '—' }, ...legal, ...extra]

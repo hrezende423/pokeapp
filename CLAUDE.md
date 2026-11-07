@@ -249,6 +249,7 @@ A nested CLAUDE.md loads on the first read of a file under its directory.
 | Area | File |
 |---|---|
 | Signed-off screens (measurements, rationale), the unsaved member, Build Form saving, Team Building debt | `src/modules/team-builder/CLAUDE.md` |
+| Collection v2: schema and migration, per-generation fields, candidate flags, `entryToBuild` | `src/modules/collection/CLAUDE.md` |
 | Species detail page (proportional scale, Info locations), grid and list views, "Has evolutions" | `src/modules/pokedex/CLAUDE.md` |
 | Data layer: sprites, era resolution, Japanese names | `src/data/CLAUDE.md` |
 | Type Coverage and its selector | `src/modules/typecoverage/CLAUDE.md` |

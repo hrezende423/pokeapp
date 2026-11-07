@@ -25,19 +25,20 @@ import { existsSync } from 'node:fs';
 const SUITES_BY_PATH = [
   // The stat formula's own assertions live in the damage suite (section 4).
   ['src/modules/team-builder/statMath', ['damage-calc']],
-  ['src/modules/team-builder/', ['team-builder', 'team-transfer', 'legal-moveset']],
-  ['src/sync/', ['team-builder']],
+  ['src/modules/team-builder/', ['team-builder', 'team-transfer', 'legal-moveset', 'collection']],
+  ['src/modules/collection/', ['collection', 'tools']],
+  ['src/sync/', ['team-builder', 'collection']],
   // The damage engine is shared with Team Matchup's battles.
   ['src/modules/calculators/damage/', ['team-matchup']],
-  ['src/modules/calculators/', ['damage-calc', 'tools']],
+  ['src/modules/calculators/', ['damage-calc', 'tools', 'collection']],
   ['src/modules/tools/', ['tools']],
   ['src/modules/battle/', ['team-matchup']],
-  ['src/modules/team-matchup/', ['team-matchup']],
+  ['src/modules/team-matchup/', ['team-matchup', 'collection']],
   ['src/modules/typecoverage/', ['type-coverage']],
   ['src/modules/search/', ['search']],
   ['src/modules/dex/Trainer', ['trainers']],
   ['src/modules/dex/trainer', ['trainers']],
-  ['src/modules/dex/', ['dexes', 'dex-filters', 'movedex']],
+  ['src/modules/dex/', ['dexes', 'dex-filters', 'movedex', 'collection']],
   ['src/modules/pokedex/evo', ['evo-icons', 'ux']],
   ['src/modules/pokedex/', ['pokedex', 'species-page', 'eggmoves']],
   // verify-design-system asserts every tab's dropdown, line by line.

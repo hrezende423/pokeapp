@@ -38,6 +38,7 @@
     "verify:scroll-nav": "node scripts/verify-scroll-nav.mjs",
     "verify:tools": "node scripts/verify-tools.mjs",
     "verify:team-transfer": "node scripts/verify-team-transfer.mjs",
+    "verify:collection": "node scripts/verify-collection.mjs",
     "audit:bw-sprites": "node scripts/audit-bw-sprites.mjs",
     "audit:supplement": "node scripts/audit-supplement.mjs",
     "audit:white-sprites": "node scripts/audit-white-sprites.mjs",
