@@ -81,6 +81,34 @@ hr('2. RUNTIME AND SETUP')
   check('the README Status section is current (no "No Pokémon data")', !/No Pokémon data or features yet/.test(read('README.md')))
 }
 
+hr('3. CI')
+{
+  const has = (p) => tracked.includes(p)
+  // Comments are dropped: pr.yml's header explains why `check --all` is NOT run.
+  const code = (p) =>
+    has(p)
+      ? read(p)
+          .split(/\r?\n/)
+          .filter((l) => !l.trimStart().startsWith('#'))
+          .join('\n')
+      : ''
+  const pr = code('.github/workflows/pr.yml')
+  check('a PR workflow exists and runs on every pull request', /\bon:\s*\n\s*pull_request:/.test(pr))
+  for (const [label, re] of [
+    ['typecheck', /npx tsc -b/],
+    ['lint', /npm run lint/],
+    ['build', /npm run build/],
+    ['the design-token contrast check, with PYTHONUTF8=1 and fails: 0 required', /PYTHONUTF8: '1'[\s\S]*check-contrast\.py[\s\S]*grep -q 'fails: 0'/],
+  ]) check(`the PR workflow runs ${label}`, re.test(pr))
+  check('the PR workflow runs no Playwright suite (documented: too long for a PR)', !/check -- --all|verify:(?!infra)/.test(pr))
+  const full = code('.github/workflows/suites.yml')
+  check(
+    'a scheduled and manual workflow runs `check --all`',
+    /schedule:/.test(full) && /workflow_dispatch:/.test(full) && /npm run check -- --all/.test(full),
+  )
+  check('the deploy workflow still deploys main', /push:\s*\n\s*branches: \[main\]/.test(read('.github/workflows/deploy.yml')))
+}
+
 hr('SUMMARY')
 if (failures.length) {
   console.log(`${failures.length} FAILED:\n  - ${failures.join('\n  - ')}`)

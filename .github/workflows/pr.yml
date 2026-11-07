@@ -1,0 +1,54 @@
+name: PR checks
+
+# The fast, browser-free half of `npm run check`, on every pull request into any
+# branch (the work is stacked, so most PRs target another feature branch).
+#
+# THE PLAYWRIGHT SUITES ARE NOT RUN HERE. The full set (`npm run check -- --all`)
+# takes over an hour, far past the ~15 minutes a PR check can sensibly hold. It
+# runs on a schedule and on demand (suites.yml), and every branch runs its own
+# areas' suites locally before its PR (`npm run check -- --since <base>`).
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Lint (all files)
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Design-token contrast (must show fails 0)
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          python3 design-system/scripts/check-contrast.py | tee contrast.log
+          grep -q 'fails: 0' contrast.log
+
+      - name: Static infrastructure rules
+        run: npm run verify:infra

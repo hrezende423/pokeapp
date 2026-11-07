@@ -1,0 +1,47 @@
+name: Full gate
+
+# `npm run check -- --all`: typecheck, lint, build and EVERY verify suite, in the
+# system Chrome that GitHub's Ubuntu runners ship (the suites never use Playwright's
+# bundled browser). Too long for every PR (see pr.yml), so it runs weekly and on
+# demand: Actions -> Full gate -> Run workflow, on any branch.
+#
+# Linux renders the self-hosted fonts through a different rasteriser than the
+# Windows machine the measured constants were taken on. A failure that only this
+# workflow shows is a platform difference to diagnose, not a regression by default.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: npm run check -- --all
+        run: npm run check -- --all 2>&1 | tee check.log; exit ${PIPESTATUS[0]}
+
+      - name: Keep the log and screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-gate
+          path: |
+            check.log
+            scripts/.verify-shots/
+          if-no-files-found: ignore

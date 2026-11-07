@@ -114,6 +114,12 @@ ignorable) — a join can be internally consistent and still wrong.
   A Playwright upgrade once left the bundled browser missing and blocked seven
   suites. `check.mjs` starts Chrome once before any browser suite and says what to
   install if it can't; `verify:infra` fails on any launch without the channel.
+- **CI is two workflows beside the deploy.** `pr.yml` runs on every PR into any
+  branch: typecheck, lint, build, the token contrast check (`fails: 0`) and
+  `verify:infra`, in under 15 minutes. `suites.yml` runs `check --all` weekly and on
+  demand. The Playwright suites are NOT on every PR: the full set takes over an
+  hour. A failure only `suites.yml` shows may be Linux font rendering against
+  constants measured on Windows: diagnose it, don't assume a regression.
 - **`verify:infra` is the static infrastructure suite**: no server, no browser. A
   later infrastructure rule adds its section there.
 - **A new browser suite must self-host.** `verify-type-coverage` shipped
