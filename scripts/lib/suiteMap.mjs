@@ -12,6 +12,8 @@ export const SUITES_BY_PATH = [
   ['src/sync/', ['team-builder', 'collection', 'store']],
   // The generic document store, and the Team Builder document that now lives on it.
   ['src/store/', ['store', 'team-builder', 'collection', 'tools', 'team-transfer']],
+  ['src/lib/entities/', ['entities']],
+  ['scripts/curated/', ['curated']],
   ['supabase/', ['infra']],
   // The damage engine is shared with Team Matchup's battles.
   ['src/modules/calculators/damage/', ['team-matchup']],

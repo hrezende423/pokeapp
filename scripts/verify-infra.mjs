@@ -224,6 +224,18 @@ hr('9. PERSISTENCE AND SYNC')
   check('the Team Builder keeps its key', /'pokeapp:team-builder:v1'/.test(read('src/modules/team-builder/store.ts')))
 }
 
+hr('10. SHARED FOUNDATIONS')
+{
+  const { suitesFor } = await import('./lib/suiteMap.mjs')
+  check('src/lib/entities/ changes run verify:entities', suitesFor(['src/lib/entities/engine.ts']).has('entities'))
+  check('scripts/curated/ changes run verify:curated', suitesFor(['scripts/curated/glossary/x.json']).has('curated'))
+  const browserless = /const BROWSERLESS = new Set\(\[[^\]]*\]/.exec(read('scripts/check.mjs'))?.[0] ?? ''
+  check('verify:entities and verify:curated are browser-free in the gate', /'entities'/.test(browserless) && /'curated'/.test(browserless))
+  const pkg = JSON.parse(read('package.json'))
+  check('build:curated, verify:entities and verify:curated are scripts', ['build:curated', 'verify:entities', 'verify:curated'].every((k) => pkg.scripts[k]))
+  check('ajv is a declared devDependency', Boolean(pkg.devDependencies?.ajv))
+}
+
 hr('SUMMARY')
 if (failures.length) {
   console.log(`${failures.length} FAILED:\n  - ${failures.join('\n  - ')}`)

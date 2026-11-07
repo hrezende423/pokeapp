@@ -188,8 +188,7 @@ A nested CLAUDE.md loads on the first read of a file under its directory. **Read
 | Species page (proportional scale, Info locations), grid and list views, "Has evolutions", evolution triggers | `src/modules/pokedex/CLAUDE.md` |
 | Data layer: sprites, era resolution, Japanese names, gender-sprite exceptions | `src/data/CLAUDE.md` |
 | Collection: schema v2, migration, candidate flags | `src/modules/collection/CLAUDE.md` |
-| Type Coverage and its selector | `src/modules/typecoverage/CLAUDE.md` |
-| Damage calculator and its selector | `src/modules/calculators/CLAUDE.md` |
+| Type Coverage, Damage calculator and their selectors | `src/modules/typecoverage/CLAUDE.md`, `src/modules/calculators/CLAUDE.md` |
 | Team Matchup, its selector, the battle engine | `src/modules/team-matchup/CLAUDE.md` |
 | Dex search / filter / sort | `src/modules/dex/CLAUDE.md` |
 | The scroll model (`ScrollArea`) | `src/components/CLAUDE.md` |
@@ -198,3 +197,4 @@ A nested CLAUDE.md loads on the first read of a file under its directory. **Read
 | Trainer Dex and its bundle | `scripts/trainers/CLAUDE.md` |
 | Tokens build, contrast check, CHANGELOG | `design-system/CLAUDE.md` |
 | Bulbapedia supplement, verification plumbing, worktrees, CI | `scripts/CLAUDE.md` |
+| Entity links (typed refs, deep links); curated data pipeline | `src/lib/entities/CLAUDE.md`, `scripts/curated/CLAUDE.md` |
