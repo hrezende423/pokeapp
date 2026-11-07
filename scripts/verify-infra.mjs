@@ -184,6 +184,19 @@ hr('6. DESIGN TOKENS (bridge only)')
   check('the frozen-screen pixel comparison tool exists', /compare <a> <b>/.test(read('scripts/compare-frozen.mjs')))
 }
 
+hr('7. PHONE SHELL')
+{
+  check('the viewport opts into safe areas (viewport-fit=cover)', /viewport-fit=cover/.test(read('index.html')))
+  const css = read('src/phoneShell.css')
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const outside = body.replace(/@media \(max-width: 639px\) \{[\s\S]*\}\s*$/, '').trim()
+  check('every phone-shell rule is inside the one phone media query (desktop untouched)', outside === '', outside.slice(0, 80))
+  check('the phone shell uses no box-shadow', !/box-shadow/.test(body))
+  check('the bottom bar and sheet pad by the safe-area inset', /env\(safe-area-inset-bottom\)/.test(body))
+  check('the phone shell is imported last in App.tsx', /import '\.\/phoneShell\.css'/.test(read('src/App.tsx')))
+  check('the mockup is in public/ (so it is reachable on the preview)', tracked.includes('public/mockups/phone-shell.html'))
+}
+
 hr('SUMMARY')
 if (failures.length) {
   console.log(`${failures.length} FAILED:\n  - ${failures.join('\n  - ')}`)
