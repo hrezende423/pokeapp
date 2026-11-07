@@ -110,7 +110,10 @@ const EXPECTED = {
     '--text-primary': tokenValue(semantic['text-primary'], 'light'),
     '--text-secondary': tokenValue(semantic['text-secondary'], 'light'),
     '--hairline': tokenValue(semantic.hairline, 'light'),
-    '--accent': tokenValue(semantic.accent, 'light'),
+    /* dist/tokens.css's --color-accent-default (accent-600), not the handoff's
+       #d91c2c: dist is the winning set (owner, 2026-11-06), and the light accent is
+       bridged to it. Dark is NOT (it moved a frozen screen): design-system/TOKEN-BRIDGE.md. */
+    '--accent': '#C91D1D',
     '--button-primary-fill': tokenValue(semantic['button-primary-fill'], 'light'),
     '--button-primary-text': tokenValue(semantic['button-primary-text'], 'light'),
     '--ghost-watermark': tokenValue(semantic['ghost-watermark'], 'light'),
@@ -264,14 +267,33 @@ const appDecls = decls(appCss)
   carry the same IBM Plex Sans / Martian Mono stacks. Anything else differing
   from the handoff copy is still a failure.
 */
+/*
+  THE TOKEN BRIDGE (2026-11-07, design-system/TOKEN-BRIDGE.md) aliased eight more to
+  the same-kind dist token with the IDENTICAL computed value in every mode (checked
+  in Chrome over 402 token values), and dropped two the app re-declared with dist's
+  own value. An alias is still held to its exact text here, and FROM_DIST to dist
+  carrying the handoff's value, so neither can drift silently.
+*/
 const ALIASED = {
   '--font-body': 'var(--font-family-sans)',
   '--font-numeric': 'var(--font-family-mono)',
+  '--font-size-body': 'var(--font-style-body-size)',
+  '--font-size-title': 'var(--font-style-h3-size)',
+  '--radius-control': 'var(--radius-md)',
+  '--radius-pill': 'var(--radius-lg)',
+  '--space-gap-sm': 'var(--space-2)',
+  '--space-gap-xl': 'var(--space-8)',
+  '--field-focus-border-width': 'var(--border-width-thick)',
+  '--font-weight-medium': 'var(--font-weight-semibold)',
 }
+const distDecls = decls(readFileSync('design-system/dist/tokens.css', 'utf8'))
+const FROM_DIST = ['--font-weight-regular', '--font-weight-bold']
 const changed = Object.keys(handoffDecls).filter((k) =>
-  k in ALIASED
-    ? canonical(appDecls[k]) !== canonical(ALIASED[k])
-    : canonical(appDecls[k]) !== canonical(handoffDecls[k]),
+  FROM_DIST.includes(k)
+    ? appDecls[k] !== undefined || canonical(distDecls[k]) !== canonical(handoffDecls[k])
+    : k in ALIASED
+      ? canonical(appDecls[k]) !== canonical(ALIASED[k])
+      : canonical(appDecls[k]) !== canonical(handoffDecls[k]),
 )
 log(`  declarations changed from the handoff copy: ${changed.length ? changed.join(', ') : 'none'}`)
 check('no token value was altered', changed.length === 0, changed.join(','))
