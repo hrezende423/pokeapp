@@ -19,54 +19,11 @@
  * once rewrapped five calculator files that had to be restored.
  */
 import { execSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { browserPreflight, CHROME_HELP } from './lib/browser.mjs';
+import { suitesFor } from './lib/suiteMap.mjs';
 
-/** Path prefix -> suites that exercise it. First match does NOT stop the scan. */
-const SUITES_BY_PATH = [
-  // The stat formula's own assertions live in the damage suite (section 4).
-  ['src/modules/team-builder/statMath', ['damage-calc']],
-  ['src/modules/team-builder/', ['team-builder', 'team-transfer', 'legal-moveset', 'collection']],
-  ['src/modules/collection/', ['collection', 'tools']],
-  ['src/sync/', ['team-builder', 'collection']],
-  // The damage engine is shared with Team Matchup's battles.
-  ['src/modules/calculators/damage/', ['team-matchup']],
-  ['src/modules/calculators/', ['damage-calc', 'tools', 'collection']],
-  ['src/modules/tools/', ['tools']],
-  ['src/modules/battle/', ['team-matchup']],
-  ['src/modules/team-matchup/', ['team-matchup', 'collection']],
-  ['src/modules/typecoverage/', ['type-coverage']],
-  ['src/modules/search/', ['search']],
-  ['src/modules/dex/Trainer', ['trainers']],
-  ['src/modules/dex/trainer', ['trainers']],
-  ['src/modules/dex/', ['dexes', 'dex-filters', 'movedex', 'collection']],
-  ['src/modules/pokedex/evo', ['evo-icons', 'ux']],
-  ['src/modules/pokedex/', ['pokedex', 'species-page', 'eggmoves']],
-  // verify-design-system asserts every tab's dropdown, line by line.
-  ['src/modules/nav/', ['scroll-nav', 'dexes', 'tools', 'ds']],
-  ['src/modules/stubs/', ['ds']],
-  ['src/components/', ['scroll-nav', 'ds']],
-  ['src/modules/design-system/', ['ds']],
-  ['src/data/moveEra', ['legal-moveset', 'movedex']],
-  ['src/data/versionGroupData', ['eggmoves']],
-  ['src/data/', ['pokedex', 'species-page']],
-  ['design-system/', ['ds', 'team-builder']],
-  // Global CSS reaches the frozen Team Builder screens: re-measure them.
-  ['src/design-tokens.css', ['ds', 'team-builder']],
-  ['src/index.css', ['ds', 'team-builder']],
-  ['src/App.css', ['ds', 'team-builder']],
-  ['scripts/verify-', []], // a changed suite runs itself, below
-  // The static infrastructure rules (no browser): see scripts/verify-infra.mjs.
-  ['scripts/', ['infra']],
-  ['vite.config.ts', ['infra']],
-  ['package.json', ['infra']],
-  // A dependency change reaches every screen: at least boot the app and the PWA.
-  ['package-lock.json', ['infra', 'app']],
-  ['.nvmrc', ['infra']],
-  ['init.sh', ['infra']],
-  ['.gitignore', ['infra']],
-  ['.github/', ['infra']],
-];
+// The routing table (path prefix -> suites) lives in lib/suiteMap.mjs.
 
 /**
  * Suites that fail at HEAD for a logged reason (CLAUDE.md, "Known deferred
@@ -94,6 +51,7 @@ const ALL_SUITES = Object.keys(
 
 const args = process.argv.slice(2);
 const fast = args.includes('--fast');
+const uncheckedOnly = args.includes('--unchecked');
 const all = args.includes('--all');
 const sinceAt = args.indexOf('--since');
 const since = sinceAt >= 0 ? args[sinceAt + 1] : null;
@@ -162,6 +120,47 @@ function runKnown(suite) {
   return { ok, note };
 }
 
+/*
+  THE LAST PASSING GATE, per worktree (inside the git dir, never committed): the
+  HEAD it passed at, and whether it was --all. `--unchecked` (the Stop hook's
+  reminder) lists the suites whose areas changed since then, so "the fast gate
+  passed" can never read as "this branch is checked".
+*/
+const STATE_FILE = execSync('git rev-parse --git-path pokeapp-last-check.json', { encoding: 'utf8' }).trim();
+function readState() {
+  try {
+    return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+function uncheckedReminder() {
+  const state = readState();
+  let files = [];
+  let known = false;
+  if (state?.head) {
+    try {
+      files = execSync(`git diff --name-only ${state.head}`, { encoding: 'utf8' }).split('\n').filter(Boolean);
+      known = true;
+    } catch {
+      /* the recorded commit is gone (rebased): treat as never checked */
+    }
+  }
+  const untracked = execSync('git ls-files --others --exclude-standard', { encoding: 'utf8' }).split('\n').filter(Boolean);
+  if (!known) {
+    files = execSync('git diff --name-only HEAD', { encoding: 'utf8' }).split('\n').filter(Boolean);
+  }
+  const areas = [...suitesFor([...new Set([...files, ...untracked])].filter((p) => !p.endsWith('.md')))].sort();
+  if (!areas.length) return null;
+  const since = known ? `since the last passing gate (${state.head.slice(0, 7)}${state.all ? ', --all' : ''})` : '(no passing gate recorded in this worktree)';
+  return `== unchecked ${since}: ${areas.join(', ')}. Run \`npm run check -- --since <base>\`; before merging, \`npm run check -- --all\`.`;
+}
+if (uncheckedOnly) {
+  const line = uncheckedReminder();
+  if (line) console.log(line);
+  process.exit(0);
+}
+
 // Docs never pick a suite: a CLAUDE.md beside a module is not the module.
 const changed = changedFiles().filter((p) => !p.endsWith('.md'));
 const lintable = changed.filter((p) => /\.(tsx?|mjs|js)$/.test(p) && !p.startsWith('_'));
@@ -169,14 +168,7 @@ const lintable = changed.filter((p) => /\.(tsx?|mjs|js)$/.test(p) && !p.startsWi
 const suites = new Set(named);
 if (all) ALL_SUITES.forEach((s) => suites.add(s));
 else if (!fast) {
-  for (const file of changed) {
-    for (const [prefix, list] of SUITES_BY_PATH) {
-      if (file.startsWith(prefix)) list.forEach((s) => suites.add(s));
-    }
-    const own = /^scripts\/verify-(.+)\.mjs$/.exec(file);
-    if (own) suites.add(own[1] === 'design-system' ? 'ds' : own[1]);
-  }
-  if (changed.some((f) => f.startsWith('src/'))) suites.add('app');
+  suitesFor(changed).forEach((s) => suites.add(s));
 }
 for (const s of suites) {
   if (!ALL_SUITES.includes(s)) {
@@ -235,4 +227,13 @@ for (const [name, { ok, note }] of results) {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${name}${note ? `  (${note})` : ''}`);
 }
 if (!fast && !suites.size) console.log('  (no suites matched the changed files)');
-process.exit(results.every(([, r]) => r.ok) ? 0 : 1);
+const passed = results.every(([, r]) => r.ok);
+if (passed && !fast) {
+  const head = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+  writeFileSync(STATE_FILE, JSON.stringify({ head, all, since, suites: [...suites].sort(), at: new Date().toISOString() }, null, 2));
+}
+if (fast) {
+  const line = uncheckedReminder();
+  if (line) console.log(`\n${line}`);
+}
+process.exit(passed ? 0 : 1);

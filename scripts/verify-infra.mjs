@@ -109,6 +109,23 @@ hr('3. CI')
   check('the deploy workflow still deploys main', /push:\s*\n\s*branches: \[main\]/.test(read('.github/workflows/deploy.yml')))
 }
 
+hr('4. GATE HONESTY')
+{
+  const { suitesFor } = await import('./lib/suiteMap.mjs')
+  const routes = (file) => [...suitesFor([file])]
+  check('a src/data/ change runs verify:ux', routes('src/data/era.ts').includes('ux'), routes('src/data/era.ts').join())
+  check('a src/modules/nav/ change runs verify:ux', routes('src/modules/nav/navHistory.ts').includes('ux'), routes('src/modules/nav/navHistory.ts').join())
+  check('a changed suite runs itself', routes('scripts/verify-scroll-nav.mjs').includes('scroll-nav'))
+  check('any src/ change boots the app', routes('src/App.tsx').includes('app'))
+  const gate = read('scripts/check.mjs')
+  check('a passing non-fast run records its HEAD for the reminder', /if \(passed && !fast\)[\s\S]*writeFileSync\(STATE_FILE/.test(gate))
+  const hook = read('.claude/hooks/stop-gate.sh')
+  check(
+    'the Stop hook adds the unchecked-areas reminder (with --all) without blocking',
+    /check\.mjs --unchecked/.test(hook) && /systemMessage/.test(hook) && /check -- --all/.test(gate),
+  )
+}
+
 hr('SUMMARY')
 if (failures.length) {
   console.log(`${failures.length} FAILED:\n  - ${failures.join('\n  - ')}`)
