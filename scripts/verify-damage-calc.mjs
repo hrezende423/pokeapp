@@ -209,7 +209,7 @@ const dev = await startDevServer({ port: PORT })
 let browser
 const consoleErrors = []
 try {
-  browser = await chromium.launch()
+  browser = await chromium.launch({ channel: 'chrome' })
   const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1440, height: 2400 } })
   context.setDefaultNavigationTimeout(180000)
   const page = await context.newPage()

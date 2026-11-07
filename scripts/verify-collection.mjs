@@ -34,7 +34,7 @@ function check(label, ok, detail = '') {
 const dev = await startDevServer({ port: PORT })
 let browser
 try {
-  browser = await chromium.launch()
+  browser = await chromium.launch({ channel: 'chrome' })
   const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1440, height: 1000 } })
   const page = await context.newPage()
   page.setDefaultNavigationTimeout(180000)

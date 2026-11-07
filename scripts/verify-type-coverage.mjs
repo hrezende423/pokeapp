@@ -77,7 +77,7 @@ const rowCount = (page) => page.locator('[data-testid="tc-row"]').count()
 
 async function main() {
   const preview = await startPreviewServer({ port: PORT })
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ channel: 'chrome' })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const consoleErrors = []
   page.on('console', (m) => {

@@ -43,7 +43,9 @@
     "audit:supplement": "node scripts/audit-supplement.mjs",
     "audit:white-sprites": "node scripts/audit-white-sprites.mjs",
     "report:type-scale": "node scripts/report-type-scale.mjs",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "verify:infra": "node scripts/verify-infra.mjs",
+    "worktree": "node scripts/worktree.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

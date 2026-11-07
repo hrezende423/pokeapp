@@ -103,6 +103,19 @@ ignorable) — a join can be internally consistent and still wrong.
   the tool's own render line confirms it lands dead on target (157.83px against
   157.83px) where the swept candidate is 0.37px off. The committed constant is
   the better one. Do not "fix" source to match a sweep's resolution.
+- **Worktrees live OUTSIDE the repo**, in `../pokeapp-worktrees/`, made and removed
+  with `npm run worktree -- add <name> <branch> [base]` / `remove <name>`. It links
+  `node_modules` (a junction) so typecheck and lint work there, and unlinks it before
+  removal. Reproduced 2026-11-07: a `git worktree add` inside the repo reloaded the
+  page under test 3 times (the two `verify:team-builder` flakes); `vite.config.ts`
+  now ignores `.claude/**`, where the agent harness puts its own. No server ever
+  runs in a worktree: ports are fixed, so the gate runs in the main tree.
+- **Every suite drives the SYSTEM Chrome** (`chromium.launch({ channel: 'chrome' })`).
+  A Playwright upgrade once left the bundled browser missing and blocked seven
+  suites. `check.mjs` starts Chrome once before any browser suite and says what to
+  install if it can't; `verify:infra` fails on any launch without the channel.
+- **`verify:infra` is the static infrastructure suite**: no server, no browser. A
+  later infrastructure rule adds its section there.
 - **A new browser suite must self-host.** `verify-type-coverage` shipped
   pointing at a hardcoded dev-server URL: it scored 0 checks and exited 1 on
   any machine without a dev server, and tested whatever was listening when

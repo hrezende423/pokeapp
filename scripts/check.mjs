@@ -55,6 +55,12 @@ const SUITES_BY_PATH = [
   ['src/index.css', ['ds', 'team-builder']],
   ['src/App.css', ['ds', 'team-builder']],
   ['scripts/verify-', []], // a changed suite runs itself, below
+  // The static infrastructure rules (no browser): see scripts/verify-infra.mjs.
+  ['scripts/', ['infra']],
+  ['vite.config.ts', ['infra']],
+  ['package.json', ['infra']],
+  ['.gitignore', ['infra']],
+  ['.github/', ['infra']],
 ];
 
 /**
@@ -179,6 +185,37 @@ results.push(['typecheck', run('typecheck (tsc -b)', 'npx', ['tsc', '-b'])]);
 if (all) results.push(['lint', run('lint (all)', 'npx', ['eslint', '.'])]);
 else if (lintable.length)
   results.push(['lint', run(`lint (${lintable.length} changed files)`, 'npx', ['eslint', ...lintable.map((p) => `"${p}"`)])]);
+
+/**
+ * Every browser suite launches SYSTEM Chrome (channel 'chrome'), so a Playwright
+ * bundled-browser mismatch can never block the gate again (it blocked seven suites
+ * on 2026-11-06). Checked once, before the build, with a message that says what to do.
+ */
+async function browserPreflight() {
+  const { chromium } = await import('playwright');
+  try {
+    const browser = await chromium.launch({ channel: 'chrome' });
+    await browser.close();
+    return null;
+  } catch (e) {
+    return String(e?.message ?? e).split('\n')[0];
+  }
+}
+
+const BROWSERLESS = new Set(['infra', 'curated', 'store']);
+if ([...suites].some((s) => !BROWSERLESS.has(s))) {
+  const problem = await browserPreflight();
+  if (problem) {
+    console.error(
+      `\n== browser pre-flight: FAIL\n` +
+        `The verify suites drive the system Google Chrome (Playwright channel 'chrome'), and it did not start:\n  ${problem}\n` +
+        `Install Google Chrome from https://www.google.com/chrome/ (or repair it), then rerun.\n` +
+        `Nothing else needs installing: the suites never use Playwright's bundled browser.\n`,
+    );
+    process.exit(1);
+  }
+  process.stdout.write('\n== browser pre-flight: PASS (system Chrome starts)\n');
+}
 
 if (suites.size) {
   // Preview-server suites test dist/, so it has to be current.

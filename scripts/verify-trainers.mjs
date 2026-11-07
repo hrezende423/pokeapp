@@ -241,7 +241,7 @@ const dev = await startDevServer({ port: PORT })
 let browser
 const errors = []
 try {
-  browser = await chromium.launch()
+  browser = await chromium.launch({ channel: 'chrome' })
   const ctx = await browser.newContext({
     viewport: { width: 1440, height: 1100 },
     serviceWorkers: 'block',

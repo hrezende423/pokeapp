@@ -50,7 +50,7 @@ const APP_URL = dev.url
 let browser
 try {
   log(`dev server ready at ${APP_URL}`)
-  browser = await chromium.launch()
+  browser = await chromium.launch({ channel: 'chrome' })
   /*
     THE SERVICE WORKER MUST BE BLOCKED -- this is not a detail, it invalidated an
     entire earlier run. vite-plugin-pwa registers a worker in dev too, and its

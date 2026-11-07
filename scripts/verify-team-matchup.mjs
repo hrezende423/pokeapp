@@ -82,7 +82,7 @@ const GAME = { 1: 'red-blue', 2: 'crystal', 3: 'emerald', 4: 'platinum' }
 
 mkdirSync(SHOTS, { recursive: true })
 const dev = await startDevServer({ port: PORT })
-const browser = await chromium.launch({ channel: 'chrome' }).catch(() => chromium.launch())
+const browser = await chromium.launch({ channel: 'chrome' })
 const consoleErrors = []
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })

@@ -22,6 +22,13 @@ const PARTITION_PATTERN = new RegExp(`/${DATA_DIR}/(${PARTITION_DIRS.join('|')})
 // https://vite.dev/config/
 export default defineConfig({
   base: BASE,
+  server: {
+    // A git worktree checked out inside the repo (agents use .claude/worktrees/)
+    // adds .html files Vite reloads the page for, even outside the module graph:
+    // the cause of the verify:team-builder flakes of 2026-11-07. Worktrees belong in
+    // ../pokeapp-worktrees/ (scripts/worktree.mjs); this guards the harness ones.
+    watch: { ignored: ['**/.claude/**'] },
+  },
   plugins: [
     react(),
     VitePWA({

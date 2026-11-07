@@ -44,7 +44,7 @@ const PAST_IDLE = 1400
 
 const server = await startPreviewServer({ port: PORT })
 const APP_URL = server.url
-const browser = await chromium.launch()
+const browser = await chromium.launch({ channel: 'chrome' })
 
 try {
   const context = await browser.newContext({

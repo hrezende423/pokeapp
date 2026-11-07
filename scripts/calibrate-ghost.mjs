@@ -56,7 +56,7 @@ const preview = await startPreviewServer({ port: PORT })
 const APP_URL = preview.url
 
 try {
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ channel: 'chrome' })
   const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } })
   await page.goto(APP_URL, { waitUntil: 'networkidle' })
   await page.waitForSelector('[data-testid="species-rows"]', { timeout: 60000 })
