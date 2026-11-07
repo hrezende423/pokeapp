@@ -51,6 +51,10 @@ hr('1. TEST-ENVIRONMENT STABILITY')
     bundled.map(({ p, i }) => `${p}:${i}`).join(', '),
   )
   check('the gate checks for Chrome before running a browser suite', /browserPreflight/.test(read('scripts/check.mjs')))
+  check(
+    'npm run worktree resolves the MAIN repo (git common dir), so a worktree never nests in a worktree',
+    /--git-common-dir/.test(read('scripts/worktree.mjs')),
+  )
 }
 
 hr('2. RUNTIME AND SETUP')
@@ -152,6 +156,29 @@ hr('5. INSTRUCTIONS AND PROGRESS')
   for (const metric of ['Suites passing', 'Unlogged failures', 'Logged debt', 'Unreleased commits', 'Data coverage', 'Token adoption', 'var(--accent) references', ':hover with a background', 'Native <select>', 'PRD Must done']) {
     check(`npm run status prints "${metric}"`, status.includes(`| ${metric}`))
   }
+}
+
+hr('6. DESIGN TOKENS (bridge only)')
+{
+  const app = read('src/design-tokens.css')
+  const bridge = {
+    '--font-size-body': '--font-style-body-size',
+    '--font-size-title': '--font-style-h3-size',
+    '--radius-control': '--radius-md',
+    '--radius-pill': '--radius-lg',
+    '--space-gap-sm': '--space-2',
+    '--space-gap-xl': '--space-8',
+    '--field-focus-border-width': '--border-width-thick',
+    '--font-weight-medium': '--font-weight-semibold',
+  }
+  const missing = Object.entries(bridge).filter(([k, v]) => !app.includes(`${k}: var(${v})`))
+  check('the app tokens with a same-kind dist equivalent are var() aliases of it', missing.length === 0, missing.map(([k]) => k).join(', '))
+  const distNames = new Set([...read('design-system/dist/tokens.css').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))
+  const dangling = Object.values(bridge).filter((v) => !distNames.has(v))
+  check('every alias target exists in dist/tokens.css', dangling.length === 0, dangling.join(', '))
+  check('the accent resolves to the dist value', (app.match(/--accent:\s*var\(--color-accent-default\)/g) ?? []).length === 2)
+  check('the tokens with no equivalent are listed (design-system/TOKEN-BRIDGE.md)', /## No equivalent in dist yet/.test(read('design-system/TOKEN-BRIDGE.md')))
+  check('the frozen-screen pixel comparison tool exists', /compare <a> <b>/.test(read('scripts/compare-frozen.mjs')))
 }
 
 hr('SUMMARY')

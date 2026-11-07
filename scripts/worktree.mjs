@@ -23,7 +23,12 @@ import { existsSync, lstatSync, mkdirSync, symlinkSync, unlinkSync } from 'node:
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+/* The MAIN repo, even when this runs inside a worktree: git's common dir is the main
+   checkout's .git, so its parent is the main repo (not the worktree the script
+   happens to sit in, which would nest worktrees inside worktrees). */
+const HERE = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const COMMON = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: HERE, encoding: 'utf8' }).trim()
+const REPO = resolve(COMMON, '..')
 export const WORKTREE_ROOT = resolve(REPO, '..', 'pokeapp-worktrees')
 
 const git = (...args) => execFileSync('git', args, { cwd: REPO, encoding: 'utf8' })
