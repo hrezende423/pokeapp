@@ -1,0 +1,137 @@
+/*
+  THE PHONE SHELL (2026-11-07; mockup: public/mockups/phone-shell.html).
+
+  Below 640px only. Every rule is inside the one media query, so the desktop shell
+  (and every signed-off screen at desktop width) is byte-for-byte unchanged; nothing
+  here touches a frozen screen's own CSS.
+
+  - The three nav groups become a FIXED BOTTOM TAB BAR: three equal cells, 48px
+    tall, padded by the home-indicator inset. The active tab keeps its accent: the
+    one sanctioned "active nav item" use, the same as on desktop.
+  - A tapped tab opens its entries as a full-width SHEET above the bar: 48px rows,
+    hairline-separated with no row gap, elevation by tone (no shadow, no scrim).
+    The open/close behaviour is NavGroup's own (click toggles), unchanged.
+  - The top bar stays one row: Back, the brand, then the page's controls and the
+    account. The search field shrinks instead of pushing the bar wider.
+  - The footer signature and the hover-only "i" are dropped: a phone has no hover,
+    and the two bars already hold 129px of an 844px screen.
+  - Safe areas need `viewport-fit=cover` (index.html); without it every env() is 0.
+  - Touch targets are at least 44px.
+*/
+@media (max-width: 639px) {
+  :root {
+    --phone-tab-bar: 48px;
+    --phone-gutter: 16px;
+  }
+
+  .panel {
+    padding: max(var(--space-2), env(safe-area-inset-top)) var(--phone-gutter)
+      calc(var(--phone-tab-bar) + env(safe-area-inset-bottom));
+  }
+
+  .app-bar {
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-2);
+    min-width: 0;
+  }
+
+  .app-bar-nav {
+    flex: 0 0 auto;
+    gap: var(--space-2);
+  }
+
+  .app-bar-back {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .app-bar-utils {
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  .app-bar-utils > *,
+  .app-controls-cluster {
+    min-width: 0;
+  }
+
+  .global-search {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .global-search-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .app-bar-utils button {
+    min-height: 44px;
+  }
+
+  .account-name,
+  .account-dot {
+    display: none;
+  }
+
+  /* ---- the bottom tab bar */
+  .app-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-areas: 'tab-1 tab-2 tab-3';
+    gap: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--color-bg-surface);
+    border-top: 1px solid var(--color-border-hairline);
+  }
+
+  .nav-group {
+    position: static;
+    display: flex;
+  }
+
+  .nav-trigger {
+    width: 100%;
+    min-height: var(--phone-tab-bar);
+    text-align: center;
+  }
+
+  /* ---- the sheet */
+  .nav-dropdown {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: calc(var(--phone-tab-bar) + env(safe-area-inset-bottom));
+    min-width: 0;
+    max-height: 60vh;
+    overflow-y: auto;
+    border-radius: 0;
+    border-width: 1px 0 0;
+    background: var(--color-bg-surface);
+  }
+
+  .nav-item {
+    min-height: 48px;
+    padding: var(--space-3) var(--phone-gutter);
+  }
+
+  .nav-subdropdown .nav-item {
+    padding-left: calc(var(--phone-gutter) * 2);
+  }
+
+  .app-footer,
+  .app-info {
+    display: none;
+  }
+}

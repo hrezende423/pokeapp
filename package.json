@@ -47,7 +47,8 @@
     "verify:infra": "node scripts/verify-infra.mjs",
     "worktree": "node scripts/worktree.mjs",
     "preflight": "node scripts/preflight.mjs",
-    "status": "node scripts/status.mjs"
+    "status": "node scripts/status.mjs",
+    "verify:mobile": "node scripts/verify-mobile.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

@@ -19,6 +19,8 @@ import { useNav } from './modules/nav/navContext'
 import { findPage } from './modules/nav/navConfig'
 import { VersionGroupProvider } from './modules/version-group/VersionGroupProvider'
 import './modules/pokedex/pokedex.css'
+// Last: the phone shell's one media query overrides the shell rules above it.
+import './phoneShell.css'
 
 /**
  * The design-system reference page has no nav tab any more -- it was an
