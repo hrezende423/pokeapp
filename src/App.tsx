@@ -12,6 +12,7 @@ import { DesignSystemPage } from './modules/design-system/DesignSystemPage'
 import { DexQueryProvider } from './modules/dex/query/DexQueryProvider'
 import { AccountControl } from './sync/AccountControl'
 import { startTeamSync } from './sync/teamSync'
+import { scheduleWarmup } from './data/offlineWarmup'
 import { ControlsPanel } from './modules/nav/ControlsPanel'
 import { NavMenu } from './modules/nav/NavMenu'
 import { NavProvider } from './modules/nav/NavProvider'
@@ -134,6 +135,9 @@ export default function App() {
         setBoot(stats)
         // The optional cloud sync of the Team Builder; idle until someone signs in.
         startTeamSync()
+        // The Gen 5+ learnsets the worker does not precache, fetched quietly in the
+        // background so they work offline too (src/data/offlineWarmup.ts).
+        scheduleWarmup()
       })
       .catch((err: unknown) => setBootError(err instanceof Error ? err.message : String(err)))
   }, [])
