@@ -1,4 +1,6 @@
 # Changelog
+## 2.1.17 — 2026-11-06 (non-breaking)
+- Team Building: Showdown text in and out, in `ui/TransferModal`; a Build name beside the "#001" on the Build Library card, truncated so the card does not move; Compare in the Build Library's selection bar, opening `tb-compare`, where a differing row carries a `--color-border-strong` line on its left edge
 ## 2.1.16 — 2026-11-06 (non-breaking)
 - Team Display: alternate animated sprites for Charizard, Blastoise, Alakazam, Gengar, Salamence and Garchomp (`team-builder/altSprites.ts`), kept by the owner after the 2026-10-23 trial. Non-shiny only; every other surface keeps the stored animated set. Card layout and sizing unchanged
 ## 2.1.15 — 2026-10-18 (non-breaking)

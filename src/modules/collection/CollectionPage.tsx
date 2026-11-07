@@ -4,6 +4,7 @@ import { TextField } from '../../components/ds/TextField'
 import { getSpecies, listNatures } from '../../data'
 import { speciesEntries } from '../dex/entrySources'
 import { useNav } from '../nav/navContext'
+import { buildLabel as teamBuildLabel } from '../team-builder/buildFacts'
 import { orderedBuilds, type CollectionEntry } from '../team-builder/model'
 import { createEntry, deleteEntry, updateEntry, useTeamBuilderData } from '../team-builder/store'
 import { ToolInputs, ToolResult, ToolShell } from '../tools/ToolShell'
@@ -88,7 +89,7 @@ function CollectionBody({ generation }: { generation: number }) {
     c.nickname || getSpecies(c.speciesId)?.display_name || `#${c.speciesId}`
   const buildLabel = (id: string | null) => {
     const b = id ? data.builds.find((x) => x.id === id) : undefined
-    return b ? `${b.nickname || getSpecies(b.speciesId)?.display_name} (build)` : null
+    return b ? `${teamBuildLabel(b, getSpecies(b.speciesId))} (build)` : null
   }
 
   return (
@@ -139,7 +140,7 @@ function CollectionBody({ generation }: { generation: number }) {
               { value: '', label: 'No build' },
               ...builds.map((b) => ({
                 value: b.id,
-                label: `${b.nickname || getSpecies(b.speciesId)?.display_name}${b.speciesId === draft.speciesId ? '' : ' (other species)'}`,
+                label: `${teamBuildLabel(b, getSpecies(b.speciesId))}${b.speciesId === draft.speciesId ? '' : ' (other species)'}`,
               })),
             ]}
             value={draft.buildId ?? ''}

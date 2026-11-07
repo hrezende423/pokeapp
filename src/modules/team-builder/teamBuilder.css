@@ -2328,6 +2328,83 @@
   color: var(--text-secondary);
 }
 
+/* The Build's name, after its "#001". Truncated: it must not move the card foot. */
+.tb-build-name {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-label);
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------- Showdown text dialogs */
+
+.tb-transfer-text {
+  min-height: 180px;
+  font-size: var(--font-size-caption);
+  white-space: pre;
+}
+.tb-transfer-note {
+  margin: var(--tb-3, 8px) 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+.tb-transfer-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--tb-3, 8px);
+}
+.tb-transfer-report {
+  width: 100%;
+  margin-top: var(--tb-3, 8px);
+  border-collapse: collapse;
+  font-size: var(--font-size-caption);
+}
+.tb-transfer-report th,
+.tb-transfer-report td {
+  padding: var(--tb-2, 4px) var(--tb-3, 8px) var(--tb-2, 4px) 0;
+  border-bottom: 1px solid var(--color-border-hairline);
+  font-weight: var(--font-weight-regular);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* -------------------------------------------------------- compare two Builds */
+
+.tb-compare-scroll {
+  overflow-x: auto;
+}
+.tb-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-caption);
+}
+.tb-compare-table th,
+.tb-compare-table td {
+  padding: var(--tb-2, 4px) var(--tb-4, 12px) var(--tb-2, 4px) var(--tb-3, 8px);
+  border-bottom: 1px solid var(--color-border-hairline);
+  border-left: 2px solid transparent;
+  font-weight: var(--font-weight-regular);
+  text-align: left;
+  vertical-align: top;
+}
+.tb-compare-table tbody th {
+  color: var(--color-text-muted);
+}
+.tb-compare-table tr[data-differs='true'] .tb-compare-first {
+  border-left-color: var(--color-border-strong);
+}
+.tb-compare-name {
+  display: block;
+  font-size: var(--font-size-body);
+}
+.tb-compare-types {
+  display: flex;
+  gap: var(--tb-3, 8px);
+}
+
 /* --------------------------------------------------- team viewer density */
 
 /*

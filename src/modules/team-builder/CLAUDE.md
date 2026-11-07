@@ -189,6 +189,23 @@ imperfections are already logged there deliberately.
   allowlist plus Everstone (and the build's current item, so an old build never
   reads "—").
 
+## Team transfer (2026-11-06)
+
+Spec: `docs/SPEC.md`, slice A. Suite: `verify-team-transfer`.
+
+- **Showdown text: `showdown.ts` knows the format, `showdownImport.ts` knows the
+  data.** What each generation holds is decided in the second, one place. Import
+  never overwrites: `resolveImport` writes nothing and the commit functions only
+  create records.
+- **An unset IV reads as 0 here**, so export writes it as 0, never as a perfect 31.
+- **`Build.name` is edited in the Build info modal**, because the Build Form is
+  frozen. `buildLabel` is the one reader: name, nickname, species. No nickname was
+  rewritten, so a Build with no name reads as it always did. The Team Display and
+  battle labels stay on the nickname: it is the in-game name.
+- **`.tb-build-name` is `flex: 1 1 0` on purpose.** The card foot wraps, so a name
+  at its natural width dropped to a second line and made a signed-off card 32px
+  taller. `verify-team-transfer` §3 asserts the height.
+
 ## The unsaved member
 
 `Build.draft` IS LEGACY. Nothing writes it; the shell prunes any it finds.

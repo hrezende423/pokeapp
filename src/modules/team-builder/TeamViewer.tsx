@@ -38,6 +38,7 @@ import { goTo } from './tbNav'
 import { GhostButton, IconButton } from './ui/GhostButton'
 import { Dock } from './ui/Dock'
 import { Modal, Popover } from './ui/Overlay'
+import { ExportModal } from './ui/TransferModal'
 import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
 import { EmptySlot, MemberCard } from './ui/MemberCard'
@@ -66,6 +67,7 @@ export function TeamViewer({ teamId }: { teamId: string }) {
   const [coverage, setCoverage] = useState(false)
   const [offence, setOffence] = useState(false)
   const [info, setInfo] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [picking, setPicking] = useState<number | null>(null)
   const [dragFrom, setDragFrom] = useState<number | null>(null)
 
@@ -310,7 +312,25 @@ export function TeamViewer({ teamId }: { teamId: string }) {
             data-testid="tb-viewer-notes"
             onBlur={(e) => updateTeam(team.id, { notes: e.target.value })}
           />
+          <div className="tb-transfer-actions">
+            <GhostButton
+              onClick={() => {
+                setInfo(false)
+                setExporting(true)
+              }}
+              testId="tb-viewer-export"
+            >
+              Export as Showdown text
+            </GhostButton>
+          </div>
         </Modal>
+      )}
+      {exporting && (
+        <ExportModal
+          title="Export this team"
+          builds={members.filter((m): m is Build => m != null)}
+          onClose={() => setExporting(false)}
+        />
       )}
 
       {prompt.config && <ConfirmPrompt config={prompt.config} onClose={prompt.close} />}

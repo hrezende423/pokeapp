@@ -8,8 +8,9 @@
  *
  * A TEAM MAY CARRY A NAME, A GAME AND A PURPOSE (owner, 2026-09-27), all asked
  * for when it is created and all optional -- the id stays the identity, and the
- * "#001" stays on screen whether or not a name is set. Builds still have none:
- * they are nickname-or-species plus tags.
+ * "#001" stays on screen whether or not a name is set. A BUILD MAY CARRY A NAME
+ * TOO (owner, 2026-11-06), separate from the in-game nickname: several Builds of
+ * one species need telling apart, and a nickname stops at ten characters.
  */
 
 import type { StatKey, StatNumbers } from './statMath'
@@ -27,6 +28,9 @@ export const MOVE_SLOTS = 4
  */
 export const NICKNAME_MAX = 10
 
+/** Room for "Physical Garchomp — Choice Scarf". */
+export const BUILD_NAME_MAX = 40
+
 /** The 510-point budget on a Gen 3-4 EV spread. */
 export const MAX_EV_TOTAL = 510
 
@@ -37,6 +41,11 @@ export interface Build {
   speciesId: number
   /** The variety (form) whose learnset and stats apply. */
   pokemonId: number
+  /**
+   * The reader's label for the Build. Optional because no Build stored before it
+   * existed has one, and those fall back to the nickname: see `buildLabel`.
+   */
+  name?: string
   nickname: string
   /** Null for a genderless species, which renders no indicator at all. */
   gender: Gender | null

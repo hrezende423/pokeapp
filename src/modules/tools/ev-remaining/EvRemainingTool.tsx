@@ -72,7 +72,7 @@ function RemainingBody({ generation }: { generation: number }) {
             label="Target build"
             options={[
               { value: '', label: 'Choose…' },
-              ...builds.map((b) => ({ value: b.id, label: name(b) })),
+              ...builds.map((b) => ({ value: b.id, label: b.name?.trim() || name(b) })),
             ]}
             value={buildId}
             data-testid="rem-build"

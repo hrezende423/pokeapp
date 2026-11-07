@@ -22,6 +22,7 @@ import { useState } from 'react'
 import {
   IconChevronRight,
   IconCopy,
+  IconFileImport,
   IconInfoCircle,
   IconListCheck,
   IconPlus,
@@ -35,6 +36,7 @@ import { GhostButton } from './ui/GhostButton'
 import { Dock, Kebab } from './ui/Dock'
 import { BulkBar, SelectCircle } from './ui/BulkSelect'
 import { useBulkSelect } from './ui/useBulkSelect'
+import { ImportModal } from './ui/TransferModal'
 import { Modal, Popover } from './ui/Overlay'
 import { ConfirmPrompt } from './ui/ConfirmPrompt'
 import { usePrompt } from './ui/usePrompt'
@@ -46,10 +48,11 @@ import { deleteTeam, duplicateTeam, updateTeam, useTeamBuilderData } from './sto
 import { NewTeamModal } from './ui/NewTeamModal'
 import { TeamMetaFields, TeamTitle } from './ui/TeamTitle'
 
-export function MyTeams({ creating }: { creating: boolean }) {
+export function MyTeams({ creating, generation }: { creating: boolean; generation: number }) {
   const data = useTeamBuilderData()
   const prompt = usePrompt()
   const bulk = useBulkSelect()
+  const [importing, setImporting] = useState(false)
 
   const buildById = new Map(data.builds.map((b) => [b.id, b]))
   /*
@@ -88,6 +91,14 @@ export function MyTeams({ creating }: { creating: boolean }) {
 
   const newTeam = () => goTo({ kind: 'my-teams', creating: true })
   const popup = creating && <NewTeamModal onClose={() => goTo({ kind: 'my-teams' })} />
+  const importer = importing && (
+    <ImportModal
+      mode="team"
+      generation={generation}
+      onClose={() => setImporting(false)}
+      onTeam={(team) => goTo({ kind: 'team-viewer', teamId: team.id })}
+    />
+  )
 
   if (allTeams.length === 0) {
     return (
@@ -98,9 +109,14 @@ export function MyTeams({ creating }: { creating: boolean }) {
             <IconPlus size={18} stroke={1.5} />
             New team
           </GhostButton>
+          <GhostButton onClick={() => setImporting(true)} testId="tb-teams-import-empty">
+            <IconFileImport size={18} stroke={1.5} />
+            Import from Showdown text
+          </GhostButton>
           <p className="tb-empty-note">No teams yet.</p>
         </div>
         {popup}
+        {importer}
       </section>
     )
   }
@@ -122,11 +138,18 @@ export function MyTeams({ creating }: { creating: boolean }) {
                 onClick: bulk.enter,
                 testId: 'tb-teams-select',
               },
+              {
+                icon: <IconFileImport size={18} stroke={1.5} />,
+                label: 'Import a team from Showdown text',
+                onClick: () => setImporting(true),
+                testId: 'tb-teams-import',
+              },
             ]}
           />
         </div>
       </header>
 
+      {importer}
       {bulk.active && (
         <BulkBar
           count={bulk.selected.size}

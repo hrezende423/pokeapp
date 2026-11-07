@@ -183,7 +183,7 @@ function buildSets(data: TeamBuilderData, gen: number): CalcSet[] {
     const species = getSpecies(b.speciesId)
     if (!species) continue
     const variety = varietyFor(species, b.pokemonId)
-    const who = b.nickname.trim() || 'My build'
+    const who = b.name?.trim() || b.nickname.trim() || 'My build'
     const tail = [who, teamOf.get(b.id), 'Team Builder'].filter(Boolean).join(' | ')
     out.push({
       key: `b:${b.id}`,

@@ -20,7 +20,7 @@
 import { getAbility, getItem, getMove, typesInGeneration } from '../../data'
 import type { DexFilter, FilterSection, SortField } from '../dex/query/dexQuery'
 import { gameLabel } from '../version-group/games'
-import { baseStatFor, buildSpecies, displayName, natureModsFor, typeIdsFor } from './buildFacts'
+import { baseStatFor, buildLabel, buildSpecies, natureModsFor, typeIdsFor } from './buildFacts'
 import {
   TEAM_PURPOSES,
   listedTeams,
@@ -94,7 +94,7 @@ function buildRow(build: Build, index: number): BuildRow | null {
   return {
     build,
     index,
-    name: displayName(build, facts.species).primary,
+    name: buildLabel(build, facts.species),
     speciesName: facts.species.display_name,
     speciesId: facts.species.id,
     typeIds: typeIdsFor(facts.variety, build.generation),
@@ -223,10 +223,22 @@ export function buildFilterSections(rows: BuildRow[]): FilterSection<BuildRow>[]
         {
           kind: 'text',
           key: 'name',
-          label: 'Search builds by nickname or species',
+          label: 'Search builds by name, nickname, species or tag',
           testId: 'tb-builds-search',
           match: (r, term) =>
-            r.name.toLowerCase().includes(term) || r.speciesName.toLowerCase().includes(term),
+            r.name.toLowerCase().includes(term) ||
+            r.build.nickname.toLowerCase().includes(term) ||
+            r.speciesName.toLowerCase().includes(term) ||
+            r.build.tags.some((tag) => tag.toLowerCase().includes(term)),
+        },
+        {
+          kind: 'multi',
+          key: 'tag',
+          label: 'Tag',
+          options: uniq(rows.flatMap((r) => r.build.tags))
+            .sort((a, b) => a.localeCompare(b))
+            .map((tag) => ({ value: tag, label: tag })),
+          match: (r, selected) => r.build.tags.some((tag) => selected.includes(tag)),
         },
         {
           kind: 'multi',

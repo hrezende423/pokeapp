@@ -574,6 +574,17 @@ export function displayName(
   return { primary: nickname, secondary: differs ? species.display_name : null }
 }
 
+/**
+ * What a Build is called in a list: its name, then its nickname, then its species.
+ * The fallback is the whole migration: stored nicknames are never rewritten.
+ */
+export function buildLabel(
+  build: Pick<Build, 'name' | 'nickname'>,
+  species: Pick<Species, 'display_name'> | null | undefined,
+): string {
+  return build.name?.trim() || build.nickname.trim() || species?.display_name || 'Build'
+}
+
 /** "252Atk/252SpA/6Spe" -- only stats with investment, in stat order. */
 export function spreadSummary(
   build: Pick<Build, 'effort'>,
