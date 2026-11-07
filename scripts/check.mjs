@@ -39,8 +39,10 @@ const KNOWN_FAILING = {};
  * attempt it took. Each entry is deferred debt (CLAUDE.md), not a fix.
  */
 const FLAKY = {
-  'scroll-nav':
-    '§2 scroll memory comes back at 1455 instead of 900 in ~1 run in 3, at HEAD before the tools work too; not coalesced scroll events, not scroll anchoring (both tested 2026-10-15)',
+  // Empty since 2026-11-07. scroll-nav §2 was here for months; the test, not the
+  // app, was wrong: it clicked a card below the fold, so Playwright's
+  // scroll-into-view moved the grid (to 1455) before the click and the app saved
+  // that real scroll. Forced, it failed 3/3 at 1455; fixed, it passed 5/5.
 };
 
 const ALL_SUITES = Object.keys(

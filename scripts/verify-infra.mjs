@@ -119,6 +119,11 @@ hr('4. GATE HONESTY')
   check('any src/ change boots the app', routes('src/App.tsx').includes('app'))
   const gate = read('scripts/check.mjs')
   check('a passing non-fast run records its HEAD for the reminder', /if \(passed && !fast\)[\s\S]*writeFileSync\(STATE_FILE/.test(gate))
+  check(
+    'scroll-nav is out of FLAKY: its §2 clicks a card visible at the parked offset',
+    !/'scroll-nav':/.test(/const FLAKY = \{[\s\S]*?\};/.exec(gate)?.[0] ?? '') &&
+      /species-open-"\]'\)\]\.find/.test(read('scripts/verify-scroll-nav.mjs')),
+  )
   const hook = read('.claude/hooks/stop-gate.sh')
   check(
     'the Stop hook adds the unchecked-areas reminder (with --all) without blocking',

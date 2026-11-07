@@ -226,12 +226,7 @@ Deliberately left alone; the cheap fix is usually the wrong one.
   stub by the owner's decision (2026-11-06).
 - **Build Form does not autosave; every other screen does.** Deliberate — see
   `src/modules/team-builder/CLAUDE.md`.
-- **verify-scroll-nav §2 is flaky: ~1 run in 3 the Pokédex grid comes back at
-  1455 instead of 900** after opening a species and going back. It predates the
-  tools work (it failed at HEAD before any of it). Ruled out on 2026-10-15:
-  coalesced scroll events swallowing the reader's scroll, and CSS scroll
-  anchoring. `npm run check` retries it up to three times (`FLAKY` in
-  `scripts/check.mjs`) and prints every failed attempt. Needs a real diagnosis.
+
 
 - **13 Gen 8-9 evolution requirements have no trigger kind** and draw the generic
   fallback icon: Sirfetch'd, Runerigus, Alcremie, Urshifu (2), Wyrdeer, Basculegion,
