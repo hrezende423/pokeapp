@@ -11,6 +11,8 @@ Data:       what it shows, and from which scope (app generation / own selector)
 States:     empty / loading / error / mobile — only the non-obvious ones
 Not doing:  explicit out of scope
 Done when:  2–4 checks you would look at to accept it
+Stop at:    the command that proves it (`npm run check -- --since <base>`) + attempt cap (about 20)
+Risk:       logic / UI (add visual checks) / auth, data, secrets (owner approves before merge)
 ```
 
 Optional: a sketch, a screenshot with `?layout=1` on, or a Figma frame. A

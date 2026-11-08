@@ -8,6 +8,9 @@
       "Bash(npm run verify:*)",
       "Bash(npm run audit:*)",
       "Bash(npm run report:*)",
+      "Bash(npm run status:*)",
+      "Bash(npm run preflight:*)",
+      "Bash(npm run worktree:*)",
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
       "Bash(git status:*)",
@@ -20,6 +23,9 @@
       "PowerShell(npm run verify:*)",
       "PowerShell(npm run audit:*)",
       "PowerShell(npm run report:*)",
+      "PowerShell(npm run status:*)",
+      "PowerShell(npm run preflight:*)",
+      "PowerShell(npm run worktree:*)",
       "PowerShell(git status:*)",
       "PowerShell(git diff:*)",
       "PowerShell(git log:*)",
@@ -33,7 +39,14 @@
       "PowerShell(git reset:*)",
       "PowerShell(npm install:*)"
     ],
-    "deny": ["Read(./node_modules/**)"]
+    "deny": [
+      "Read(./node_modules/**)",
+      "Read(./.env*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f *)"
+    ]
   },
   "hooks": {
     "Stop": [
