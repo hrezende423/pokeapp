@@ -261,8 +261,8 @@
     "steps": [
       "node scripts/verify-counters.mjs"
     ],
-    "passes": false,
-    "evidence": null
+    "passes": true,
+    "evidence": "verify:counters sections 1-5, literal values, 52 checks"
   },
   {
     "id": "D2",
@@ -274,8 +274,8 @@
     "steps": [
       "node scripts/verify-counters.mjs"
     ],
-    "passes": false,
-    "evidence": null
+    "passes": true,
+    "evidence": "verify:counters section 6: round trip, corrupt, wrong shape, throwing and absent storage"
   },
   {
     "id": "D3",
@@ -287,8 +287,8 @@
     "steps": [
       "browser look with screenshots in scripts/.verify-shots/"
     ],
-    "passes": false,
-    "evidence": null
+    "passes": true,
+    "evidence": "verify:tools section 2b, 17 checks; shots counters-light/dark/empty.png"
   },
   {
     "id": "D4",
@@ -300,8 +300,8 @@
     "steps": [
       "npm run check -- --since main"
     ],
-    "passes": false,
-    "evidence": null
+    "passes": true,
+    "evidence": "npm run check -- --since main: 7/7 PASS on feature/counters"
   },
   {
     "id": "W2-1",

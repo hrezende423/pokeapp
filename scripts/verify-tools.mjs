@@ -1525,6 +1525,10 @@ try {
   await page.click(`[data-testid="counter-minus-${b}"]`)
   await page.click(`[data-testid="counter-minus-${b}"]`)
   check('descending to 0: "Reached zero"', (await val(b)) === '0' && (await status(b)) === 'Reached zero')
+  const d3 = ids[2]
+  await page.click(`[data-testid="counter-mode-down-${d3}"]`)
+  await page.locator(`[data-testid="counter-goal-${d3}"]`).pressSequentially('30')
+  check('BR-2 with real typing: "30" typed key by key gives value 30, not 3', (await val(d3)) === '30' && (await status(d3)) === '30 left', await val(d3))
   await page.screenshot({ path: shot('counters-light.png') })
 
   await page.click(`[data-testid="counter-remove-${ids[6]}"]`)
@@ -1549,7 +1553,8 @@ try {
       const cs = getComputedStyle(e)
       return { bg: cs.backgroundColor, border: cs.borderTopColor, shadow: cs.boxShadow }
     })
-    check(`${theme} theme: the reached card has a surface, a border and no shadow`, look.bg !== 'rgba(0, 0, 0, 0)' && look.border !== 'rgba(0, 0, 0, 0)' && look.shadow === 'none', JSON.stringify(look))
+    const plain = await page.$eval(`[data-testid="counter-${d3}"]`, (e) => getComputedStyle(e).borderTopColor)
+    check(`${theme} theme: the reached card has a surface and no shadow, and its border differs from an unreached card's`, look.bg !== 'rgba(0, 0, 0, 0)' && look.shadow === 'none' && look.border !== plain, JSON.stringify({ ...look, plain }))
     await page.screenshot({ path: shot(`counters-${theme}.png`) })
   }
 

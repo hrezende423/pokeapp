@@ -66,11 +66,16 @@ export function setMode(c: Counter, mode: CounterMode): Counter {
   return { ...next, value: startValue(next) }
 }
 
-/** BR-2: a goal set on a descending counter that sits at 0 puts the value at the goal. */
+/**
+ * BR-2: a goal set on a descending counter that sits at 0 puts the value at the goal.
+ * The goal is typed one key at a time ("3", then "30"), so a counter still sitting at
+ * its previous goal (the start BR-2 gave it a keystroke ago) follows the new one.
+ */
 export function setGoal(c: Counter, goal: string): Counter {
   const next = { ...c, goal }
   const g = goalOf(next)
-  return next.mode === 'down' && next.value === 0 && g != null ? { ...next, value: g } : next
+  const atStart = c.value === 0 || c.value === goalOf(c)
+  return next.mode === 'down' && atStart && g != null ? { ...next, value: g } : next
 }
 
 /** 0-100, or null with no goal. Up: value/goal. Down: (goal - value)/goal. */
