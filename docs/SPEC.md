@@ -1,4 +1,4 @@
-# Spec: the build phase (slices A-C) and the roadmap (journeys and waves)
+# Spec: the build phase (slices A-D) and the roadmap (journeys and waves)
 
 Written 2026-11-06 from the owner's autonomous brief. Work items and their pass state: `docs/features.json`. The latest task's result, including the choices it made, is in `docs/status/results.md`, which each task overwrites.
 
@@ -232,6 +232,75 @@ Computed, never stored, same generation only, in `src/modules/collection/candida
 - Trade history, boxes, friendship, PP, form-specific art, screenshots.
 - Save-file import, legality warnings.
 - Showing other generations' entries: the list follows the selector.
+
+---
+
+## Slice D: Multi-Counter tool
+
+Brief (docs/FEATURE-BRIEF.md format). Owner decisions of 2026-11-08. Status: spec and mockup only; the component is not built.
+
+```
+Goal:       count anything (EV training, XP, ...) with several independent counters, each with an optional goal
+Where:      Tools tab, new tool "Counters": src/modules/tools/counters/, registered in registry.ts and pages.ts
+Data:       none from the bundle. Own state only, saved on this device
+States:     default (6 counters), goal in progress, goal reached, descending in progress, descending reached zero, no goal, empty (0 counters)
+Not doing:  generation selector, account sync, phone layout (parked), new tokens, frozen screens, import of old "contadores-v1" data
+Done when:  see below
+Stop at:    npm run check -- --since main; attempt cap about 20
+Risk:       UI (visual checks) + logic (suite)
+```
+
+### Decisions
+
+- Device only: `defineDocument`, name `counters`, key `pokeapp:counters:v1`, `sync: false`. No account sync. The old "counters saved without an increment" rule is dropped with the import.
+- App design system, not the original spec's styling: no green, no badges, no `box-shadow`, no hover backgrounds, no `--accent`. A reached goal = card border and progress fill in `--color-border-strong`, plus the status text "Goal reached" / "Reached zero" in default text colour. Martian Mono for values.
+- Layout: responsive grid, cards at least 290px wide, checked at desktop widths. No 400px guarantee, no 58px targets: standard button size.
+- English UI. A goal <= 0 counts as no goal. Remove (x) and Reset all have no confirmation. A new counter is named "Counter N", N = the new total count.
+
+### Model
+
+`{ id, name: string, value: number, mode: "up" | "down", goal: string | number | "", step: string | number }`
+
+### Requirements
+
+- **Initial**: 6 counters "Counter 1".."Counter 6", value 0, mode up, no goal, increment 1; fully independent.
+- **Management**: "New counter" adds a default counter "Counter N"; its name field is focused and selected. Each counter has a remove button; no upper limit. "Reset all" resets every counter.
+- **Per counter**
+  - Name: text, max 40 chars, saved as typed.
+  - + / - add or subtract the increment; negative values allowed.
+  - Increment: numeric, default 1, decimals allowed; empty, zero or negative falls back to 1.
+  - Direction toggle: Ascending (counts up from 0) / Descending (counts down from the goal).
+  - Goal: optional numeric; empty = none.
+  - Progress bar when a goal is set. Ascending: value/goal. Descending: (goal - value)/goal. Clamped 0-100%.
+  - Status text: the remaining amount to the goal; "Goal reached" (ascending, value >= goal) or "Reached zero" (descending, value <= 0). With no goal: the direction only.
+  - Reset: value 0; a descending counter with a goal resets to the goal.
+- **Rules**
+  - BR-1: switching direction resets the value (descending with a goal starts at the goal, otherwise 0).
+  - BR-2: setting a goal on a descending counter whose value is 0 sets the value to the goal.
+  - BR-3: a reached goal highlights the card but does not lock it; counting continues past the goal.
+  - BR-4: values round to 6 decimal places (0.1 + 0.2 shows 0.3).
+- **Persistence**: the full state is saved after every change and restored on load. Nothing saved, corrupt, or storage unavailable = the 6 defaults.
+- **UI**: light and dark; tabular monospace values; every input and icon button labelled; visible keyboard focus; animations respect `prefers-reduced-motion`.
+
+### Files and interfaces
+
+- `src/modules/tools/counters/` (new): `countersMath.ts` (pure maths), `countersStore.ts` (`defineDocument`), `CountersPage.tsx`, `counters.css`.
+- `src/modules/tools/registry.ts`, `src/modules/tools/pages.ts` (register).
+- `scripts/verify-counters.mjs` (new browser-free suite), `scripts/lib/suiteMap.mjs`, `scripts/check.mjs`.
+- `public/mockups/counters.html` (mockup, this step).
+
+### Done when
+
+- [ ] A browser-free suite asserts the maths with literal values: increment fallback, progress and status for both directions, reset, BR-1, BR-2, BR-4 (0.1 + 0.2).
+- [ ] Storage round trip passes; corrupt and unavailable storage fall back to the 6 defaults.
+- [ ] A browser check covers: add (name focused and selected), remove, reset all, reload persistence, light and dark, keyboard focus, reduced motion.
+- [ ] `npm run check -- --since main` is green.
+
+### Not doing
+
+- Generation selector, account sync, phone layout, new tokens, frozen screens.
+- Import of old `contadores-v1` data.
+- Confirmation on remove or Reset all.
 
 ---
 

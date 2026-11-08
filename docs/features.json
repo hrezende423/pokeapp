@@ -252,6 +252,58 @@
     "evidence": "PR #7: verify-collection 74/74; check --since fix/gender-gen1-2 PASS"
   },
   {
+    "id": "D1",
+    "slice": "D",
+    "category": "functional",
+    "description": "Counters: maths and rules (increment fallback, progress, status, reset, BR-1, BR-2, BR-4)",
+    "doneWhen": "browser-free suite asserts them with literal values, incl. 0.1 + 0.2 = 0.3",
+    "notDoing": "generation selector, account sync, phone layout, new tokens, frozen screens",
+    "steps": [
+      "node scripts/verify-counters.mjs"
+    ],
+    "passes": true,
+    "evidence": "verify:counters sections 1-5, literal values, 52 checks"
+  },
+  {
+    "id": "D2",
+    "slice": "D",
+    "category": "functional",
+    "description": "Counters: device-only persistence with defaults fallback",
+    "doneWhen": "storage round trip passes; corrupt and unavailable storage give the 6 defaults",
+    "notDoing": "generation selector, account sync, phone layout, new tokens, frozen screens",
+    "steps": [
+      "node scripts/verify-counters.mjs"
+    ],
+    "passes": true,
+    "evidence": "verify:counters section 6: round trip, corrupt, wrong shape, throwing and absent storage"
+  },
+  {
+    "id": "D3",
+    "slice": "D",
+    "category": "functional",
+    "description": "Counters: Tools-tab screen",
+    "doneWhen": "browser check: add (name focused and selected), remove, reset all, reload persistence, light and dark, keyboard focus, reduced motion",
+    "notDoing": "generation selector, account sync, phone layout, new tokens, frozen screens",
+    "steps": [
+      "browser look with screenshots in scripts/.verify-shots/"
+    ],
+    "passes": true,
+    "evidence": "verify:tools section 2b, 17 checks; shots counters-light/dark/empty.png"
+  },
+  {
+    "id": "D4",
+    "slice": "D",
+    "category": "functional",
+    "description": "Counters: gate",
+    "doneWhen": "npm run check -- --since main is green",
+    "notDoing": "generation selector, account sync, phone layout, new tokens, frozen screens",
+    "steps": [
+      "npm run check -- --since main"
+    ],
+    "passes": true,
+    "evidence": "npm run check -- --since main: 7/7 PASS on feature/counters"
+  },
+  {
     "id": "W2-1",
     "slice": "W2",
     "wave": 2,

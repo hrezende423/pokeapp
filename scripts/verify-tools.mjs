@@ -1473,6 +1473,130 @@ try {
   }
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
 
+  // ------------------------------------------------------------------ 2b
+  hr('2b. COUNTERS -- add, remove, reset all, persistence, themes, keyboard focus, reduced motion')
+  const KEY = 'pokeapp:counters:v1'
+  const openCounters = async () => {
+    await openIndex(page)
+    await page.click('[data-testid="tool-link-counters"]')
+    await page.waitForSelector('[data-testid="tool-page-counters"]', { timeout: 60000 })
+  }
+  const cards = () => page.$$eval('[data-layout="counter-card"]', (els) => els.map((e) => e.dataset.testid.replace('counter-', '')))
+  const val = (id) => page.$eval(`[data-testid="counter-value-${id}"]`, (e) => e.textContent)
+  const status = (id) => page.$eval(`[data-testid="counter-status-${id}"]`, (e) => e.textContent)
+
+  await page.evaluate((k) => localStorage.removeItem(k), KEY)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[data-testid="nav-tab-tools"]', { timeout: 180000 })
+  await openCounters()
+  let ids = await cards()
+  const names0 = await page.$$eval('[data-layout="counter-card"] input[data-testid^="counter-name-"]', (els) => els.map((e) => e.value))
+  check('first open: 6 counters named Counter 1..6, all 0', ids.length === 6 && names0.join('|') === 'Counter 1|Counter 2|Counter 3|Counter 4|Counter 5|Counter 6' && (await Promise.all(ids.map(val))).every((v) => v === '0'), names0.join('|'))
+  check('regions are named: header, grid, card, head, value, controls, goal, progress, status', await page.evaluate(() =>
+    ['counters-header', 'counters-grid', 'counter-card', 'counter-head', 'counter-value', 'counter-controls', 'counter-goal', 'counter-progress', 'counter-status'].every((n) => document.querySelector(`[data-layout="${n}"]`)),
+  ))
+
+  await page.click('[data-testid="counters-new"]')
+  await page.waitForFunction(() => document.querySelectorAll('[data-layout="counter-card"]').length === 7)
+  const focused = await page.evaluate(() => {
+    const a = document.activeElement
+    return { testid: a?.dataset.testid ?? '', value: a?.value, start: a?.selectionStart, end: a?.selectionEnd }
+  })
+  check('New counter adds "Counter 7" with its name field focused and its text selected', focused.testid.startsWith('counter-name-') && focused.value === 'Counter 7' && focused.start === 0 && focused.end === 9, JSON.stringify(focused))
+  ids = await cards()
+
+  const a = ids[0]
+  await page.click(`[data-testid="counter-plus-${a}"]`)
+  await page.click(`[data-testid="counter-plus-${a}"]`)
+  check('+ twice on Counter 1 shows 2', (await val(a)) === '2')
+  await page.fill(`[data-testid="counter-goal-${a}"]`, '3')
+  check('an ascending goal of 3 at value 2: "1 left", bar drawn, not reached', (await status(a)) === '1 left' && Boolean(await page.$(`[data-testid="counter-bar-${a}"]`)) && (await page.$eval(`[data-testid="counter-${a}"]`, (e) => e.dataset.reached)) === 'false')
+  const hairline = await page.$eval(`[data-testid="counter-${a}"]`, (e) => getComputedStyle(e).borderTopColor)
+  await page.click(`[data-testid="counter-plus-${a}"]`)
+  const reached = await page.$eval(`[data-testid="counter-${a}"]`, (e) => ({ reached: e.dataset.reached, border: getComputedStyle(e).borderTopColor }))
+  check('goal reached: "Goal reached", and the border steps up from the hairline', (await status(a)) === 'Goal reached' && reached.reached === 'true' && reached.border !== hairline, `${hairline} -> ${reached.border}`)
+  const look2 = await page.evaluate((id) => {
+    const card = document.querySelector(`[data-testid="counter-${id}"]`)
+    const num = getComputedStyle(card.querySelector('.counter-num'))
+    return {
+      border: getComputedStyle(card).borderTopWidth,
+      value: num.fontSize,
+      valueFont: num.fontFamily,
+      statusFont: getComputedStyle(card.querySelector('.counter-status')).fontFamily,
+    }
+  }, a)
+  check('reached card border is 2px; value is 32px mono; status is Plex Sans, not mono', look2.border === '2px' && look2.value === '32px' && /Martian/i.test(look2.valueFont) && /IBM Plex Sans/i.test(look2.statusFont) && !/Martian/i.test(look2.statusFont), JSON.stringify(look2))
+  await page.click(`[data-testid="counter-plus-${a}"]`)
+  check('a reached goal does not lock: counting goes on to 4', (await val(a)) === '4' && (await status(a)) === 'Goal reached')
+
+  const b = ids[1]
+  await page.click(`[data-testid="counter-mode-down-${b}"]`)
+  await page.fill(`[data-testid="counter-goal-${b}"]`, '2')
+  check('descending, goal typed at value 0 starts at the goal (BR-2): 2, "2 left"', (await val(b)) === '2' && (await status(b)) === '2 left')
+  await page.click(`[data-testid="counter-minus-${b}"]`)
+  await page.click(`[data-testid="counter-minus-${b}"]`)
+  check('descending to 0: "Reached zero"', (await val(b)) === '0' && (await status(b)) === 'Reached zero')
+  const d3 = ids[2]
+  await page.click(`[data-testid="counter-mode-down-${d3}"]`)
+  await page.locator(`[data-testid="counter-goal-${d3}"]`).pressSequentially('30')
+  check('BR-2 with real typing: "30" typed key by key gives value 30, not 3', (await val(d3)) === '30' && (await status(d3)) === '30 left', await val(d3))
+  await page.screenshot({ path: shot('counters-light.png') })
+
+  await page.click(`[data-testid="counter-remove-${ids[6]}"]`)
+  await page.waitForFunction(() => document.querySelectorAll('[data-layout="counter-card"]').length === 6)
+  check('remove (x) drops the counter at once, no confirmation', (await cards()).length === 6 && !(await cards()).includes(ids[6]))
+
+  await page.click('[data-testid="counters-reset-all"]')
+  check('Reset all: Counter 1 back to 0, the descending one back to its goal of 2', (await val(a)) === '0' && (await val(b)) === '2')
+
+  await page.click(`[data-testid="counter-plus-${a}"]`)
+  await page.click(`[data-testid="counter-plus-${a}"]`)
+  await page.click(`[data-testid="counter-plus-${a}"]`)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[data-testid="nav-tab-tools"]', { timeout: 180000 })
+  await openCounters()
+  const after = await cards()
+  check('after a reload: the same 6 counters, Counter 1 at 3, goal 3 and the descending mode kept', after.join() === ids.slice(0, 6).join() && (await val(a)) === '3' && (await page.$eval(`[data-testid="counter-goal-${a}"]`, (e) => e.value)) === '3' && (await page.$eval(`[data-testid="counter-mode-down-${b}"]`, (e) => e.getAttribute('aria-pressed'))) === 'true')
+
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    const look = await page.$eval(`[data-testid="counter-${a}"]`, (e) => {
+      const cs = getComputedStyle(e)
+      return { bg: cs.backgroundColor, border: cs.borderTopColor, shadow: cs.boxShadow }
+    })
+    const plain = await page.$eval(`[data-testid="counter-${d3}"]`, (e) => getComputedStyle(e).borderTopColor)
+    check(`${theme} theme: the reached card has a surface and no shadow, and its border differs from an unreached card's`, look.bg !== 'rgba(0, 0, 0, 0)' && look.shadow === 'none' && look.border !== plain, JSON.stringify({ ...look, plain }))
+    await page.screenshot({ path: shot(`counters-${theme}.png`) })
+  }
+
+  await page.focus(`[data-testid="counter-name-${a}"]`)
+  await page.keyboard.press('Tab')
+  const ring = await page.evaluate(() => {
+    const e = document.activeElement
+    const cs = getComputedStyle(e)
+    return { label: e.getAttribute('aria-label'), style: cs.outlineStyle, width: cs.outlineWidth }
+  })
+  check('keyboard focus is visible: Tab to the Remove button shows an outline', /^Remove/.test(ring.label ?? '') && ring.style !== 'none' && ring.width !== '0px', JSON.stringify(ring))
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const motion = await page.$eval(`[data-testid="counter-bar-${a}"]`, (e) => getComputedStyle(e).transitionDuration)
+  check('reduced motion: the progress bar does not animate', motion === '0s', motion)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+
+  // Remove everything: the empty state, and it persists.
+  for (const id of await cards()) await page.click(`[data-testid="counter-remove-${id}"]`)
+  await page.waitForSelector('[data-testid="counters-empty"]', { timeout: 10000 })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[data-testid="nav-tab-tools"]', { timeout: 180000 })
+  await openCounters()
+  check('zero counters is an empty state, message only (no second button), that survives a reload', Boolean(await page.$('[data-testid="counters-empty"]')) && (await page.$$('[data-testid="counters-empty"] button')).length === 0 && (await cards()).length === 0)
+  await page.screenshot({ path: shot('counters-empty.png') })
+  await page.evaluate((k) => localStorage.removeItem(k), KEY)
+  // Back to the index, where the next section expects to start.
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[data-testid="nav-tab-tools"]', { timeout: 180000 })
+  await openIndex(page)
+
   // ------------------------------------------------------------------ 3
   hr('3. PHONE WIDTH -- no sideways scroll on the index')
   await page.setViewportSize({ width: 390, height: 844 })

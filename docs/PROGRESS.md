@@ -12,3 +12,4 @@ is `docs/tools/PROGRESS.md`; the current task's result is `docs/status/results.m
 | 2026-11-07 | Gen 2 Special: DV and Stat Exp read from the stored keys | `fix/gen2-special` (`01cb817`) | [#5](https://github.com/hrezende423/pokeapp/pull/5) | `--since feature/team-transfer` | |
 | 2026-11-07 | B: gender (none in Gen 1, Gen 2 from the Attack DV) | `fix/gender-gen1-2` (`943e866`) | [#6](https://github.com/hrezende423/pokeapp/pull/6) | `--since fix/gen2-special` | |
 | 2026-11-07 | C: Collection v2 | `feature/collection-v2` (`08a4fe5`) | [#7](https://github.com/hrezende423/pokeapp/pull/7) | `--since fix/gender-gen1-2`; collection 74/74 | |
+| 2026-11-08 | D: Multi-Counter tool (Tools tab, device only) | `feature/counters` | PR | `--since main` 7/7; counters 52 checks | |
