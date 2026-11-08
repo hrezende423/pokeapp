@@ -23,8 +23,8 @@ The template and the reasons are in `docs/FEATURE-BRIEF.md`.
 
 1. **Before code, ask once.** If a request is more than a one-file change and
    lacks a "Done when" or a "Not doing", reply with EVERY open question in one
-   batch, the files you will touch, and the acceptance checks. No code until
-   the owner answers. Never trickle questions across turns.
+   batch, the files you will touch, and the acceptance checks. Once approved,
+   build without asking and log assumptions in `docs/status/results.md`.
 2. **New screen or redesign → mockup first** (static, real tokens, real data),
    for the owner to mark up: two redesigns built on a guess were reverted.
 3. **One feature per branch**, named for the feature.
@@ -120,13 +120,13 @@ them: after any global token or font change, run `npm run verify:team-builder`.
 ## Verification discipline
 
 - **"Reported done" ≠ "verified"**: a browser look or an equivalent real check.
-- **Stop and ask, don't over-engineer**: when an automated approach gives wrong
-  results, pause and ask rather than apply a cleverer algorithm.
+- **Stop and ask only for**: a secret or paid service, an irreversible or production
+  action, auth or security, a frozen screen or CLAUDE.md conflict, a gate failing
+  twice unexplained, or an automated fix giving wrong results (don't get clever).
 - **Servers start only through `scripts/lib/devServer.mjs`**, one fixed port per
   script; suites self-host and drive the system Chrome. **Worktrees live in
   `../pokeapp-worktrees/`** (`npm run worktree`), never inside the repo.
-- **Prettier is not a gate**: 260 files predate it. Never run `npm run format`
-  over the repo (it once rewrapped five calculator files that had to be restored).
+- **Prettier is not a gate**: never run `npm run format` over the repo (260 files predate it).
 
 ## Design system
 
