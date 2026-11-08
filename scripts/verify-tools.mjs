@@ -1481,7 +1481,7 @@ try {
     await page.click('[data-testid="tool-link-counters"]')
     await page.waitForSelector('[data-testid="tool-page-counters"]', { timeout: 60000 })
   }
-  const cards = () => page.$eval('[data-layout="counter-card"]', (els) => els.map((e) => e.dataset.testid.replace('counter-', '')))
+  const cards = () => page.$$eval('[data-layout="counter-card"]', (els) => els.map((e) => e.dataset.testid.replace('counter-', '')))
   const val = (id) => page.$eval(`[data-testid="counter-value-${id}"]`, (e) => e.textContent)
   const status = (id) => page.$eval(`[data-testid="counter-status-${id}"]`, (e) => e.textContent)
 
@@ -1490,7 +1490,7 @@ try {
   await page.waitForSelector('[data-testid="nav-tab-tools"]', { timeout: 180000 })
   await openCounters()
   let ids = await cards()
-  const names0 = await page.$eval('[data-layout="counter-card"] input[data-testid^="counter-name-"]', (els) => els.map((e) => e.value))
+  const names0 = await page.$$eval('[data-layout="counter-card"] input[data-testid^="counter-name-"]', (els) => els.map((e) => e.value))
   check('first open: 6 counters named Counter 1..6, all 0', ids.length === 6 && names0.join('|') === 'Counter 1|Counter 2|Counter 3|Counter 4|Counter 5|Counter 6' && (await Promise.all(ids.map(val))).every((v) => v === '0'), names0.join('|'))
   check('regions are named: header, grid, card, head, value, controls, goal, progress, status', await page.evaluate(() =>
     ['counters-header', 'counters-grid', 'counter-card', 'counter-head', 'counter-value', 'counter-controls', 'counter-goal', 'counter-progress', 'counter-status'].every((n) => document.querySelector(`[data-layout="${n}"]`)),
@@ -1576,6 +1576,10 @@ try {
   check('zero counters is an empty state that survives a reload', Boolean(await page.$('[data-testid="counters-empty"]')) && (await cards()).length === 0)
   await page.screenshot({ path: shot('counters-empty.png') })
   await page.evaluate((k) => localStorage.removeItem(k), KEY)
+  // Back to the index, where the next section expects to start.
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('[data-testid="nav-tab-tools"]', { timeout: 180000 })
+  await openIndex(page)
 
   // ------------------------------------------------------------------ 3
   hr('3. PHONE WIDTH -- no sideways scroll on the index')
