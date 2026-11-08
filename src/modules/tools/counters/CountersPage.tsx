@@ -83,9 +83,6 @@ export function CountersTool() {
           {counters.length === 0 ? (
             <div className="counters-empty" data-layout="counters-empty" data-testid="counters-empty">
               <p>No counters yet.</p>
-              <button type="button" className="counters-ghost" onClick={add}>
-                New counter
-              </button>
             </div>
           ) : (
             <div className="counters-grid" data-layout="counters-grid" data-testid="counters-grid">
@@ -143,7 +140,7 @@ function CounterCard({
           data-testid={`counter-remove-${c.id}`}
           onClick={onRemove}
         >
-          <IconX size={20} stroke={1.5} aria-hidden />
+          <IconX size={18} stroke={1.5} aria-hidden />
         </button>
       </div>
       <div className="counter-value" data-layout="counter-value">
@@ -154,7 +151,7 @@ function CounterCard({
           data-testid={`counter-minus-${c.id}`}
           onClick={() => onChange((x) => nudge(x, -1))}
         >
-          <IconMinus size={20} stroke={1.5} aria-hidden />
+          <IconMinus size={18} stroke={1.5} aria-hidden />
         </button>
         <output className="counter-num" aria-label={`Value of ${label}`} data-testid={`counter-value-${c.id}`}>
           {c.value}
@@ -166,7 +163,7 @@ function CounterCard({
           data-testid={`counter-plus-${c.id}`}
           onClick={() => onChange((x) => nudge(x, 1))}
         >
-          <IconPlus size={20} stroke={1.5} aria-hidden />
+          <IconPlus size={18} stroke={1.5} aria-hidden />
         </button>
       </div>
       <div className="counter-controls" data-layout="counter-controls">

@@ -1,6 +1,10 @@
 /* Multi-Counter. Semantic tokens only; no shadow, no hover fill, no accent. */
 
 .counters {
+  /* Sizes declared once, as .tb does with its scale. */
+  --counter-card-min: 290px;
+  --counter-field-width: 96px;
+  --counter-value-size: 32px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
@@ -33,7 +37,7 @@
 
 .counters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--counter-card-min), 1fr));
   gap: var(--space-4);
   align-items: start;
 }
@@ -54,9 +58,12 @@
   border-radius: var(--radius-lg);
 }
 
-/* A reached goal: the border and the fill step up to border-strong. Not locked (BR-3). */
+/* A reached goal: a 2px border-strong, the padding giving back the extra pixel so the card
+   keeps its size, and the fill steps up too. Not locked (BR-3). */
 .counter-card[data-reached='true'] {
+  border-width: var(--border-width-thick);
   border-color: var(--color-border-strong);
+  padding: calc(var(--d-pad) - var(--border-width-thick) + var(--border-width-thin));
 }
 
 .counter-head {
@@ -89,7 +96,7 @@
   text-align: center;
   font-family: var(--font-family-mono);
   font-variant-numeric: tabular-nums;
-  font-size: var(--font-style-h2-size);
+  font-size: var(--counter-value-size);
   line-height: var(--font-style-h2-line-height);
   letter-spacing: var(--font-tracking-data);
 }
@@ -98,7 +105,7 @@
   grid-area: controls;
   display: grid;
   grid-template-areas: 'inc dir';
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: var(--counter-field-width) 1fr;
   align-items: end;
   gap: var(--space-4);
 }
@@ -200,7 +207,7 @@
 .counter-status {
   grid-area: status;
   margin: 0;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-sans);
   font-size: var(--font-style-data-size);
   line-height: var(--font-style-data-line-height);
   color: var(--color-text-default);
@@ -208,9 +215,7 @@
 
 .counters-empty {
   display: grid;
-  grid-template-areas:
-    'msg'
-    'act';
+  grid-template-areas: 'msg';
   justify-items: start;
   gap: var(--space-2);
   padding: var(--space-8) 0;
@@ -221,10 +226,6 @@
   grid-area: msg;
   margin: 0;
   color: var(--color-text-muted);
-}
-
-.counters-empty .counters-ghost {
-  grid-area: act;
 }
 
 @media (prefers-reduced-motion: reduce) {

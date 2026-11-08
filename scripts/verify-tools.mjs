@@ -1515,6 +1515,17 @@ try {
   await page.click(`[data-testid="counter-plus-${a}"]`)
   const reached = await page.$eval(`[data-testid="counter-${a}"]`, (e) => ({ reached: e.dataset.reached, border: getComputedStyle(e).borderTopColor }))
   check('goal reached: "Goal reached", and the border steps up from the hairline', (await status(a)) === 'Goal reached' && reached.reached === 'true' && reached.border !== hairline, `${hairline} -> ${reached.border}`)
+  const look2 = await page.evaluate((id) => {
+    const card = document.querySelector(`[data-testid="counter-${id}"]`)
+    const num = getComputedStyle(card.querySelector('.counter-num'))
+    return {
+      border: getComputedStyle(card).borderTopWidth,
+      value: num.fontSize,
+      valueFont: num.fontFamily,
+      statusFont: getComputedStyle(card.querySelector('.counter-status')).fontFamily,
+    }
+  }, a)
+  check('reached card border is 2px; value is 32px mono; status is Plex Sans, not mono', look2.border === '2px' && look2.value === '32px' && /Martian/i.test(look2.valueFont) && /IBM Plex Sans/i.test(look2.statusFont) && !/Martian/i.test(look2.statusFont), JSON.stringify(look2))
   await page.click(`[data-testid="counter-plus-${a}"]`)
   check('a reached goal does not lock: counting goes on to 4', (await val(a)) === '4' && (await status(a)) === 'Goal reached')
 
@@ -1578,7 +1589,7 @@ try {
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-testid="nav-tab-tools"]', { timeout: 180000 })
   await openCounters()
-  check('zero counters is an empty state that survives a reload', Boolean(await page.$('[data-testid="counters-empty"]')) && (await cards()).length === 0)
+  check('zero counters is an empty state, message only (no second button), that survives a reload', Boolean(await page.$('[data-testid="counters-empty"]')) && (await page.$$('[data-testid="counters-empty"] button')).length === 0 && (await cards()).length === 0)
   await page.screenshot({ path: shot('counters-empty.png') })
   await page.evaluate((k) => localStorage.removeItem(k), KEY)
   // Back to the index, where the next section expects to start.
