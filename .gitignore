@@ -33,3 +33,6 @@ scripts/.verify-shots
 
 # Agent worktrees (the harness puts them here; ours go to ../pokeapp-worktrees/)
 .claude/worktrees/
+
+# Agent hand-off files
+docs/status/
