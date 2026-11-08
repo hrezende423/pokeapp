@@ -18,6 +18,7 @@ export const SUITES_BY_PATH = [
   // The damage engine is shared with Team Matchup's battles.
   ['src/modules/calculators/damage/', ['team-matchup']],
   ['src/modules/calculators/', ['damage-calc', 'tools', 'collection']],
+  ['src/modules/tools/counters/', ['counters']],
   ['src/modules/tools/', ['tools']],
   ['src/modules/battle/', ['team-matchup']],
   ['src/modules/team-matchup/', ['team-matchup', 'collection']],

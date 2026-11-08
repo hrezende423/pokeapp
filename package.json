@@ -47,6 +47,7 @@
     "check": "node scripts/check.mjs",
     "verify:infra": "node scripts/verify-infra.mjs",
     "verify:store": "node scripts/verify-store.mjs",
+    "verify:counters": "node scripts/verify-counters.mjs",
     "verify:entities": "node scripts/verify-entities.mjs",
     "verify:curated": "node scripts/verify-curated.mjs",
     "worktree": "node scripts/worktree.mjs",

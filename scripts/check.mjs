@@ -190,7 +190,7 @@ else if (lintable.length)
   Every browser suite launches SYSTEM Chrome (lib/browser.mjs), checked once here,
   before the build, with a message that says what to do.
 */
-const BROWSERLESS = new Set(['infra', 'curated', 'store', 'entities']);
+const BROWSERLESS = new Set(['infra', 'curated', 'store', 'entities', 'counters']);
 if ([...suites].some((s) => !BROWSERLESS.has(s))) {
   const problem = await browserPreflight();
   if (problem) {

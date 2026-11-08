@@ -275,6 +275,13 @@ export const TOOLS: readonly ToolEntry[] = [
     blurb: 'Your team against a trainer’s, with that game’s own AI.',
     target: { kind: 'page', id: 'team-matchup' },
   },
+  {
+    key: 'counters',
+    label: 'Counters',
+    group: 'more',
+    blurb: 'Several independent counters with optional goals, for EV training, XP, anything. Saved on this device.',
+    target: { kind: 'page', id: 'tool-counters' },
+  },
 ]
 
 /** The entry with this key, or undefined. */
