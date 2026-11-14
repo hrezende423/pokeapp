@@ -1,5 +1,5 @@
 import { IconSquare, IconSquareCheck } from '@tabler/icons-react'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import type { FrontierData, FrontierSet, FrontierTrainer } from './data'
 import { itemName, moveNames, natureName, speciesName } from './names'
 import { Evs, MonCell, Muted } from './parts'
@@ -20,32 +20,36 @@ export function SetsTrainers({ data, lookup }: { data: FrontierData; lookup?: St
     { id: 'trainers', label: 'Trainers', count: data.trainers().length },
     { id: 'lookup', label: 'Streak lookup' },
   ]
+  const tabRow = (
+    <div className="bf-vtabs" role="tablist" data-layout="sets-views" style={{ gridArea: 'views' }}>
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={view === t.id}
+          data-testid={`frontier-view-${t.id}`}
+          onClick={() => setView(t.id)}
+        >
+          {t.label}
+          {t.count != null && (
+            <>
+              {' '}
+              <span className="bf-mono bf-muted">{t.count}</span>
+            </>
+          )}
+        </button>
+      ))}
+    </div>
+  )
+  /* Each view is one flat stack with the view row on top, as the mockup's sets-body. */
+  if (view === 'sets') return <SetsView data={data} tabs={tabRow} />
+  if (view === 'trainers') return <TrainersView data={data} tabs={tabRow} />
   return (
-    <div className="bf-stack bf-sets-body" data-layout={view === 'trainers' ? 'trainers-body' : 'sets-body'}>
-      <div className="bf-vtabs" role="tablist" data-layout="sets-views" style={{ gridArea: 'views' }}>
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={view === t.id}
-            data-testid={`frontier-view-${t.id}`}
-            onClick={() => setView(t.id)}
-          >
-            {t.label}
-            {t.count != null && (
-              <>
-                {' '}
-                <span className="bf-mono bf-muted">{t.count}</span>
-              </>
-            )}
-          </button>
-        ))}
-      </div>
-      <div style={{ gridArea: 'body' }} className="bf-view">
-        {view === 'sets' && <SetsView data={data} />}
-        {view === 'trainers' && <TrainersView data={data} />}
-        {view === 'lookup' && <StreakLookup data={data} initial={lookup} />}
+    <div className="bf-stack bf-lookup-body" data-layout="lookup-body">
+      {tabRow}
+      <div style={{ gridArea: 'lookup' }}>
+        <StreakLookup data={data} initial={lookup} />
       </div>
     </div>
   )
@@ -90,7 +94,7 @@ function SetTable({ sets }: { sets: FrontierSet[] }) {
   )
 }
 
-function SetsView({ data }: { data: FrontierData }) {
+function SetsView({ data, tabs }: { data: FrontierData; tabs: ReactNode }) {
   const [query, setQuery] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
   /** What a set is searchable by: its species, the classes that draw it, its held item. */
@@ -114,7 +118,8 @@ function SetsView({ data }: { data: FrontierData }) {
   const shown = data.sets().filter((s) => (!openOnly || s.openOnly) && (!q || haystack[s.index].includes(q)))
 
   return (
-    <div className="bf-stack bf-sets-view">
+    <div className="bf-stack bf-sets-view" data-layout="sets-body">
+      {tabs}
       <div className="bf-three" data-layout="sets-controls" style={{ gridArea: 'controls' }}>
         <label className="bf-field" style={{ gridArea: 'a' }}>
           <span className="bf-cap">Search species, class or held item</span>
@@ -169,7 +174,7 @@ function trainerIvs(data: FrontierData): Map<number, number> {
   return out
 }
 
-function TrainersView({ data }: { data: FrontierData }) {
+function TrainersView({ data, tabs }: { data: FrontierData; tabs: ReactNode }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<number | null>(null)
   const ivs = useMemo(() => trainerIvs(data), [data])
@@ -179,7 +184,8 @@ function TrainersView({ data }: { data: FrontierData }) {
     .filter((t) => !q || `${t.className ?? ''}\n${t.name ?? ''}`.toLowerCase().includes(q))
 
   return (
-    <div className="bf-stack bf-trainers-view">
+    <div className="bf-stack bf-trainers-view" data-layout="trainers-body">
+      {tabs}
       <label className="bf-field" data-layout="trainers-search" style={{ gridArea: 'search' }}>
         <span className="bf-cap">Search class or name</span>
         <input

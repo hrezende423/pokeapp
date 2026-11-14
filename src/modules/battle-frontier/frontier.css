@@ -165,6 +165,10 @@
 .bf-mon .bf-muted {
   grid-area: name;
 }
+/* The hover hairline's room is not part of the text: keep the name on the row's line. */
+.bf-mon .bf-link {
+  margin-bottom: calc(-1 * var(--border-width-thin));
+}
 
 /* ------------------------------------------------------------ key-value rows */
 
@@ -308,18 +312,18 @@
 }
 .bf-stack > *,
 .bf-three > *,
-.bf-four > *,
-.bf-five > * {
+.bf-five > *,
+.bf-six > * {
   min-width: 0;
 }
-.bf-sets-body {
-  grid-template-areas: 'views' 'body';
-}
 .bf-sets-view {
-  grid-template-areas: 'controls' 'count' 'list';
+  grid-template-areas: 'views' 'controls' 'count' 'list';
 }
 .bf-trainers-view {
-  grid-template-areas: 'search' 'list';
+  grid-template-areas: 'views' 'search' 'list';
+}
+.bf-lookup-body {
+  grid-template-areas: 'views' 'lookup';
 }
 .bf-three {
   display: grid;
@@ -436,16 +440,16 @@
   grid-template-areas: 'title' 'hint' 'form' 'result';
   padding-top: var(--space-3);
 }
-.bf-four {
-  display: grid;
-  grid-template-areas: 'a b c d';
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  column-gap: var(--space-8);
-}
 .bf-five {
   display: grid;
   grid-template-areas: 'a b c d e';
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: var(--space-8);
+}
+.bf-six {
+  display: grid;
+  grid-template-areas: 'a b c d e f';
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   column-gap: var(--space-8);
 }
 .bf-lookup [data-layout='streak-lookup-result'] {
@@ -475,15 +479,15 @@
   .bf-three {
     grid-template-areas: 'a' 'b' 'c';
     grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-4);
-  }
-  .bf-four {
-    grid-template-areas: 'a' 'b' 'c' 'd';
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-4);
+    row-gap: var(--space-6);
   }
   .bf-five {
     grid-template-areas: 'a' 'b' 'c' 'd' 'e';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-4);
+  }
+  .bf-six {
+    grid-template-areas: 'a' 'b' 'c' 'd' 'e' 'f';
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--space-4);
   }

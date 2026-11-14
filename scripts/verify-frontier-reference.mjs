@@ -11,7 +11,7 @@
  *   npm run verify:frontier-reference        (dev server, port 4206, system Chrome)
  */
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { CHROME } from './lib/browser.mjs'
@@ -82,14 +82,23 @@ const accentUses = (page) =>
       return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && r.bottom > 0 && r.top < innerHeight
     }
     const hits = []
+    const drawn = (s) =>
+      ['Top', 'Right', 'Bottom', 'Left'].some(
+        (k) => parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' && accents.has(s[`border${k}Color`]),
+      ) ||
+      (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 && accents.has(s.outlineColor)) ||
+      accents.has(s.backgroundColor) ||
+      (s.textDecorationLine !== 'none' && accents.has(s.textDecorationColor))
     for (const el of document.querySelectorAll('body *')) {
       if (!visible(el)) continue
       const s = getComputedStyle(el)
       const ownText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())
-      const border = ['Top', 'Right', 'Bottom', 'Left'].some(
-        (k) => parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' && accents.has(s[`border${k}Color`]),
-      )
-      if ((ownText && accents.has(s.color)) || border) hits.push(el)
+      const svg = el instanceof SVGElement && (accents.has(s.stroke) || accents.has(s.fill))
+      const pseudo = ['::before', '::after'].some((p) => {
+        const ps = getComputedStyle(el, p)
+        return ps.content !== 'none' && ps.content !== 'normal' && (drawn(ps) || accents.has(ps.color))
+      })
+      if ((ownText && accents.has(s.color)) || drawn(s) || svg || pseudo) hits.push(el)
     }
     const outer = hits.filter((el) => !hits.some((o) => o !== el && o.contains(el)))
     return outer.map((el) => `${el.tagName.toLowerCase()}${el.dataset.testid ? `[${el.dataset.testid}]` : ''}:${el.textContent.trim().slice(0, 24)}`)
@@ -226,6 +235,9 @@ try {
   await page.waitForFunction(() => [...document.querySelectorAll('[data-layout="brain-team"] img.bf-sprite')].every((i) => i.complete), null, { timeout: 60000 }).catch(() => {})
   const decoded = await page.$$eval('[data-layout="brain-team"] img.bf-sprite', (imgs) => imgs.filter((i) => i.naturalWidth > 0).length)
   check('the 36 Brain sprites decode', decoded === 36, decoded)
+  const regionsBrains = await page.$$eval('[data-layout]', (els) => [...new Set(els.map((e) => e.dataset.layout))])
+  const wantBrains = ['frontier-scroll', 'frontier-brains', 'page-head', 'brain-list', 'brain', 'brain-head', 'brain-appearances', 'brain-team', 'brain-generated']
+  check('Brains: region names are the mockup’s', wantBrains.every((r) => regionsBrains.includes(r)), wantBrains.filter((r) => !regionsBrains.includes(r)).join(','))
   await page.screenshot({ path: shot('brains-light') })
   await page.setViewportSize({ width: 1440, height: 1000 })
 
@@ -236,6 +248,8 @@ try {
   await page.hover(salamence)
   const hover = await page.$eval(salamence, (el) => ({
     c: getComputedStyle(el).borderBottomColor,
+    w: parseFloat(getComputedStyle(el).borderBottomWidth),
+    style: getComputedStyle(el).borderBottomStyle,
     strong: (() => {
       const p = document.createElement('span')
       p.style.color = 'var(--color-border-strong)'
@@ -246,7 +260,7 @@ try {
     })(),
   }))
   check('a link has no line at rest', /rgba\(.*, 0\)|transparent/.test(rest), rest)
-  check('... and a hairline on hover (--color-border-strong)', hover.c === hover.strong, JSON.stringify(hover))
+  check('... and a hairline on hover (--color-border-strong, drawn)', hover.c === hover.strong && hover.w > 0 && hover.w <= 1.5 && hover.style === 'solid', JSON.stringify(hover))
   await page.click(salamence)
   const opened = await page.waitForSelector('[data-testid="species-page"][data-species-id="373"]', { timeout: 30000 }).catch(() => null)
   check('Salamence (Tucker\'s Silver team) opens its Pokédex page through the entity link', opened != null)
@@ -263,6 +277,9 @@ try {
   await page.waitForSelector('[data-testid="sets-list"] tbody tr')
   const rowsAll = await page.$$eval('[data-testid="sets-list"] tbody tr', (trs) => trs.length)
   check('882 sets, one list', rowsAll === 882 && (await page.textContent('[data-testid="sets-count"]')) === '882 sets', rowsAll)
+  const regionsSets = await page.$$eval('[data-layout]', (els) => [...new Set(els.map((e) => e.dataset.layout))])
+  const wantSets = ['frontier-scroll', 'frontier-sets', 'page-head', 'sets-body', 'sets-views', 'sets-controls', 'sets-count', 'sets-list']
+  check('Sets: region names are the mockup’s', wantSets.every((r) => regionsSets.includes(r)), wantSets.filter((r) => !regionsSets.includes(r)).join(','))
   check('the views read "Sets 882" and "Trainers 300"', norm((await appTexts(page, '[data-layout="sets-views"] [role="tab"]')).slice(0, 2).join('|')) === 'Sets 882|Trainers 300')
   sameList('the first 30 set rows as the mockup', (await appTexts(page, '[data-testid="sets-list"] tbody tr')).slice(0, 30), await mockTexts(mock, 1, '[data-layout="sets-list"] tbody tr'))
   const spriteRows = await page.$$eval('[data-testid="sets-list"] tbody tr', (trs) => trs.filter((tr) => tr.querySelector('img.bf-sprite')?.getAttribute('src')?.includes('/emerald/')).length)
@@ -309,6 +326,9 @@ try {
   await page.click('[data-testid="frontier-view-trainers"]')
   const trainerRows = await page.$$eval('[data-testid="trainers-list"] tbody tr', (trs) => trs.length)
   check('300 trainers', trainerRows === 300, trainerRows)
+  const regionsTr = await page.$$eval('[data-layout]', (els) => [...new Set(els.map((e) => e.dataset.layout))])
+  const wantTr = ['trainers-body', 'sets-views', 'trainers-search', 'trainers-list']
+  check('Trainers: region names are the mockup’s', wantTr.every((r) => regionsTr.includes(r)), wantTr.filter((r) => !regionsTr.includes(r)).join(','))
   const mockTrainerRows = await mockTexts(mock, 4, '[data-layout="trainers-list"] tbody tr')
   sameList('the first 25 trainer rows as the mockup', (await appTexts(page, '[data-testid="trainers-list"] tbody tr')).slice(0, 25), mockTrainerRows.slice(0, 25))
   same('Vince\'s row (#222) as the mockup', (await appTexts(page, '[data-trainer-id="222"]'))[0], mockTrainerRows[25])
@@ -336,8 +356,9 @@ try {
   const mockCases = await mock.evaluate(() =>
     [...document.querySelectorAll('section.state')[4].querySelectorAll('[data-layout="streak-lookup-result"] dl')].map((d) => d.textContent),
   )
-  const lookup = async ({ facility, level, battle, symbols, tower }) => {
+  const lookup = async ({ facility, level, battle, symbols, tower, format = 'singles' }) => {
     await page.selectOption('[data-testid="lookup-facility"]', facility)
+    await page.selectOption('[data-testid="lookup-format"]', format)
     await page.selectOption('[data-testid="lookup-level"]', level)
     await page.fill('[data-testid="lookup-battle"]', String(battle))
     await page.selectOption('[data-testid="lookup-symbols"]', String(symbols))
@@ -354,9 +375,66 @@ try {
   const tower = await lookup({ facility: 'tower', level: 'lv50', battle: 50, symbols: 1 })
   same('Tower streak 49 (battle 50): as the mockup', tower, mockCases[2])
   check('... IDs 200–299, not Hard, IV 21 for 200–219 and 31 for 220–299, next Gold at battle 70', /200–299/.test(tower) && /Hard 7th battleNo/.test(tower) && /21 for IDs 200–219, 31 for IDs 220–299/.test(tower) && /Next: Gold at battle 70/.test(tower))
-  const src = read('src/modules/battle-frontier/StreakLookup.tsx')
-  check('the lookup is a reusable component taking { facility, levelMode, streak }', /export function StreakLookup\(\{[^}]*initial/.test(src) && /export interface StreakLookupInput \{[\s\S]*facility: FacilityId[\s\S]*levelMode: LevelMode[\s\S]*streak: number/.test(src))
-  check('... and Sets & Trainers can open on it (the tracker\'s seam, not wired)', /lookup\?: StreakLookupInput/.test(read('src/modules/battle-frontier/SetsTrainers.tsx')))
+  const regionsLk = await page.$$eval('[data-layout]', (els) => [...new Set(els.map((e) => e.dataset.layout))])
+  const wantLk = ['streak-lookup', 'streak-lookup-form', 'streak-lookup-result']
+  check('Lookup: region names are the mockup’s', wantLk.every((r) => regionsLk.includes(r)), wantLk.filter((r) => !regionsLk.includes(r)).join(','))
+
+  // Beyond the mockup: Brains are Singles only, and the Pyramid's waits at the top after floor 7.
+  const anabel = await lookup({ facility: 'tower', level: 'lv50', battle: 35, symbols: 0 })
+  check('Tower battle 35, Singles: Anabel (Silver) is the opponent', /Anabel \(Silver\) is this battle’s opponent/.test(anabel), anabel.slice(-90))
+  const doubles = await lookup({ facility: 'tower', level: 'lv50', battle: 35, symbols: 0, format: 'doubles' })
+  check('... in Doubles: no Brain (Singles only)', /BrainNone: Frontier Brains appear in Singles only\./.test(doubles) && !/Anabel/.test(doubles), doubles.slice(-90))
+  const floor21 = await lookup({ facility: 'pyramid', level: 'lv50', battle: 21, symbols: 0 })
+  check('Pyramid floor 21 (challenge 3, floor 7): Brandon (Silver) waits at the top after it', /21 · Challenge 3 · floor 7/.test(floor21) && /Brandon \(Silver\) waits at the top, after this floor\./.test(floor21), floor21.slice(-90))
+  const floor22 = await lookup({ facility: 'pyramid', level: 'lv50', battle: 22, symbols: 1 })
+  check('Pyramid floor 22 (challenge 4, floor 1): no Brain on it; next Gold after floor 70', /22 · Challenge 4 · floor 1/.test(floor22) && !/Brandon/.test(floor22) && /Next: Gold at the top, after floor 70/.test(floor22), floor22.slice(-90))
+
+  // The reusable component, mounted on its own with initial inputs, as the tracker will.
+  const seeded = await page.evaluate(async () => {
+    const base = '/pokeapp/'
+    const main = await (await fetch(`${base}src/main.tsx`)).text()
+    const domUrl = /["']([^"']*\/deps\/react-dom_client\.js[^"']*)["']/.exec(main)?.[1]
+    const own = await (await fetch(`${base}src/modules/battle-frontier/StreakLookup.tsx`)).text()
+    const reactUrl = /["']([^"']*\/deps\/react\.js[^"']*)["']/.exec(own)?.[1]
+    if (!domUrl || !reactUrl) return { error: `no dep urls: ${domUrl} / ${reactUrl}` }
+    const reactMod = await import(reactUrl)
+    const React = reactMod.default ?? reactMod
+    const dom = await import(domUrl)
+    const createRoot = dom.createRoot ?? dom.default.createRoot
+    const { SetsTrainers } = await import(`${base}src/modules/battle-frontier/SetsTrainers.tsx`)
+    const { loadFrontierData } = await import(`${base}src/modules/battle-frontier/data/index.ts`)
+    const data = await loadFrontierData(3)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    root.render(
+      React.createElement(SetsTrainers, {
+        data,
+        lookup: { facility: 'factory', levelMode: 'open', streak: 20, format: 'doubles', symbols: 1, towerLv50Streak: 7 },
+      }),
+    )
+    await new Promise((r) => setTimeout(r, 400))
+    const v = (id) => host.querySelector(`[data-testid="${id}"]`)?.value
+    const out = {
+      tab: host.querySelector('[role="tab"][aria-selected="true"]')?.textContent,
+      facility: v('lookup-facility'),
+      format: v('lookup-format'),
+      level: v('lookup-level'),
+      battle: v('lookup-battle'),
+      symbols: v('lookup-symbols'),
+      tower: v('lookup-tower-streak'),
+      result: host.querySelector('[data-testid="streak-lookup-result"]')?.textContent ?? '',
+    }
+    root.unmount()
+    host.remove()
+    return out
+  })
+  check(
+    'Sets & Trainers with { facility, levelMode, streak, … } opens on the lookup, seeded',
+    seeded.tab === 'Streak lookup' && seeded.facility === 'factory' && seeded.format === 'doubles' && seeded.level === 'open' && seeded.battle === '21' && seeded.symbols === '1' && seeded.tower === '7',
+    JSON.stringify({ ...seeded, result: undefined }),
+  )
+  check('... and answers for those inputs (battle 21, Open Level, Doubles: no Brain)', /21 · Set 3 · battle 7/.test(seeded.result ?? '') && /at least 100/.test(seeded.result ?? '') && /Singles only/.test(seeded.result ?? ''), norm(seeded.result).slice(0, 120))
 
   // ================================================================ 8. THEMES
   hr('8. BOTH THEMES: tokens only, accent within 2 per screen, no shadow')
@@ -377,6 +455,8 @@ try {
       check(`[${theme}] ${screen}${view ? `/${view}` : ''}: accent within 2 uses`, uses.length <= 2, uses.join(' | '))
       const shadows = await page.$$eval('.bf, .bf *', (els) => els.filter((e) => getComputedStyle(e).boxShadow !== 'none').length)
       check(`[${theme}] ${screen}${view ? `/${view}` : ''}: no shadow`, shadows === 0, shadows)
+      const selects = await page.$$eval('.bf select', (els) => els.map((e) => e.dataset.testid))
+      check(`[${theme}] ${screen}${view ? `/${view}` : ''}: no select but the lookup's own fields (no generation or game select)`, selects.every((t) => ['lookup-facility', 'lookup-format', 'lookup-level', 'lookup-symbols'].includes(t)), selects.join(','))
     }
     colours[theme] = await page.evaluate(() => {
       const probe = (v) => {
@@ -448,6 +528,15 @@ try {
 
   // ================================================================ 10. BACK TO GEN 4
   hr('10. BACK TO ANOTHER GENERATION: the notice again, nothing new fetched')
+  // Empty the loader's in-memory cache first, or a screen that ignored the
+  // generation would still fetch nothing and this would prove nothing.
+  const reset = await page.evaluate(async () => {
+    const m = await import('/pokeapp/src/modules/battle-frontier/data/index.ts')
+    const had = m.peekFrontierData(3) != null
+    m.__resetFrontierCache()
+    return { had, now: m.peekFrontierData(3) != null }
+  })
+  check('the app’s loader cache (it held the data) is emptied first', reset.had && !reset.now, JSON.stringify(reset))
   const fetchedBefore = frontierRequests.length
   await selectGeneration(page, 4)
   for (const [id, screen] of [['frontier-facilities', 'facilities'], ['frontier-brains', 'brains'], ['frontier-sets', 'sets']]) {
@@ -465,11 +554,16 @@ try {
   } catch {
     base = 'origin/main'
   }
-  const changed = execFileSync('git', ['diff', '--name-only', base], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean)
+  const fork = execFileSync('git', ['merge-base', base, 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim()
+  const changed = execFileSync('git', ['diff', '--name-only', fork], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean)
   const frozen = changed.filter((f) => f.startsWith('src/modules/battle-frontier/data/') || /^src\/modules\/dex\/(Trainerdex|trainerdex|trainerEntries)/.test(f) || f.startsWith('scripts/trainers/') || f === 'src/data/trainers.ts')
-  check(`git diff ${base}: no change to the frozen loader or the Trainer Dex`, frozen.length === 0, frozen.join(', '))
-  const moduleSrc = ['Facilities.tsx', 'Brains.tsx', 'SetsTrainers.tsx', 'StreakLookup.tsx', 'parts.tsx', 'useFrontierData.ts', 'FrontierScreens.tsx'].map((f) => read(`src/modules/battle-frontier/${f}`)).join('\n')
-  check('no generation selector of its own (no fifth exception)', !/setGeneration|gen-select|useGameInGeneration|GameRow/.test(moduleSrc))
+  check(`git diff from where the branch left ${base}: no change to the frozen loader or the Trainer Dex`, frozen.length === 0, frozen.join(', '))
+  const moduleFiles = readdirSync(new URL('../src/modules/battle-frontier/', import.meta.url)).filter((f) => /\.(tsx?|css)$/.test(f))
+  const moduleSrc = moduleFiles.map((f) => read(`src/modules/battle-frontier/${f}`)).join('\n')
+  check(
+    `no generation or game selector of its own in any of the module's ${moduleFiles.length} files (no fifth exception)`,
+    moduleFiles.length >= 10 && !/setGeneration|gen-select|useGameInGeneration|GameRow|VersionGroupSelector|setVersionGroup/.test(moduleSrc),
+  )
 
   hr('CONSOLE')
   const appErrors = consoleErrors.filter((e) => !/raw\.githubusercontent|github\.com|objects\.githubusercontent|Failed to load resource/.test(e))

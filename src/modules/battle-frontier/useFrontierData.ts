@@ -20,6 +20,13 @@ export function useFrontierData(): FrontierLoad {
   const { selectedGeneration } = useVersionGroup()
   const inScope = isFrontierGeneration(selectedGeneration)
   const [attempt, setAttempt] = useState(0)
+  // Leaving Gen 3 and coming back is a NEW request: a fresh key, so the previous
+  // visit's error never shows while the new load runs (derived state, set in render).
+  const [wasInScope, setWasInScope] = useState(inScope)
+  if (wasInScope !== inScope) {
+    setWasInScope(inScope)
+    setAttempt((n) => n + 1)
+  }
   const key = `${selectedGeneration}|${attempt}`
   const [result, setResult] = useState<{ key: string; data: FrontierData | null; error: string | null } | null>(null)
 

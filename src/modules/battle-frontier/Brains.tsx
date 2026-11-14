@@ -2,7 +2,7 @@ import type { FacilityPokemon } from '../../data/trainers'
 import type { FacilityId, FrontierBrain, FrontierData } from './data'
 import { FACILITY_ORDER } from './format'
 import { itemName, moveNames, natureName } from './names'
-import { Appearance, Evs, MonCell, Num, Repeat } from './parts'
+import { Appearance, Evs, MonCell, Num, Range, Repeat } from './parts'
 
 /**
  * Brains: the seven Frontier Brains, their Silver and Gold teams (sprites as the
@@ -71,7 +71,7 @@ function GeneratedTeam({ b, data }: { b: FrontierBrain; data: FrontierData }) {
   const rows = Array.from({ length: 8 }, (_, c) => {
     const lv = data.trainerPoolForStreak({ facility: 'factory', levelMode: 'lv50', streak: c * 7 }).factorySetRange
     const op = data.trainerPoolForStreak({ facility: 'factory', levelMode: 'open', streak: c * 7 }).factorySetRange
-    return { c, lv, op, span: c < 7 ? `${c * 7 + 1}–${c * 7 + 7}` : `${c * 7 + 1} on` }
+    return { c, lv, op, from: c * 7 + 1, last: c === 7 }
   })
   return (
     <div className="bf-stack bf-generated" style={{ gridArea: 'silver' }} data-layout="brain-generated">
@@ -97,9 +97,18 @@ function GeneratedTeam({ b, data }: { b: FrontierBrain; data: FrontierData }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ c, lv, op, span }) => (
+            {rows.map(({ c, lv, op, from, last }) => (
               <tr key={c}>
-                <td className="bf-mono">{span}</td>
+                <td>
+                  {/* Mono on the numbers only: "on" is a word. */}
+                  {last ? (
+                    <>
+                      <Num n={from} /> on
+                    </>
+                  ) : (
+                    <Range from={from} to={from + 6} />
+                  )}
+                </td>
                 <td className="bf-r bf-mono">{lv && `#${lv.from}–#${lv.to}`}</td>
                 <td className="bf-r bf-mono">{lv && lv.to - lv.from + 1}</td>
                 <td className="bf-r bf-mono">{op && `#${op.from}–#${op.to}`}</td>

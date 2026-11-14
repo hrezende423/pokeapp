@@ -1,4 +1,9 @@
 # Changelog
+## 2.1.23 — 2026-11-14 (non-breaking)
+- Battle Frontier tab (`battle-frontier/`, mockups `public/mockups/frontier-{facilities,brains,sets}.html`, approved with the owner's review batch): a fourth app-bar tab between Team Building and Tools, with Facilities, Brains, Challenge Tracker (a stub) and Sets & Trainers. Key-value rows and tables are hairline rows with no row gap; numbers in the mono face; "Open Level only" is a text column and a text filter, never a badge. The Pokémon cell of a Brain team row and of a set row is the Emerald sprite at 32px (the Trainer Dex party strip's) before the name
+- Its dropdown marks the open entry by WEIGHT (semibold), not the accent, so Sets & Trainers' selected view tab is the screen's second accent (nav.md)
+- Species names on these screens are entity links in data rows: regular weight, no line at rest, a `border.strong` hairline on hover (owner, review batch Q14; link.md)
+- Phone shell: the bottom tab bar is four equal cells (was three), so the fourth tab stays on the one row the scrollers reserve
 ## 2.1.22 — 2026-11-07 (non-breaking)
 - Tokens bridge (`src/design-tokens.css` → `dist/tokens.css`, owner decision 2026-11-06): eight app tokens are now `var()` aliases of same-kind dist tokens with identical values in every mode (body and title sizes, control and pill radii, the sm and xl gaps, the focus border width, medium weight), and `--font-weight-regular`/`-bold` come from dist. **The light accent is now dist's #C91D1D (was #d91c2c)**: the active nav item, the selected tab, and the field focus and error borders. The dark accent is unchanged (#ff3b4e), because dist's value moved 4 pixels of the signed-off Team Display. The list of tokens with no dist equivalent is in `TOKEN-BRIDGE.md`
 ## 2.1.21 — 2026-11-07 (non-breaking)

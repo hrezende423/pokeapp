@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import type { FacilityId, FrontierData, LevelMode } from './data'
-import { battleLabel, FACILITY_ORDER, LEVEL_LABEL, loaderStreak } from './format'
+import type { FacilityId, FrontierData, FrontierFormat, LevelMode } from './data'
+import { battleLabel, FACILITY_ORDER, FORMAT_LABEL, LEVEL_LABEL, loaderStreak } from './format'
 import { Appearance, Kv, Num, Range } from './parts'
 
 /**
  * What the Streak lookup opens on. Reusable on purpose: the Challenge Tracker
- * (its own branch) opens it for a log row with that row's values.
+ * (its own branch) opens it for a log row with that row's values. The fields
+ * seed the form once, when it mounts; to open it on another row, give it a new
+ * React `key` (the row's id).
  *
  * `streak` is the battles WON so far, counted the way the owner's log counts
  * them, so the battle looked up is `streak + 1` ("streak 49" is battle 50). The
@@ -16,6 +18,8 @@ export interface StreakLookupInput {
   facility: FacilityId
   levelMode: LevelMode
   streak: number
+  /** Default Singles. Frontier Brains appear in Singles only. */
+  format?: FrontierFormat
   /** Symbols held at this facility: they decide whether the Brain is due. Default none. */
   symbols?: 0 | 1 | 2
   /** Factory only: the Battle Tower Lv50 streak its IVs read (left blank when absent). */
@@ -32,13 +36,47 @@ const whole = (text: string, min: number): number | null => {
   return Number.isSafeInteger(n) && n >= min ? n : null
 }
 
+function Select<T extends string>({
+  label,
+  area,
+  testId,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  area: string
+  testId: string
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+}) {
+  return (
+    <label className="bf-field" style={{ gridArea: area }}>
+      <span className="bf-cap">{label}</span>
+      <select className="bf-uf" data-testid={testId} value={value} onChange={(e) => onChange(e.target.value as T)}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 export function StreakLookup({ data, initial = DEFAULT_INPUT }: { data: FrontierData; initial?: StreakLookupInput }) {
   const [facility, setFacility] = useState<FacilityId>(initial.facility)
+  const [format, setFormat] = useState<FrontierFormat>(initial.format ?? 'singles')
   const [levelMode, setLevelMode] = useState<LevelMode>(initial.levelMode)
   const [battleText, setBattleText] = useState(String(initial.streak + 1))
   const [symbols, setSymbols] = useState<0 | 1 | 2>(initial.symbols ?? 0)
   const [towerText, setTowerText] = useState(initial.towerLv50Streak == null ? '' : String(initial.towerLv50Streak))
-  const names = new Map(data.facilities().map((f) => [f.id, f.name]))
+  const facilities = data.facilities()
+  const names = new Map(facilities.map((f) => [f.id, f.name]))
+  const formats = facilities.find((f) => f.id === facility)?.formats.map((x) => x.id) ?? ['singles']
+  // A format the facility does not have reads as Singles (the Arena has nothing else).
+  const fmt: FrontierFormat = formats.includes(format) ? format : 'singles'
   const battle = whole(battleText, 1)
   const tower = facility === 'factory' ? whole(towerText, 0) : null
 
@@ -52,32 +90,36 @@ export function StreakLookup({ data, initial = DEFAULT_INPUT }: { data: Frontier
         Brain is due).
       </p>
       <form
-        className={facility === 'factory' ? 'bf-lookup-form bf-five' : 'bf-lookup-form bf-four'}
+        className={facility === 'factory' ? 'bf-lookup-form bf-six' : 'bf-lookup-form bf-five'}
         style={{ gridArea: 'form' }}
         data-layout="streak-lookup-form"
         onSubmit={(e) => e.preventDefault()}
       >
-        <label className="bf-field" style={{ gridArea: 'a' }}>
-          <span className="bf-cap">Facility</span>
-          <select className="bf-uf" data-testid="lookup-facility" value={facility} onChange={(e) => setFacility(e.target.value as FacilityId)}>
-            {FACILITY_ORDER.map((id) => ({ value: id, label: names.get(id) ?? id })).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="bf-field" style={{ gridArea: 'b' }}>
-          <span className="bf-cap">Level</span>
-          <select className="bf-uf" data-testid="lookup-level" value={levelMode} onChange={(e) => setLevelMode(e.target.value as LevelMode)}>
-            {(['lv50', 'open'] as const).map((m) => ({ value: m, label: LEVEL_LABEL[m] })).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="bf-field" style={{ gridArea: 'c' }}>
+        <Select
+          label="Facility"
+          area="a"
+          testId="lookup-facility"
+          value={facility}
+          options={FACILITY_ORDER.map((id) => ({ value: id, label: names.get(id) ?? id }))}
+          onChange={setFacility}
+        />
+        <Select
+          label="Format"
+          area="b"
+          testId="lookup-format"
+          value={fmt}
+          options={formats.map((id) => ({ value: id, label: FORMAT_LABEL[id] }))}
+          onChange={setFormat}
+        />
+        <Select
+          label="Level"
+          area="c"
+          testId="lookup-level"
+          value={levelMode}
+          options={(['lv50', 'open'] as const).map((m) => ({ value: m, label: LEVEL_LABEL[m] }))}
+          onChange={setLevelMode}
+        />
+        <label className="bf-field" style={{ gridArea: 'd' }}>
           <span className="bf-cap">Battle number (as you log it)</span>
           <input
             className="bf-uf bf-num"
@@ -87,18 +129,16 @@ export function StreakLookup({ data, initial = DEFAULT_INPUT }: { data: Frontier
             onChange={(e) => setBattleText(e.target.value)}
           />
         </label>
-        <label className="bf-field" style={{ gridArea: 'd' }}>
-          <span className="bf-cap">Symbols held here</span>
-          <select className="bf-uf" data-testid="lookup-symbols" value={String(symbols)} onChange={(e) => setSymbols(Number(e.target.value) as 0 | 1 | 2)}>
-            {SYMBOLS.map((l, i) => ({ value: String(i), label: l })).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          label="Symbols held here"
+          area="e"
+          testId="lookup-symbols"
+          value={String(symbols) as '0' | '1' | '2'}
+          options={SYMBOLS.map((l, i) => ({ value: String(i) as '0' | '1' | '2', label: l }))}
+          onChange={(v) => setSymbols(Number(v) as 0 | 1 | 2)}
+        />
         {facility === 'factory' && (
-          <label className="bf-field" style={{ gridArea: 'e' }}>
+          <label className="bf-field" style={{ gridArea: 'f' }}>
             <span className="bf-cap">Battle Tower Lv50 streak (Factory IVs read it)</span>
             <input
               className="bf-uf bf-num"
@@ -118,6 +158,7 @@ export function StreakLookup({ data, initial = DEFAULT_INPUT }: { data: Frontier
           <LookupFacts
             data={data}
             facility={facility}
+            format={fmt}
             levelMode={levelMode}
             battle={battle}
             symbols={symbols}
@@ -132,6 +173,7 @@ export function StreakLookup({ data, initial = DEFAULT_INPUT }: { data: Frontier
 function LookupFacts({
   data,
   facility,
+  format,
   levelMode,
   battle,
   symbols,
@@ -139,17 +181,23 @@ function LookupFacts({
 }: {
   data: FrontierData
   facility: FacilityId
+  format: FrontierFormat
   levelMode: LevelMode
   battle: number
   symbols: 0 | 1 | 2
   tower: number | null
 }) {
   const streak = loaderStreak(facility, battle)
+  const pyramid = facility === 'pyramid'
   const pool = data.trainerPoolForStreak({
     facility,
+    format,
     levelMode,
     streak,
-    symbols,
+    // The Pyramid's Brain is not a floor's opponent: he waits at the top AFTER
+    // floor 7, when the streak already counts it (below), so the floor's own
+    // pool never carries him.
+    ...(pyramid ? {} : { symbols }),
     ...(tower != null ? { towerLv50Streak: tower } : {}),
   })
   const trainers = data.trainers()
@@ -198,25 +246,36 @@ function LookupFacts({
       </>
     )
 
+  /* The Pyramid: the floor's streak counts it once cleared, and the top waits after floor 7. */
+  const top =
+    pyramid && battle % 7 === 0
+      ? data.trainerPoolForStreak({ facility, format, levelMode, streak: battle, symbols }).brain
+      : undefined
+  const due = pyramid ? top : pool.brain
   let brain: ReactNode
-  if (pool.brain && who) {
-    const sym = pool.brain.symbol === 'gold' ? 'Gold' : 'Silver'
+  if (format !== 'singles') {
+    brain = 'None: Frontier Brains appear in Singles only.'
+  } else if (due && who) {
+    const sym = due.symbol === 'gold' ? 'Gold' : 'Silver'
     brain =
       facility === 'dome' ? (
         `${who.name} (${sym}) takes one entrant’s place and waits in this tournament’s final.`
+      ) : pyramid ? (
+        `${who.name} (${sym}) waits at the top, after this floor.`
       ) : (
         <>
           {who.name} ({sym}) is this battle’s opponent
           {who.teamKind === 'generated' ? (
             <>
-              , with a generated team at IVs <Num n={who.ivs[pool.brain.symbol]} />
+              , with a generated team at IVs <Num n={who.ivs[due.symbol]} />
             </>
           ) : null}
           ; the trainer pool does not apply.
         </>
       )
   } else {
-    const next = data.nextBrainAt({ facility, format: 'singles', levelMode, streak, symbols })
+    // The Pyramid asks from the end of this floor, so a Brain at its top is never "next" once past it.
+    const next = data.nextBrainAt({ facility, format, levelMode, streak: pyramid ? battle : streak, symbols })
     brain = next ? (
       <>
         Not this battle. Next: {next.symbol === 'silver' ? 'Silver' : 'Gold'} at <Appearance a={next} />

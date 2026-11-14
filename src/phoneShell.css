@@ -5,7 +5,7 @@
   (and every signed-off screen at desktop width) is byte-for-byte unchanged; nothing
   here touches a frozen screen's own CSS.
 
-  - The three nav groups become a FIXED BOTTOM TAB BAR: three equal cells, 48px
+  - The four nav groups become a FIXED BOTTOM TAB BAR: four equal cells, 48px
     tall, padded by the home-indicator inset. The active tab keeps its accent: the
     one sanctioned "active nav item" use, the same as on desktop.
   - A tapped tab opens its entries as a full-width SHEET above the bar: 48px rows,
