@@ -1,204 +1,169 @@
-# Result: Frontier data layer
+# Result: Frontier mockups
 
 2026-11-14. Replaces the previous result; history is in git.
 
-DONE. Branch `feature/frontier-data` (commits `6265f1c`, `e28a934`). `npm run check -- --since main`: 9/9 PASS (typecheck, lint, build, app, frontier-data, infra, pokedex, species-page, ux). Not merged, no preview.
+DONE, except the preview. Branch `feature/frontier-mockups`, pushed to origin for a PR (not opened, not merged). `npm run check -- --since main`: 5/5 PASS (typecheck, lint, build, frontier-data, infra).
 
-- **Rules bundle:** `public/data/frontier/emerald.json` (13.6 KiB), built by `npm run build:frontier` (`scripts/frontier/build.mjs`).
-  - It reads the same pinned `pret/pokeemerald@c925b8482d05`. No new clone: five more sparse paths at the same SHA, `scripts/trainers/sources.mjs`.
-  - Every table is parsed from the source, never typed in. The build throws, and writes nothing, on any count or cross-check failure.
-  - Running it again gives an identical file.
-- **Loader:** `src/modules/battle-frontier/data/`: `types.ts`, `rules.ts` (pure), `index.ts` (lazy fetch, Gen 3 only).
-- **Wiring:**
-  - `frontier` is added to `PARTITION_DIRS` (runtime CacheFirst).
-  - `frontier/*.json` is added to the precache globs (`vite.config.ts`).
-  - `build:frontier` and `verify:frontier-data` are npm scripts.
-  - The suite is in `suiteMap.mjs` and is browser-free in `check.mjs`.
-- **Suite:** `verify:frontier-data`, 84 checks, Node only.
-- **Review:** a fresh-context spec review checked every transcription against the disassembly. It found no blockers. One real gap and three weak tests were fixed in `e28a934` (see Assumptions).
-- **Untouched:** no screen, no nav entry, no store; the Trainer Dex bundle and screens.
+**Preview: NOT published.** The repo publishes a preview by force-pushing the branch to the `preview` remote's `main`, and that push was denied in this session. To publish it, run `git push --force preview feature/frontier-mockups:main` from the repo, wait for the Pages deploy in `hrezende423/pokeapp-preview`, and the links below go live.
 
-## (a) Audit: what `trainers/emerald.json` held
+**Preview links** (live once the push above is done):
+- [frontier-facilities.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-facilities.html)
+- [frontier-brains.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-brains.html)
+- [frontier-tracker.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-tracker.html)
+- [frontier-sets.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-sets.html)
 
-| Item | Before | Now |
+## What was made
+
+- **Four static mockups** in `public/mockups/`, like the Counters slice: one self-contained file per screen, states stacked and numbered, `tokens.css` inlined.
+- **Generated, not hand-written.** `scripts/mockups/frontier.mjs` builds them, so every value is real:
+  - the frozen frontier loader, bundled in memory the way `verify:frontier-data` does it;
+  - names from the eager bundle;
+  - the tracker runs from `docs/fixtures/bf-tracker.xlsx`.
+- **Regenerate** with `node scripts/mockups/frontier.mjs`.
+- **The generator checks the Brain rows.** It throws if the loader's Brain flag disagrees with a Brain row in your log. It agrees on all three: Dome battles 20 and 40, Factory run 4 battle 21.
+- **No app code changed:** no nav entry (`NAV_TABS` untouched), no component, no store, no import code, no loader change.
+- **Shared reader:** the xlsx reader moved to `scripts/lib/xlsx.mjs`, used by both the suite and the generator.
+- **Checks on the rendered mockups** (Chrome, every frame):
+  - at most 2 accent elements;
+  - 0 box-shadows;
+  - IBM Plex Sans and Martian Mono both loaded;
+  - no horizontal page overflow; wide tables scroll inside their own wrapper.
+- **Design audit:** a read-only audit found 7 rule violations. All are fixed:
+  - colliding EV text;
+  - Brain spacing that broke the hairline-band rule;
+  - resting underlines on links;
+  - the dropdown overrunning its frame;
+  - stacks of more than two children without named areas;
+  - numbers in Sans and words in mono;
+  - semibold emphasis in data cells.
+
+## Screens: screenshots and region names
+
+Screenshots are in `docs/status/frontier-mockups/` (1440 px viewport).
+
+Every frame shares these regions: `app-bar`, `nav-tabs`, `frontier-scroll` (the module's ScrollArea) and `page-head`. The other-generation state also shows `frontier-notice`.
+
+| Screen | Screenshots | Regions (`data-layout`) |
 |---|---|---|
-| 882 Frontier sets (species, moves, item, nature, EVs) | have | Bundle order = decomp set index 0-881, verified (8 samples at range edges, 2 sets field by field) |
-| 300 regular trainers + set lists | have | Bundle order = decomp trainer id 0-299, verified (8 samples, Brady and Gretel field by field) |
-| 14 Brain teams (42 Pokémon) with IVs, EVs, nature, moves | have | Counted; IVs read back per facility |
-| Brain streak table | partial: only Silver and Gold, inside the label text ("(35th challenge)"); no repeat and no offset column | `facilities[].brain.streak` {silver, gold, repeat, offset} |
-| Facility table: formats, party size, set length, rule text | missing (one shared rule sentence) | Added. Party sizes from `sBattleTowerPartySizes2` and the lobby scripts; formats from the BP table |
-| Trainer-id ranges per challenge, normal + Hard | missing | Added (`sFrontierTrainerIdRanges`, `...Hard`) |
-| Open Level-only sets (index > 849) | missing | Added: `open_only_from_index` 850, 32 sets |
-| Level rules | partial (prose) | Lv50 = 50. Open = highest in party, at least 60. Factory Open = 100 |
-| Opponent IV by trainer id | missing | Added: 3/6/9/12/15/18/21, then 31 from id 220 |
-| Factory IV table, off-by-one, rental ranges | missing | Added: `sFixedIVTable`, out-of-bounds row, `sInitialRentalMonRanges` |
-| BP awards, Brain +10, 9999 cap | missing | Added: `sBattlePointAwards` (30 rows), +10, cap |
-| BP shop | missing | Added: 30 entries over four clerks |
-| Banned species | missing | Added: 10 |
-| Held-item table | partial: sets carry the resolved `item_id`; the table is absent | Added: 63 slots |
-| Factory Brain team kind | shown as a fixed team (see c) | `teamKind: 'generated'` |
-| Set abilities | missing | Still open (see e) |
+| Facilities | `frontier-facilities-1.jpg` (tab and dropdown), `-2.jpg` (the screen) | `nav-dropdown`, `frontier-facilities`, `facility-grid`, `facility` ×7, `facility-facts`, `frontier-shared`, `frontier-symbols`, `frontier-levels`, `frontier-banned`, `frontier-bp-rules`, `frontier-bp-shop`, `bp-shop-clerk` ×4 |
+| Brains | `frontier-brains-1.jpg` | `frontier-brains`, `brain-list`, `brain` ×7, `brain-head`, `brain-appearances`, `brain-team` (Silver, Gold), `brain-generated` (Noland) |
+| Challenge Tracker | `frontier-tracker-1.jpg` (home), `-2.jpg` (Dome run), `-3.jpg` (Factory run 4), `-4.jpg` (picker, unknown Pokémon), `-8.jpg` (390 px) | home: `frontier-tracker`, `tracker`, `tracker-main`, `tracker-runs`, `tracker-insights` (`insight-history`, `insight-species`, `insight-dome-pairs`), `tracker-side`, `tracker-bp` · run: `frontier-run`, `run-head`, `run-team`, `run-log`, `tracker-stats`, `log-add-state`, `log-add`, `species-picker` · `new-run`, `new-run-form`, `tracker-empty` |
+| Sets & Trainers | `frontier-sets-1.jpg` (Sets), `-4.jpg` (Trainers), `-5.jpg` (Streak lookup) | `frontier-sets`, `sets-body`, `sets-views`, `sets-controls`, `sets-count`, `sets-list`, `trainers-body`, `trainers-search`, `trainers-list`, `streak-lookup`, `streak-lookup-form`, `streak-lookup-cases`, `streak-lookup-result` |
 
-**Answers to the audit questions:**
-- **The 314 trainers** are 300 regular trainers (`FRONTIER_TRAINER_BRADY` 0 … `GRETEL` 299) and 14 Brain teams (7 Brains × Silver and Gold).
-- **Set order** maps one-to-one onto the decomp index: `bundle.sets[i].key` has the `FRONTIER_MON_*` value `i` for every `i`.
-- **Brain streak data** is present for all 7 Brains, but only as the Silver/Gold numbers inside the label text.
+### States per mockup
 
-**Trainer Dex labels:** those label numbers are the raw table values, not challenge numbers.
-- "Battle Tower · Silver Symbol (35th challenge)" is the 35th *battle*.
-- "Battle Dome · Silver Symbol (4th challenge)" means 4 tournaments won, so Tucker is in the 5th tournament.
+- **Facilities** (4 states):
+  1. the open tab;
+  2. the screen;
+  3. another generation;
+  4. 390 px.
+- **Brains** (2 states):
+  1. the seven Brains, with Noland generated;
+  2. another generation.
+- **Tracker** (8 states):
+  1. home after import;
+  2. Dome run 1 (40 battles, Tucker at 20 and 40);
+  3. Factory run 4 (40 battles, rentals and swaps, Noland at 21);
+  4. logging a battle with the species picker, and an unknown Pokémon;
+  5. new run;
+  6. empty;
+  7. another generation;
+  8. 390 px.
+- **Sets & Trainers** (6 states):
+  1. Sets;
+  2. search "salamence";
+  3. Open Level only;
+  4. Trainers, with Vince (#222) opened;
+  5. Streak lookup with your three cases;
+  6. another generation.
 
-I am reporting this, not changing it.
+### The owner's cases (Streak lookup)
 
-## (b) Frozen loader API
+- **Dome battle 20** = tournament 5, the final:
+  - IDs 140–199, drawn as 10 from 140–179 and 5 from 160–199;
+  - IVs 12 / 15 / 18, by ID slice;
+  - Tucker (Silver) is due.
+- **Factory battle 21** = set 3, battle 7:
+  - the Hard ladder, 140–159;
+  - opponent sets #267–#371;
+  - Noland (Silver) is due, with a generated team at IV 15.
+- **"Streak 49"** = 49 won, so Tower battle 50:
+  - IDs 200–299, not the Hard ladder;
+  - IV 21 for IDs 200–219, 31 for 220–299;
+  - with Silver held, the next Brain is Gold at battle 70.
 
-```ts
-// src/modules/battle-frontier/data/index.ts
-export const FRONTIER_GENERATION = 3
-export function isFrontierGeneration(generation: number | null | undefined): boolean
-export function loadFrontierData(generation: number | null | undefined): Promise<FrontierData | null> // null unless 3; fetches nothing then
-export function peekFrontierData(generation: number | null | undefined): FrontierData | null
-export function speciesKey(name: string): string
+## Questions (one batch, answer once; each default is already in the mockups)
 
-export interface FrontierData {
-  facilities(): FrontierFacility[]          // { id, name, formats: { id, partySize, battlePartySize? }[], unit, perSet, rules }
-  brains(): FrontierBrain[]                 // { facility, name, title, symbolName, teamKind, streak, silver, gold, ivs, teams | null, note? }
-  sets(): FrontierSet[]                     // FacilitySet & { index: number /* 0-881 */; openOnly: boolean }
-  trainers(): FrontierTrainer[]             // { id /* 0-299 */, key, classId, className, name, setIndices }
-  trainerSets(trainerId: number, levelMode: LevelMode): FrontierSet[]   // Lv50 drops openOnly
-  trainerPoolForStreak(args: TrainerPoolArgs): TrainerPool
-  nextBrainAt(args: NextBrainArgs): BrainAppearance | null
-  bpAward(args: BpAwardArgs): BpAward | null       // null: no such format at that facility
-  addBattlePoints(balance: number, points: number): number   // capped at 9999
-  bpShop(): BpShopEntry[]                   // { clerk, itemId, decor, name, price }
-  bannedSpecies(): number[]
-  resolveSpecies(name: string): number | null      // Gen 3 species id
-}
+1. **Dome "dropped" (1–3).**
+   - *Default:* the opponent's Pokémon in that slot, the one that did not battle (opponents also bring 2 of their 3).
+   - Shown in a "Dropped" column as the slot number and the species, e.g. "2 Salamence".
+2. **Factory rentals you never saw.**
+   - Each set's draft offers 6 and you rent 3; each swap offers the beaten trainer's Pokémon.
+   - *Default:* record only your 3 at each draft, plus each swap (out → in). Nothing for unpicked offers.
+   - An opponent Pokémon you never saw is "Unknown".
+3. **Spreadsheet import.**
+   - *Default:* a dev script converts the xlsx into the tracker's export JSON, and the existing document import loads it. No spreadsheet dependency in the PWA.
+   - `scripts/lib/xlsx.mjs` already reads the file with no dependency.
+   - The alternative is an in-app importer, which adds a parser to the app.
+4. **Dates.** The log has none.
+   - *Default:* imported runs carry the import date; new runs carry the date they start.
+5. **Win/loss.** The log has no result column.
+   - *Default on import:* every battle is a win, except the last battle of a run that another run follows (a loss). The last run of each block is ongoing.
+   - Please confirm Factory runs 1–4 ended in a loss rather than a retirement, and that Dome run 1 and Factory run 5 are ongoing.
+   - Because of this default, the Dome win rate per pair reads 100% for every pair.
+6. **Format and level.** The log doesn't say.
+   - *Default:* Singles for both, because Brains only appear in singles.
+   - Lv50 for both. The Factory's Lv50 is supported by Noland's team fitting the Lv50 draw. **Is the Dome Lv50?**
+7. **Battle Points before the app.**
+   - *Default:* an editable opening balance (0), then one ledger line per completed set. Shop spending is a minus line.
+   - Under the defaults, imported runs earn 82 BP: Dome 50, Factory 32.
+   - The alternative is one "current balance" field instead.
+8. **Opponent trainer.** The log has no trainer column.
+   - *Default:* no trainer field per battle.
+9. **Factory run 4, battle 29.**
+   - It is a new set, so the game re-drafts the rentals at that point (`factory_generaterentalmons`).
+   - Your log keeps Espeon and Heracross across that draft.
+   - *Default:* shown as logged, as set 5's draft. Please confirm it is not a typo.
+10. **Run detail is a screen inside the module.**
+    - *Default:* its "All runs" link is the module's own control, like Team Building's screens. It is not a step in the back stack.
+11. **The Sets list.**
+    - *Default:* one scrolling list of all 882 (the mockup shows the first 30).
+    - The alternative is pages.
+12. **Sprites.**
+    - *Default:* names only (links to the species page) in Brains, the log and the sets.
+    - Should Brain teams and log rows show sprites, as Trainer Dex parties do?
+13. **Symbol toggles.**
+    - The design system's Toggle turns accent when on, and accent is reserved for the tab and the selected view.
+    - *Default:* a checkbox icon with a semibold label instead.
+14. **Links at rest.**
+    - *Default:* no line at rest, a hairline on hover (per the audit).
+    - The Pokédex's egg-group links keep a hairline at rest. Which one do you want?
+15. **Streak lookup location.**
+    - *Default:* inside Sets & Trainers only.
+    - Should a log row also open it for that battle?
+16. **Dome team.**
+    - *Default:* your three are recorded once per run (the log has one team line), and each battle records the pair you brought.
 
-type FacilityId = 'tower' | 'dome' | 'palace' | 'arena' | 'factory' | 'pike' | 'pyramid'
-type FrontierFormat = 'singles' | 'doubles' | 'multi' | 'link-multi'
-type LevelMode = 'lv50' | 'open'
-type StreakUnit = 'battle' | 'tournament' | 'room' | 'floor'
+## Assumptions
 
-interface TrainerPoolArgs { facility: FacilityId; levelMode: LevelMode; streak: number; format?: FrontierFormat; symbols?: 0 | 1 | 2; towerLv50Streak?: number }
-interface TrainerPool {
-  facility; levelMode; streak; challenge: number      // the game's u8 challenge number
-  idRange: { from: number; to: number }; hard: boolean
-  ivBand: { min: number; max: number; rule: 'trainer-id' | 'factory-table'; byTrainerId?: { from; to; iv }[]; readsTowerStreak?: true; random?: true }
-  level: { mode: 'lv50'; level: number } | { mode: 'open'; min: number; max: number; rule: 'highest-in-party' }
-  draws: { idRange; hard: boolean; count?: number; when: string }[]
-  factorySetRange?: { from: number; to: number }
-  brain?: BrainAppearance                              // the Brain is due instead (needs `symbols`)
-  note?: string
-}
-interface NextBrainArgs { facility: FacilityId; format: FrontierFormat; levelMode: LevelMode; streak: number; symbols: 0 | 1 | 2 }
-interface BrainAppearance { symbol: 'silver' | 'gold'; battle: number; unit: StreakUnit; unitNumber: number; repeat: boolean }
-interface BpAwardArgs { facility: FacilityId; format: FrontierFormat; completedSets: number; brain?: boolean }
-interface BpAward { base: number; brainBonus: number; points: number }
-```
-
-**`streak` everywhere** is the game's own counter for that facility:
-- battles won (Tower, Palace, Arena, Factory);
-- tournaments won (Dome);
-- rooms cleared (Pike);
-- floors cleared (Pyramid).
-
-**`nextBrainAt().battle`** counts the way your log does:
-- Dome: battles, at 4 per tournament.
-- Pike: rooms.
-- Pyramid: floors.
-
-**Checked results:**
-- Tower 35/70, Dome 20/40 (5th and 10th tournament), Palace 21/42, Arena 28/56, Factory 21/42, Pike room 28/140, Pyramid floor 21/70.
-- Repeats come every 35/5/21/28/21/56/35 after Gold.
-
-## (c) Factory Brain: generated
-
-**Conclusion:** `teamKind: 'generated'`.
-
-**Code evidence:**
-- `FillFactoryFrontierTrainerParty` (battle_tower.c) routes `TRAINER_FRONTIER_BRAIN` to `FillFactoryBrainParty` (battle_factory.c).
-- That function never reads `sFrontierBrainsMons`.
-- It draws three sets with `GetFactoryMonId(lvlMode, challengeNum, FALSE)`. That is the same rental-range draw a regular Factory opponent gets, with the same Unown, duplicate-species and duplicate-item rules.
-- The IV is `GetFactoryMonFixedIV(challengeNum + 2, FALSE)`: 15 at battle 21 and 31 at battle 42.
-- The decomp's own comment on the table entry: "Because Factory's Pokémon are random, this facility's Brain also uses random Pokémon. … this team is actually the one Steven uses in the multi tag battle".
-
-**Evidence from your log:**
-- At Factory battle 21 (attempt 4), Noland fielded Roselia / Venomoth / Weepinbell.
-- The table's team is Metang / Skarmory / Aggron, so none of the three is on it.
-- All three have a set in the Lv50 challenge-3 rental range, sets 267-371.
-- They do not fit the Open Level range (564-659), so your log is Lv50.
-
-**Trainer Dex (reported, not changed):**
-- The Trainer Dex does present a fixed Noland team.
-- `brain-factory-silver` and `brain-factory-gold` both show Steven's Metang / Skarmory / Aggron as Noland's party, at 31 IVs.
-- A "Note" line says he uses rentals.
-- `verify:trainers` asserts that note.
-
-## (d) Fixture names that did not resolve
-
-None.
-- I parsed 500 species cells (175 distinct names) from both blocks, plus the Dome team in row 3. All of them resolve through `resolveSpecies`, including `mr. mime`, `farfetch'd` and `porygon2`.
-- Your log's Tucker teams at battles 20 and 40 equal the bundle's fixed Silver and Gold teams.
-
-## (e) Known gaps still open
-
-- **No ability on sets.** The bundle carries none; Gen 3 Frontier Pokémon get one of their two abilities at random.
-- **Pike: which room type comes up is not traced.**
-  - The pools per room type are encoded: Single/Double rooms use battleNum 1, Hard rooms use the Hard row.
-  - Wild Pokémon rooms are not modelled.
-- **Pyramid: how many trainers per floor, and the wild Pokémon tables, are not traced.**
-  - The trainer pool per floor is encoded: floor index 0-6, and the 7th floor uses the Hard row.
-- **Dome: CPU-vs-CPU match resolution is not traced.**
-  - So which entrant you meet, and whether Tucker always reaches the final, is not modelled.
-  - Your log has him in the final both times.
-- **Tower record-mixing, Apprentice and e-Reader trainers are not modelled.** `ChooseSpecialBattleTowerTrainer` can replace a random Tower opponent.
-- **The Factory rentals offered to the player** (their range and IVs) are not encoded. Only opponents and Noland are.
-
-## Assumptions (decided, not asked)
-
-**The brief's "63 held items":**
-- `gBattleFrontierHeldItems` has **63 slots**, but slot 0 is `ITEM_NONE`, so it holds **62 real items**.
-- The build asserts both numbers.
-
-**`ivBand` for streak 49:**
-- Ids 200-299 span two IV bands, so the result is `{ min: 21, max: 31, byTrainerId: [200-219 → 21, 220-299 → 31] }`.
-- "ivBand 21" in the brief is `min`.
-
-**Changes to the brief's API sketch:**
-- `facilities()` … `resolveSpecies()` are methods of the object `loadFrontierData` resolves to. They cannot be called before loading, or outside Gen 3.
-- `loadFrontierData` takes the generation.
-- `bpAward` takes `brain?: boolean`. It returns `{ base, brainBonus, points }`, and the cap is applied by `addBattlePoints`.
-- Added beyond the brief: `trainerSets`, `addBattlePoints`, `peekFrontierData`, `speciesKey`, and the optional pool args `symbols`, `format` and `towerLv50Streak`.
-
-**`bpAward(completedSets)`:**
-- It counts the set just won: row = sets − 1, clamped.
-- The review confirmed the streak is already incremented when `GiveBattlePoints` runs.
-
-**Factory regular-trainer IVs read the Tower Lv50 streak** (a documented decomp mistake).
-- Without `towerLv50Streak`, the band spans the whole table and is flagged `readsTowerStreak`.
-- Tower challenge 8 hits the off-by-one row:
-  - Battles 1-6 get random IVs; the decomp comment says so.
-  - The 7th battle gets IV 0. That value is derived from the ROM layout (the next table's first byte), not observed, and is flagged `derived: true`.
-
-**Review fixes in `e28a934`:**
-- Factory Open Level opponents are fixed at 100.
-- Challenge numbers wrap as the game's u8 (streak 1792 reads as challenge 0).
-- A due Brain is flagged on the pool when `symbols` is passed.
-- Drift checks for the hard-coded Dome, Pike and Pyramid rules.
-- The suite now compares decomp-side samples, set lists and EVs instead of build-written booleans. It pins the fixture's 500 cells and Noland's Lv50 range.
-
-**Hand-written, not parsed:**
-- The rule sentences.
-- The symbol names: Ability, Tactics, Spirits, Guts, Knowledge, Luck, Brave. The strings are not in the sparse checkout; your log's "tactics" and "knowledge" match.
-
-**Files:**
-- `frontier/*.json` is precached, like the trainers partition (offline before first view).
-- The entry chunk does not contain the loader (asserted on `dist/`).
-- `docs/fixtures/bf-tracker.xlsx` is committed, because the suite reads it.
-- This file is force-added, because `docs/status/` is gitignored.
+- **Fonts** are inlined as data URIs: the latin subsets of Plex Sans Roman and Martian Mono. The other mockups load no fonts and fall back to system faces.
+- **Accent per screen:**
+  - the Battle Frontier tab;
+  - on Sets & Trainers, also the selected view tab;
+  - the open dropdown marks the current entry by weight only.
+- **BP per format** on Facilities is one line per format, in runs: "1–2 → 1 · 3–4 → 2 · … · 29 on → 15". It is exact; a 30-column table did not fit.
+- **The tracker stores the battle number as logged.** It is converted to the loader's streak only when the loader is called (Dome: wins before the battle ÷ 4). The screens show the logged number and its label, never the raw streak.
+- **A Brain flag on a log row** comes from `trainerPoolForStreak({ symbols })` (the same rule as `nextBrainAt`); in the Dome, only on the final.
+- **Factory rentals:**
+  - a heading line at each set's draft (battles 1, 8, 15, 22, 29, 36);
+  - a swap line where one changed inside a set;
+  - never repeated on every row.
+- **The per-battle note** is an optional field when logging (state 4). Notes do not get their own log column.
+- **The stats panel** belongs to facility × format × level, not to a run. Its "Current streak" names the run it comes from.
+- **Narrow frames** use a container query at 900 px, so the regions stack inside a 390 px frame. The phone layout stays parked.
+- **`docs/status/`** is gitignored, so this file and the screenshots are force-added.
 
 ## Open items
 
-- Nothing blocks handoff 2.
-- If the Trainer Dex labels or Noland's displayed team should change, that is a separate request: Trainer Dex screens were out of scope.
+- None blocks the build. Answering questions 1, 5, 6 and 9 also fixes the import.
+- Not drawn: dark theme (nothing theme-specific), sprites (question 12), Platinum and HGSS.
