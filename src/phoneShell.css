@@ -87,8 +87,11 @@
     bottom: 0;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-areas: 'tab-1 tab-2 tab-3';
+    /* One row, one column per tab (Battle Frontier made it four, 2026-11-14):
+       a wrapped second row would cover the bottom of every scroller, which
+       reserves one bar's height only. */
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-areas: 'tab-1 tab-2 tab-3 tab-4';
     gap: 0;
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--color-bg-surface);

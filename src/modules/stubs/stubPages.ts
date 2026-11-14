@@ -19,6 +19,8 @@ export const STUB_PAGES = [
     (../tools/pages.ts), keeping its id so the dropdown line is unchanged.
   */
   { id: 'training-optimization', label: 'Training and Optimization' },
+  /* Battle Frontier: the Challenge Tracker gets its own branch. */
+  { id: 'frontier-tracker', label: 'Challenge Tracker' },
 ] as const
 
 export type StubPageId = (typeof STUB_PAGES)[number]['id']

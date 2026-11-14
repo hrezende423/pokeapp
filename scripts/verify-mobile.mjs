@@ -59,10 +59,10 @@ try {
     const r = el.getBoundingClientRect()
     const tabs = [...el.querySelectorAll('.nav-trigger')].map((t) => t.getBoundingClientRect())
     const cs = getComputedStyle(el)
-    return { position: cs.position, bottom: Math.round(r.bottom), top: Math.round(r.top), width: Math.round(r.width), shadow: cs.boxShadow, tabs: tabs.map((t) => ({ w: Math.round(t.width), h: Math.round(t.height) })) }
+    return { position: cs.position, bottom: Math.round(r.bottom), top: Math.round(r.top), width: Math.round(r.width), shadow: cs.boxShadow, tabs: tabs.map((t) => ({ w: Math.round(t.width), h: Math.round(t.height), top: Math.round(t.top) })) }
   })
   check('the nav is a fixed bar along the bottom of the screen', bar.position === 'fixed' && bar.bottom === 844 && bar.width === 390, JSON.stringify({ position: bar.position, top: bar.top, bottom: bar.bottom, width: bar.width }))
-  check('three tabs, each at least 44 x 44', bar.tabs.length === 3 && bar.tabs.every((t) => t.w >= 44 && t.h >= 44), JSON.stringify(bar.tabs))
+  check('four tabs in one row, each at least 44 x 44', bar.tabs.length === 4 && new Set(bar.tabs.map((t) => t.top)).size === 1 && bar.tabs.every((t) => t.w >= 44 && t.h >= 44), JSON.stringify(bar.tabs))
   check('no box-shadow on the bar', bar.shadow === 'none', bar.shadow)
   let s = await noHorizontalScroll(page)
   check('the Pokédex has no horizontal scroll', s.scroll <= s.client, `${s.scroll} / ${s.client}`)

@@ -1456,11 +1456,12 @@ try {
       '(' + shell.elements + ')',
     )
 
-    // ITEM 5: three groups, in this order, with Notes deliberately absent.
+    // ITEM 5: the groups, in this order, with Notes deliberately absent. Battle
+    // Frontier joined between Team Building and Tools (2026-11-14).
     check(
-      '[' + theme + '] the nav is Poképedia / Team Building / Tools',
+      '[' + theme + '] the nav is Poképedia / Team Building / Battle Frontier / Tools',
       JSON.stringify(shell.triggerLabels) ===
-        JSON.stringify(['Poképedia', 'Team Building', 'Tools']),
+        JSON.stringify(['Poképedia', 'Team Building', 'Battle Frontier', 'Tools']),
       shell.triggerLabels.join(','),
     )
     check(
