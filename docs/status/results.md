@@ -1,169 +1,153 @@
-# Result: Frontier mockups
+# Result: Frontier reference screens
 
 2026-11-14. Replaces the previous result; history is in git.
 
-DONE, except the preview. Branch `feature/frontier-mockups`, pushed to origin for a PR (not opened, not merged). `npm run check -- --since main`: 5/5 PASS (typecheck, lint, build, frontier-data, infra).
+**DONE.** Branch `feature/frontier-reference`, pushed to origin (not merged, no PR). `npm run check -- --since main`: **PASS**, every step:
 
-**Preview: NOT published.** The repo publishes a preview by force-pushing the branch to the `preview` remote's `main`, and that push was denied in this session. To publish it, run `git push --force preview feature/frontier-mockups:main` from the repo, wait for the Pages deploy in `hrezende423/pokeapp-preview`, and the links below go live.
+| Step | Result |
+|---|---|
+| typecheck, lint (18 files), build | PASS |
+| `verify:frontier-reference` (new) | PASS, 138/138 |
+| `verify:frontier-data`, `verify:infra` | PASS |
+| `verify:app`, `verify:dexes`, `verify:ds`, `verify:ux` | PASS |
+| `verify:scroll-nav`, `verify:tools` (304/304), `verify:mobile` | PASS |
 
-**Preview links** (live once the push above is done):
-- [frontier-facilities.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-facilities.html)
-- [frontier-brains.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-brains.html)
-- [frontier-tracker.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-tracker.html)
-- [frontier-sets.html](https://hrezende423.github.io/pokeapp-preview/mockups/frontier-sets.html)
+`check --all` was not run.
 
-## What was made
+**Preview:** see the last section.
 
-- **Four static mockups** in `public/mockups/`, like the Counters slice: one self-contained file per screen, states stacked and numbered, `tokens.css` inlined.
-- **Generated, not hand-written.** `scripts/mockups/frontier.mjs` builds them, so every value is real:
-  - the frozen frontier loader, bundled in memory the way `verify:frontier-data` does it;
-  - names from the eager bundle;
-  - the tracker runs from `docs/fixtures/bf-tracker.xlsx`.
-- **Regenerate** with `node scripts/mockups/frontier.mjs`.
-- **The generator checks the Brain rows.** It throws if the loader's Brain flag disagrees with a Brain row in your log. It agrees on all three: Dome battles 20 and 40, Factory run 4 battle 21.
-- **No app code changed:** no nav entry (`NAV_TABS` untouched), no component, no store, no import code, no loader change.
-- **Shared reader:** the xlsx reader moved to `scripts/lib/xlsx.mjs`, used by both the suite and the generator.
-- **Checks on the rendered mockups** (Chrome, every frame):
-  - at most 2 accent elements;
-  - 0 box-shadows;
-  - IBM Plex Sans and Martian Mono both loaded;
-  - no horizontal page overflow; wide tables scroll inside their own wrapper.
-- **Design audit:** a read-only audit found 7 rule violations. All are fixed:
-  - colliding EV text;
-  - Brain spacing that broke the hairline-band rule;
-  - resting underlines on links;
-  - the dropdown overrunning its frame;
-  - stacks of more than two children without named areas;
-  - numbers in Sans and words in mono;
-  - semibold emphasis in data cells.
+## What was built
 
-## Screens: screenshots and region names
+- **The tab.** "Battle Frontier" sits between Team Building and Tools. Clicking the word opens Facilities.
+  - The dropdown lists Facilities, Brains, Challenge Tracker and Sets & Trainers.
+  - The open entry is semibold, in the same colour as the others.
+  - Challenge Tracker is a `StubPage` entry in `stubs/stubPages.ts`, with no screen.
+- **The registry.** `src/modules/battle-frontier/pages.ts`, registered in `PageId` and `findPage`.
+  - The screens load lazily, so the entry chunk never carries the loader (`verify:infra` asserts it).
+- **Facilities.** 7 facility sections, then the shared section:
+  - symbols;
+  - Level 50 and Open Level;
+  - 10 banned species;
+  - Battle Points;
+  - the BP shop: 30 entries from 4 clerks.
+- **Brains.** 7 Brains.
+  - Six have Silver and Gold teams, with a 32 px Emerald sprite on every row.
+  - Noland shows the generated explanation and his rental ranges, and no team.
+- **Sets & Trainers.** Three views:
+  - **Sets:** 882 in one list, searchable by species, trainer class or held item, with an "Open Level only" text filter.
+  - **Trainers:** 300 trainers. A row opens to that trainer's sets.
+  - **Streak lookup.**
+- **Streak lookup.** A reusable component: `StreakLookup({ data, initial })`, with `initial = { facility, levelMode, streak, format?, symbols?, towerLv50Streak? }`.
+  - `SetsTrainers` takes `lookup` and opens on it. That is the tracker's seam; it is not wired.
+- **Other generations.** Every screen shows only the notice "Battle Frontier data covers Emerald (Gen 3)." and fetches nothing.
+- **Links.** Species names link through the entity engine (`deepLink` + `followLink`) and resolve through the Gen 3 species list. No line at rest, a hairline on hover.
 
-Screenshots are in `docs/status/frontier-mockups/` (1440 px viewport).
+## How it was checked
 
-Every frame shares these regions: `app-bar`, `nav-tabs`, `frontier-scroll` (the module's ScrollArea) and `page-head`. The other-generation state also shows `frontier-notice`.
+`verify:frontier-reference` (port 4206) opens each approved mockup in the browser and compares the app's text with it, region by region.
 
-| Screen | Screenshots | Regions (`data-layout`) |
+**Compared with the mockup text:**
+- every facility section and every shared region;
+- every Brain section;
+- the first 30 set rows, the "salamence" rows and the 32 Open Level rows;
+- the first 25 trainer rows, Vince's row and his first 8 sets;
+- the three lookup cases.
+
+**The "Done when" values, also asserted as literals:**
+
+| Case | Result |
+|---|---|
+| Dome battle 20 | Tournament 5 final. IDs 140–199 (10 from 140–179, 5 from 160–199). Tucker (Silver) due |
+| Factory battle 21 | Hard ladder 140–159. Sets #267–#371. Noland (Silver) due, generated team |
+| Tower streak 49 (battle 50, Silver held) | IDs 200–299, not Hard. IV 21 for 200–219, 31 for 220–299. Next: Gold at battle 70 |
+
+**Also checked:**
+- No Frontier request under Gen 4 or All. The loader's cache is emptied before the "after leaving Gen 3" check, so that check can fail.
+- The lookup is mounted on its own with initial inputs, and the form is read back.
+- At most 2 accent uses per screen, in both themes. The count includes outline, background, SVG and pseudo-element accents.
+- No shadow, no select except the lookup's own, and text colours from the tokens in each theme.
+- The 36 Brain sprites decode.
+- Switching views and opening a trainer push no back-stack step.
+- At 390 px nothing runs past the scroll area.
+- Since the merge base: no change to `battle-frontier/data/` or the Trainer Dex.
+
+**Scrolling:** the 882 rows scroll at 17 ms per frame (95th percentile), so the list is not windowed.
+
+**Reviews:** a spec review and a design audit ran on the first commit. Their findings are fixed in the second commit, `153a875`.
+
+## Screenshots, next to the mockups
+
+App screenshots (1440 px) are in `docs/status/frontier-reference/`. The mockup screenshots are in `docs/status/frontier-mockups/`.
+
+| Screen | App | Mockup |
 |---|---|---|
-| Facilities | `frontier-facilities-1.jpg` (tab and dropdown), `-2.jpg` (the screen) | `nav-dropdown`, `frontier-facilities`, `facility-grid`, `facility` ×7, `facility-facts`, `frontier-shared`, `frontier-symbols`, `frontier-levels`, `frontier-banned`, `frontier-bp-rules`, `frontier-bp-shop`, `bp-shop-clerk` ×4 |
-| Brains | `frontier-brains-1.jpg` | `frontier-brains`, `brain-list`, `brain` ×7, `brain-head`, `brain-appearances`, `brain-team` (Silver, Gold), `brain-generated` (Noland) |
-| Challenge Tracker | `frontier-tracker-1.jpg` (home), `-2.jpg` (Dome run), `-3.jpg` (Factory run 4), `-4.jpg` (picker, unknown Pokémon), `-8.jpg` (390 px) | home: `frontier-tracker`, `tracker`, `tracker-main`, `tracker-runs`, `tracker-insights` (`insight-history`, `insight-species`, `insight-dome-pairs`), `tracker-side`, `tracker-bp` · run: `frontier-run`, `run-head`, `run-team`, `run-log`, `tracker-stats`, `log-add-state`, `log-add`, `species-picker` · `new-run`, `new-run-form`, `tracker-empty` |
-| Sets & Trainers | `frontier-sets-1.jpg` (Sets), `-4.jpg` (Trainers), `-5.jpg` (Streak lookup) | `frontier-sets`, `sets-body`, `sets-views`, `sets-controls`, `sets-count`, `sets-list`, `trainers-body`, `trainers-search`, `trainers-list`, `streak-lookup`, `streak-lookup-form`, `streak-lookup-cases`, `streak-lookup-result` |
+| Tab and dropdown | `nav.png` | `frontier-facilities-1.jpg` |
+| Facilities | `facilities-light.png`, `facilities-dark.png` | `frontier-facilities-2.jpg` |
+| Another generation | `notice.png` | (state 3 of each mockup) |
+| Brains | `brains-light.png`, `brains-dark.png` | `frontier-brains-1.jpg` |
+| Sets | `sets-light.png`, `sets-open-light.png`, `sets-dark.png` | `frontier-sets-1.jpg` |
+| Trainers, Vince opened | `trainers-light.png` | `frontier-sets-4.jpg` |
+| Streak lookup | `lookup-dome-light.png`, `lookup-dark.png` | `frontier-sets-5.jpg` |
+| 390 px | `narrow-facilities.png`, `narrow-lookup.png` | `frontier-facilities` state 4 |
 
-### States per mockup
+**Region names (`?layout=1`)** are the mockups' names. The suite asserts them on every screen. One name is new: `lookup-body`.
 
-- **Facilities** (4 states):
-  1. the open tab;
-  2. the screen;
-  3. another generation;
-  4. 390 px.
-- **Brains** (2 states):
-  1. the seven Brains, with Noland generated;
-  2. another generation.
-- **Tracker** (8 states):
-  1. home after import;
-  2. Dome run 1 (40 battles, Tucker at 20 and 40);
-  3. Factory run 4 (40 battles, rentals and swaps, Noland at 21);
-  4. logging a battle with the species picker, and an unknown Pokémon;
-  5. new run;
-  6. empty;
-  7. another generation;
-  8. 390 px.
-- **Sets & Trainers** (6 states):
-  1. Sets;
-  2. search "salamence";
-  3. Open Level only;
-  4. Trainers, with Vince (#222) opened;
-  5. Streak lookup with your three cases;
-  6. another generation.
+## Deviations from the mockups, and why
 
-### The owner's cases (Streak lookup)
+1. **Streak lookup is a third view tab.** The mockup drew it as its own state, directly under the page head. In the Sets and Trainers states, the view row sits in that same place. As a tab, all three views can be reached, and the accent stays at 2.
+2. **One result, for the form.** The mockup's three fixed "owner's cases" panels are not on screen; the suite checks them against the mockup instead. The case label and the input caption went with them.
+3. **Two more fields in the lookup form:**
+   - **Format.** Brains appear only in Singles, so the mockup's form gave a Doubles player a Brain who never comes. The spec review found this.
+   - **"Battle Tower Lv50 streak", for the Factory only.** The mockup's Factory case used it. Without it, the Factory IVs are a range.
+4. **The lookup opens on Battle Tower · Singles · Lv50 · battle 1 · no symbols.** The mockup's form showed Dome 20 because that was its first case.
+5. **The Pyramid Brain waits at the top, after the floor.** On floor 7 of a challenge (21, 70, …) the lookup says "Brandon (…) waits at the top, after this floor". The mockup had no Pyramid case. Read naively, the loader's streak puts him on the next challenge's floor 1.
+6. **Sprites (your decision).** Brain team rows, set rows and an opened trainer's sets have a 32 px sprite, so the rows are taller (49 px against 38 px).
+   - The Trainer Dex's `PartyStrip` is private, and `Trainerdex.tsx` must stay untouched. So `MonSprite` uses the same data-layer calls (`slotsFor` and `versionSpriteUrl` for `emerald`, `getSpriteUrl` as the fallback). Sprites are runtime-cached, never precached.
+7. **Full lists.** All 882 sets, all 300 trainers, and all 100 of Vince's sets are shown. The mockup cut them at 30, 25 and 8 for the page.
+8. **Noland's "50 on":** only the number is in mono (the design audit found "on" in mono in the mockup).
+9. **No side padding on the page.** The mockup's frame padded its page by `--space-6`. In the app, the shell's panel already gives the gutter, so the page head lines up with the app bar.
+10. **The dropdown's open entry uses the nav's own colour token** (`--text-primary`, legacy), so weight is the only difference from the other lines. Moving the nav to `dist` tokens is not done in a feature commit.
+11. **The app bar has no region names.** The mockup's `app-bar`, `nav-tabs` and `nav-dropdown` belong to the existing shell, which has no `data-layout`. I did not add them; the shell is out of scope.
 
-- **Dome battle 20** = tournament 5, the final:
-  - IDs 140–199, drawn as 10 from 140–179 and 5 from 160–199;
-  - IVs 12 / 15 / 18, by ID slice;
-  - Tucker (Silver) is due.
-- **Factory battle 21** = set 3, battle 7:
-  - the Hard ladder, 140–159;
-  - opponent sets #267–#371;
-  - Noland (Silver) is due, with a generated team at IV 15.
-- **"Streak 49"** = 49 won, so Tower battle 50:
-  - IDs 200–299, not the Hard ladder;
-  - IV 21 for IDs 200–219, 31 for 220–299;
-  - with Silver held, the next Brain is Gold at battle 70.
+## Changes outside the module
 
-## Questions (one batch, answer once; each default is already in the mockups)
-
-1. **Dome "dropped" (1–3).**
-   - *Default:* the opponent's Pokémon in that slot, the one that did not battle (opponents also bring 2 of their 3).
-   - Shown in a "Dropped" column as the slot number and the species, e.g. "2 Salamence".
-2. **Factory rentals you never saw.**
-   - Each set's draft offers 6 and you rent 3; each swap offers the beaten trainer's Pokémon.
-   - *Default:* record only your 3 at each draft, plus each swap (out → in). Nothing for unpicked offers.
-   - An opponent Pokémon you never saw is "Unknown".
-3. **Spreadsheet import.**
-   - *Default:* a dev script converts the xlsx into the tracker's export JSON, and the existing document import loads it. No spreadsheet dependency in the PWA.
-   - `scripts/lib/xlsx.mjs` already reads the file with no dependency.
-   - The alternative is an in-app importer, which adds a parser to the app.
-4. **Dates.** The log has none.
-   - *Default:* imported runs carry the import date; new runs carry the date they start.
-5. **Win/loss.** The log has no result column.
-   - *Default on import:* every battle is a win, except the last battle of a run that another run follows (a loss). The last run of each block is ongoing.
-   - Please confirm Factory runs 1–4 ended in a loss rather than a retirement, and that Dome run 1 and Factory run 5 are ongoing.
-   - Because of this default, the Dome win rate per pair reads 100% for every pair.
-6. **Format and level.** The log doesn't say.
-   - *Default:* Singles for both, because Brains only appear in singles.
-   - Lv50 for both. The Factory's Lv50 is supported by Noland's team fitting the Lv50 draw. **Is the Dome Lv50?**
-7. **Battle Points before the app.**
-   - *Default:* an editable opening balance (0), then one ledger line per completed set. Shop spending is a minus line.
-   - Under the defaults, imported runs earn 82 BP: Dome 50, Factory 32.
-   - The alternative is one "current balance" field instead.
-8. **Opponent trainer.** The log has no trainer column.
-   - *Default:* no trainer field per battle.
-9. **Factory run 4, battle 29.**
-   - It is a new set, so the game re-drafts the rentals at that point (`factory_generaterentalmons`).
-   - Your log keeps Espeon and Heracross across that draft.
-   - *Default:* shown as logged, as set 5's draft. Please confirm it is not a typo.
-10. **Run detail is a screen inside the module.**
-    - *Default:* its "All runs" link is the module's own control, like Team Building's screens. It is not a step in the back stack.
-11. **The Sets list.**
-    - *Default:* one scrolling list of all 882 (the mockup shows the first 30).
-    - The alternative is pages.
-12. **Sprites.**
-    - *Default:* names only (links to the species page) in Brains, the log and the sets.
-    - Should Brain teams and log rows show sprites, as Trainer Dex parties do?
-13. **Symbol toggles.**
-    - The design system's Toggle turns accent when on, and accent is reserved for the tab and the selected view.
-    - *Default:* a checkbox icon with a semibold label instead.
-14. **Links at rest.**
-    - *Default:* no line at rest, a hairline on hover (per the audit).
-    - The Pokédex's egg-group links keep a hairline at rest. Which one do you want?
-15. **Streak lookup location.**
-    - *Default:* inside Sets & Trainers only.
-    - Should a log row also open it for that battle?
-16. **Dome team.**
-    - *Default:* your three are recorded once per run (the log has one team line), and each battle records the pair you brought.
+- **`src/phoneShell.css`:** the bottom tab bar has 4 columns (was 3).
+  - With 3, the fourth tab wrapped onto a second row. That row covered the bottom of every scroller on a phone, which reserves room for one row only.
+  - `verify-mobile` now expects four tabs in one row.
+  - The phone layout is otherwise parked and unchanged.
+- **`scripts/verify-design-system.mjs`:** the expected tab list now includes Battle Frontier.
+- **`design-system/`:** per its rule (a component's `.md` plus a CHANGELOG entry in the same commit):
+  - CHANGELOG 2.1.23;
+  - a link exception in `link.md` (your Q14 answer);
+  - the Frontier dropdown in `nav.md`.
+- **`scripts/lib/suiteMap.mjs`:** `battle-frontier/`, `navConfig`, `stubs/` and the frontier mockups route to `frontier-reference`.
 
 ## Assumptions
 
-- **Fonts** are inlined as data URIs: the latin subsets of Plex Sans Roman and Martian Mono. The other mockups load no fonts and fall back to system faces.
-- **Accent per screen:**
-  - the Battle Frontier tab;
-  - on Sets & Trainers, also the selected view tab;
-  - the open dropdown marks the current entry by weight only.
-- **BP per format** on Facilities is one line per format, in runs: "1–2 → 1 · 3–4 → 2 · … · 29 on → 15". It is exact; a 30-column table did not fit.
-- **The tracker stores the battle number as logged.** It is converted to the loader's streak only when the loader is called (Dome: wins before the battle ÷ 4). The screens show the logged number and its label, never the raw streak.
-- **A Brain flag on a log row** comes from `trainerPoolForStreak({ symbols })` (the same rule as `nextBrainAt`); in the Dome, only on the final.
-- **Factory rentals:**
-  - a heading line at each set's draft (battles 1, 8, 15, 22, 29, 36);
-  - a swap line where one changed inside a set;
-  - never repeated on every row.
-- **The per-battle note** is an optional field when logging (state 4). Notes do not get their own log column.
-- **The stats panel** belongs to facility × format × level, not to a run. Its "Current streak" names the run it comes from.
-- **Narrow frames** use a container query at 900 px, so the regions stack inside a 390 px frame. The phone layout stays parked.
-- **`docs/status/`** is gitignored, so this file and the screenshots are force-added.
+- **`streak` in the lookup's input** counts battles won, the way your log counts them: battle = streak + 1, so "streak 49" is battle 50. The Dome is also counted in battles, and is converted to tournaments only inside.
+- **`initial` seeds the form once, when it mounts.** To open it on another log row, the tracker gives it a new React `key`.
+- **IVs per trainer ID** (Trainers view) are read from the loader's own pools. The loader API has no direct call for them, and the loader may not change.
+- **Search** matches a case-insensitive substring of the species name, a trainer class that draws the set, or the held item.
 
 ## Open items
 
-- None blocks the build. Answering questions 1, 5, 6 and 9 also fixes the import.
-- Not drawn: dark theme (nothing theme-specific), sprites (question 12), Platinum and HGSS.
+- **Third tab or panel.** The lookup as a third tab is my call. Moving it under the lists, or onto its own entry, is a small change if you prefer.
+- **Tracker branch.** Open the lookup through `SetsTrainers`' `lookup` prop, or a one-shot handoff. `format` is part of the input now.
+- **Mockup generator.** `scripts/mockups/frontier.mjs` shares the Pyramid label issue (deviation 5). The mockups were not regenerated.
+- **`check --all`** was not run. Run it before merging.
+
+## Preview
+
+**NOT published.** The push to the `preview` remote was denied in this session.
+
+To publish it yourself:
+
+1. Open a terminal in the repo folder.
+2. Run `git push --force preview feature/frontier-reference:main`.
+3. Wait for the Pages deploy in `hrezende423/pokeapp-preview` to finish (its Actions tab shows it).
+4. Open https://hrezende423.github.io/pokeapp-preview/
+5. In the account menu, set the generation to **3**. The default is 4, which shows the notice.
+6. Open the **Battle Frontier** tab.
+7. Add `?layout=1` to the URL, or press Ctrl+Shift+L, to see the region names.
+
+**For the review**, name regions from `?layout=1`. Mark up all three screens in one batch.
