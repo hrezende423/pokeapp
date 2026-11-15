@@ -278,10 +278,308 @@
   margin-left: calc(-1 * var(--space-3));
 }
 
+/* ------------------------------------------------------------ the Battle Pyramid (PyramidPanel.tsx) */
+
+/* The run head's totals line, under the facts. */
+.bf-run-head.bf-run-head-pyr {
+  grid-template-areas:
+    'back back'
+    'title facts'
+    '. totals';
+}
+.bf-pyr-totals {
+  grid-area: totals;
+  color: var(--color-text-muted);
+}
+
+/* A floor being logged, or a logged one reopened: areas set inline (only those it has). */
+.bf-pyr {
+  display: grid;
+  row-gap: var(--space-6);
+  min-width: 0;
+}
+.bf-pyr > * {
+  min-width: 0;
+}
+/* The open floor's hairline is its own; no gap above or below it (hairline-band rule). */
+.bf-pyr-open {
+  padding-block: var(--space-3);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.bf-pyr-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-4);
+}
+.bf-pyr-strip {
+  display: grid;
+  grid-template-areas: 'modes' 'pane';
+  row-gap: var(--space-4);
+}
+
+/* Wild / Trainer / Item: three big ghost buttons; the chosen one carries a neutral underbar, never the accent. */
+.bf-pyr-modes {
+  grid-area: modes;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: calc(var(--space-16) * 8);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.bf-pyr-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  column-gap: var(--space-2);
+  min-height: var(--space-12);
+  padding: 0 var(--space-3);
+  font: inherit;
+  letter-spacing: inherit;
+  font-size: var(--font-style-label-size);
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  border-bottom: var(--border-width-thick) solid transparent;
+  margin-bottom: calc(-1 * var(--border-width-thin));
+  cursor: pointer;
+}
+.bf-pyr-mode:hover:not([aria-pressed='true']) {
+  color: var(--color-text-default);
+}
+.bf-pyr-mode[aria-pressed='true'] {
+  color: var(--color-text-default);
+  border-bottom-color: var(--color-text-default);
+}
+.bf-pyr-mode svg {
+  flex: none;
+}
+
+.bf-pyr-pane {
+  grid-area: pane;
+  display: grid;
+  row-gap: var(--space-4);
+  min-width: 0;
+}
+.bf-pyr-pane > * {
+  min-width: 0;
+}
+.bf-pyr-catline {
+  margin: 0;
+}
+
+/* The 20 categories: the hint's first line, the tactic under it. Plain text buttons, no fill, no border. */
+.bf-pyr-cats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-16) * 4), 1fr));
+  gap: var(--space-1) var(--space-6);
+  margin-top: var(--space-2);
+}
+.bf-pyr-cat {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  padding: var(--space-1) 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  color: var(--color-text-default);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.bf-pyr-cat:hover > span:first-child,
+.bf-pyr-cat[aria-pressed='true'] > span:first-child {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* One-tap picks: a sprite, the name, the count so far. */
+.bf-pyr-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-16) * 2 + var(--space-8)), 1fr));
+  gap: var(--space-1) var(--space-4);
+}
+.bf-pyr-pick {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-2);
+  min-height: var(--space-12);
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  color: var(--color-text-default);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.bf-pyr-pick:hover {
+  font-weight: var(--font-weight-semibold);
+}
+.bf-pyr-pick .bf-sprite,
+.bf-pyr-met .bf-sprite {
+  flex: none;
+}
+
+.bf-pyr-trainer {
+  grid-template-areas:
+    'pick lost'
+    'more more';
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-4);
+  align-items: end;
+}
+.bf-pyr-more {
+  display: grid;
+  row-gap: var(--space-2);
+}
+.bf-pyr-disclose {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-1);
+}
+.bf-pyr-more-fields {
+  display: grid;
+  grid-template-areas: 'trainer set';
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-4);
+}
+.bf-pyr-more-fields > * {
+  min-width: 0;
+}
+
+.bf-pyr-brain {
+  display: grid;
+  grid-template-areas:
+    'title title title lost'
+    's1 s2 s3 lost'
+    'cap cap cap cap';
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: var(--space-2) var(--space-4);
+  align-items: end;
+}
+.bf-pyr-brain > * {
+  min-width: 0;
+}
+
+/* The floor's entries: three lists; each row's hairline is its own, no row gap. */
+.bf-pyr-entries {
+  display: grid;
+  grid-template-areas: 'trainers wild items';
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--space-8);
+  align-items: start;
+}
+.bf-pyr-entries > * {
+  min-width: 0;
+}
+.bf-pyr-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bf-pyr-entry {
+  display: grid;
+  grid-template-areas: 'what acts';
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-2);
+  align-items: center;
+  padding-block: var(--space-1);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.bf-pyr-what {
+  grid-area: what;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-2);
+  min-width: 0;
+}
+.bf-pyr-acts {
+  grid-area: acts;
+  display: inline-flex;
+}
+.bf-ghost.bf-pyr-step {
+  padding: 0 var(--space-1);
+}
+
+.bf-pyr-actions {
+  display: grid;
+  grid-template-areas:
+    'note next'
+    'retire retire';
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
+}
+.bf-pyr-actions .bf-retire {
+  justify-content: end;
+}
+
+/* The floor log: one row a floor, its three lists as labelled lines. */
+.bf-pyr-lines {
+  display: grid;
+  row-gap: var(--space-1);
+}
+.bf-pyr-line {
+  display: grid;
+  grid-template-areas: 'label items';
+  grid-template-columns: var(--space-16) minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: center;
+}
+.bf-pyr-line > .bf-cap {
+  grid-area: label;
+}
+.bf-pyr-line-items {
+  grid-area: items;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+.bf-pyr-met {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-1);
+}
+/* Home's Pyramid tables carry sprites: centre the count on them. */
+.bf-pyr-ins td {
+  vertical-align: middle;
+}
+
 /* ------------------------------------------------------------ narrow */
 
 /* Phone layout is parked: this only stacks the regions so nothing clips. */
 @container frontier (max-width: 900px) {
+  .bf-run-head.bf-run-head-pyr {
+    grid-template-areas: 'back' 'title' 'facts' 'totals';
+  }
+  .bf-pyr-entries {
+    grid-template-areas: 'trainers' 'wild' 'items';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-4);
+  }
+  .bf-pyr-trainer {
+    grid-template-areas: 'pick' 'lost' 'more';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-2);
+  }
+  .bf-pyr-more-fields {
+    grid-template-areas: 'trainer' 'set';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-2);
+  }
+  .bf-pyr-brain {
+    grid-template-areas: 'title' 's1' 's2' 's3' 'lost' 'cap';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-pyr-actions {
+    grid-template-areas: 'note' 'next' 'retire';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-pyr-actions .bf-retire {
+    justify-content: start;
+  }
   .bf-tracker {
     grid-template-areas: 'head' 'main' 'side';
     grid-template-columns: minmax(0, 1fr);
