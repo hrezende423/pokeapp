@@ -60,6 +60,7 @@ export function SpeciesPicker({
   allowUnknown = true,
   testId,
   focusOnMount = false,
+  additive = false,
 }: {
   label: string
   area?: string
@@ -69,6 +70,11 @@ export function SpeciesPicker({
   testId: string
   /** Focus (and so open) on mount: the Pyramid's Trainer mode, one tap from its options. */
   focusOnMount?: boolean
+  /**
+   * Each pick ADDS an entry (the Pyramid): a tap on the field reopens the list for
+   * the next one, and with text typed Enter takes the first match, not Unknown.
+   */
+  additive?: boolean
 }) {
   const list = useMemo(() => speciesEntries({ generation: FRONTIER_GENERATION, isAll: false }), [])
   const [text, setText] = useState('')
@@ -110,9 +116,15 @@ export function SpeciesPicker({
           setOpen(true)
           e.target.select()
         }}
+        onClick={() => {
+          if (!additive || open) return
+          setText(shown)
+          setActive(0)
+          setOpen(true)
+        }}
         onChange={(e) => {
           setText(e.target.value)
-          setActive(0)
+          setActive(additive && allowUnknown && e.target.value.trim() ? 1 : 0)
           setOpen(true)
         }}
         onBlur={() => setOpen(false)}

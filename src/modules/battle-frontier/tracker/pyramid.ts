@@ -13,6 +13,7 @@
 import type { FrontierData } from '../data'
 import {
   logBattle,
+  type Battle,
   type OpenFloor,
   type PyramidFloor,
   type PyramidTrainer,
@@ -143,6 +144,11 @@ export function editOpenFloor(doc: TrackerDoc, runId: string, fn: (o: OpenFloor)
   return { ...doc, runs: doc.runs.map((r) => (r.id === runId ? { ...r, openFloor: next } : r)) }
 }
 
+/** Change a logged floor's own fields (its note, Brandon's three): a saved floor reopened. */
+export function editLoggedBattle(doc: TrackerDoc, battleId: string, fn: (b: Battle) => Battle): TrackerDoc {
+  return { ...doc, battles: doc.battles.map((b) => (b.id === battleId ? fn(b) : b)) }
+}
+
 /** Change a logged (closed) floor's lists: a saved floor reopened. Its result and number stay. */
 export function editLoggedFloor(doc: TrackerDoc, battleId: string, fn: (f: PyramidFloor) => PyramidFloor): TrackerDoc {
   return {
@@ -214,11 +220,16 @@ export interface PyramidTotals {
   items: number
 }
 
+/**
+ * The floor still open when the run stopped: the ongoing run's, or the entries a
+ * run retired on mid-floor keeps (a loss closes its floor, so it has none).
+ */
+export const unclosedFloor = (v: Pick<RunView, 'run' | 'battles'>): PyramidFloor => openFloorOf(v.run, v.battles).pyramid
+
 /** A run's floors (closed ones) and what was logged on them, the open floor's entries included. */
 export function pyramidTotals(v: Pick<RunView, 'run' | 'battles'>): PyramidTotals {
   const floors = v.battles.map((b) => b.pyramid ?? EMPTY_FLOOR)
-  const open = v.run.outcome === 'ongoing' ? openFloorOf(v.run, v.battles).pyramid : EMPTY_FLOOR
-  const all = [...floors, open]
+  const all = [...floors, unclosedFloor(v)]
   return {
     floors: v.battles.length,
     trainers: all.reduce((s, f) => s + f.trainers.length, 0),
@@ -251,8 +262,7 @@ export function pyramidInsights(
   }
   for (const v of view.ordered) {
     if (v.run.facility !== 'pyramid') continue
-    const floors = v.battles.map((b) => b.pyramid ?? EMPTY_FLOOR)
-    if (v.run.outcome === 'ongoing') floors.push(openFloorOf(v.run, v.battles).pyramid)
+    const floors = [...v.battles.map((b) => b.pyramid ?? EMPTY_FLOOR), unclosedFloor(v)]
     for (const f of floors) {
       for (const w of f.wild) add(wild, w.species, w.count)
       for (const x of f.items) add(items, x.itemId, x.qty)

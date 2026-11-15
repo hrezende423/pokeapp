@@ -322,6 +322,7 @@
 .bf-pyr-modes {
   grid-area: modes;
   display: grid;
+  grid-template-areas: 'wild trainer item';
   grid-template-columns: repeat(3, minmax(0, 1fr));
   max-width: calc(var(--space-16) * 8);
   border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
@@ -378,6 +379,7 @@
   display: grid;
   justify-items: start;
   align-content: start;
+  min-height: var(--space-12);
   padding: var(--space-1) 0;
   font: inherit;
   letter-spacing: inherit;
@@ -443,6 +445,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: var(--space-4);
 }
+.bf-pyr-more-fields.bf-pyr-more-which {
+  grid-template-areas: 'which trainer set';
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .bf-pyr-more-fields > * {
   min-width: 0;
 }
@@ -459,6 +465,13 @@
 }
 .bf-pyr-brain > * {
   min-width: 0;
+}
+/* A logged Brain floor reopened: his three only (the result stays). */
+.bf-pyr-brain.bf-pyr-brain-edit {
+  grid-template-areas:
+    'title title title'
+    's1 s2 s3';
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 /* The floor's entries: three lists; each row's hairline is its own, no row gap. */
@@ -483,7 +496,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: var(--space-2);
   align-items: center;
-  padding-block: var(--space-1);
   border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
 }
 .bf-pyr-what {
@@ -498,8 +510,12 @@
   grid-area: acts;
   display: inline-flex;
 }
+/* Icon-only: a 48px hit area each (the 44px touch minimum); the row's height comes from them. */
 .bf-ghost.bf-pyr-step {
-  padding: 0 var(--space-1);
+  justify-content: center;
+  width: var(--space-12);
+  height: var(--space-12);
+  padding: 0;
 }
 
 .bf-pyr-actions {
@@ -537,8 +553,9 @@
   align-items: center;
   gap: var(--space-1) var(--space-3);
 }
+/* Flex, not inline-flex: inside a table cell an inline box sits on the text baseline and makes the row taller. */
 .bf-pyr-met {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   column-gap: var(--space-1);
 }
@@ -569,8 +586,16 @@
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--space-2);
   }
+  .bf-pyr-more-fields.bf-pyr-more-which {
+    grid-template-areas: 'which' 'trainer' 'set';
+    grid-template-columns: minmax(0, 1fr);
+  }
   .bf-pyr-brain {
     grid-template-areas: 'title' 's1' 's2' 's3' 'lost' 'cap';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-pyr-brain.bf-pyr-brain-edit {
+    grid-template-areas: 'title' 's1' 's2' 's3';
     grid-template-columns: minmax(0, 1fr);
   }
   .bf-pyr-actions {
