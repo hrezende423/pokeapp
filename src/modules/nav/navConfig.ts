@@ -1,3 +1,4 @@
+import { findFrontierPage, type FrontierPageId } from '../battle-frontier/pages'
 import { findCalculatorsPage, type CalculatorsPageId } from '../calculators/pages'
 import { findCollectionPage, type CollectionPageId } from '../collection/pages'
 import { StubPage } from '../stubs/StubPage'
@@ -43,6 +44,7 @@ export type PageId =
   | TeamMatchupPageId
   | ToolsPageId
   | CollectionPageId
+  | FrontierPageId
   | StubPageId
 
 export interface NavEntry {
@@ -115,6 +117,20 @@ export const NAV_TABS: readonly NavTab[] = [
     ],
   },
   {
+    id: 'battle-frontier',
+    label: 'Battle Frontier',
+    /* Clicking the word opens Facilities. Emerald (Gen 3) only: under any other
+       generation every screen shows one notice (no selector of its own). */
+    destination: 'frontier-facilities',
+    entries: [
+      { id: 'frontier-facilities', label: 'Facilities' },
+      { id: 'frontier-brains', label: 'Brains' },
+      /* A stub until the tracker's own branch. */
+      ...stubs('frontier-tracker'),
+      { id: 'frontier-sets', label: 'Sets & Trainers' },
+    ],
+  },
+  {
     id: 'tools',
     label: 'Tools',
     /* Clicking the word opens the Tools index (owner, 2026-10-15): every tool,
@@ -179,6 +195,8 @@ export function findPage(id: PageId): ResolvedPage {
   if (tm) return { id: tm.id, label: tm.label, Component: tm.Component }
   const col = findCollectionPage(id)
   if (col) return { id: col.id, label: col.label, Component: col.Component }
+  const bf = findFrontierPage(id)
+  if (bf) return { id: bf.id, label: bf.label, Component: bf.Component }
   const tool = findToolsPage(id)
   if (tool) return { id: tool.id, label: tool.label, Component: tool.Component }
   const stub = findStub(id)

@@ -5,7 +5,7 @@
   (and every signed-off screen at desktop width) is byte-for-byte unchanged; nothing
   here touches a frozen screen's own CSS.
 
-  - The three nav groups become a FIXED BOTTOM TAB BAR: three equal cells, 48px
+  - The four nav groups become a FIXED BOTTOM TAB BAR: four equal cells, 48px
     tall, padded by the home-indicator inset. The active tab keeps its accent: the
     one sanctioned "active nav item" use, the same as on desktop.
   - A tapped tab opens its entries as a full-width SHEET above the bar: 48px rows,
@@ -87,8 +87,11 @@
     bottom: 0;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-areas: 'tab-1 tab-2 tab-3';
+    /* One row, one column per tab (Battle Frontier made it four, 2026-11-14):
+       a wrapped second row would cover the bottom of every scroller, which
+       reserves one bar's height only. */
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-areas: 'tab-1 tab-2 tab-3 tab-4';
     gap: 0;
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--color-bg-surface);

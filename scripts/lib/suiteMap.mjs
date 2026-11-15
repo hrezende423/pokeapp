@@ -27,6 +27,9 @@ export const SUITES_BY_PATH = [
   // The Frontier data layer joins its rules bundle with the Emerald trainer
   // partition and resolves names through the dex's scoped species list.
   ['src/modules/battle-frontier/', ['frontier-data']],
+  // The reference screens: the tab, Facilities, Brains, Sets & Trainers, the lookup.
+  ['src/modules/battle-frontier/', ['frontier-reference']],
+  ['public/mockups/frontier-', ['frontier-reference']],
   ['scripts/frontier/', ['frontier-data']],
   ['public/data/frontier/', ['frontier-data']],
   ['public/data/trainers/emerald.json', ['frontier-data']],
@@ -42,6 +45,9 @@ export const SUITES_BY_PATH = [
   ['src/modules/nav/', ['scroll-nav', 'dexes', 'tools', 'ds']],
   // verify-ux asserts the back stack and the evolution data: the map once hid its failure.
   ['src/modules/nav/', ['ux']],
+  // The Battle Frontier tab lives in navConfig; its stub entry in stubs/.
+  ['src/modules/nav/navConfig', ['frontier-reference']],
+  ['src/modules/stubs/', ['frontier-reference']],
   ['src/modules/stubs/', ['ds']],
   ['src/components/', ['scroll-nav', 'ds']],
   ['src/modules/design-system/', ['ds']],

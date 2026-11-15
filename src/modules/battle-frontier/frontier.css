@@ -1,0 +1,494 @@
+/*
+  Battle Frontier reference screens. The approved mockups' CSS
+  (scripts/mockups/frontier.mjs), scoped to .bf. Semantic tokens from
+  design-system/dist/tokens.css only, both themes; no shadow, no hover fill,
+  no badge. Accent: the selected view tab only (the nav tab is the other).
+*/
+
+/* ------------------------------------------------------------ module root */
+
+.bf {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-style-body-size);
+  line-height: var(--font-style-body-line-height);
+  letter-spacing: var(--font-style-body-letter-spacing);
+  color: var(--color-text-default);
+}
+
+.bf-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The page's container: an element cannot query itself (MODULE-PATTERNS §1). */
+.bf-scroll-area {
+  container: frontier / inline-size;
+}
+
+/*
+  App.css's bare `.panel h2` / `.panel section` and index.css's h1/h2 reach
+  every heading and section here (MODULE-PATTERNS §10); reset them once.
+*/
+.panel .bf :is(h1, h2, h3, section) {
+  margin: 0;
+  padding-top: 0;
+  border-top: 0;
+  font-family: inherit;
+  font-weight: var(--font-weight-regular);
+  text-transform: none;
+  color: inherit;
+}
+
+.bf p,
+.bf dl {
+  margin: 0;
+}
+
+.bf-page {
+  display: grid;
+  grid-template-areas: 'head' 'body';
+  gap: var(--space-8);
+  padding: var(--space-6) 0;
+  min-width: 0;
+}
+.bf-page > * {
+  min-width: 0;
+}
+
+.bf-head {
+  grid-area: head;
+  display: grid;
+  grid-template-areas: 'title scope';
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--space-4);
+}
+.panel .bf .bf-title {
+  grid-area: title;
+  font-size: var(--font-style-h4-size);
+  line-height: var(--font-style-h4-line-height);
+  letter-spacing: var(--font-tracking-heading);
+}
+.bf-scope {
+  grid-area: scope;
+  color: var(--color-text-muted);
+  font-size: var(--font-style-caption-size);
+}
+.bf-notice {
+  grid-area: body;
+  padding: var(--space-8) 0;
+  color: var(--color-text-muted);
+}
+.bf-page > :not(.bf-head):not(.bf-notice) {
+  grid-area: body;
+}
+
+/* ------------------------------------------------------------ type */
+
+.bf-sec {
+  font-size: var(--font-style-caption-size);
+  line-height: var(--font-style-caption-line-height);
+  letter-spacing: var(--font-tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding-bottom: var(--space-2);
+}
+.panel .bf .bf-name {
+  font-size: var(--font-style-name-size);
+  line-height: var(--font-style-name-line-height);
+  letter-spacing: var(--font-tracking-name);
+}
+.bf-muted {
+  color: var(--color-text-muted);
+}
+.bf-mono {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-style-data-size);
+  letter-spacing: var(--font-tracking-data);
+}
+.bf-cap {
+  font-size: var(--font-style-caption-size);
+  line-height: var(--font-style-caption-line-height);
+  color: var(--color-text-muted);
+}
+.bf-nw {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ links */
+
+/* A clickable label, never a button shape: no line at rest, a hairline on hover. */
+.bf-link {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: var(--border-width-thin) solid transparent;
+  border-radius: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+.bf-link:hover {
+  border-bottom-color: var(--color-border-strong);
+}
+.bf button:focus-visible,
+.bf input:focus-visible,
+.bf select:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* The Pokémon cell: the Emerald sprite (32px, as the Trainer Dex's party), then the name. */
+/* A block grid, not inline: an inline one sits on the text baseline and lifts the
+   name above the row's other cells. */
+.bf-mon {
+  display: grid;
+  grid-template-areas: 'sprite name';
+  grid-template-columns: var(--space-8) auto;
+  justify-content: start;
+  align-items: center;
+  column-gap: var(--space-2);
+}
+.bf-sprite {
+  grid-area: sprite;
+  display: block;
+  width: var(--space-8);
+  height: var(--space-8);
+  image-rendering: pixelated;
+}
+.bf-mon .bf-link,
+.bf-mon .bf-muted {
+  grid-area: name;
+}
+/* The hover hairline's room is not part of the text: keep the name on the row's line. */
+.bf-mon .bf-link {
+  margin-bottom: calc(-1 * var(--border-width-thin));
+}
+
+/* ------------------------------------------------------------ key-value rows */
+
+/* The hairline is the row's; no row gap (hairline-band rule). */
+.bf-kv {
+  display: grid;
+}
+.bf-kv > div {
+  display: grid;
+  grid-template-areas: 'k v';
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  column-gap: var(--space-4);
+  padding-block: var(--space-2);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.bf-kv dt {
+  grid-area: k;
+  color: var(--color-text-muted);
+}
+.bf-kv dd {
+  grid-area: v;
+  margin: 0;
+}
+
+/* ------------------------------------------------------------ tables */
+
+.bf-tw {
+  overflow-x: auto;
+  min-width: 0;
+}
+.bf-t {
+  width: 100%;
+  border-collapse: collapse;
+}
+.bf-t th {
+  font-size: var(--font-style-label-caps-size);
+  line-height: var(--font-style-label-caps-line-height);
+  letter-spacing: var(--font-tracking-caps);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
+  text-align: left;
+  white-space: nowrap;
+  padding: var(--space-2) var(--space-4) var(--space-2) 0;
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.bf-t td {
+  padding: var(--space-2) var(--space-4) var(--space-2) 0;
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+  vertical-align: top;
+}
+/* A row with a sprite centres its text on the sprite. */
+.bf-team td,
+.bf-set-table td {
+  vertical-align: middle;
+}
+.bf-t .bf-r {
+  text-align: right;
+}
+.bf-team {
+  table-layout: fixed;
+}
+.bf-trainer-row {
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------ fields */
+
+.bf-field {
+  display: grid;
+  row-gap: var(--space-1);
+  min-width: 0;
+}
+.bf-uf {
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--color-text-default);
+  background: none;
+  border: 0;
+  border-bottom: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: 0;
+  height: var(--d-field);
+  padding: 0 var(--space-1);
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+.bf-uf::placeholder {
+  color: var(--color-text-disabled);
+}
+.bf-uf.bf-num {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-style-data-size);
+}
+.bf-textfilter {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-1);
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--color-text-default);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.bf-textfilter[aria-pressed='true'] {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* View tabs: the selected one is the screen's second accent. */
+.bf-vtabs {
+  display: flex;
+  column-gap: var(--space-6);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.bf-vtabs button {
+  font: inherit;
+  letter-spacing: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: var(--space-2) 0;
+  color: var(--color-text-muted);
+  border-bottom: var(--border-width-thick) solid transparent;
+  margin-bottom: calc(-1 * var(--border-width-thin));
+}
+.bf-vtabs button[aria-selected='true'] {
+  color: var(--color-accent-default);
+  font-weight: var(--font-weight-semibold);
+  border-bottom-color: var(--color-accent-default);
+}
+
+/* ------------------------------------------------------------ stacks */
+
+.bf-stack {
+  display: grid;
+  row-gap: var(--space-3);
+  min-width: 0;
+}
+.bf-stack > *,
+.bf-three > *,
+.bf-five > *,
+.bf-six > * {
+  min-width: 0;
+}
+.bf-sets-view {
+  grid-template-areas: 'views' 'controls' 'count' 'list';
+}
+.bf-trainers-view {
+  grid-template-areas: 'views' 'search' 'list';
+}
+.bf-lookup-body {
+  grid-template-areas: 'views' 'lookup';
+}
+.bf-three {
+  display: grid;
+  grid-template-areas: 'a b c';
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--space-8);
+}
+
+/* ------------------------------------------------------------ facilities */
+
+.bf-fac-grid {
+  display: grid;
+  grid-template-areas:
+    'tower dome'
+    'factory palace'
+    'arena pike'
+    'pyramid .'
+    'shared shared';
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12) var(--space-8);
+}
+.bf-fac {
+  display: grid;
+  grid-template-areas: 'name' 'rule' 'facts';
+  row-gap: var(--space-3);
+  min-width: 0;
+  align-content: start;
+}
+.bf-fac > * {
+  min-width: 0;
+}
+.bf-fac .bf-name {
+  grid-area: name;
+}
+.bf-fac .bf-rule {
+  grid-area: rule;
+}
+.bf-fac .bf-kv {
+  grid-area: facts;
+}
+.panel .bf .bf-shared {
+  grid-area: shared;
+  display: grid;
+  grid-template-areas:
+    'title title'
+    'symbols levels'
+    'banned bprules'
+    'shop shop';
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: var(--border-width-thin) solid var(--color-border-strong);
+}
+.bf-shared > * {
+  min-width: 0;
+}
+.bf-shop {
+  grid-area: shop;
+  display: grid;
+  grid-template-areas: 'd1 d2 vit hold';
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--space-6);
+}
+.bf-banned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* ------------------------------------------------------------ brains */
+
+.bf-brain-list {
+  display: grid;
+  min-width: 0;
+}
+.panel .bf .bf-brain {
+  display: grid;
+  grid-template-areas: 'head' 'when' 'silver' 'gold';
+  row-gap: var(--space-4);
+  padding-block: var(--space-8);
+  border-bottom: var(--border-width-thin) solid var(--color-border-strong);
+  min-width: 0;
+}
+.panel .bf .bf-brain:first-child {
+  padding-top: 0;
+}
+.panel .bf .bf-brain:last-child {
+  border-bottom: 0;
+}
+.bf-brain > * {
+  min-width: 0;
+}
+.bf-brain-head {
+  grid-area: head;
+  display: grid;
+  grid-template-areas: 'name meta';
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: baseline;
+}
+.bf-brain-head .bf-name {
+  grid-area: name;
+}
+.bf-brain-head .bf-meta {
+  grid-area: meta;
+}
+.bf-generated {
+  grid-template-areas: 'rule' 'note' 'ranges';
+}
+
+/* ------------------------------------------------------------ streak lookup */
+
+.bf-lookup {
+  grid-template-areas: 'title' 'hint' 'form' 'result';
+  padding-top: var(--space-3);
+}
+.bf-five {
+  display: grid;
+  grid-template-areas: 'a b c d e';
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: var(--space-8);
+}
+.bf-six {
+  display: grid;
+  grid-template-areas: 'a b c d e f';
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  column-gap: var(--space-8);
+}
+.bf-lookup [data-layout='streak-lookup-result'] {
+  max-width: calc(var(--space-16) * 7);
+  padding-top: var(--space-4);
+}
+
+/* ------------------------------------------------------------ narrow */
+
+/* Phone layout is parked: this only stacks the regions so nothing clips. */
+@container frontier (max-width: 900px) {
+  .bf-fac-grid {
+    grid-template-areas: 'tower' 'dome' 'factory' 'palace' 'arena' 'pike' 'pyramid' 'shared';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel .bf .bf-shared {
+    grid-template-areas: 'title' 'symbols' 'levels' 'banned' 'bprules' 'shop';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-shop {
+    grid-template-areas: 'd1' 'd2' 'vit' 'hold';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-team {
+    table-layout: auto;
+  }
+  .bf-three {
+    grid-template-areas: 'a' 'b' 'c';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-6);
+  }
+  .bf-five {
+    grid-template-areas: 'a' 'b' 'c' 'd' 'e';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-4);
+  }
+  .bf-six {
+    grid-template-areas: 'a' 'b' 'c' 'd' 'e' 'f';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-4);
+  }
+}

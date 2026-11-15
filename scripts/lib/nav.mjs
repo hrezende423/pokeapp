@@ -15,6 +15,7 @@
 export const TAB = {
   pokepedia: '[data-testid="nav-tab-pokepedia"]',
   teamBuilding: '[data-testid="nav-tab-team-building"]',
+  battleFrontier: '[data-testid="nav-tab-battle-frontier"]',
   tools: '[data-testid="nav-tab-tools"]',
 }
 

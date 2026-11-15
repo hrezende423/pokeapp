@@ -56,7 +56,8 @@
     "verify:mobile": "node scripts/verify-mobile.mjs",
     "verify:offline": "node scripts/verify-offline.mjs",
     "build:frontier": "node scripts/frontier/build.mjs",
-    "verify:frontier-data": "node scripts/verify-frontier-data.mjs"
+    "verify:frontier-data": "node scripts/verify-frontier-data.mjs",
+    "verify:frontier-reference": "node scripts/verify-frontier-reference.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

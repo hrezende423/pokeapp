@@ -1,0 +1,11 @@
+/*
+  The Battle Frontier dropdown marks the open entry by WEIGHT, not colour: the
+  tab trigger is this screen's first accent and Sets & Trainers' selected view
+  its second, so the line under them cannot be a third (at most 2 per screen).
+  Eager (imported by pages.ts): the nav renders before any screen chunk loads.
+*/
+[data-testid='nav-dropdown-battle-frontier'] .nav-item-active {
+  /* The other lines' own colour (.nav-item), so weight is the only difference. */
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
