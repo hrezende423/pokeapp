@@ -967,7 +967,7 @@ try {
   const row7 = await cells(page, '[data-testid="run-log"] tr[data-battle-n="7"]')
   check('Lost ends the run on floor 7: no strip, the row reads Golem (lost) and Lost', (await page.$('[data-testid="pyramid-add"]')) == null && /Golem\(lost\)/.test(row7) && row7.endsWith('| Lost | Edit') && (await readDoc()).runs.find((r) => r.id === pyrId).outcome === 'lost', row7)
   check('run head totals still match the logged data', norm(await appText(page, '[data-testid="run-totals"]')) === totalsText(await modelTotals()), norm(await appText(page, '[data-testid="run-totals"]')))
-  await full('pyramid-log-light')
+  await full('pyramid-log-full')
 
   // Home: the Pyramid insights.
   await page.click('[data-testid="tracker-all-runs"]')
@@ -999,7 +999,7 @@ try {
   const b21 = await cells(page, '[data-testid="run-log"] tr[data-brain-after="21"]')
   const b70 = await cells(page, '[data-testid="run-log"] tr[data-brain-after="70"]')
   check('... each with the 3-species team comparison: 21 his known Silver team, matches; 70 three Unknowns, differs', /Brandon · Silver.*Known team: .*· matches/.test(b21) && /\| Won \|/.test(b21) && (await page.$$eval('[data-testid="run-log"] tr[data-brain-after="21"] img.bf-sprite', (e) => e.length)) === 3 && /Brandon · Gold.*· differs/.test(b70), `${b21} // ${b70}`)
-  await full('pyramid-brain-light')
+  await full('pyramid-brain-rows')
   await page.click('[data-testid="tracker-all-runs"]')
   await page.click('[data-testid="tracker-run-pyr-20"]')
   await page.waitForSelector('[data-testid="pyramid-brain"]')
