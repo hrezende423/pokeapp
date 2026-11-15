@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { chromium } from 'playwright'
 import { CHROME } from './lib/browser.mjs'
@@ -95,6 +95,9 @@ const bundled = await build({
       "export * from './src/modules/battle-frontier/data/index.ts'",
       "export { initDataLayer, getSpecies } from './src/data/index.ts'",
       "export * as model from './src/modules/battle-frontier/tracker/model.ts'",
+      "export * as pyramid from './src/modules/battle-frontier/tracker/pyramid.ts'",
+      "export * as pyramidData from './src/modules/battle-frontier/tracker/pyramidData.ts'",
+      "export { itemEntries, speciesEntries } from './src/modules/dex/entrySources.ts'",
       "export { trackerDocument } from './src/modules/battle-frontier/tracker/trackerStore.ts'",
       "export { exportDocuments, importDocuments } from './src/store/documentStore.ts'",
       "export { syncTargetFor } from './src/sync/syncTargets.ts'",
@@ -284,6 +287,133 @@ check('tracker CSS: no accent at all (the nav tab is the screen\'s one use)', !/
 const storeBundle = await build({ entryPoints: [join(ROOT, 'src/modules/battle-frontier/tracker/trackerStore.ts')], bundle: true, write: false, metafile: true, format: 'esm', platform: 'browser', logLevel: 'silent' })
 const pulled = Object.keys(storeBundle.metafile.inputs).filter((f) => /battle-frontier\/data\/|src\/data\/|entrySources/.test(f.replace(/\\/g, '/')))
 check('the eager tracker store bundles no loader or data-layer code', pulled.length === 0, pulled.join(', '))
+
+hr('A10. THE BATTLE PYRAMID: the fixtures, the floor log, Brandon, BP, totals, the document')
+const { pyramid: P, pyramidData: PD } = api
+const tmpPyr = join(tmpdir(), `pyramid-data-${process.pid}.ts`)
+log(
+  execFileSync(process.execPath, ['scripts/frontier/build-pyramid.mjs', '--out', tmpPyr], { cwd: ROOT, encoding: 'utf8' })
+    .trim()
+    .split('\n')
+    .map((l) => `      ${l}`)
+    .join('\n'),
+)
+check('re-running build-pyramid reproduces the committed pyramidData.ts (line ends aside)', lf(readFileSync(tmpPyr, 'utf8')) === lf(read('src/modules/battle-frontier/tracker/pyramidData.ts')))
+rmSync(tmpPyr, { force: true })
+const { parseWild, parseItems, itemKey } = await import(pathToFileURL(join(ROOT, 'scripts/frontier/build-pyramid.mjs')).href)
+const wildFx = parseWild(read('docs/fixtures/pyramid-wild-categories.tsv'))
+const itemsFx = parseItems(read('docs/fixtures/pyramid-items-by-round.tsv'))
+const gen3 = new Set(api.speciesEntries({ generation: 3, isAll: false }).map((s) => s.id))
+const wildNames = wildFx.flatMap((c) => c.species)
+check('the wild fixture: 20 categories, 157 entries (category 6 lists 5 species, every other one 8)', wildFx.length === 20 && wildNames.length === 157 && json(wildFx.map((c) => c.species.length)) === json([8, 8, 8, 8, 8, 5, ...Array(14).fill(8)]), json(wildFx.map((c) => c.species.length)))
+const badWild = wildNames.filter((n) => !gen3.has(sp(n)))
+check('every wild entry of the fixture resolves to a Gen 3 species (#1-386), no alias', badWild.length === 0 && gen3.size === 386, badWild.join(', '))
+check('... and pyramidData holds exactly those ids, in order, with each hint and tactic', json(PD.PYRAMID_CATEGORIES.map((c) => [c.id, c.hint, c.tactic, c.species])) === json(wildFx.map((c) => [c.id, c.hint, c.tactic, c.species.map(sp)])))
+const itemIdx = new Map()
+for (const i of api.itemEntries({ generation: 3, isAll: false })) {
+  itemIdx.set(itemKey(i.name), i.id)
+  itemIdx.set(itemKey(i.display_name), i.id)
+}
+const it = (name) => itemIdx.get(itemKey(name))
+const itemNamesFx = itemsFx.flatMap((r) => r.items)
+check('the item fixture: rounds 1-40, ten slots each', itemsFx.length === 40 && itemsFx.every((r, i) => r.round === i + 1 && r.items.length === 10))
+const badItems = [...new Set(itemNamesFx.filter((n) => it(n) == null))]
+check('every item name of the fixture resolves to a Gen 3 item (the Itemdex list), no alias', badItems.length === 0, badItems.join(', '))
+check('... and pyramidData holds exactly those ids in slot order', json(PD.PYRAMID_ITEMS_BY_ROUND) === json(itemsFx.map((r) => r.items.map(it))))
+const R1 = ['Hyper Potion', 'Fluffy Tail', 'Cheri Berry', 'Ether', 'Lum Berry', 'Revive', 'Bright Powder', 'Shell Bell', 'Max Revive', 'Sacred Ash'].map(it)
+check('round 1 chips: its ten distinct items in slot order', json(P.roundItems(1)) === json(R1))
+check('round 7 lists Lum Berry twice: one chip, nine in slot order', json(P.roundItems(7)) === json(['Hyper Potion', 'X Sp. Atk', 'Lum Berry', 'Ether', 'Revive', 'Scope Lens', 'Focus Band', 'Max Revive', 'Sacred Ash'].map(it)))
+check('round 41 and past: no chips (search only)', P.roundItems(41).length === 0 && P.roundItems(60).length === 0)
+check('round = ceil(floor / 7): floors 1, 7, 8, 280, 281 -> 1, 1, 2, 40, 41; floor 21 reads "Round 3 · floor 7 of 7"', json([1, 7, 8, 280, 281].map((n) => P.roundOf(n, 7))) === '[1,1,2,40,41]' && P.floorLabel(21, 7) === 'Round 3 · floor 7 of 7')
+
+const PK = { facility: 'pyramid', format: 'singles', levelMode: 'lv50' }
+check('a floor\'s trainers are drawn at the floors cleared before it: floor 1 -> loader streak 0, floor 8 -> 7', M.floorPoolArgs(PK, 1).streak === 0 && M.floorPoolArgs(PK, 8).streak === 7)
+check('floor 7 reads the loader\'s Hard row, floor 1 the normal one', fd.trainerPoolForStreak(M.floorPoolArgs(PK, 7)).hard === true && fd.trainerPoolForStreak(M.floorPoolArgs(PK, 1)).hard === false)
+const pyrFac = fd.facilities().find((f) => f.id === 'pyramid')
+check('the loader\'s Pyramid party size is 3: the PLAYER\'s (and Brandon\'s); it has none for a regular trainer, built to the owner\'s rule of one', pyrFac.formats.length === 1 && pyrFac.formats[0].partySize === 3)
+const twoSpecies = M.normaliseTracker({
+  runs: [{ id: 'p', facility: 'pyramid', format: 'singles', levelMode: 'lv50', startedAt: '2026-11-15', outcome: 'ongoing' }],
+  battles: [{ id: 'pb', runId: 'p', n: 1, opponents: [null, null, null], result: 'W', pyramid: { trainers: [{ species: [sp('gengar'), sp('haunter')], result: 'W' }, { species: sp('gengar'), result: 'W' }, { species: null, result: 'W' }, { result: 'W' }], wild: [], items: [] } }],
+})
+check('model: a trainer entry with two species (or none) is not a Pyramid trainer and is dropped on read; one species or Unknown stays', json(twoSpecies.battles[0].pyramid.trainers) === json([{ species: sp('gengar'), result: 'W' }, { species: null, result: 'W' }]), json(twoSpecies.battles[0].pyramid.trainers))
+let threw = false
+try {
+  P.addTrainer(P.EMPTY_FLOOR, [sp('gengar'), sp('haunter')])
+} catch {
+  threw = true
+}
+check('model: adding a trainer with two species throws', threw)
+
+const at = '2026-11-15'
+const edOpen = (d, runId, fn) => P.editOpenFloor(d, runId, (o) => ({ ...o, pyramid: fn(o.pyramid) }))
+let Q = M.startRun(M.EMPTY_TRACKER, PK, at, 'pyr')
+Q = edOpen(Q, 'pyr', (f) => P.setCategory(f, 1))
+for (let k = 0; k < 3; k++) Q = edOpen(Q, 'pyr', (f) => P.addWild(f, sp('pikachu')))
+Q = edOpen(Q, 'pyr', (f) => P.addTrainer(f, sp('gengar')))
+Q = edOpen(Q, 'pyr', (f) => P.addTrainer(f, null))
+Q = edOpen(Q, 'pyr', (f) => P.addItem(f, R1[0]))
+Q = edOpen(Q, 'pyr', (f) => P.addItem(f, R1[4]))
+const open1 = Q.runs[0].openFloor
+check('every edit saves the open floor on the run: floor 1, Pikachu x3, Gengar and Unknown, two items', open1.n === 1 && json(open1.pyramid.wild) === json([{ species: sp('pikachu'), count: 3 }]) && json(open1.pyramid.trainers.map((t) => t.species)) === json([sp('gengar'), null]) && json(open1.pyramid.items) === json([{ itemId: R1[0], qty: 1 }, { itemId: R1[4], qty: 1 }]))
+Q = P.closeFloor(Q, fd, 'pyr', 'W', at, ids('p1'))
+const f1 = Q.battles.find((b) => b.runId === 'pyr' && b.n === 1)
+check('Next floor: floor 1 is a battle (n 1, W, three Unknown opponents) holding its lists; the open floor is gone', f1?.result === 'W' && json(f1.opponents) === '[null,null,null]' && f1.pyramid.trainers.length === 2 && f1.pyramid.wild[0].count === 3 && f1.pyramid.items.length === 2 && f1.pyramid.wildCategory === 1 && Q.runs[0].openFloor == null)
+const vQ = (d) => M.deriveTracker(d, fd).runs.get('pyr')
+check('the category is remembered for the round: floor 2 uses category 1 with no pick', P.categoryAt(Q.runs[0], vQ(Q).battles, 2, 7) === 1)
+for (let n = 2; n <= 7; n++) Q = P.closeFloor(Q, fd, 'pyr', 'W', at, ids(`p${n}`))
+check('... floor 2 closed with it stored; floor 8 opens round 2 with none', Q.battles.find((b) => b.runId === 'pyr' && b.n === 2).pyramid.wildCategory === 1 && P.categoryAt(Q.runs[0], vQ(Q).battles, 8, 7) === undefined)
+const l7 = Q.bp.ledger.at(-1)
+check('floor 7 completes challenge 1: bpAward\'s line, 5 BP, "Pyramid run 1, challenge 1"', Q.bp.ledger.length === 1 && l7.set === 1 && l7.delta === fd.bpAward({ facility: 'pyramid', format: 'singles', completedSets: 1 }).points && l7.delta === 5 && l7.reason === 'Pyramid run 1, challenge 1', json(l7))
+Q = edOpen(Q, 'pyr', (f) => P.addWild(f, sp('haunter')))
+const U = M.undoLastBattle(Q, 'pyr', 7)
+check('undo floor 7: the floor, its lists and its BP line go; the next floor\'s open entries with it', !U.battles.some((b) => b.runId === 'pyr' && b.n === 7) && U.bp.ledger.length === 0 && U.runs[0].openFloor == null && U.battles.filter((b) => b.runId === 'pyr').length === 6)
+let BB = U
+const brandon = fd.brains().find((b) => b.facility === 'pyramid')
+const silverTeam = brandon.teams.silver.map((m) => m.species_id)
+for (let n = 7; n <= 70; n++) {
+  if (n === 21) BB = P.editOpenFloor(BB, 'pyr', (o) => ({ ...o, opponents: silverTeam }))
+  BB = P.closeFloor(BB, fd, 'pyr', 'W', at, ids(`b${n}`))
+}
+const vB = vQ(BB)
+const brainFloors = vB.battles.filter((b) => vB.brains.has(b.id)).map((b) => `${b.n}:${vB.brains.get(b.id).symbol}`)
+check('Brandon from the loader after floors 21 (Silver) and 70 (Gold), on no other floor', json(brainFloors) === '["21:silver","70:gold"]', json(brainFloors))
+check('floor 21 holds his three as picked; every other floor keeps three Unknowns', json(vB.battles.find((b) => b.n === 21).opponents) === json(silverTeam) && vB.battles.filter((b) => b.n !== 21).every((b) => json(b.opponents) === '[null,null,null]'))
+check('his win carries the Brain bonus on challenge 3\'s line', BB.bp.ledger.find((l) => l.runId === 'pyr' && l.set === 3)?.brainBonus === 10)
+check('run totals: 70 floors, 2 trainers, 3 wild defeated, 2 items', json(P.pyramidTotals(vB)) === json({ floors: 70, trainers: 2, wild: 3, items: 2 }), json(P.pyramidTotals(vB)))
+let I = M.startRun(BB, PK, at, 'pyr2')
+I = edOpen(I, 'pyr2', (f) => P.addWild(P.addWild(P.addWild(f, sp('pikachu')), sp('haunter')), sp('haunter')))
+I = edOpen(I, 'pyr2', (f) => P.addItem(P.addTrainer(f, sp('gengar')), R1[4]))
+const byId = (l) => json(l.slice().sort((a, b) => a[0] - b[0]))
+const ins = P.pyramidInsights(M.deriveTracker(I, fd), { species: String, item: String })
+check('insights across runs, open floors included: wild Pikachu 4, Haunter 2; items Lum Berry 2, Hyper Potion 1; trainers Gengar 2 (Unknown not counted)', byId(ins.wild) === byId([[sp('pikachu'), 4], [sp('haunter'), 2]]) && json(ins.items) === json([[R1[4], 2], [R1[0], 1]]) && json(ins.trainers) === json([[sp('gengar'), 2]]), json(ins))
+I = edOpen(I, 'pyr2', (f) => P.addTrainer(f, sp('dusclops')))
+const Lz = P.loseToTrainer(I, fd, 'pyr2', 1, at, ids('lz'))
+const lzFloor = Lz.battles.find((b) => b.runId === 'pyr2')
+check('Lost to a trainer: that trainer is the loss, floor 1 closes L, the run ends, no BP line', Lz.runs.find((r) => r.id === 'pyr2').outcome === 'lost' && lzFloor.result === 'L' && json(lzFloor.pyramid.trainers.map((t) => t.result)) === '["W","L"]' && Lz.bp.ledger.length === BB.bp.ledger.length)
+const withOpen = edOpen(Lz, 'pyr', (f) => P.addItem(f, R1[9]))
+doc.write(withOpen)
+const exP = api.exportDocuments(['frontier-tracker'])
+localStorage.clear()
+doc.reset()
+api.importDocuments(exP, { mode: 'replace' })
+doc.reset()
+check('export -> import is lossless with floors, Brandon\'s three, a loss and an open floor', json(doc.read()) === json(withOpen))
+const laterP = M.normaliseTracker({
+  ...withOpen,
+  runs: withOpen.runs.map((r) => (r.id === 'pyr' ? { ...r, openFloor: { ...r.openFloor, later: 1, pyramid: { ...r.openFloor.pyramid, later: 2 } } } : r)),
+  battles: withOpen.battles.map((b) => (b.id === f1.id ? { ...b, pyramid: { ...b.pyramid, later: 3, trainers: b.pyramid.trainers.map((t, i) => (i ? t : { ...t, later: 4 })) } } : b)),
+})
+const lf1 = laterP.battles.find((b) => b.id === f1.id).pyramid
+const lo = laterP.runs.find((r) => r.id === 'pyr').openFloor
+check('fields a newer client adds to a floor, a trainer or the open floor survive (it syncs)', lo.later === 1 && lo.pyramid.later === 2 && lf1.later === 3 && lf1.trainers[0].later === 4)
+check('bf-tracker.import.json still loads unchanged: normalising it gives it back exactly', json(canon(M.normaliseTracker(imported))) === json(canon(imported)))
+check('the document stays version 1 (the change is additive)', doc.version === 1 && M.TRACKER_VERSION === 1)
+let RT = M.startRun(M.EMPTY_TRACKER, PK, at, 'pyr-rt')
+RT = edOpen(RT, 'pyr-rt', (f) => P.addItem(P.addWild(f, sp('pikachu')), R1[0]))
+RT = M.endRun(RT, 'pyr-rt', 'retired', at)
+check('retired mid-floor: that floor\'s entries still count in the totals and the insights', json(P.pyramidTotals(M.deriveTracker(RT, fd).runs.get('pyr-rt'))) === json({ floors: 0, trainers: 0, wild: 1, items: 1 }) && json(P.pyramidInsights(M.deriveTracker(RT, fd), { species: String, item: String }).wild) === json([[sp('pikachu'), 1]]))
+const noted = P.editLoggedBattle(BB, vB.battles.find((b) => b.n === 70).id, (b) => ({ ...b, note: 'top', opponents: [sp('arcanine'), null, null] }))
+check('a saved floor\'s note and Brandon\'s three can be edited later', noted.battles.find((b) => b.runId === 'pyr' && b.n === 70).note === 'top' && noted.battles.find((b) => b.runId === 'pyr' && b.n === 70).opponents[0] === sp('arcanine'))
 
 // ================================================================== PART B
 const TRIGGER = '[data-testid="nav-tab-battle-frontier"]'
@@ -666,6 +796,257 @@ try {
   const todayText = `${now.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()]} ${now.getFullYear()}`
   check('home lists it with today\'s date, not "(imported)"', arenaRow === `Run 1 | Singles | Open Level | ${todayText} | 0 | Ongoing · 0 won`, arenaRow)
 
+  // ---------------------------------------------------------------- the Pyramid
+  hr('B12. THE BATTLE PYRAMID: the floor strip, the floor log, Brandon, totals, insights')
+  const readDoc = () => page.evaluate(() => JSON.parse(localStorage.getItem('pokeapp:frontier-tracker:v1')))
+  const reopen = async (runId) => {
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.waitForSelector(TRIGGER, { timeout: 180000 })
+    await selectGeneration(page, 3) // the app does not keep the generation across a reload
+    await openTracker(page)
+    await ready(page)
+    await page.click(`[data-testid="tracker-run-${runId}"]`)
+  }
+  const seen = new Set()
+  const collect = async () => (await appRegions(page)).forEach((r) => seen.add(r))
+  const openOf = async (runId) => (await readDoc()).runs.find((r) => r.id === runId).openFloor
+  const floorN = () => appText(page, '[data-testid="pyramid-floor-n"]').then(norm)
+  const pickTrainer = async (text, id) => {
+    await page.click('[data-testid="pyramid-trainer-species"]')
+    await page.keyboard.type(text)
+    await page.click(`[data-testid="pyramid-trainer-species-list"] li[data-species-id="${id}"]`)
+  }
+  await page.click('[data-testid="tracker-new-run"]')
+  await page.waitForSelector('[data-layout="new-run-form"]')
+  await page.selectOption('[data-testid="new-run-facility"]', 'pyramid')
+  await page.click('[data-testid="tracker-start-run"]')
+  await page.waitForSelector('[data-testid="pyramid-add"]')
+  const pyrId = (await readDoc()).runs.find((r) => r.facility === 'pyramid').id
+  check('a Pyramid run opens on its floor strip, not the battle row: floor 1, "Round 1 · floor 1 of 7"', (await page.$('[data-testid="log-add"]')) == null && (await floorN()) === '1' && norm(await appText(page, '[data-testid="pyramid-floor-label"]')) === 'Round 1 · floor 1 of 7')
+  check('three big buttons, Wild chosen by default', json(await page.$$eval('[data-layout="pyramid-modes"] button', (b) => b.map((x) => `${x.textContent}:${x.getAttribute('aria-pressed')}`))) === '["Wild:true","Trainer:false","Item:false"]')
+  const catTexts = await page.$$eval('[data-testid="pyramid-categories"] button', (b) => b.map((x) => [...x.children].map((c) => c.textContent)))
+  check('the category chooser: 20 entries, each the hint\'s first line and the tactic', catTexts.length === 20 && catTexts.every((c, i) => c[0] === PD.PYRAMID_CATEGORIES[i].hint[0] && c[1] === PD.PYRAMID_CATEGORIES[i].tactic), json(catTexts[0]))
+  await collect()
+
+  // The common floor, every tap counted, every key counted.
+  await page.evaluate(() => {
+    window.__keys = 0
+    document.addEventListener('keydown', () => (window.__keys += 1), true)
+  })
+  let taps = 0
+  const tap = async (sel) => {
+    taps += 1
+    await page.click(sel)
+  }
+  await tap('[data-testid="pyramid-category-1"]')
+  check('a category shows its species as one-tap sprite buttons', json(await page.$$eval('[data-testid="pyramid-wild-picks"] button', (b) => b.map((x) => Number(x.dataset.speciesId)))) === json(PD.PYRAMID_CATEGORIES[0].species) && (await page.$$eval('[data-testid="pyramid-wild-picks"] img.bf-sprite', (e) => e.length)) === 8)
+  await collect()
+  for (let k = 0; k < 3; k++) await tap(`[data-testid="pyramid-wild-${sp('pikachu')}"]`)
+  await tap('[data-testid="pyramid-mode-item"]')
+  const chipIds = await page.$$eval('[data-testid="pyramid-item-picks"] button', (b) => b.map((x) => Number(x.dataset.itemId)))
+  const chipNames = await page.$$eval('[data-testid="pyramid-item-picks"] button', (b) => b.map((x) => x.textContent))
+  check('Item: round 1\'s chips are exactly its distinct items in slot order, by name', json(chipIds) === json(R1) && json(chipNames) === json(itemsFx[0].items), json(chipNames))
+  await collect()
+  await tap(`[data-testid="pyramid-item-${R1[0]}"]`)
+  await tap(`[data-testid="pyramid-item-${R1[4]}"]`)
+  await tap('[data-testid="pyramid-mode-trainer"]')
+  await page.waitForSelector('[data-testid="pyramid-trainer-species-list"]')
+  check('Trainer: its one species picker opens at once, Unknown (not seen) first', norm(await appText(page, '[data-testid="pyramid-trainer-species-list"] li')) === 'Unknown (not seen)')
+  await tap(`[data-testid="pyramid-trainer-species-list"] li[data-species-id="${sp('bulbasaur')}"]`)
+  await page.waitForSelector('[data-testid="pyramid-trainer-0"]')
+  await tap('[data-testid="pyramid-next-floor"]')
+  await page.waitForSelector('[data-testid="run-log"] tr[data-battle-n="1"]')
+  const keys = await page.evaluate(() => window.__keys)
+  check('the common floor (the round\'s category once, 3 species, 2 item chips, 1 trainer, Next floor): 10 taps, no typing', taps === 10 && keys === 0, `${taps} taps, ${keys} keys`)
+  const row1 = await cells(page, '[data-testid="run-log"] tr[data-battle-n="1"]')
+  check('floor 1 in the log: label, counts 1 / 3 / 2, the three lists with sprites, Cleared', row1.startsWith('1 | Round 1 · floor 1 of 7 | 1 / 3 / 2 |') && /Trainers\s*Bulbasaur/.test(row1) && /Wild\s*Pikachu×3/.test(row1) && /Items.*Hyper Potion×1.*Lum Berry×1/.test(row1) && row1.endsWith('| Cleared | Edit') && (await page.$$eval('[data-testid="run-log"] tr[data-battle-n="1"] img.bf-sprite', (e) => e.length)) === 4, row1)
+
+  // Floor 2: two trainers, a species three times, two items; persists across reload.
+  check('floor 2 opens with the round\'s category already chosen', (await floorN()) === '2' && /I see a shower of sparks/.test(await appText(page, '[data-testid="pyramid-category"]')))
+  for (let k = 0; k < 3; k++) await page.click(`[data-testid="pyramid-wild-${sp('pikachu')}"]`)
+  await page.click('[data-testid="pyramid-mode-trainer"]')
+  await pickTrainer('geng', sp('gengar'))
+  await page.click('[data-testid="pyramid-trainer-species"]')
+  check('a second tap on the trainer field reopens its list for the next trainer, no typing', (await page.$('[data-testid="pyramid-trainer-species-list"]')) != null)
+  await page.keyboard.type('dusc')
+  await page.keyboard.press('Enter')
+  check('... and with text typed, Enter adds the first match (Dusclops), not Unknown', json((await openOf(pyrId)).pyramid.trainers.map((t) => t.species)) === json([sp('gengar'), sp('dusclops')]))
+  await page.click('[data-testid="pyramid-mode-item"]')
+  await page.click(`[data-testid="pyramid-item-${R1[1]}"]`)
+  await page.click(`[data-testid="pyramid-item-${R1[5]}"]`)
+  const want2 = { n: 2, pyramid: { trainers: [{ species: sp('gengar'), result: 'W' }, { species: sp('dusclops'), result: 'W' }], wild: [{ species: sp('pikachu'), count: 3 }], items: [{ itemId: R1[1], qty: 1 }, { itemId: R1[5], qty: 1 }] } }
+  check('every tap saved at once: the open floor 2 is in storage (2 trainers, one species each; Pikachu x3; 2 items)', json(await openOf(pyrId)) === json(want2), json(await openOf(pyrId)))
+  await reopen(pyrId)
+  await page.waitForSelector('[data-testid="pyramid-add"]')
+  check('after a reload the open floor 2 is intact: the strip says floor 2, five entries', json(await openOf(pyrId)) === json(want2) && (await floorN()) === '2' && (await page.$$eval('[data-testid="pyramid-entries"] .bf-pyr-entry', (e) => e.length)) === 5)
+  await page.keyboard.press('Control+Shift+L')
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: shot('pyramid-layout'), fullPage: false })
+  await page.keyboard.press('Control+Shift+L')
+  // More reaches every trainer of the floor, the latest by default.
+  await page.click('[data-testid="pyramid-mode-trainer"]')
+  await page.click('[data-testid="pyramid-trainer-more"]')
+  check('More with two trainers: a "For" list, Dusclops (the latest) chosen', json(await page.$$eval('[data-testid="pyramid-trainer-which"] option', (o) => o.map((x) => x.textContent))) === '["Trainer 1 · Gengar","Trainer 2 · Dusclops"]' && (await page.$eval('[data-testid="pyramid-trainer-which"]', (e) => e.value)) === '1')
+  await page.selectOption('[data-testid="pyramid-trainer-which"]', '0')
+  const first2 = fd.trainerPoolForStreak(M.floorPoolArgs(PK, 2)).idRange.from
+  await page.selectOption('[data-testid="pyramid-trainer-id"]', String(first2))
+  check('... choosing Gengar there sets Gengar\'s trainer, not Dusclops\'s', json((await openOf(pyrId)).pyramid.trainers.map((t) => t.trainerId ?? null)) === json([first2, null]))
+  await page.click('[data-testid="pyramid-next-floor"]')
+  await page.waitForSelector('[data-testid="run-log"] tr[data-battle-n="2"]')
+  const row2 = await cells(page, '[data-testid="run-log"] tr[data-battle-n="2"]')
+  check('floor 2 closed: 2 / 3 / 2, Gengar (with its trainer) and Dusclops, Pikachu x3, Fluffy Tail, Revive', row2.startsWith('2 | Round 1 · floor 2 of 7 | 2 / 3 / 2 |') && /Trainers\s*Gengar.+Dusclops/.test(row2) && /Fluffy Tail×1.*Revive×1/.test(row2), row2)
+  await reopen(pyrId)
+  await page.waitForSelector('[data-testid="run-log"] tr[data-battle-n="2"]')
+  check('after a reload floor 2 is still there, exactly', (await cells(page, '[data-testid="run-log"] tr[data-battle-n="2"]')) === row2)
+  const totalsText = (t) => `${t.floors} floor${t.floors === 1 ? '' : 's'} · ${t.trainers} trainer${t.trainers === 1 ? '' : 's'} · ${t.wild} wild defeated · ${t.items} item${t.items === 1 ? '' : 's'}`
+  const modelTotals = async () => P.pyramidTotals(M.deriveTracker(M.normaliseTracker(await readDoc()), fd).runs.get(pyrId))
+  check('run head totals match the logged data: 2 floors · 3 trainers · 6 wild defeated · 4 items', norm(await appText(page, '[data-testid="run-totals"]')) === totalsText(await modelTotals()) && totalsText(await modelTotals()) === '2 floors · 3 trainers · 6 wild defeated · 4 items', norm(await appText(page, '[data-testid="run-totals"]')))
+
+  // A saved floor reopened and edited.
+  await page.click('[data-testid="floor-2-edit"]')
+  await page.waitForSelector('[data-testid="floor-2-editor"]')
+  await page.click('[data-testid="floor-2-mode-item"]')
+  await page.click(`[data-testid="floor-2-item-${R1[2]}"]`)
+  await page.click(`[data-testid="floor-2-item-${R1[2]}"]`)
+  await page.click(`[data-testid="floor-2-item-entry-${R1[2]}-minus"]`)
+  const f2 = () => readDoc().then((d) => d.battles.find((b) => b.runId === pyrId && b.n === 2))
+  check('a saved floor reopens and edits in place: Cheri Berry +2 -1 -> 2 / 3 / 3, still Cleared', norm(await appText(page, '[data-testid="floor-2-counts"]')) === '2 / 3 / 3' && (await f2()).pyramid.items.at(-1).qty === 1 && (await f2()).result === 'W')
+  await collect()
+  await page.click(`[data-testid="floor-2-item-entry-${R1[2]}-remove"]`)
+  check('... and remove takes it out again: 2 / 3 / 2', norm(await appText(page, '[data-testid="floor-2-counts"]')) === '2 / 3 / 2')
+  await page.click('[data-testid="floor-2-edit"]')
+
+  // Floor 3: - / + / remove, the wild search, the trainer's More.
+  await page.click(`[data-testid="pyramid-wild-${sp('pikachu')}"]`)
+  await page.click(`[data-testid="pyramid-wild-${sp('pikachu')}"]`)
+  await page.click(`[data-testid="pyramid-wild-entry-${sp('pikachu')}-minus"]`)
+  await page.click(`[data-testid="pyramid-wild-entry-${sp('pikachu')}-plus"]`)
+  await page.click(`[data-testid="pyramid-wild-entry-${sp('pikachu')}-plus"]`)
+  check('- / + on an entry: Pikachu 2, -1, +2 -> x3', (await openOf(pyrId)).pyramid.wild[0].count === 3)
+  const stepBoxes = await page.$$eval('[data-testid="pyramid-entries"] .bf-pyr-step', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)] }))
+  check('every - / + / remove button has at least a 44 px hit area', stepBoxes.length >= 3 && stepBoxes.every(([w, h]) => w >= 44 && h >= 44), json(stepBoxes))
+  await page.click(`[data-testid="pyramid-wild-entry-${sp('pikachu')}-remove"]`)
+  check('remove: no wild entry left on floor 3', (await openOf(pyrId)).pyramid.wild.length === 0)
+  await page.click('[data-testid="pyramid-wild-search"]')
+  await page.waitForSelector('[data-testid="pyramid-wild-search-list"]')
+  check('the wild search reaches any Gen 3 species, Unknown (not seen) first', norm(await appText(page, '[data-testid="pyramid-wild-search-list"] li')) === 'Unknown (not seen)')
+  await page.keyboard.type('sabley')
+  await page.click(`[data-testid="pyramid-wild-search-list"] li[data-species-id="${sp('sableye')}"]`)
+  check('... a pick adds one: Sableye x1', json((await openOf(pyrId)).pyramid.wild) === json([{ species: sp('sableye'), count: 1 }]))
+  await page.click('[data-testid="pyramid-mode-trainer"]')
+  await pickTrainer('mach', sp('machamp'))
+  await page.click('[data-testid="pyramid-trainer-more"]')
+  const range3 = fd.trainerPoolForStreak(M.floorPoolArgs(PK, 3)).idRange
+  const want3 = fd.trainers().filter((t) => t.id >= range3.from && t.id <= range3.to).map((t) => t.id)
+  const opts3 = (await page.$$eval('[data-testid="pyramid-trainer-id"] option', (o) => o.map((x) => x.value))).filter(Boolean).map(Number)
+  check(`More: the trainer picker offers only the loader's range for floor 3 (#${range3.from}-#${range3.to}, ${want3.length} trainers)`, opts3.length > 0 && json(opts3) === json(want3), `${opts3.length} options`)
+  await page.selectOption('[data-testid="pyramid-trainer-id"]', String(want3[0]))
+  const setOpts3 = (await page.$$eval('[data-testid="pyramid-trainer-set"] option', (o) => o.map((x) => x.value))).filter(Boolean)
+  const machSets = fd.sets().filter((s) => s.species_id === sp('machamp') && !s.openOnly).map((s) => String(s.index))
+  check('... and the set among that species\' Frontier sets (Lv50)', setOpts3.length > 0 && json(setOpts3) === json(machSets), json(setOpts3))
+  await page.selectOption('[data-testid="pyramid-trainer-set"]', setOpts3[0])
+  const t3 = (await openOf(pyrId)).pyramid.trainers[0]
+  check('the trainer entry keeps its ONE species, the trainer id and the set', json(t3) === json({ species: sp('machamp'), result: 'W', trainerId: want3[0], setIndex: Number(setOpts3[0]) }), json(t3))
+  await collect()
+
+  // Floor 7: the BP line; Undo floor 7.
+  for (let n = 3; n <= 7; n++) {
+    await page.click('[data-testid="pyramid-next-floor"]')
+    await page.waitForSelector(`[data-testid="run-log"] tr[data-battle-n="${n}"]`)
+  }
+  check('floor 7 completes challenge 1: its BP line, +5', /^Pyramid run 1, challenge 1\s*\+5/.test(norm(await appText(page, '[data-testid="bp-ledger"] tbody tr'))) && norm(await appText(page, '[data-testid="run-undo"]')) === 'Undo floor 7', norm(await appText(page, '[data-testid="bp-ledger"] tbody tr')))
+  await page.click('[data-testid="run-undo"]')
+  check('Undo floor 7 removes the floor, its lists and its BP line', (await page.$('[data-testid="run-log"] tr[data-battle-n="7"]')) == null && !(await appTexts(page, '[data-testid="bp-ledger"] tbody tr')).some((t) => /Pyramid run 1/.test(t)) && !(await readDoc()).battles.some((b) => b.runId === pyrId && b.n === 7) && (await floorN()) === '7')
+
+  // Lost: the run ends on floor 7.
+  await page.click('[data-testid="pyramid-mode-trainer"]')
+  await pickTrainer('golem', sp('golem'))
+  check('the Lost button names the trainer just saved; "Lost to another" is beside it for an unseen one', norm(await appText(page, '[data-testid="pyramid-trainer-lost"]')) === 'Lost to Golem' && norm(await appText(page, '[data-testid="pyramid-trainer-lost-other"]')) === 'Lost to another')
+  await page.click('[data-testid="pyramid-trainer-lost"]')
+  await page.waitForSelector('[data-testid="run-log"] tr[data-battle-n="7"]')
+  const row7 = await cells(page, '[data-testid="run-log"] tr[data-battle-n="7"]')
+  check('Lost ends the run on floor 7: no strip, the row reads Golem (lost) and Lost', (await page.$('[data-testid="pyramid-add"]')) == null && /Golem\(lost\)/.test(row7) && row7.endsWith('| Lost | Edit') && (await readDoc()).runs.find((r) => r.id === pyrId).outcome === 'lost', row7)
+  check('run head totals still match the logged data', norm(await appText(page, '[data-testid="run-totals"]')) === totalsText(await modelTotals()), norm(await appText(page, '[data-testid="run-totals"]')))
+  await full('pyramid-log-full')
+
+  // Home: the Pyramid insights.
+  await page.click('[data-testid="tracker-all-runs"]')
+  await page.waitForSelector('[data-testid="insight-pyramid"]')
+  const insUi = await page.evaluate(() => Object.fromEntries(['wild', 'items', 'trainers'].map((k) => [k, [...document.querySelectorAll(`[data-testid="insight-pyramid-${k}"] tr`)].map((tr) => [Number(tr.dataset.id), Number(tr.lastElementChild.textContent)])])))
+  const insModel = P.pyramidInsights(M.deriveTracker(M.normaliseTracker(await readDoc()), fd), { species: String, item: String })
+  const desc = (l) => l.every((r, i) => i === 0 || l[i - 1][1] >= r[1])
+  check('home: the Pyramid insights match the logged data (wild, items, trainers\' Pokémon; Unknown not counted), most first', ['wild', 'items', 'trainers'].every((k) => byId(insUi[k]) === byId(insModel[k]) && desc(insUi[k])) && byId(insUi.wild) === byId([[sp('pikachu'), 6], [sp('sableye'), 1]]) && insUi.trainers.length === 5, json(insUi))
+  await collect()
+  await full('pyramid-home-light')
+
+  // Brandon, and round 41: three long runs written to storage with the app's own model.
+  let J = M.normaliseTracker(await readDoc())
+  J = M.startRun(J, PK, at, 'pyr-70')
+  for (let n = 1; n <= 70; n++) {
+    if (n === 21) J = P.editOpenFloor(J, 'pyr-70', (o) => ({ ...o, opponents: silverTeam }))
+    J = P.closeFloor(J, fd, 'pyr-70', 'W', at, ids(`j${n}`))
+  }
+  const OPEN = { facility: 'pyramid', format: 'singles', levelMode: 'open' }
+  J = M.startRun(J, OPEN, at, 'pyr-20')
+  for (let n = 1; n <= 20; n++) J = P.closeFloor(J, fd, 'pyr-20', 'W', at, ids(`k${n}`))
+  J = M.startRun(J, OPEN, at, 'pyr-280')
+  for (let n = 1; n <= 280; n++) J = P.closeFloor(J, fd, 'pyr-280', 'W', at, ids(`m${n}`))
+  await page.evaluate((d) => localStorage.setItem('pokeapp:frontier-tracker:v1', JSON.stringify(d)), J)
+  await reopen('pyr-70')
+  await page.waitForSelector('[data-testid="run-log"] tr[data-battle-n="70"]')
+  const brainRows = await page.$$eval('[data-testid="run-log"] tr[data-brain]', (r) => r.map((x) => `${x.dataset.brainAfter}:${x.dataset.brain}`))
+  check('Brandon\'s Brain rows after floors 21 (Silver) and 70 (Gold) only; no floor row carries one', json(brainRows) === '["21:silver","70:gold"]' && (await page.$$('[data-testid="run-log"] tr[data-battle-n][data-brain]')).length === 0, json(brainRows))
+  const b21 = await cells(page, '[data-testid="run-log"] tr[data-brain-after="21"]')
+  const b70 = await cells(page, '[data-testid="run-log"] tr[data-brain-after="70"]')
+  check('... each with the 3-species team comparison: 21 his known Silver team, matches; 70 three Unknowns, differs', /Brandon · Silver.*Known team: .*· matches/.test(b21) && /\| Won \|/.test(b21) && (await page.$$eval('[data-testid="run-log"] tr[data-brain-after="21"] img.bf-sprite', (e) => e.length)) === 3 && /Brandon · Gold.*· differs/.test(b70), `${b21} // ${b70}`)
+  await full('pyramid-brain-rows')
+  await page.click('[data-testid="tracker-all-runs"]')
+  await page.click('[data-testid="tracker-run-pyr-20"]')
+  await page.waitForSelector('[data-testid="pyramid-brain"]')
+  check('floor 21 of a run with no symbol: Brandon\'s three are picked in the strip', (await floorN()) === '21' && /Brandon · Silver · at the top, after this floor/.test(norm(await appText(page, '[data-testid="pyramid-brain"]'))))
+  await collect()
+  await full('pyramid-brain-floor-light')
+  for (const i of [0, 1, 2]) {
+    await page.click(`[data-testid="pyramid-brain-${i}"]`)
+    await page.click(`[data-testid="pyramid-brain-${i}-list"] li[data-species-id="unknown"]`)
+  }
+  await page.click('[data-testid="pyramid-next-floor"]')
+  await page.waitForSelector('[data-testid="run-log"] tr[data-brain-after="21"]')
+  check('Next floor records the win over him: his row after floor 21, Won', /\| Won \|/.test(await cells(page, '[data-testid="run-log"] tr[data-brain-after="21"]')))
+  await page.click('[data-testid="tracker-all-runs"]')
+  await page.click('[data-testid="tracker-run-pyr-280"]')
+  await page.waitForSelector('[data-testid="pyramid-add"]')
+  check('floor 281 is round 41', norm(await appText(page, '[data-testid="pyramid-floor-label"]')) === 'Round 41 · floor 1 of 7')
+  await page.click('[data-testid="pyramid-mode-item"]')
+  check('round 41: no item chips, the search only', (await page.$('[data-testid="pyramid-item-picks"]')) == null && (await page.$('[data-testid="pyramid-item-none"]')) != null && (await page.$('[data-testid="pyramid-item-search"]')) != null)
+  await page.click('[data-testid="pyramid-item-search"]')
+  await page.keyboard.type('leftov')
+  await page.click(`[data-testid="pyramid-item-search-list"] li[data-item-id="${it('Leftovers')}"]`)
+  check('the item search reaches any Gen 3 item: Leftovers x1 on floor 281', json((await openOf('pyr-280')).pyramid.items) === json([{ itemId: it('Leftovers'), qty: 1 }]))
+  await page.click('[data-testid="run-retire"]')
+  await page.click('[data-testid="run-retire"]')
+  await page.waitForSelector('[data-testid="run-log"] tr[data-retired-floor="281"]')
+  const retiredRow = await cells(page, '[data-testid="run-log"] tr[data-retired-floor="281"]')
+  check('retired mid-floor: floor 281 stays in the log with its Leftovers, "Retired", and in the totals', /Leftovers×1/.test(retiredRow) && retiredRow.endsWith('| Retired |') && / · 1 item$/.test(norm(await appText(page, '[data-testid="run-totals"]'))), `${retiredRow} // ${norm(await appText(page, '[data-testid="run-totals"]'))}`)
+  // A saved Brain floor reopened: his three and the note.
+  await page.click('[data-testid="tracker-all-runs"]')
+  await page.click('[data-testid="tracker-run-pyr-70"]')
+  await page.click('[data-testid="floor-70-edit"]')
+  await page.waitForSelector('[data-testid="floor-70-editor"]')
+  await page.click('[data-testid="floor-70-brain-0"]')
+  await page.keyboard.type('arca')
+  await page.click(`[data-testid="floor-70-brain-0-list"] li[data-species-id="${sp('arcanine')}"]`)
+  await page.fill('[data-testid="floor-70-note"]', 'top')
+  const b70d = (await readDoc()).battles.find((b) => b.runId === 'pyr-70' && b.n === 70)
+  check('a reopened floor edits Brandon\'s three and its note', b70d.opponents[0] === sp('arcanine') && b70d.note === 'top' && /Arcanine/.test(await cells(page, '[data-testid="run-log"] tr[data-brain-after="70"]')))
+  await collect()
+  await page.click('[data-testid="floor-70-edit"]')
+  await collect()
+  const wantRegions = ['run-totals', 'pyramid-categories', 'floor-lists', 'pyramid-add', 'pyramid-head', 'pyramid-strip', 'pyramid-modes', 'pyramid-wild', 'pyramid-category', 'pyramid-wild-picks', 'pyramid-wild-search', 'pyramid-item', 'pyramid-item-picks', 'pyramid-item-search', 'pyramid-trainer', 'pyramid-trainer-more', 'pyramid-trainer-more-fields', 'pyramid-brain', 'pyramid-entries', 'pyramid-entries-trainers', 'pyramid-entries-wild', 'pyramid-entries-items', 'pyramid-floor-actions', 'floor-edit', 'floor-edit-brain', 'insight-pyramid', 'insight-pyramid-wild', 'insight-pyramid-items', 'insight-pyramid-trainers']
+  const missingRegions = wantRegions.filter((r) => !seen.has(r))
+  check('every new region is named for ?layout=1', missingRegions.length === 0, missingRegions.join(', '))
+  await page.click('[data-testid="tracker-all-runs"]')
+
   // ---------------------------------------------------------------- themes
   hr('B10. BOTH THEMES: tokens only, accent within 2, no badge, no shadow')
   const setTheme = (t) => page.evaluate((t) => (document.documentElement.dataset.theme = t), t)
@@ -680,6 +1061,16 @@ try {
         await page.click('[data-testid="tracker-run-imp-factory-5"]')
         await page.click('[data-testid="log-opponent-0"]')
         await page.keyboard.type('ma')
+      }],
+      ['pyramid-log', async () => (await page.click('[data-testid="tracker-all-runs"]'), page.click(`[data-testid="tracker-run-${pyrId}"]`))],
+      ['pyramid-brain', async () => (await page.click('[data-testid="tracker-all-runs"]'), page.click('[data-testid="tracker-run-pyr-70"]'))],
+      ['pyramid-open', async () => {
+        await page.click('[data-testid="tracker-all-runs"]')
+        await page.click('[data-testid="tracker-run-pyr-20"]')
+        // The second theme finds the category already picked on this floor.
+        if (await page.$('[data-testid="pyramid-category-14"]')) await page.click('[data-testid="pyramid-category-14"]')
+        await page.click(`[data-testid="pyramid-wild-${sp('sableye')}"]`)
+        await page.click(`[data-testid="pyramid-wild-${sp('absol')}"]`)
       }],
     ]
     for (const [name, go] of screens) {
@@ -701,7 +1092,7 @@ try {
         return { text: getComputedStyle(document.querySelector('.bf')).color, token: probe('--color-text-default'), muted: getComputedStyle(document.querySelector('.bf-cap')).color, mutedToken: probe('--color-text-muted') }
       })
       check(`[${theme}] ${name}: text and muted text are the theme's tokens`, colours.text === colours.token && colours.muted === colours.mutedToken, json(colours))
-      if (theme === 'dark' || name === 'logging') await page.screenshot({ path: shot(`${name}-${theme}`) })
+      if (theme === 'dark' || name === 'logging' || name.startsWith('pyramid')) await page.screenshot({ path: shot(`${name}-${theme}`) })
       if (name === 'logging') await page.keyboard.press('Escape')
     }
   }
@@ -710,7 +1101,7 @@ try {
   // ---------------------------------------------------------------- narrow
   hr('B11. NARROW (390 px): nothing clips (phone layout stays parked)')
   await page.setViewportSize({ width: 390, height: 844 })
-  for (const [name, testId] of [['home', null], ['dome', 'tracker-run-imp-dome-1'], ['factory5', 'tracker-run-imp-factory-5']]) {
+  for (const [name, testId] of [['home', null], ['dome', 'tracker-run-imp-dome-1'], ['factory5', 'tracker-run-imp-factory-5'], ['pyramid-log', `tracker-run-${pyrId}`], ['pyramid-open', 'tracker-run-pyr-20']]) {
     await page.click('[data-testid="tracker-all-runs"]').catch(() => {})
     if (testId) await page.click(`[data-testid="${testId}"]`)
     await page.waitForTimeout(250)

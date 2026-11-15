@@ -69,6 +69,49 @@ export interface Run {
   /** The Factory: a draft at each set's start, swaps inside a set. Never one per row. */
   drafts?: Draft[]
   swaps?: Swap[]
+  /** The Pyramid: the floor being logged, saved at every tap; a Battle once it is closed. */
+  openFloor?: OpenFloor
+}
+
+/**
+ * A regular Pyramid trainer: exactly ONE Pokémon (FillFrontierTrainerParty(1),
+ * battle_setup.c). null = Unknown. Brandon is not one: his three are the floor's
+ * `opponents`, on the Brain row.
+ */
+export interface PyramidTrainer {
+  trainerId?: number
+  species: number | null
+  setIndex?: number
+  result: BattleResult
+}
+
+/** Wild Pokémon defeated on a floor; null = Unknown (not seen). */
+export interface PyramidWild {
+  species: number | null
+  count: number
+}
+
+export interface PyramidItem {
+  itemId: number
+  qty: number
+}
+
+/** A Pyramid floor's log. Any list may be empty. */
+export interface PyramidFloor {
+  trainers: PyramidTrainer[]
+  wild: PyramidWild[]
+  items: PyramidItem[]
+  /** The wild category picked for this floor (pyramidData.ts, 1-20). */
+  wildCategory?: number
+}
+
+/** The Pyramid floor being logged: battle number `n` (the floor as logged), not yet closed. */
+export interface OpenFloor {
+  n: number
+  pyramid: PyramidFloor
+  /** A Brain floor: Brandon's three as picked so far (null = Unknown). */
+  opponents?: (number | null)[]
+  note?: string
 }
 
 export interface Battle {
@@ -82,6 +125,8 @@ export interface Battle {
   /** The Dome: the pair the owner brought, and the OPPONENT's slot (1-3) that did not battle. */
   dome?: { pair: number[]; dropped: 1 | 2 | 3 | null }
   note?: string
+  /** The Pyramid: the floor's trainers, wild Pokémon and items. `opponents` stays three Unknowns but on a Brain floor. */
+  pyramid?: PyramidFloor
 }
 
 /** A manual symbol override; absent = follow the log. */
@@ -158,6 +203,69 @@ function keep(x: Record<string, unknown>, optional: string[]): Record<string, un
   return out
 }
 
+/**
+ * A Pyramid trainer holds ONE species: a positive id or null (Unknown). An entry
+ * whose species is anything else -- a list of two, a missing one -- is not a
+ * Pyramid trainer and is dropped, whatever the UI did.
+ */
+export function pyramidTrainer(x: unknown): PyramidTrainer | null {
+  if (!isObj(x)) return null
+  const species = x.species === null ? null : posInt(x.species)
+  const result = oneOf(x.result, ['W', 'L'] as const)
+  if (species === undefined || !result) return null
+  const out = keep(x, ['trainerId', 'setIndex']) as unknown as PyramidTrainer
+  Object.assign(out, { species, result })
+  const trainerId = int(x.trainerId)
+  if (trainerId != null && trainerId >= 0) out.trainerId = trainerId
+  const setIndex = int(x.setIndex)
+  if (setIndex != null && setIndex >= 0) out.setIndex = setIndex
+  return out
+}
+
+function pyramidWild(x: unknown): PyramidWild | null {
+  if (!isObj(x)) return null
+  const species = x.species === null ? null : posInt(x.species)
+  const count = posInt(x.count)
+  return species === undefined || count == null ? null : ({ ...x, species, count } as PyramidWild)
+}
+
+function pyramidItem(x: unknown): PyramidItem | null {
+  if (!isObj(x)) return null
+  const itemId = posInt(x.itemId)
+  const qty = posInt(x.qty)
+  return itemId == null || qty == null ? null : ({ ...x, itemId, qty } as PyramidItem)
+}
+
+const some = <T>(list: (T | null)[]): T[] => list.filter((x): x is T => x != null)
+
+export function pyramidFloor(x: unknown): PyramidFloor {
+  const o = isObj(x) ? x : {}
+  const out = keep(o, ['wildCategory']) as unknown as PyramidFloor
+  out.trainers = some(arr(o.trainers).map(pyramidTrainer))
+  out.wild = some(arr(o.wild).map(pyramidWild))
+  out.items = some(arr(o.items).map(pyramidItem))
+  const cat = posInt(o.wildCategory)
+  if (cat != null) out.wildCategory = cat
+  return out
+}
+
+const threeOpponents = (x: unknown): (number | null)[] | undefined => {
+  const list = arr(x).map((o) => (o === null ? null : (posInt(o) ?? null)))
+  return list.length === 3 ? list : undefined
+}
+
+function openFloor(x: unknown): OpenFloor | undefined {
+  if (!isObj(x)) return undefined
+  const n = posInt(x.n)
+  if (n == null) return undefined
+  const out = keep(x, ['opponents', 'note']) as unknown as OpenFloor
+  Object.assign(out, { n, pyramid: pyramidFloor(x.pyramid) })
+  const opponents = threeOpponents(x.opponents)
+  if (opponents) out.opponents = opponents
+  if (typeof x.note === 'string' && x.note !== '') out.note = x.note
+  return out
+}
+
 function run(x: unknown): Run | null {
   if (!isObj(x)) return null
   const id = str(x.id)
@@ -166,7 +274,9 @@ function run(x: unknown): Run | null {
   const levelMode = oneOf(x.levelMode, ['lv50', 'open'] as const)
   const startedAt = str(x.startedAt)
   if (!id || !facility || !format || !levelMode || !startedAt) return null
-  const out = keep(x, ['imported', 'endedAt', 'note', 'dome', 'drafts', 'swaps']) as unknown as Run
+  const out = keep(x, ['imported', 'endedAt', 'note', 'dome', 'drafts', 'swaps', 'openFloor']) as unknown as Run
+  const open = openFloor(x.openFloor)
+  if (open) out.openFloor = open
   Object.assign(out, { id, facility, format, levelMode, startedAt, outcome: oneOf(x.outcome, OUTCOMES) ?? 'ongoing' })
   if (x.imported === true) out.imported = true
   const endedAt = str(x.endedAt)
@@ -207,7 +317,7 @@ function battle(x: unknown): Battle | null {
   const result = oneOf(x.result, ['W', 'L'] as const)
   const opponents = arr(x.opponents).map((o) => (o === null ? null : (posInt(o) ?? null)))
   if (!id || !runId || n == null || !result || opponents.length !== 3) return null
-  const out = keep(x, ['dome', 'note']) as unknown as Battle
+  const out = keep(x, ['dome', 'note', 'pyramid']) as unknown as Battle
   Object.assign(out, { id, runId, n, opponents, result })
   if (isObj(x.dome)) {
     const pair = arr(x.dome.pair).map(posInt)
@@ -217,6 +327,7 @@ function battle(x: unknown): Battle | null {
   }
   const note = str(x.note)
   if (note) out.note = note
+  if (isObj(x.pyramid)) out.pyramid = pyramidFloor(x.pyramid)
   return out
 }
 
@@ -333,6 +444,17 @@ export function poolArgsAt(run: RunKey, n: number, symbols: Symbols): TrainerPoo
     streak: run.facility === 'pyramid' ? n : loaderStreak(run.facility, n),
     symbols,
   }
+}
+
+/**
+ * The loader call for the TRAINERS on Pyramid floor `n`: drawn at the floors
+ * cleared before it (GetUniqueTrainerId, battle_pyramid.c: the streak and the
+ * floor index both count floors already cleared), the facility's loaderStreak.
+ * Its Brain is not: he waits at the top AFTER floor n (`poolArgsAt`). No symbols:
+ * this asks for the trainer range only.
+ */
+export function floorPoolArgs(run: RunKey, n: number): TrainerPoolArgs {
+  return { facility: run.facility, format: run.format, levelMode: run.levelMode, streak: loaderStreak(run.facility, n) }
 }
 
 /**
@@ -663,6 +785,8 @@ export interface BattleEntry {
   draft?: Rental[]
   /** The Factory, inside a set. */
   swap?: { out: Rental; in: Rental }
+  /** The Pyramid: the floor's lists (closing the run's open floor). */
+  pyramid?: PyramidFloor
 }
 
 /**
@@ -688,6 +812,10 @@ export function logBattle(
     run.drafts = [...(run.drafts ?? []).filter((d) => d.atBattle !== n), { atBattle: n, rentals: entry.draft }]
   }
   if (run.facility === 'factory' && entry.swap) run.swaps = [...(run.swaps ?? []), { atBattle: n, ...entry.swap }]
+  if (run.facility === 'pyramid') {
+    if (entry.pyramid) b.pyramid = pyramidFloor(entry.pyramid)
+    delete run.openFloor
+  }
   if (entry.result === 'L') {
     run.outcome = 'lost'
     run.endedAt = at
@@ -705,13 +833,18 @@ export function logBattle(
   return next
 }
 
-/** Take back a run's last battle: its draft or swap, the line its set proposed, and a loss's end. */
+/**
+ * Take back a run's last battle: its draft or swap, the line its set proposed, and
+ * a loss's end. A Pyramid floor goes with its lists, and the open floor after it
+ * (it was the next floor's) is dropped.
+ */
 export function undoLastBattle(doc: TrackerDoc, runId: string, perSet: number): TrackerDoc {
   const last = doc.battles.filter((b) => b.runId === runId).sort((a, b) => a.n - b.n).at(-1)
   if (!last) return doc
   const runs = doc.runs.map((r) => {
     if (r.id !== runId) return r
     const out: Run = { ...r }
+    delete out.openFloor
     if (last.result === 'L' && r.outcome === 'lost') {
       out.outcome = 'ongoing'
       delete out.endedAt

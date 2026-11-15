@@ -36,6 +36,8 @@ export const SUITES_BY_PATH = [
   ['public/mockups/frontier-tracker', ['frontier-tracker']],
   ['scripts/frontier/', ['frontier-tracker']],
   ['docs/fixtures/bf-tracker', ['frontier-tracker']],
+  // The Pyramid's floor log: its two fixtures feed pyramidData.ts (scripts/frontier/build-pyramid.mjs).
+  ['docs/fixtures/pyramid-', ['frontier-tracker']],
   ['src/store/', ['frontier-tracker']],
   ['src/sync/', ['frontier-tracker']],
   ['scripts/frontier/', ['frontier-data']],

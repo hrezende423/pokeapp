@@ -2,7 +2,7 @@ import { IconPlus } from '@tabler/icons-react'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { ScrollArea } from '../../../components/ScrollArea'
 import { scrollKey } from '../../../components/scrollMemory'
-import type { BrainAppearance, FacilityId, FrontierData, FrontierFormat, LevelMode } from '../data'
+import type { FacilityId, FrontierData, FrontierFormat, LevelMode } from '../data'
 import { battleLabel, FACILITY_ORDER, FORMAT_LABEL, LEVEL_LABEL } from '../format'
 import { speciesName } from '../names'
 import { Appearance, Joined, Kv, MonCell, Muted, Num, SpeciesLink } from '../parts'
@@ -38,6 +38,8 @@ import {
   type TrackerView,
 } from './model'
 import { LogAdd, RunTeam, SymbolToggle } from './LogAdd'
+import { BrainCell, Opponents } from './LogParts'
+import { PyramidAdd, PyramidInsights, PyramidLog, PyramidTotalsLine } from './PyramidPanel'
 import { trackerDocument } from './trackerStore'
 import '../frontier.css'
 import './tracker.css'
@@ -119,13 +121,29 @@ function Tracker({ data, screen, go }: { data: FrontierData; screen: Screen; go:
       </div>
     )
   }
+  // The Pyramid's insights only once there is a Pyramid run.
+  const pyramid = doc.runs.some((r) => r.facility === 'pyramid')
+  const areas = ['runs', 'insights', ...(pyramid ? ['pyramid'] : [])]
   return (
     <div className="bf-page bf-page-one" data-layout="frontier-tracker">
       <div className="bf-tracker" data-layout="tracker">
         <PageHead actions={<NewRunButton go={go} />} />
-        <div className="bf-tracker-main" data-layout="tracker-main">
-          <RunList ctx={ctx} />
-          <Insights ctx={ctx} />
+        <div
+          className="bf-tracker-main"
+          data-layout="tracker-main"
+          style={{ gridTemplateAreas: areas.map((a) => `'${a}'`).join(' ') }}
+        >
+          <div style={{ gridArea: 'runs' }}>
+            <RunList ctx={ctx} />
+          </div>
+          <div style={{ gridArea: 'insights' }}>
+            <Insights ctx={ctx} />
+          </div>
+          {pyramid && (
+            <div style={{ gridArea: 'pyramid' }}>
+              <PyramidInsights view={view} />
+            </div>
+          )}
         </div>
         <aside className="bf-tracker-side" data-layout="tracker-side">
           <BpPanel ctx={ctx} limit={12} />
@@ -572,6 +590,7 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
   const done = v.setsCompleted
   const unit = UNIT_WORD[v.run.facility]
   const last = v.battles.at(-1)
+  const pyramid = v.run.facility === 'pyramid'
   const areas = [
     ...(v.run.facility === 'dome' ? ['team'] : []),
     ...(v.run.outcome === 'ongoing' ? ['add'] : []),
@@ -581,7 +600,7 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
   return (
     <div className="bf-page bf-page-one" data-layout="frontier-run">
       <div className="bf-tracker" data-layout="tracker">
-        <header className="bf-run-head" data-layout="run-head">
+        <header className={`bf-run-head${pyramid ? ' bf-run-head-pyr' : ''}`} data-layout="run-head">
           <button type="button" className="bf-link bf-backlink" data-testid="tracker-all-runs" onClick={() => go({ kind: 'home' })}>
             All runs
           </button>
@@ -592,6 +611,7 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
             {FORMAT_LABEL[v.run.format]} · {LEVEL_LABEL[v.run.levelMode]} · {outcomeText(v)} ({done} {unit}
             {done === 1 ? '' : 's'}) · symbols: {symbolsText(v.symbolsAtEnd)}
           </span>
+          {pyramid && <PyramidTotalsLine v={v} />}
         </header>
         {/* Positioned by area; only the areas this run has, so no empty row adds a gap. */}
         <div
@@ -606,12 +626,14 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
           )}
           {areas.includes('add') && (
             <div style={{ gridArea: 'add' }}>
-              <LogAdd key={`${v.run.id}-${last?.n ?? 0}`} data={data} v={v} />
+              {pyramid ? (
+                <PyramidAdd key={`${v.run.id}-${last?.n ?? 0}`} data={data} v={v} />
+              ) : (
+                <LogAdd key={`${v.run.id}-${last?.n ?? 0}`} data={data} v={v} />
+              )}
             </div>
           )}
-          <div style={{ gridArea: 'log' }}>
-            <RunLog ctx={ctx} v={v} />
-          </div>
+          <div style={{ gridArea: 'log' }}>{pyramid ? <PyramidLog data={data} v={v} /> : <RunLog ctx={ctx} v={v} />}</div>
           {last && (
             <p className="bf-cap" style={{ gridArea: 'undo' }} data-layout="run-undo">
               <button
@@ -620,7 +642,7 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
                 data-testid="run-undo"
                 onClick={() => trackerDocument.update((d) => undoLastBattle(d, v.run.id, v.perSet))}
               >
-                Undo battle {last.n}
+                Undo {pyramid ? 'floor' : 'battle'} {last.n}
               </button>
             </p>
           )}
@@ -631,15 +653,6 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
         </aside>
       </div>
     </div>
-  )
-}
-
-/** Three opponents (Unknown included), each with its Emerald sprite, as Trainer Dex parties. */
-function Opponents({ ids }: { ids: (number | null)[] }) {
-  return (
-    <span className="bf-opps">
-      <Joined sep={<Muted> · </Muted>} items={ids.map((id, i) => <MonCell key={i} speciesId={id ?? undefined} />)} />
-    </span>
   )
 }
 
@@ -656,44 +669,6 @@ export function Rentals({ list }: { list: Rental[] }) {
         </span>
       ))}
     </span>
-  )
-}
-
-function BrainCell({
-  data,
-  facility,
-  b,
-  opponents,
-}: {
-  data: FrontierData
-  facility: FacilityId
-  b: BrainAppearance | undefined
-  opponents: (number | null)[]
-}) {
-  if (!b) return null
-  const who = brainOf(data, facility)
-  if (!who) return null
-  const label = `${who.name} · ${b.symbol === 'silver' ? 'Silver' : 'Gold'}`
-  if (!who.teams) {
-    return (
-      <>
-        {label}
-        <br />
-        <span className="bf-cap">Generated team: nothing to compare</span>
-      </>
-    )
-  }
-  const known = who.teams[b.symbol].map((m) => m.species_id)
-  const match = known.join() === opponents.join()
-  return (
-    <>
-      {label}
-      <br />
-      <span className="bf-cap">
-        Known team: {known.map((id) => (id == null ? '—' : speciesName(id))).join(', ')} ·{' '}
-        {match ? 'matches' : 'differs'}
-      </span>
-    </>
   )
 }
 
