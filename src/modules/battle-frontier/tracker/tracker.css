@@ -1,0 +1,313 @@
+/*
+  Challenge Tracker: the approved mockup's tracker rules (scripts/mockups/frontier.mjs,
+  "tracker", "actions and fields", "species picker"), scoped to .bf beside
+  ../frontier.css. Semantic tokens only, both themes; no shadow, no hover fill,
+  no badge. Accent: none here (the nav tab is the screen's one use).
+*/
+
+/* A page whose head lives inside the tracker grid: one area, no empty head row. */
+.bf-page.bf-page-one {
+  grid-template-areas: 'body';
+}
+
+.bf-tracker {
+  display: grid;
+  grid-template-areas:
+    'head head'
+    'main side';
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: var(--space-8);
+  min-width: 0;
+}
+.bf-tracker > *,
+.bf-tracker-main > *,
+.bf-tracker-side > * {
+  min-width: 0;
+}
+.bf-tracker > .bf-head,
+.bf-tracker > .bf-run-head {
+  grid-area: head;
+}
+.bf-tracker-main {
+  grid-area: main;
+  display: grid;
+  row-gap: var(--space-12);
+  align-content: start;
+}
+.bf-tracker-side {
+  grid-area: side;
+  display: grid;
+  row-gap: var(--space-8);
+  align-content: start;
+}
+
+/* The page head with its action (New run). */
+.bf-head.bf-tracker-head {
+  grid-template-areas: 'title scope actions';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.bf-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  column-gap: var(--space-2);
+}
+
+/* A ghost button: no fill, no border, the label semibold (bold on hover). */
+.bf-ghost {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-1);
+  height: var(--d-field);
+  padding: 0 var(--space-3);
+  font: inherit;
+  letter-spacing: inherit;
+  font-size: var(--font-style-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-default);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.bf-ghost:hover:not(:disabled) {
+  font-weight: var(--font-weight-bold);
+}
+.bf-ghost:disabled {
+  color: var(--color-text-disabled);
+  cursor: default;
+}
+.bf-ghost svg,
+.bf-sym svg {
+  flex: none;
+}
+
+/* A group heading row: the facility in the run list, a set's draft in the log. */
+.bf-t tr.bf-group td {
+  padding-top: var(--space-6);
+  border-bottom-color: var(--color-border-strong);
+}
+
+/* ------------------------------------------------------------ a run */
+
+.bf-run-head {
+  display: grid;
+  grid-template-areas:
+    'back back'
+    'title facts';
+  grid-template-columns: auto minmax(0, 1fr);
+  row-gap: var(--space-2);
+  column-gap: var(--space-6);
+  align-items: baseline;
+}
+.bf-run-head .bf-backlink {
+  grid-area: back;
+  justify-self: start;
+}
+.panel .bf .bf-run-head .bf-title {
+  grid-area: title;
+}
+.bf-facts {
+  grid-area: facts;
+  color: var(--color-text-muted);
+}
+
+/* Log rows carry 32px sprites: centre the row's text on them. */
+.bf-log td {
+  vertical-align: middle;
+}
+.bf-opps {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-1);
+  vertical-align: middle;
+}
+/* The comma sits against its name: no gap inside an item, only before a set index. */
+.bf-rental {
+  display: inline-flex;
+  align-items: center;
+}
+.bf-rental > .bf-mono {
+  margin-left: var(--space-1);
+}
+.bf-opps:has(> .bf-rental) {
+  column-gap: var(--space-2);
+}
+/*
+  The Dome's log has seven columns and three sprites a row: tighter cells, and
+  room for the Brain's known team (the mockup's ~3 lines, not a word a line).
+*/
+.bf-log th,
+.bf-log td {
+  padding-right: var(--space-3);
+}
+.bf-log .bf-mon {
+  column-gap: var(--space-1);
+}
+.bf-log .bf-brain-cell {
+  min-width: calc(var(--space-16) * 2 + var(--space-4));
+}
+.bf-note {
+  display: block;
+}
+.bf-lookup-row > td {
+  padding-bottom: var(--space-6);
+}
+
+/* Symbols and the Dome pair: a checkbox icon, the label semibold when held. */
+.bf-sym {
+  display: inline-flex;
+  align-items: center;
+  column-gap: var(--space-1);
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--color-text-default);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.bf-sym[aria-pressed='true'] {
+  font-weight: var(--font-weight-semibold);
+}
+.bf-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  min-height: var(--d-field);
+  align-items: center;
+}
+
+/* ------------------------------------------------------------ logging a battle */
+
+/* The hairline is the row's own; no gap above or below it (hairline-band rule). */
+.bf-addrow {
+  display: grid;
+  grid-template-areas:
+    'n label s1 s2 s3 result'
+    '. . note note note retire';
+  grid-template-columns: auto auto repeat(3, minmax(0, 1fr)) auto;
+  column-gap: var(--space-4);
+  row-gap: var(--space-3);
+  align-items: end;
+  padding-block: var(--space-3);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+}
+.bf-addrow > * {
+  min-width: 0;
+}
+.bf-addrow-dome {
+  grid-template-areas:
+    'n label s1 s2 s3 result'
+    '. . pair pair drop .'
+    '. . note note note retire';
+}
+.bf-addrow-draft {
+  grid-template-areas:
+    'n label s1 s2 s3 result'
+    '. . r1 r2 r3 .'
+    '. . note note note retire';
+}
+.bf-addrow-swap {
+  grid-template-areas:
+    'n label s1 s2 s3 result'
+    '. . sout sin sset .'
+    '. . note note note retire';
+}
+.bf-addrow .bf-retire {
+  justify-content: end;
+}
+.bf-rental-pick {
+  align-content: end;
+}
+
+/* The species picker: a popover is the surface plus a hairline, nothing else. */
+.bf-picker {
+  position: relative;
+}
+.bf-picker-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 3;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  width: max-content;
+  min-width: 100%;
+  background: var(--color-bg-surface);
+  border: var(--border-width-thin) solid var(--color-border-hairline);
+  border-radius: var(--radius-md);
+}
+.bf-picker-list li {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+  cursor: pointer;
+}
+.bf-picker-list li:last-child {
+  border-bottom: 0;
+}
+.bf-picker-list li[aria-selected='true'] {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ------------------------------------------------------------ Battle Points */
+
+.bf-line-edit {
+  display: grid;
+  grid-template-areas:
+    'reason reason'
+    'bp act';
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  align-items: end;
+}
+.bf-line-edit > * {
+  min-width: 0;
+}
+.bf-bp-actions {
+  margin-left: calc(-1 * var(--space-3));
+}
+
+/* ------------------------------------------------------------ new run */
+
+.bf-new-run {
+  grid-template-areas: 'form' 'start';
+  row-gap: var(--space-6);
+}
+.bf-new-run > .bf-actions {
+  margin-left: calc(-1 * var(--space-3));
+}
+
+/* ------------------------------------------------------------ narrow */
+
+/* Phone layout is parked: this only stacks the regions so nothing clips. */
+@container frontier (max-width: 900px) {
+  .bf-tracker {
+    grid-template-areas: 'head' 'main' 'side';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-head.bf-tracker-head {
+    grid-template-areas: 'title actions' 'scope scope';
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .bf-run-head {
+    grid-template-areas: 'back' 'title' 'facts';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-addrow {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'n label' 's1 s1' 's2 s2' 's3 s3' 'note note' 'result result' 'retire retire';
+  }
+  .bf-addrow-dome {
+    grid-template-areas: 'n label' 's1 s1' 's2 s2' 's3 s3' 'pair pair' 'drop drop' 'note note' 'result result' 'retire retire';
+  }
+  .bf-addrow-draft {
+    grid-template-areas: 'n label' 's1 s1' 's2 s2' 's3 s3' 'r1 r1' 'r2 r2' 'r3 r3' 'note note' 'result result' 'retire retire';
+  }
+  .bf-addrow-swap {
+    grid-template-areas: 'n label' 's1 s1' 's2 s2' 's3 s3' 'sout sout' 'sin sin' 'sset sset' 'note note' 'result result' 'retire retire';
+  }
+  .bf-addrow .bf-retire {
+    justify-content: start;
+  }
+}

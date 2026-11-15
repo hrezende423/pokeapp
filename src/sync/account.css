@@ -118,6 +118,12 @@
   bottom: 4px;
 }
 
+/* Saved documents: Export / Import, two ghost buttons on one row. */
+.account-documents-actions {
+  display: flex;
+  column-gap: var(--space-2);
+}
+
 .account-editor {
   display: flex;
   flex-direction: column;

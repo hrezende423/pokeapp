@@ -5,6 +5,8 @@ import { SearchSelect } from '../components/ds/SearchSelect'
 import { ThemeSwitcher } from '../components/ds/ThemeSwitcher'
 import { VersionGroupSelector } from '../modules/version-group/VersionGroupSelector'
 import { useDisclosureGroup } from '../modules/dex/query/useDisclosureGroup'
+import { downloadText, readFileText } from '../store/backupFile'
+import { exportDocuments, getDocument, importDocuments } from '../store/documentStore'
 import {
   signInWithGitHub,
   signOut,
@@ -131,6 +133,8 @@ export function AccountControl() {
           <VersionGroupSelector />
         </div>
 
+        <SavedDocuments />
+
         {signedIn && (
           <div className="app-controls-field">
             <button
@@ -144,6 +148,116 @@ export function AccountControl() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Every saved document (src/store/) to a file and back: Export downloads them
+ * all; Import REPLACES each document the file holds with the file's copy, so
+ * importing your own export gives back exactly what it saved (a merge would
+ * append a second copy of every build and team). When a document the file holds
+ * already has data on this device, nothing is written until Replace is pressed.
+ * The store refuses another app's file, a newer version, or malformed JSON.
+ */
+function SavedDocuments() {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [report, setReport] = useState<string | null>(null)
+  const [pending, setPending] = useState<{ text: string; names: string[] } | null>(null)
+
+  function runImport(text: string) {
+    setPending(null)
+    const r = importDocuments(text, { mode: 'replace' })
+    if (!r.ok) setReport(`Not imported: ${r.reason}`)
+    else if (!r.documents.length) setReport('The file holds no documents.')
+    else
+      setReport(
+        r.documents
+          .map((d) => `${d.name}: ${d.result}${d.reason ? ` (${d.reason})` : ''}`)
+          .join(' · '),
+      )
+  }
+
+  async function onFile(file: File | undefined) {
+    if (!file) return
+    const text = await readFileText(file)
+    if (fileRef.current) fileRef.current.value = ''
+    let names: string[] = []
+    try {
+      const docs = (JSON.parse(text) as { documents?: unknown })?.documents
+      if (docs && typeof docs === 'object') {
+        names = Object.keys(docs).filter((n) => {
+          const doc = getDocument(n)
+          return doc != null && !doc.isEmpty(doc.read())
+        })
+      }
+    } catch {
+      /* importDocuments reports a malformed file */
+    }
+    setReport(null)
+    if (names.length) setPending({ text, names })
+    else runImport(text)
+  }
+
+  return (
+    <div className="app-controls-field account-documents" data-testid="saved-documents">
+      <span className="app-controls-label">Saved documents</span>
+      <div className="account-documents-actions" data-layout="saved-documents-actions">
+        <button
+          type="button"
+          className="ghost-button"
+          data-testid="documents-export"
+          onClick={() => downloadText(exportDocuments())}
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          data-testid="documents-import"
+          onClick={() => fileRef.current?.click()}
+        >
+          Import…
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          data-testid="documents-file"
+          onChange={(e) => void onFile(e.target.files?.[0])}
+        />
+      </div>
+      {pending && (
+        <div data-testid="documents-confirm">
+          <p className="account-note">
+            This replaces what this device holds for: {pending.names.join(', ')}.
+          </p>
+          <div className="account-documents-actions" data-layout="saved-documents-confirm">
+            <button
+              type="button"
+              className="ghost-button"
+              data-testid="documents-replace"
+              onClick={() => runImport(pending.text)}
+            >
+              Replace
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              data-testid="documents-cancel"
+              onClick={() => setPending(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {report && (
+        <p className="account-note" data-testid="documents-report" role="status">
+          {report}
+        </p>
+      )}
     </div>
   )
 }

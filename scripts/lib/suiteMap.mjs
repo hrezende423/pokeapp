@@ -30,6 +30,14 @@ export const SUITES_BY_PATH = [
   // The reference screens: the tab, Facilities, Brains, Sets & Trainers, the lookup.
   ['src/modules/battle-frontier/', ['frontier-reference']],
   ['public/mockups/frontier-', ['frontier-reference']],
+  // The Challenge Tracker: its model and document (browser-free), its screens, the
+  // owner's import, and the account menu's Saved documents import it is loaded through.
+  ['src/modules/battle-frontier/', ['frontier-tracker']],
+  ['public/mockups/frontier-tracker', ['frontier-tracker']],
+  ['scripts/frontier/', ['frontier-tracker']],
+  ['docs/fixtures/bf-tracker', ['frontier-tracker']],
+  ['src/store/', ['frontier-tracker']],
+  ['src/sync/', ['frontier-tracker']],
   ['scripts/frontier/', ['frontier-data']],
   ['public/data/frontier/', ['frontier-data']],
   ['public/data/trainers/emerald.json', ['frontier-data']],

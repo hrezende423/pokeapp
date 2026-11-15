@@ -16,11 +16,10 @@ export const STUB_PAGES = [
     graduation the note above describes -- the entries left this list and the nav
     resolves them from that registry instead. Battle Simulator graduated as Team
     Matchup (../team-matchup/pages.ts). Compare Pokemon graduated as Tools #13
-    (../tools/pages.ts), keeping its id so the dropdown line is unchanged.
+    (../tools/pages.ts), keeping its id so the dropdown line is unchanged. The
+    Battle Frontier's Challenge Tracker graduated too (../battle-frontier/pages.ts).
   */
   { id: 'training-optimization', label: 'Training and Optimization' },
-  /* Battle Frontier: the Challenge Tracker gets its own branch. */
-  { id: 'frontier-tracker', label: 'Challenge Tracker' },
 ] as const
 
 export type StubPageId = (typeof STUB_PAGES)[number]['id']

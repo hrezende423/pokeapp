@@ -5,6 +5,8 @@ const load = () => import('./FrontierScreens')
 const Facilities = lazy(() => load().then((m) => ({ default: m.FacilitiesPage })))
 const Brains = lazy(() => load().then((m) => ({ default: m.BrainsPage })))
 const Sets = lazy(() => load().then((m) => ({ default: m.SetsTrainersPage })))
+/* The Challenge Tracker: its own chunk (the loader and the parts are shared with the screens'). */
+const Tracker = lazy(() => import('./tracker/TrackerPage').then((m) => ({ default: m.TrackerPage })))
 
 const Wrap = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<p>Loading Battle Frontier…</p>}>{children}</Suspense>
@@ -24,5 +26,10 @@ export const FrontierBrainsLazy = () => (
 export const FrontierSetsLazy = () => (
   <Wrap>
     <Sets />
+  </Wrap>
+)
+export const FrontierTrackerLazy = () => (
+  <Wrap>
+    <Tracker />
   </Wrap>
 )

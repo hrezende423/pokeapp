@@ -1,0 +1,1813 @@
+{
+  "app": "pokeapp",
+  "format": 1,
+  "exportedAt": "2026-11-14T00:00:00.000Z",
+  "documents": {
+    "frontier-tracker": {
+      "version": 1,
+      "data": {
+        "schemaVersion": 1,
+        "runs": [
+          {
+            "id": "imp-dome-1",
+            "facility": "dome",
+            "format": "singles",
+            "levelMode": "lv50",
+            "startedAt": "2026-11-14",
+            "outcome": "ongoing",
+            "imported": true,
+            "dome": {
+              "team": [
+                260,
+                376,
+                381
+              ]
+            }
+          },
+          {
+            "id": "imp-factory-1",
+            "facility": "factory",
+            "format": "singles",
+            "levelMode": "lv50",
+            "startedAt": "2026-11-14",
+            "outcome": "lost",
+            "imported": true,
+            "drafts": [
+              {
+                "atBattle": 1,
+                "rentals": [
+                  {
+                    "species": 75
+                  },
+                  {
+                    "species": 253
+                  },
+                  {
+                    "species": 228
+                  }
+                ]
+              }
+            ],
+            "swaps": []
+          },
+          {
+            "id": "imp-factory-2",
+            "facility": "factory",
+            "format": "singles",
+            "levelMode": "lv50",
+            "startedAt": "2026-11-14",
+            "outcome": "lost",
+            "imported": true,
+            "drafts": [
+              {
+                "atBattle": 1,
+                "rentals": [
+                  {
+                    "species": 75
+                  },
+                  {
+                    "species": 253
+                  },
+                  {
+                    "species": 228
+                  }
+                ]
+              }
+            ],
+            "swaps": [
+              {
+                "atBattle": 3,
+                "out": {
+                  "species": 253
+                },
+                "in": {
+                  "species": 239
+                }
+              }
+            ]
+          },
+          {
+            "id": "imp-factory-3",
+            "facility": "factory",
+            "format": "singles",
+            "levelMode": "lv50",
+            "startedAt": "2026-11-14",
+            "outcome": "lost",
+            "imported": true,
+            "drafts": [
+              {
+                "atBattle": 1,
+                "rentals": [
+                  {
+                    "species": 75
+                  },
+                  {
+                    "species": 253
+                  },
+                  {
+                    "species": 228
+                  }
+                ]
+              }
+            ],
+            "swaps": [
+              {
+                "atBattle": 7,
+                "out": {
+                  "species": 253
+                },
+                "in": {
+                  "species": 315
+                }
+              }
+            ]
+          },
+          {
+            "id": "imp-factory-4",
+            "facility": "factory",
+            "format": "singles",
+            "levelMode": "lv50",
+            "startedAt": "2026-11-14",
+            "outcome": "lost",
+            "imported": true,
+            "drafts": [
+              {
+                "atBattle": 1,
+                "rentals": [
+                  {
+                    "species": 5
+                  },
+                  {
+                    "species": 320
+                  },
+                  {
+                    "species": 267
+                  }
+                ]
+              },
+              {
+                "atBattle": 8,
+                "rentals": [
+                  {
+                    "species": 106
+                  },
+                  {
+                    "species": 49
+                  },
+                  {
+                    "species": 159
+                  }
+                ]
+              },
+              {
+                "atBattle": 15,
+                "rentals": [
+                  {
+                    "species": 335
+                  },
+                  {
+                    "species": 336
+                  },
+                  {
+                    "species": 326
+                  }
+                ]
+              },
+              {
+                "atBattle": 22,
+                "rentals": [
+                  {
+                    "species": 196
+                  },
+                  {
+                    "species": 214
+                  },
+                  {
+                    "species": 373
+                  }
+                ]
+              },
+              {
+                "atBattle": 29,
+                "rentals": [
+                  {
+                    "species": 196
+                  },
+                  {
+                    "species": 214
+                  },
+                  {
+                    "species": 350
+                  }
+                ]
+              },
+              {
+                "atBattle": 36,
+                "rentals": [
+                  {
+                    "species": 121
+                  },
+                  {
+                    "species": 330
+                  },
+                  {
+                    "species": 205
+                  }
+                ]
+              }
+            ],
+            "swaps": [
+              {
+                "atBattle": 6,
+                "out": {
+                  "species": 267
+                },
+                "in": {
+                  "species": 315
+                }
+              }
+            ]
+          },
+          {
+            "id": "imp-factory-5",
+            "facility": "factory",
+            "format": "singles",
+            "levelMode": "lv50",
+            "startedAt": "2026-11-14",
+            "outcome": "ongoing",
+            "imported": true,
+            "drafts": [
+              {
+                "atBattle": 1,
+                "rentals": [
+                  {
+                    "species": 75
+                  },
+                  {
+                    "species": 239
+                  },
+                  {
+                    "species": 228
+                  }
+                ]
+              }
+            ],
+            "swaps": []
+          }
+        ],
+        "battles": [
+          {
+            "id": "imp-dome-1-1",
+            "runId": "imp-dome-1",
+            "n": 1,
+            "opponents": [
+              79,
+              258,
+              90
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-2",
+            "runId": "imp-dome-1",
+            "n": 2,
+            "opponents": [
+              305,
+              189,
+              372
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-3",
+            "runId": "imp-dome-1",
+            "n": 3,
+            "opponents": [
+              113,
+              375,
+              57
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-4",
+            "runId": "imp-dome-1",
+            "n": 4,
+            "opponents": [
+              207,
+              123,
+              164
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-5",
+            "runId": "imp-dome-1",
+            "n": 5,
+            "opponents": [
+              57,
+              176,
+              305
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-6",
+            "runId": "imp-dome-1",
+            "n": 6,
+            "opponents": [
+              226,
+              319,
+              211
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-7",
+            "runId": "imp-dome-1",
+            "n": 7,
+            "opponents": [
+              107,
+              164,
+              226
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-8",
+            "runId": "imp-dome-1",
+            "n": 8,
+            "opponents": [
+              359,
+              186,
+              62
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-9",
+            "runId": "imp-dome-1",
+            "n": 9,
+            "opponents": [
+              123,
+              57,
+              198
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-10",
+            "runId": "imp-dome-1",
+            "n": 10,
+            "opponents": [
+              65,
+              286,
+              362
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-11",
+            "runId": "imp-dome-1",
+            "n": 11,
+            "opponents": [
+              324,
+              40,
+              323
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-12",
+            "runId": "imp-dome-1",
+            "n": 12,
+            "opponents": [
+              139,
+              367,
+              234
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-13",
+            "runId": "imp-dome-1",
+            "n": 13,
+            "opponents": [
+              112,
+              122,
+              101
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-14",
+            "runId": "imp-dome-1",
+            "n": 14,
+            "opponents": [
+              85,
+              124,
+              101
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-15",
+            "runId": "imp-dome-1",
+            "n": 15,
+            "opponents": [
+              123,
+              354,
+              324
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-16",
+            "runId": "imp-dome-1",
+            "n": 16,
+            "opponents": [
+              130,
+              73,
+              306
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-17",
+            "runId": "imp-dome-1",
+            "n": 17,
+            "opponents": [
+              306,
+              254,
+              121
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-18",
+            "runId": "imp-dome-1",
+            "n": 18,
+            "opponents": [
+              289,
+              295,
+              123
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-19",
+            "runId": "imp-dome-1",
+            "n": 19,
+            "opponents": [
+              350,
+              289,
+              171
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-20",
+            "runId": "imp-dome-1",
+            "n": 20,
+            "opponents": [
+              260,
+              373,
+              6
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-21",
+            "runId": "imp-dome-1",
+            "n": 21,
+            "opponents": [
+              319,
+              121,
+              342
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-22",
+            "runId": "imp-dome-1",
+            "n": 22,
+            "opponents": [
+              214,
+              103,
+              45
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-23",
+            "runId": "imp-dome-1",
+            "n": 23,
+            "opponents": [
+              350,
+              340,
+              260
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-24",
+            "runId": "imp-dome-1",
+            "n": 24,
+            "opponents": [
+              212,
+              73,
+              157
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-25",
+            "runId": "imp-dome-1",
+            "n": 25,
+            "opponents": [
+              68,
+              115,
+              199
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-26",
+            "runId": "imp-dome-1",
+            "n": 26,
+            "opponents": [
+              365,
+              9,
+              376
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-27",
+            "runId": "imp-dome-1",
+            "n": 27,
+            "opponents": [
+              160,
+              143,
+              373
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-28",
+            "runId": "imp-dome-1",
+            "n": 28,
+            "opponents": [
+              260,
+              115,
+              289
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-29",
+            "runId": "imp-dome-1",
+            "n": 29,
+            "opponents": [
+              85,
+              80,
+              169
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-30",
+            "runId": "imp-dome-1",
+            "n": 30,
+            "opponents": [
+              380,
+              131,
+              112
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-31",
+            "runId": "imp-dome-1",
+            "n": 31,
+            "opponents": [
+              306,
+              297,
+              212
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-32",
+            "runId": "imp-dome-1",
+            "n": 32,
+            "opponents": [
+              376,
+              131,
+              154
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-33",
+            "runId": "imp-dome-1",
+            "n": 33,
+            "opponents": [
+              121,
+              233,
+              130
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-34",
+            "runId": "imp-dome-1",
+            "n": 34,
+            "opponents": [
+              373,
+              197,
+              135
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-35",
+            "runId": "imp-dome-1",
+            "n": 35,
+            "opponents": [
+              260,
+              257,
+              9
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 2
+            }
+          },
+          {
+            "id": "imp-dome-1-36",
+            "runId": "imp-dome-1",
+            "n": 36,
+            "opponents": [
+              257,
+              306,
+              308
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-37",
+            "runId": "imp-dome-1",
+            "n": 37,
+            "opponents": [
+              124,
+              9,
+              131
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                376
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-38",
+            "runId": "imp-dome-1",
+            "n": 38,
+            "opponents": [
+              68,
+              217,
+              381
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-dome-1-39",
+            "runId": "imp-dome-1",
+            "n": 39,
+            "opponents": [
+              130,
+              217,
+              376
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                376,
+                381
+              ],
+              "dropped": 3
+            }
+          },
+          {
+            "id": "imp-dome-1-40",
+            "runId": "imp-dome-1",
+            "n": 40,
+            "opponents": [
+              260,
+              376,
+              380
+            ],
+            "result": "W",
+            "dome": {
+              "pair": [
+                260,
+                381
+              ],
+              "dropped": 1
+            }
+          },
+          {
+            "id": "imp-factory-1-1",
+            "runId": "imp-factory-1",
+            "n": 1,
+            "opponents": [
+              162,
+              15,
+              133
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-1-2",
+            "runId": "imp-factory-1",
+            "n": 2,
+            "opponents": [
+              219,
+              327,
+              5
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-1-3",
+            "runId": "imp-factory-1",
+            "n": 3,
+            "opponents": [
+              188,
+              30,
+              162
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-1-4",
+            "runId": "imp-factory-1",
+            "n": 4,
+            "opponents": [
+              112,
+              72,
+              301
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-1-5",
+            "runId": "imp-factory-1",
+            "n": 5,
+            "opponents": [
+              109,
+              67,
+              153
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-1-6",
+            "runId": "imp-factory-1",
+            "n": 6,
+            "opponents": [
+              108,
+              202,
+              77
+            ],
+            "result": "L"
+          },
+          {
+            "id": "imp-factory-2-1",
+            "runId": "imp-factory-2",
+            "n": 1,
+            "opponents": [
+              162,
+              15,
+              133
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-2-2",
+            "runId": "imp-factory-2",
+            "n": 2,
+            "opponents": [
+              168,
+              5,
+              239
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-2-3",
+            "runId": "imp-factory-2",
+            "n": 3,
+            "opponents": [
+              47,
+              370,
+              null
+            ],
+            "result": "L"
+          },
+          {
+            "id": "imp-factory-3-1",
+            "runId": "imp-factory-3",
+            "n": 1,
+            "opponents": [
+              162,
+              15,
+              133
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-3-2",
+            "runId": "imp-factory-3",
+            "n": 2,
+            "opponents": [
+              5,
+              370,
+              67
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-3-3",
+            "runId": "imp-factory-3",
+            "n": 3,
+            "opponents": [
+              301,
+              72,
+              83
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-3-4",
+            "runId": "imp-factory-3",
+            "n": 4,
+            "opponents": [
+              240,
+              140,
+              111
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-3-5",
+            "runId": "imp-factory-3",
+            "n": 5,
+            "opponents": [
+              269,
+              120,
+              225
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-3-6",
+            "runId": "imp-factory-3",
+            "n": 6,
+            "opponents": [
+              315,
+              108,
+              198
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-3-7",
+            "runId": "imp-factory-3",
+            "n": 7,
+            "opponents": [
+              30,
+              222,
+              370
+            ],
+            "result": "L"
+          },
+          {
+            "id": "imp-factory-4-1",
+            "runId": "imp-factory-4",
+            "n": 1,
+            "opponents": [
+              184,
+              170,
+              247
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-2",
+            "runId": "imp-factory-4",
+            "n": 2,
+            "opponents": [
+              284,
+              185,
+              77
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-3",
+            "runId": "imp-factory-4",
+            "n": 3,
+            "opponents": [
+              138,
+              111,
+              302
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-4",
+            "runId": "imp-factory-4",
+            "n": 4,
+            "opponents": [
+              253,
+              313,
+              133
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-5",
+            "runId": "imp-factory-4",
+            "n": 5,
+            "opponents": [
+              315,
+              77,
+              198
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-6",
+            "runId": "imp-factory-4",
+            "n": 6,
+            "opponents": [
+              269,
+              109,
+              313
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-7",
+            "runId": "imp-factory-4",
+            "n": 7,
+            "opponents": [
+              259,
+              153,
+              370
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-8",
+            "runId": "imp-factory-4",
+            "n": 8,
+            "opponents": [
+              20,
+              137,
+              277
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-9",
+            "runId": "imp-factory-4",
+            "n": 9,
+            "opponents": [
+              189,
+              357,
+              313
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-10",
+            "runId": "imp-factory-4",
+            "n": 10,
+            "opponents": [
+              203,
+              368,
+              219
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-11",
+            "runId": "imp-factory-4",
+            "n": 11,
+            "opponents": [
+              262,
+              99,
+              148
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-12",
+            "runId": "imp-factory-4",
+            "n": 12,
+            "opponents": [
+              108,
+              57,
+              182
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-13",
+            "runId": "imp-factory-4",
+            "n": 13,
+            "opponents": [
+              215,
+              5,
+              211
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-14",
+            "runId": "imp-factory-4",
+            "n": 14,
+            "opponents": [
+              113,
+              247,
+              367
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-15",
+            "runId": "imp-factory-4",
+            "n": 15,
+            "opponents": [
+              288,
+              47,
+              148
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-16",
+            "runId": "imp-factory-4",
+            "n": 16,
+            "opponents": [
+              359,
+              49,
+              226
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-17",
+            "runId": "imp-factory-4",
+            "n": 17,
+            "opponents": [
+              64,
+              262,
+              367
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-18",
+            "runId": "imp-factory-4",
+            "n": 18,
+            "opponents": [
+              139,
+              185,
+              342
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-19",
+            "runId": "imp-factory-4",
+            "n": 19,
+            "opponents": [
+              182,
+              237,
+              108
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-20",
+            "runId": "imp-factory-4",
+            "n": 20,
+            "opponents": [
+              44,
+              314,
+              332
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-21",
+            "runId": "imp-factory-4",
+            "n": 21,
+            "opponents": [
+              315,
+              49,
+              70
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-22",
+            "runId": "imp-factory-4",
+            "n": 22,
+            "opponents": [
+              346,
+              73,
+              205
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-23",
+            "runId": "imp-factory-4",
+            "n": 23,
+            "opponents": [
+              321,
+              130,
+              101
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-24",
+            "runId": "imp-factory-4",
+            "n": 24,
+            "opponents": [
+              36,
+              213,
+              73
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-25",
+            "runId": "imp-factory-4",
+            "n": 25,
+            "opponents": [
+              356,
+              68,
+              115
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-26",
+            "runId": "imp-factory-4",
+            "n": 26,
+            "opponents": [
+              242,
+              59,
+              6
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-27",
+            "runId": "imp-factory-4",
+            "n": 27,
+            "opponents": [
+              38,
+              199,
+              80
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-28",
+            "runId": "imp-factory-4",
+            "n": 28,
+            "opponents": [
+              125,
+              130,
+              126
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-29",
+            "runId": "imp-factory-4",
+            "n": 29,
+            "opponents": [
+              346,
+              36,
+              112
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-30",
+            "runId": "imp-factory-4",
+            "n": 30,
+            "opponents": [
+              254,
+              45,
+              143
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-31",
+            "runId": "imp-factory-4",
+            "n": 31,
+            "opponents": [
+              171,
+              210,
+              340
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-32",
+            "runId": "imp-factory-4",
+            "n": 32,
+            "opponents": [
+              257,
+              348,
+              295
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-33",
+            "runId": "imp-factory-4",
+            "n": 33,
+            "opponents": [
+              6,
+              275,
+              171
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-34",
+            "runId": "imp-factory-4",
+            "n": 34,
+            "opponents": [
+              229,
+              197,
+              136
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-35",
+            "runId": "imp-factory-4",
+            "n": 35,
+            "opponents": [
+              68,
+              22,
+              55
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-36",
+            "runId": "imp-factory-4",
+            "n": 36,
+            "opponents": [
+              55,
+              97,
+              212
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-37",
+            "runId": "imp-factory-4",
+            "n": 37,
+            "opponents": [
+              171,
+              199,
+              115
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-38",
+            "runId": "imp-factory-4",
+            "n": 38,
+            "opponents": [
+              124,
+              310,
+              105
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-39",
+            "runId": "imp-factory-4",
+            "n": 39,
+            "opponents": [
+              22,
+              136,
+              101
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-4-40",
+            "runId": "imp-factory-4",
+            "n": 40,
+            "opponents": [
+              51,
+              308,
+              295
+            ],
+            "result": "L"
+          },
+          {
+            "id": "imp-factory-5-1",
+            "runId": "imp-factory-5",
+            "n": 1,
+            "opponents": [
+              133,
+              193,
+              96
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-5-2",
+            "runId": "imp-factory-5",
+            "n": 2,
+            "opponents": [
+              176,
+              12,
+              83
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-5-3",
+            "runId": "imp-factory-5",
+            "n": 3,
+            "opponents": [
+              325,
+              190,
+              153
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-5-4",
+            "runId": "imp-factory-5",
+            "n": 4,
+            "opponents": [
+              176,
+              138,
+              370
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-5-5",
+            "runId": "imp-factory-5",
+            "n": 5,
+            "opponents": [
+              77,
+              98,
+              64
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-5-6",
+            "runId": "imp-factory-5",
+            "n": 6,
+            "opponents": [
+              327,
+              15,
+              168
+            ],
+            "result": "W"
+          },
+          {
+            "id": "imp-factory-5-7",
+            "runId": "imp-factory-5",
+            "n": 7,
+            "opponents": [
+              20,
+              294,
+              231
+            ],
+            "result": "W"
+          }
+        ],
+        "symbols": {},
+        "bp": {
+          "opening": 0,
+          "ledger": [
+            {
+              "id": "imp-bp-imp-dome-1-1",
+              "at": "2026-11-14",
+              "delta": 1,
+              "reason": "Dome run 1, tournament 1",
+              "runId": "imp-dome-1",
+              "set": 1
+            },
+            {
+              "id": "imp-bp-imp-dome-1-2",
+              "at": "2026-11-14",
+              "delta": 1,
+              "reason": "Dome run 1, tournament 2",
+              "runId": "imp-dome-1",
+              "set": 2
+            },
+            {
+              "id": "imp-bp-imp-dome-1-3",
+              "at": "2026-11-14",
+              "delta": 2,
+              "reason": "Dome run 1, tournament 3",
+              "runId": "imp-dome-1",
+              "set": 3
+            },
+            {
+              "id": "imp-bp-imp-dome-1-4",
+              "at": "2026-11-14",
+              "delta": 2,
+              "reason": "Dome run 1, tournament 4",
+              "runId": "imp-dome-1",
+              "set": 4
+            },
+            {
+              "id": "imp-bp-imp-dome-1-5",
+              "at": "2026-11-14",
+              "delta": 13,
+              "reason": "Dome run 1, tournament 5",
+              "runId": "imp-dome-1",
+              "set": 5,
+              "brainBonus": 10
+            },
+            {
+              "id": "imp-bp-imp-dome-1-6",
+              "at": "2026-11-14",
+              "delta": 3,
+              "reason": "Dome run 1, tournament 6",
+              "runId": "imp-dome-1",
+              "set": 6
+            },
+            {
+              "id": "imp-bp-imp-dome-1-7",
+              "at": "2026-11-14",
+              "delta": 4,
+              "reason": "Dome run 1, tournament 7",
+              "runId": "imp-dome-1",
+              "set": 7
+            },
+            {
+              "id": "imp-bp-imp-dome-1-8",
+              "at": "2026-11-14",
+              "delta": 4,
+              "reason": "Dome run 1, tournament 8",
+              "runId": "imp-dome-1",
+              "set": 8
+            },
+            {
+              "id": "imp-bp-imp-dome-1-9",
+              "at": "2026-11-14",
+              "delta": 5,
+              "reason": "Dome run 1, tournament 9",
+              "runId": "imp-dome-1",
+              "set": 9
+            },
+            {
+              "id": "imp-bp-imp-dome-1-10",
+              "at": "2026-11-14",
+              "delta": 15,
+              "reason": "Dome run 1, tournament 10",
+              "runId": "imp-dome-1",
+              "set": 10,
+              "brainBonus": 10
+            },
+            {
+              "id": "imp-bp-imp-factory-4-1",
+              "at": "2026-11-14",
+              "delta": 3,
+              "reason": "Factory run 4, set 1",
+              "runId": "imp-factory-4",
+              "set": 1
+            },
+            {
+              "id": "imp-bp-imp-factory-4-2",
+              "at": "2026-11-14",
+              "delta": 3,
+              "reason": "Factory run 4, set 2",
+              "runId": "imp-factory-4",
+              "set": 2
+            },
+            {
+              "id": "imp-bp-imp-factory-4-3",
+              "at": "2026-11-14",
+              "delta": 14,
+              "reason": "Factory run 4, set 3",
+              "runId": "imp-factory-4",
+              "set": 3,
+              "brainBonus": 10
+            },
+            {
+              "id": "imp-bp-imp-factory-4-4",
+              "at": "2026-11-14",
+              "delta": 4,
+              "reason": "Factory run 4, set 4",
+              "runId": "imp-factory-4",
+              "set": 4
+            },
+            {
+              "id": "imp-bp-imp-factory-4-5",
+              "at": "2026-11-14",
+              "delta": 5,
+              "reason": "Factory run 4, set 5",
+              "runId": "imp-factory-4",
+              "set": 5
+            },
+            {
+              "id": "imp-bp-imp-factory-5-1",
+              "at": "2026-11-14",
+              "delta": 3,
+              "reason": "Factory run 5, set 1",
+              "runId": "imp-factory-5",
+              "set": 1
+            }
+          ]
+        }
+      }
+    }
+  }
+}
