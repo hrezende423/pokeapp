@@ -157,7 +157,8 @@ try {
   await page.screenshot({ path: shot('nav'), clip: { x: 0, y: 0, width: 1440, height: 320 } })
   await page.click(ENTRY('frontier-tracker'))
   await page.mouse.move(1300, 900)
-  check('Challenge Tracker is a stub placeholder', (await page.waitForSelector('[data-testid="stub-frontier-tracker"]', { timeout: 15000 }).catch(() => null)) != null)
+  // Graduated on feature/frontier-tracker: its own screen (verify:frontier-tracker).
+  check('Challenge Tracker opens its own screen (no stub)', (await page.waitForSelector('[data-testid="frontier-tracker"]', { timeout: 15000 }).catch(() => null)) != null && (await page.$('[data-testid="stub-frontier-tracker"]')) == null)
 
   // ================================================================ 2. OTHER GENERATION
   hr('2. ANY OTHER GENERATION: the notice only, and no Frontier data fetched')

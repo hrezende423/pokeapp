@@ -5,6 +5,8 @@ import { SearchSelect } from '../components/ds/SearchSelect'
 import { ThemeSwitcher } from '../components/ds/ThemeSwitcher'
 import { VersionGroupSelector } from '../modules/version-group/VersionGroupSelector'
 import { useDisclosureGroup } from '../modules/dex/query/useDisclosureGroup'
+import { downloadText, readFileText } from '../store/backupFile'
+import { exportDocuments, importDocuments } from '../store/documentStore'
 import {
   signInWithGitHub,
   signOut,
@@ -131,6 +133,8 @@ export function AccountControl() {
           <VersionGroupSelector />
         </div>
 
+        <SavedDocuments />
+
         {signedIn && (
           <div className="app-controls-field">
             <button
@@ -144,6 +148,68 @@ export function AccountControl() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Every saved document (src/store/) to a file and back: Export downloads them
+ * all; Import reads an export and MERGES each document that has a merge (the
+ * Challenge Tracker's adds only what is new, by id), replacing any other. The
+ * store refuses another app's file, a newer version, or malformed JSON.
+ */
+function SavedDocuments() {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [report, setReport] = useState<string | null>(null)
+
+  async function onFile(file: File | undefined) {
+    if (!file) return
+    const r = importDocuments(await readFileText(file), { mode: 'merge' })
+    if (!r.ok) setReport(`Not imported: ${r.reason}`)
+    else if (!r.documents.length) setReport('The file holds no documents.')
+    else
+      setReport(
+        r.documents
+          .map((d) => `${d.name}: ${d.result}${d.reason ? ` (${d.reason})` : ''}`)
+          .join(' · '),
+      )
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  return (
+    <div className="app-controls-field account-documents" data-testid="saved-documents">
+      <span className="app-controls-label">Saved documents</span>
+      <div className="account-documents-actions">
+        <button
+          type="button"
+          className="ghost-button"
+          data-testid="documents-export"
+          onClick={() => downloadText(exportDocuments())}
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          data-testid="documents-import"
+          onClick={() => fileRef.current?.click()}
+        >
+          Import…
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          data-testid="documents-file"
+          onChange={(e) => void onFile(e.target.files?.[0])}
+        />
+      </div>
+      {report && (
+        <p className="account-note" data-testid="documents-report" role="status">
+          {report}
+        </p>
+      )}
     </div>
   )
 }

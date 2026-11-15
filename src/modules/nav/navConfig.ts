@@ -125,8 +125,7 @@ export const NAV_TABS: readonly NavTab[] = [
     entries: [
       { id: 'frontier-facilities', label: 'Facilities' },
       { id: 'frontier-brains', label: 'Brains' },
-      /* A stub until the tracker's own branch. */
-      ...stubs('frontier-tracker'),
+      { id: 'frontier-tracker', label: 'Challenge Tracker' },
       { id: 'frontier-sets', label: 'Sets & Trainers' },
     ],
   },

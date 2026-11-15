@@ -50,6 +50,10 @@ refuses another app, another format or malformed JSON outright; per document,
 refuses a newer version, skips an unknown name, migrates the rest forward, and
 writes them (`replace`, or `merge` through the document's `merge`; none = replace).
 Imports are local writes (the sync uploads them); `backupFile.ts` handles the file.
+The one UI is the account menu's **Saved documents** (`src/sync/AccountControl.tsx`):
+Export downloads every document, Import reads a file with `mode: 'merge'`. A
+document must be registered before that import runs, so define it in an EAGER
+module (the Challenge Tracker's `trackerStore.ts` is imported by its `pages.ts`).
 
 ## Sync (`src/sync/`)
 
