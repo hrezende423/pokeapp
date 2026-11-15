@@ -1,5 +1,5 @@
 import { IconSquare, IconSquareCheck } from '@tabler/icons-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { speciesEntries } from '../../dex/entrySources'
 import { FRONTIER_GENERATION, type FrontierData, type LevelMode } from '../data'
 import { battleLabel } from '../format'
@@ -59,7 +59,6 @@ export function SpeciesPicker({
   onChange,
   allowUnknown = true,
   testId,
-  focusOnMount = false,
   additive = false,
 }: {
   label: string
@@ -68,8 +67,6 @@ export function SpeciesPicker({
   onChange: (v: number | null) => void
   allowUnknown?: boolean
   testId: string
-  /** Focus (and so open) on mount: the Pyramid's Trainer mode, one tap from its options. */
-  focusOnMount?: boolean
   /**
    * Each pick ADDS an entry (the Pyramid): a tap on the field reopens the list for
    * the next one, and with text typed Enter takes the first match, not Unknown.
@@ -81,10 +78,6 @@ export function SpeciesPicker({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const listId = useId()
-  const input = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (focusOnMount) input.current?.focus()
-  }, [focusOnMount])
   const shown = value === undefined ? '' : value === null ? 'Unknown' : speciesName(value)
   const q = text.trim().toLowerCase()
   const matches = (q ? list.filter((s) => s.display_name.toLowerCase().startsWith(q)) : list).slice(0, MATCHES)
@@ -100,7 +93,6 @@ export function SpeciesPicker({
     <label className="bf-field bf-picker" style={area ? { gridArea: area } : undefined} data-layout="species-picker">
       <span className="bf-cap">{label}</span>
       <input
-        ref={input}
         className="bf-uf"
         role="combobox"
         aria-expanded={open}
