@@ -64,7 +64,8 @@ const out = execFileSync(process.execPath, ['scripts/frontier/import-bf-xlsx.mjs
 const regenerated = readFileSync(tmp, 'utf8')
 rmSync(tmp, { force: true })
 const committed = read(FIXTURE)
-check('re-running the script reproduces the committed import file byte for byte', regenerated === committed, `${regenerated.length} vs ${committed.length} bytes`)
+const lf = (t) => t.replace(/\r\n/g, '\n') // a checkout may turn the committed file's line ends to CRLF
+check('re-running the script reproduces the committed import file exactly (line ends aside)', lf(regenerated) === lf(committed), `${regenerated.length} vs ${committed.length} bytes`)
 log(out.trim().split('\n').map((l) => `      ${l}`).join('\n'))
 const file = JSON.parse(committed)
 check('an export file: app pokeapp, format 1, one document "frontier-tracker" at version 1', file.app === 'pokeapp' && file.format === 1 && json(Object.keys(file.documents)) === '["frontier-tracker"]' && file.documents['frontier-tracker'].version === 1)
