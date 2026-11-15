@@ -437,7 +437,7 @@ function LineEditor({ line, onDone }: { line?: LedgerLine; onDone: () => void })
   return (
     <tr className="bf-edit-row" data-testid="bp-editor">
       <td colSpan={3}>
-        <div className="bf-line-edit">
+        <div className="bf-line-edit" data-layout="bp-line-edit">
           <label className="bf-field" style={{ gridArea: 'reason' }}>
             <span className="bf-cap">Line</span>
             <input
@@ -572,6 +572,12 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
   const done = v.setsCompleted
   const unit = UNIT_WORD[v.run.facility]
   const last = v.battles.at(-1)
+  const areas = [
+    ...(v.run.facility === 'dome' ? ['team'] : []),
+    ...(v.run.outcome === 'ongoing' ? ['add'] : []),
+    'log',
+    ...(last ? ['undo'] : []),
+  ]
   return (
     <div className="bf-page bf-page-one" data-layout="frontier-run">
       <div className="bf-tracker" data-layout="tracker">
@@ -587,12 +593,27 @@ function RunDetail({ ctx, v }: { ctx: Ctx; v: RunView }) {
             {done === 1 ? '' : 's'}) · symbols: {symbolsText(v.symbolsAtEnd)}
           </span>
         </header>
-        <div className="bf-tracker-main" data-layout="tracker-main">
-          {v.run.facility === 'dome' && <RunTeam v={v} />}
-          {v.run.outcome === 'ongoing' && <LogAdd key={`${v.run.id}-${last?.n ?? 0}`} data={data} v={v} />}
-          <RunLog ctx={ctx} v={v} />
+        {/* Positioned by area; only the areas this run has, so no empty row adds a gap. */}
+        <div
+          className="bf-tracker-main"
+          data-layout="tracker-main"
+          style={{ gridTemplateAreas: areas.map((a) => `'${a}'`).join(' ') }}
+        >
+          {areas.includes('team') && (
+            <div style={{ gridArea: 'team' }}>
+              <RunTeam v={v} />
+            </div>
+          )}
+          {areas.includes('add') && (
+            <div style={{ gridArea: 'add' }}>
+              <LogAdd key={`${v.run.id}-${last?.n ?? 0}`} data={data} v={v} />
+            </div>
+          )}
+          <div style={{ gridArea: 'log' }}>
+            <RunLog ctx={ctx} v={v} />
+          </div>
           {last && (
-            <p className="bf-cap" data-layout="run-undo">
+            <p className="bf-cap" style={{ gridArea: 'undo' }} data-layout="run-undo">
               <button
                 type="button"
                 className="bf-link"
@@ -723,7 +744,8 @@ function RunLog({ ctx, v }: { ctx: Ctx; v: RunView }) {
                   '—'
                 )}
               </td>
-              <td className="bf-nw">
+              {/* May wrap: the Dome's seven columns must fit the main column at 1440. */}
+              <td>
                 {(b.dome?.pair ?? [])
                   .slice()
                   .sort((x, y) => team.indexOf(x) - team.indexOf(y))

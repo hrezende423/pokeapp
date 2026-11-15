@@ -203,7 +203,7 @@ export function RunTeam({ v }: { v: RunView }) {
     <section data-layout="run-team" data-testid="run-team">
       <p className="bf-sec">Your three</p>
       {editable ? (
-        <div className="bf-three">
+        <div className="bf-three" data-layout="run-team-pick">
           {[0, 1, 2].map((i) => (
             <SpeciesPicker
               key={i}
@@ -276,7 +276,8 @@ export function LogAdd({ data, v }: { data: FrontierData; v: RunView }) {
   const setRental = (i: number, r: Rental | undefined) => setDraft((d) => d.map((x, j) => (j === i ? r : x)))
 
   return (
-    <section className={`bf-addrow ${variant}`} data-layout="log-add" data-testid="log-add">
+    // A div: the old bare `.panel .bf section` reset would zero this row's padding.
+    <div className={`bf-addrow ${variant}`} data-layout="log-add" data-testid="log-add">
       <span className="bf-mono" style={{ gridArea: 'n' }} data-testid="log-add-n">
         {n}
       </span>
@@ -298,7 +299,7 @@ export function LogAdd({ data, v }: { data: FrontierData; v: RunView }) {
         <>
           <div className="bf-field" style={{ gridArea: 'pair' }}>
             <span className="bf-cap">Your pair (2 of your 3)</span>
-            <div className="bf-pair">
+            <div className="bf-pair" data-layout="log-pair">
               {(team ?? []).map((id, i) => (
                 <SymbolToggle
                   key={i}
@@ -334,7 +335,7 @@ export function LogAdd({ data, v }: { data: FrontierData; v: RunView }) {
 
       {draftHere &&
         [0, 1, 2].map((i) => (
-          <div key={i} className="bf-stack bf-rental-pick" style={{ gridArea: `r${i + 1}` }}>
+          <div key={i} className="bf-stack bf-rental-pick" style={{ gridArea: `r${i + 1}` }} data-layout="log-rental">
             <SpeciesPicker
               label={`${battleLabel(run.facility, n).split(' · ')[0]} rental ${i + 1}`}
               allowUnknown={false}
@@ -434,16 +435,17 @@ export function LogAdd({ data, v }: { data: FrontierData; v: RunView }) {
           Lost
         </button>
       </span>
-      <span className="bf-actions bf-retire" style={{ gridArea: 'retire' }}>
+      {/* The caption style on the wrapper: `.bf-link`'s `font: inherit` would undo it on the button. */}
+      <span className="bf-actions bf-retire bf-cap" style={{ gridArea: 'retire' }}>
         <button
           type="button"
-          className="bf-link bf-cap"
+          className="bf-link"
           data-testid="run-retire"
           onClick={() => (retiring ? trackerDocument.update((d) => endRun(d, run.id, 'retired', today())) : setRetiring(true))}
         >
           {retiring ? 'Confirm: end this run as retired' : 'Retire the run'}
         </button>
       </span>
-    </section>
+    </div>
   )
 }

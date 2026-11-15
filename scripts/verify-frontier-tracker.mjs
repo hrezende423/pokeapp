@@ -14,7 +14,7 @@
  *   npm run verify:frontier-tracker
  */
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -167,6 +167,8 @@ const recomputed = ledger.every((l) => {
   const a = fd.bpAward({ facility: v.run.facility, format: v.run.format, completedSets: l.set, brain: v.brains.has(b.id) })
   return a.points === l.delta && (a.brainBonus || undefined) === l.brainBonus
 })
+// Literals from emerald.json's award rows (Dome singles 1,1,2,2,3,3,4,4,5,5; Factory singles 3,3,4,4,5), Brain +10.
+check('the 16 lines, in order: Dome 1,1,2,2,13,3,4,4,5,15; Factory run 4 3,3,14,4,5; run 5 3', json(ledger.map((l) => l.delta)) === '[1,1,2,2,13,3,4,4,5,15,3,3,14,4,5,3]', json(ledger.map((l) => l.delta)))
 check('every line is bpAward for its set (Brain +10 on the Brain win)', recomputed && ledger.filter((l) => l.brainBonus === 10).map((l) => l.reason).join('|') === 'Dome run 1, tournament 5|Dome run 1, tournament 10|Factory run 4, set 3')
 check('balance after the last line: 82 of a 9,999 cap', M.bpBalance(fd, D) === 82 && fd.addBattlePoints(9990, 82) === 9999)
 check('an opening balance carries every line: opening 100 -> 182', M.bpBalance(fd, M.setOpening(D, 100)) === 182)
@@ -206,6 +208,15 @@ const nY = M.nextBrainFor(fd, kY)
 check('toggling Factory Gold on (won before the app): held, stored as an override; next Brain: the loader’s Silver rematch at 21', kY.held.gold && json(Y.symbols) === '{"factory|singles|lv50":{"gold":true}}' && nY.symbol === 'silver' && nY.battle === 21, json(nY))
 Y = M.toggleSymbol(Y, kY, 'gold')
 check('toggling it back to the log\'s answer removes the override', json(Y.symbols) === '{}')
+// Silver won before the app, then a Tower run reaches battle 35: with Silver held the game has no Brain there.
+let T = M.startRun(M.EMPTY_TRACKER, { facility: 'tower', format: 'singles', levelMode: 'lv50' }, '2026-11-15', 'r-tower')
+const kT0 = M.keyViewFor(M.deriveTracker(T, fd), { facility: 'tower', format: 'singles', levelMode: 'lv50' })
+T = M.toggleSymbol(T, kT0, 'silver')
+for (let k = 1; k <= 35; k++) T = M.logBattle(T, fd, 'r-tower', { opponents: [null, null, null], result: 'W' }, '2026-11-15', ids(`t${k}`))
+const vT = M.deriveTracker(T, fd)
+const kT = vT.keys.get('tower|singles|lv50')
+check('Silver marked before the app stays held after the log passes battle 35: no Brain on 35, next Gold at 70', vT.runs.get('r-tower').brains.size === 0 && kT.held.silver && M.nextBrainFor(fd, kT).battle === 70 && M.nextBrainFor(fd, kT).symbol === 'gold')
+check('... and set 5\'s line (battle 35) carries no Brain bonus: bpAward(5) = 5', T.bp.ledger.at(-1).set === 5 && T.bp.ledger.at(-1).delta === 5 && T.bp.ledger.at(-1).brainBonus == null, json(T.bp.ledger.at(-1)))
 Y = M.toggleSymbol(D, kDome, 'gold')
 kY = M.deriveTracker(Y, fd).keys.get('dome|singles|lv50')
 check('overriding a symbol the log earned (Dome Gold off): Silver only held, the log still flags its Brains', !kY.held.gold && kY.held.silver && kY.level === 1 && M.deriveTracker(Y, fd).runs.get('imp-dome-1').brains.size === 2)
@@ -228,8 +239,22 @@ check('after clearing storage the tracker is empty', doc.read().runs.length === 
 api.importDocuments(exported, { mode: 'replace' })
 doc.reset()
 check('export -> import is lossless (drafts, set indexes, swaps, Unknowns, ledger)', json(doc.read()) === json(F) && json(JSON.parse(localStorage.getItem('pokeapp:frontier-tracker:v1'))) === json(F))
-check('normalise drops junk and keeps the shape', json(M.normaliseTracker({ runs: [{ id: 'a' }, 5], battles: [{ id: 'b', runId: 'zz', n: 1, opponents: [1, 2, 3], result: 'W' }], bp: { opening: -3, ledger: [{ id: 'l', at: 'x', delta: 'no' }] } })) === json(M.EMPTY_TRACKER))
-check('a merge keeps base runs first and appends the new ones', json(M.mergeTracker(F, D).runs.map((r) => r.id)) === json(F.runs.map((r) => r.id)) && M.mergeTracker(M.EMPTY_TRACKER, D).runs.length === 6)
+const canon = (x) => (Array.isArray(x) ? x.map(canon) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, canon(x[k])])) : x)
+check('normalise drops junk and keeps the shape', json(canon(M.normaliseTracker({ runs: [{ id: 'a' }, 5], battles: [{ id: 'b', runId: 'zz', n: 1, opponents: [1, 2, 3], result: 'W' }], bp: { opening: -3, ledger: [{ id: 'l', at: 'x', delta: 'no' }] } }))) === json(canon(M.EMPTY_TRACKER)))
+const future = M.normaliseTracker({ ...imported, extra: 1, runs: imported.runs.map((r, i) => (i ? r : { ...r, later: 'x' })), battles: imported.battles.map((b, i) => (i ? b : { ...b, later: 2 })), bp: { ...imported.bp, later: true, ledger: imported.bp.ledger.map((l, i) => (i ? l : { ...l, later: 3 })) } })
+check('a field a newer client added survives this client\'s normalise (it syncs)', future.extra === 1 && future.runs[0].later === 'x' && future.battles[0].later === 2 && future.bp.later === true && future.bp.ledger[0].later === 3)
+check('merge into an empty tracker: everything; into itself: nothing new', M.mergeTracker(M.EMPTY_TRACKER, D).runs.length === 6 && json(M.mergeTracker(D, D)) === json(D))
+// Device A logged more of a shared run (battle 8 won with a draft, 9 lost); device B merges A's copy.
+let A = M.logBattle(D, fd, 'imp-factory-5', { opponents: [null, null, null], result: 'W', draft: [{ species: sp('espeon') }, { species: sp('heracross') }, { species: sp('milotic') }] }, '2026-11-15', ids('a8'))
+A = M.logBattle(A, fd, 'imp-factory-5', { opponents: [null, null, null], result: 'L' }, '2026-11-15', ids('a9'))
+const B = M.mergeTracker(D, A)
+const b5 = B.runs.find((r) => r.id === 'imp-factory-5')
+check('a shared run comes whole from the side that logged more: lost, its set 2 draft, battles 8 and 9 once each', b5.outcome === 'lost' && b5.drafts.at(-1).atBattle === 8 && B.battles.filter((b) => b.runId === 'imp-factory-5').length === 9)
+// Ordering: a newer run started on this device, then the old log merged in.
+let N = M.startRun(M.EMPTY_TRACKER, { facility: 'factory', format: 'singles', levelMode: 'lv50' }, '2026-11-15', 'r-newer')
+for (let k = 1; k <= 21; k++) N = M.logBattle(N, fd, 'r-newer', { opponents: [null, null, null], result: 'W' }, '2026-11-15', ids(`n${k}`))
+const NM = M.deriveTracker(M.mergeTracker(N, D), fd)
+check('the imported log merged after a newer run: the newer run is Factory run 6, imported run 4 keeps its Brain at 21, current is the newer run', NM.runs.get('r-newer').number === 6 && NM.runs.get('imp-factory-4').brains.has('imp-factory-4-21') && NM.keys.get('factory|singles|lv50').current.run.id === 'r-newer')
 
 hr('A9. FROZEN: no change to the loader API, the Trainer Dex or the reference screens')
 let base = 'main'
@@ -256,7 +281,9 @@ check(`git diff since ${base}: no change to the loader, the reference screens, t
 const css = read('src/modules/battle-frontier/tracker/tracker.css')
 check('tracker CSS: no hard-coded colour, no primitive token, no box-shadow', !/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i.test(css.replace(/\/\*[\s\S]*?\*\//g, '')) && !/--color-(accent|neutral)-\d/.test(css) && !/box-shadow/.test(css))
 check('tracker CSS: no accent at all (the nav tab is the screen\'s one use)', !/accent/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')))
-check('the tracker store module imports no loader code (it is eager)', !/from '\.\.\/data'|from '\.\.\/data\/index'/.test(read('src/modules/battle-frontier/tracker/trackerStore.ts')) && !/^import (?!type)[^\n]*from '\.\.\/data'/m.test(read('src/modules/battle-frontier/tracker/model.ts')))
+const storeBundle = await build({ entryPoints: [join(ROOT, 'src/modules/battle-frontier/tracker/trackerStore.ts')], bundle: true, write: false, metafile: true, format: 'esm', platform: 'browser', logLevel: 'silent' })
+const pulled = Object.keys(storeBundle.metafile.inputs).filter((f) => /battle-frontier\/data\/|src\/data\/|entrySources/.test(f.replace(/\\/g, '/')))
+check('the eager tracker store bundles no loader or data-layer code', pulled.length === 0, pulled.join(', '))
 
 // ================================================================== PART B
 const TRIGGER = '[data-testid="nav-tab-battle-frontier"]'
@@ -392,7 +419,7 @@ try {
   check('the account menu has Saved documents: Export and Import…', json(await appTexts(page, '[data-testid="saved-documents"] :is(.app-controls-label, button)')) === '["Saved documents","Export","Import…"]')
   await page.setInputFiles('[data-testid="documents-file"]', join(ROOT, FIXTURE))
   const report = await page.waitForSelector('[data-testid="documents-report"]').then((e) => e.textContent())
-  check('the report says the tracker was merged', report === 'frontier-tracker: merged', report)
+  check('into an empty tracker it imports without asking: replaced', report === 'frontier-tracker: replaced' && (await page.$('[data-testid="documents-confirm"]')) == null, report)
   await page.screenshot({ path: shot('account-import') })
   await page.click('[data-testid="account-toggle"]')
   await page.waitForSelector('[data-testid="tracker-runs"]')
@@ -419,6 +446,8 @@ try {
   check('the run detail is a screen inside the module: no back-stack step', (await page.$eval(ROOT_SEL, (r) => r.dataset.screen)) === 'run')
   same('run head', await appText(page, '[data-layout="run-head"]'), await mockText(mock, 2, '[data-layout="run-head"]'))
   same('your three', await appText(page, '[data-layout="run-team"]'), await mockText(mock, 2, '[data-layout="run-team"]'))
+  const fitsDome = await page.$eval('[data-testid="run-log"] .bf-tw', (e) => ({ scroll: e.scrollWidth, client: e.clientWidth }))
+  check('at 1440 the Dome log fits its column: no sideways scroll, nothing cut', fitsDome.scroll <= fitsDome.client, json(fitsDome))
   sameList('the 40 log rows (Dropped, pair, Brain and its known team)', await appTexts(page, '[data-testid="run-log"] tr:not(.bf-lookup-row)'), await mockTexts(mock, 2, '[data-layout="run-log"] tr'))
   same('stats: streaks, Tactics Symbol, next Brain', await appText(page, '[data-layout="tracker-stats"]'), await mockText(mock, 2, '[data-layout="tracker-stats"]'))
   sameList('BP: the 4 newest lines', await appTexts(page, '[data-testid="bp-ledger"] tr'), await mockTexts(mock, 2, '[data-layout="tracker-bp"] tr'))
@@ -457,6 +486,8 @@ try {
   same('stats: Knowledge Symbol, next Brain', await appText(page, '[data-layout="tracker-stats"]'), await mockText(mock, 3, '[data-layout="tracker-stats"]'))
   const fFlag = await page.$$eval('[data-testid="run-log"] tr[data-brain]', (r) => r.map((x) => x.dataset.battleN))
   check('the Brain row is flagged at battle 21 only', json(fFlag) === '["21"]', json(fFlag))
+  const fitsF = await page.$eval('[data-testid="run-log"] .bf-tw', (e) => ({ scroll: e.scrollWidth, client: e.clientWidth }))
+  check('at 1440 the Factory log fits its column', fitsF.scroll <= fitsF.client, json(fitsF))
   check('rentals carry sprites (the set 1 draft line: 3)', (await page.$$eval('[data-draft-at="1"] img.bf-sprite', (e) => e.length)) === 3)
   check('no undo-able loss hides: the ended run has no logging row', (await page.$('[data-testid="log-add"]')) == null)
   await regionsMatch('state 3', page, mock, 3)
@@ -494,8 +525,8 @@ try {
     await page.click(`[data-testid="${testId}-list"] li[data-species-id="${id}"]`)
   }
   await pickSpecies('log-opponent-1', 'mach', sp('machamp'))
-  check('Won stays disabled until the set\'s rentals are drafted', await page.$eval('[data-testid="log-won"]', (e) => e.disabled))
   await pickSpecies('log-opponent-2', 'mag', sp('magneton'))
+  check('with the three opponents chosen, Won stays disabled until the set\'s rentals are drafted', await page.$eval('[data-testid="log-won"]', (e) => e.disabled))
   await pickSpecies('log-rental-0', 'esp', sp('espeon'))
   const setOpts = await page.$$eval('[data-testid="log-rental-0-set"] option', (o) => o.map((x) => x.value))
   check('a rental\'s set is optional: "Any of its sets", then Espeon\'s Lv50 Frontier sets', setOpts[0] === '' && setOpts.length > 1, setOpts.slice(0, 4).join(','))
@@ -510,6 +541,20 @@ try {
   check('battle 8 logged: Unknown, Machamp, Magneton, the note, Won', row8 === '8 | Set 2 · battle 1 | Unknown · Machamp · Magnetona test note | Won |', row8)
   check('its draft line: Set 2 rentals with the chosen set index', norm(await appText(page, '[data-draft-at="8"]')) === `Set 2 rentals: Espeon#${setOpts[1]}, Heracross, Milotic`, norm(await appText(page, '[data-draft-at="8"]')))
   check('the next row is 9, inside the set: a swap, not a draft', norm(await appText(page, '[data-testid="log-add-n"]')) === '9' && (await page.$('[data-testid="log-swap-out"]')) != null && (await page.$('[data-testid="log-rental-0"]')) == null)
+  // A same-species swap: Espeon (its set) out, Espeon on another set in.
+  await page.selectOption('[data-testid="log-swap-out"]', '0')
+  await pickSpecies('log-swap-in', 'esp', sp('espeon'))
+  await page.selectOption('[data-testid="log-swap-in-set"]', setOpts[2])
+  for (const i of [0, 1, 2]) {
+    await page.click(`[data-testid="log-opponent-${i}"]`)
+    await page.click(`[data-testid="log-opponent-${i}-list"] li[data-species-id="unknown"]`)
+  }
+  await page.click('[data-testid="log-won"]')
+  await page.waitForSelector('[data-swap-at="9"]')
+  const swapRow = norm(await appText(page, '[data-swap-at="9"]'))
+  check('battle 9 with a same-species swap: one swap line, never a draft', swapRow === `Swap before battle 9: Espeon out, Espeon#${setOpts[2]} in` && (await page.$('[data-draft-at="9"]')) == null, swapRow)
+  await page.click('[data-testid="run-undo"]')
+  check('Undo battle 9 removes the battle and its swap', (await page.$('[data-swap-at="9"]')) == null && (await page.$('[data-testid="run-log"] tr[data-battle-n="9"]')) == null)
 
   // The Dome: pair + dropped.
   await page.click('[data-testid="tracker-all-runs"]')
@@ -577,6 +622,27 @@ try {
   await page.click('[data-testid="account-toggle"]')
   rmSync(exportPath, { force: true })
   check('importing the export restores the identical document', (await page.evaluate(() => localStorage.getItem('pokeapp:frontier-tracker:v1'))) === stored)
+  // Over data: it asks first, Cancel writes nothing, Replace gives back exactly the file (no merge, no copies).
+  const exportAgain = join(tmpdir(), `bf-export2-${process.pid}.json`)
+  writeFileSync(exportAgain, JSON.stringify(exportedFile))
+  await page.waitForSelector('[data-testid="bp-add-line"]')
+  await page.click('[data-testid="bp-add-line"]')
+  await page.fill('[data-testid="bp-editor-reason"]', 'Leftovers')
+  await page.fill('[data-testid="bp-editor-delta"]', '-48')
+  await page.click('[data-testid="bp-editor-save"]')
+  const withLine = await page.evaluate(() => localStorage.getItem('pokeapp:frontier-tracker:v1'))
+  await page.click('[data-testid="account-toggle"]')
+  await page.setInputFiles('[data-testid="documents-file"]', exportAgain)
+  const ask = norm(await page.waitForSelector('[data-testid="documents-confirm"]').then((e) => e.textContent()))
+  check('importing over data asks first, naming the document', /This replaces what this device holds for: .*frontier-tracker/.test(ask), ask)
+  await page.click('[data-testid="documents-cancel"]')
+  check('Cancel writes nothing', (await page.evaluate(() => localStorage.getItem('pokeapp:frontier-tracker:v1'))) === withLine)
+  await page.setInputFiles('[data-testid="documents-file"]', exportAgain)
+  await page.click('[data-testid="documents-replace"]')
+  await page.waitForSelector('[data-testid="documents-report"]')
+  check('Replace gives back exactly the file: the new line is gone, nothing doubled', (await page.evaluate(() => localStorage.getItem('pokeapp:frontier-tracker:v1'))) === stored)
+  await page.click('[data-testid="account-toggle"]')
+  rmSync(exportAgain, { force: true })
 
   // ---------------------------------------------------------------- new run
   hr('B9. NEW RUN (state 5)')
@@ -596,7 +662,9 @@ try {
   check('Start run opens the new run: Battle Arena run 1, Open Level, ongoing, dated today', /^Battle Arena · run 1$/.test(norm(await appText(page, '.bf-run-head .bf-title'))) && norm(await appText(page, '[data-testid="run-facts"]')).startsWith('Singles · Open Level · Ongoing · 0 won'))
   await page.click('[data-testid="tracker-all-runs"]')
   const arenaRow = await cells(page, '[data-testid="tracker-runs"] tr[data-run-id^="run-"]')
-  check('home lists it with today\'s date, not "(imported)"', /^Run 1 \| Singles \| Open Level \| \d{1,2} [A-Z][a-z]{2} \d{4} \| 0 \| Ongoing · 0 won$/.test(arenaRow), arenaRow)
+  const now = new Date()
+  const todayText = `${now.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.getMonth()]} ${now.getFullYear()}`
+  check('home lists it with today\'s date, not "(imported)"', arenaRow === `Run 1 | Singles | Open Level | ${todayText} | 0 | Ongoing · 0 won`, arenaRow)
 
   // ---------------------------------------------------------------- themes
   hr('B10. BOTH THEMES: tokens only, accent within 2, no badge, no shadow')

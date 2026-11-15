@@ -147,6 +147,17 @@ function rental(x: unknown): Rental | null {
   return setIndex != null && setIndex >= 0 ? { species, setIndex } : { species }
 }
 
+/**
+ * Start from the stored object, so a field a NEWER client added survives this
+ * client's next write (src/store/CLAUDE.md; this document syncs), then drop the
+ * optional fields this client knows and sets again only those that read.
+ */
+function keep(x: Record<string, unknown>, optional: string[]): Record<string, unknown> {
+  const out = { ...x }
+  for (const k of optional) delete out[k]
+  return out
+}
+
 function run(x: unknown): Run | null {
   if (!isObj(x)) return null
   const id = str(x.id)
@@ -155,7 +166,8 @@ function run(x: unknown): Run | null {
   const levelMode = oneOf(x.levelMode, ['lv50', 'open'] as const)
   const startedAt = str(x.startedAt)
   if (!id || !facility || !format || !levelMode || !startedAt) return null
-  const out: Run = { id, facility, format, levelMode, startedAt, outcome: oneOf(x.outcome, OUTCOMES) ?? 'ongoing' }
+  const out = keep(x, ['imported', 'endedAt', 'note', 'dome', 'drafts', 'swaps']) as unknown as Run
+  Object.assign(out, { id, facility, format, levelMode, startedAt, outcome: oneOf(x.outcome, OUTCOMES) ?? 'ongoing' })
   if (x.imported === true) out.imported = true
   const endedAt = str(x.endedAt)
   if (endedAt) out.endedAt = endedAt
@@ -163,7 +175,7 @@ function run(x: unknown): Run | null {
   if (note) out.note = note
   if (isObj(x.dome)) {
     const team = arr(x.dome.team).map(posInt)
-    if (team.length === 3 && team.every((t) => t != null)) out.dome = { team: team as number[] }
+    if (team.length === 3 && team.every((t) => t != null)) out.dome = { ...x.dome, team: team as number[] }
   }
   if (Array.isArray(x.drafts)) {
     out.drafts = x.drafts.flatMap((d) => {
@@ -171,7 +183,7 @@ function run(x: unknown): Run | null {
       const atBattle = posInt(d.atBattle)
       const rentals = arr(d.rentals).map(rental)
       return atBattle != null && rentals.length === 3 && rentals.every(Boolean)
-        ? [{ atBattle, rentals: rentals as Rental[] }]
+        ? [{ ...d, atBattle, rentals: rentals as Rental[] }]
         : []
     })
   }
@@ -181,7 +193,7 @@ function run(x: unknown): Run | null {
       const atBattle = posInt(s.atBattle)
       const o = rental(s.out)
       const i = rental(s.in)
-      return atBattle != null && o && i ? [{ atBattle, out: o, in: i }] : []
+      return atBattle != null && o && i ? [{ ...s, atBattle, out: o, in: i }] : []
     })
   }
   return out
@@ -195,12 +207,13 @@ function battle(x: unknown): Battle | null {
   const result = oneOf(x.result, ['W', 'L'] as const)
   const opponents = arr(x.opponents).map((o) => (o === null ? null : (posInt(o) ?? null)))
   if (!id || !runId || n == null || !result || opponents.length !== 3) return null
-  const out: Battle = { id, runId, n, opponents, result }
+  const out = keep(x, ['dome', 'note']) as unknown as Battle
+  Object.assign(out, { id, runId, n, opponents, result })
   if (isObj(x.dome)) {
     const pair = arr(x.dome.pair).map(posInt)
     const d = x.dome.dropped
     const dropped = d === 1 || d === 2 || d === 3 ? d : null
-    if (pair.length === 2 && pair.every((p) => p != null)) out.dome = { pair: pair as number[], dropped }
+    if (pair.length === 2 && pair.every((p) => p != null)) out.dome = { ...x.dome, pair: pair as number[], dropped }
   }
   const note = str(x.note)
   if (note) out.note = note
@@ -213,7 +226,8 @@ function line(x: unknown): LedgerLine | null {
   const at = str(x.at)
   const delta = int(x.delta)
   if (!id || !at || delta == null) return null
-  const out: LedgerLine = { id, at, delta, reason: typeof x.reason === 'string' ? x.reason : '' }
+  const out = keep(x, ['runId', 'set', 'brainBonus']) as unknown as LedgerLine
+  Object.assign(out, { id, at, delta, reason: typeof x.reason === 'string' ? x.reason : '' })
   const runId = str(x.runId)
   if (runId) out.runId = runId
   const set = posInt(x.set)
@@ -228,7 +242,7 @@ const uniqueById = <T extends { id: string }>(list: (T | null)[]): T[] => {
   return list.filter((x): x is T => x != null && !seen.has(x.id) && (seen.add(x.id), true))
 }
 
-/** Any stored value -> a TrackerDoc. Unreadable entries are dropped; unknown fields are not kept. */
+/** Any stored value -> a TrackerDoc. Unreadable entries are dropped; fields this client does not know are kept. */
 export function normaliseTracker(raw: unknown): TrackerDoc {
   if (!isObj(raw)) return EMPTY_TRACKER
   const runs = uniqueById(arr(raw.runs).map(run))
@@ -247,30 +261,51 @@ export function normaliseTracker(raw: unknown): TrackerDoc {
   const bp = isObj(raw.bp) ? raw.bp : {}
   const opening = int(bp.opening)
   return {
+    ...raw,
     schemaVersion: 1,
     runs,
     battles,
     symbols,
-    bp: { opening: opening != null && opening >= 0 ? opening : 0, ledger: uniqueById(arr(bp.ledger).map(line)) },
+    bp: { ...bp, opening: opening != null && opening >= 0 ? opening : 0, ledger: uniqueById(arr(bp.ledger).map(line)) },
   }
 }
 
 /**
- * The import's merge and the first sync's: `base` keeps everything it has; the
- * runs, battles and ledger lines of `added` that `base` lacks (by id) are
- * appended. Importing the same file twice therefore adds nothing.
+ * The first sync's merge (the account menu's import replaces): `base` keeps its
+ * identity. A run only one side has comes with its battles. A run BOTH sides
+ * have is taken whole -- its battles, drafts, swaps and outcome -- from the side
+ * that logged more of it (the base on a tie), so two copies of one battle never
+ * meet. Ledger lines are joined by id; a merge never deletes, so a line deleted
+ * on one device only comes back from the other.
  */
 export function mergeTracker(base: TrackerDoc, added: TrackerDoc): TrackerDoc {
-  const addNew = <T extends { id: string }>(a: T[], b: T[]) => {
-    const have = new Set(a.map((x) => x.id))
-    return [...a, ...b.filter((x) => !have.has(x.id))]
-  }
+  const count = (d: TrackerDoc, runId: string) => d.battles.filter((b) => b.runId === runId).length
+  const addedRuns = new Map(added.runs.map((r) => [r.id, r]))
+  const fromAdded = new Set(
+    base.runs.filter((r) => addedRuns.has(r.id) && count(added, r.id) > count(base, r.id)).map((r) => r.id),
+  )
+  const baseIds = new Set(base.runs.map((r) => r.id))
+  const runs = [
+    ...base.runs.map((r) => (fromAdded.has(r.id) ? (addedRuns.get(r.id) as Run) : r)),
+    ...added.runs.filter((r) => !baseIds.has(r.id)),
+  ]
+  const battles = [
+    ...base.battles.filter((b) => !fromAdded.has(b.runId)),
+    ...added.battles.filter((b) => fromAdded.has(b.runId) || !baseIds.has(b.runId)),
+  ]
+  const lineIds = new Set(base.bp.ledger.map((l) => l.id))
   return {
+    ...added,
+    ...base,
     schemaVersion: 1,
-    runs: addNew(base.runs, added.runs),
-    battles: addNew(base.battles, added.battles),
+    runs,
+    battles,
     symbols: { ...added.symbols, ...base.symbols },
-    bp: { opening: base.bp.opening || added.bp.opening, ledger: addNew(base.bp.ledger, added.bp.ledger) },
+    bp: {
+      ...base.bp,
+      opening: base.bp.opening || added.bp.opening,
+      ledger: [...base.bp.ledger, ...added.bp.ledger.filter((l) => !lineIds.has(l.id))],
+    },
   }
 }
 
@@ -363,7 +398,7 @@ export interface KeyView {
 
 export interface TrackerView {
   runs: Map<string, RunView>
-  /** Every run in the document's order. */
+  /** Every run, in order (`chronological`). */
   ordered: RunView[]
   keys: Map<string, KeyView>
 }
@@ -373,15 +408,32 @@ const levelOf = (f: { silver: boolean; gold: boolean }): Symbols => (f.gold ? 2 
 /**
  * Walk each facility|format|level's runs in order, battle by battle: each
  * battle's Brain is the loader's at the symbols held THEN, and a won Brain battle
- * raises them. A symbol the owner marks as held that the log never earned was
- * won before the app, so the walk starts with it.
+ * raises them. A symbol the owner marks as held (an override that is on) was
+ * won before the app, so the walk starts with it -- even once the log alone
+ * would have reached that Brain, which then never appears.
+ *
+ * ORDER: imported runs first (they are the history before the app), then by the
+ * day they started, then as stored. Run numbers, the walk and "current" follow it,
+ * so a merge that appends older runs cannot renumber or re-walk the newer ones.
  */
+export function chronological(runs: Run[]): Run[] {
+  return runs
+    .map((r, i) => ({ r, i }))
+    .sort(
+      (a, b) =>
+        (a.r.imported ? 0 : 1) - (b.r.imported ? 0 : 1) ||
+        a.r.startedAt.localeCompare(b.r.startedAt) ||
+        a.i - b.i,
+    )
+    .map((x) => x.r)
+}
+
 export function deriveTracker(doc: TrackerDoc, fd: FrontierData): TrackerView {
   const perSet = new Map(fd.facilities().map((f) => [f.id, f.perSet]))
   const counter = new Map<FacilityId, number>()
   const byId = new Map<string, Battle[]>()
   for (const b of doc.battles) byId.set(b.runId, [...(byId.get(b.runId) ?? []), b])
-  const views: RunView[] = doc.runs.map((run) => {
+  const views: RunView[] = chronological(doc.runs).map((run) => {
     const number = (counter.get(run.facility) ?? 0) + 1
     counter.set(run.facility, number)
     const battles = (byId.get(run.id) ?? []).slice().sort((a, b) => a.n - b.n)
@@ -424,7 +476,7 @@ export function deriveTracker(doc: TrackerDoc, fd: FrontierData): TrackerView {
     const logLevel = walk(list, 0, false)
     const fromLog = { silver: logLevel >= 1, gold: logLevel >= 2 }
     const ov = doc.symbols[key] ?? {}
-    const before = levelOf({ silver: ov.silver === true && !fromLog.silver, gold: ov.gold === true && !fromLog.gold })
+    const before = levelOf({ silver: ov.silver === true, gold: ov.gold === true })
     const end = walk(list, before, true)
     const held = { silver: ov.silver ?? end >= 1, gold: ov.gold ?? end >= 2 }
     const ongoing = list.filter((v) => v.run.outcome === 'ongoing')
