@@ -201,4 +201,15 @@ A spec review and a design audit ran on the first commit. Their findings are fix
 
 ## Preview
 
-See the next message in this file's commit history, or the reply that delivered it.
+**NOT published.** The push to the `preview` remote was denied in this session.
+
+To publish it yourself:
+
+1. Open a terminal in the repo folder.
+2. Run `git push --force preview feature/frontier-tracker:main`.
+3. Wait for the Pages deploy in `hrezende423/pokeapp-preview` to finish (its Actions tab shows it).
+4. Open https://hrezende423.github.io/pokeapp-preview/
+5. Load your log as in "How to load your log" above. The preview is a separate site, so its storage starts empty.
+6. Add `?layout=1` to the URL, or press Ctrl+Shift+L, to see the region names.
+
+**For the review**, name regions from `?layout=1`, and mark up every screen in one batch: home, a Dome run, a Factory run, logging, new run.
