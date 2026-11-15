@@ -1,13 +1,4 @@
-import {
-  IconBackpack,
-  IconChevronDown,
-  IconChevronRight,
-  IconMinus,
-  IconPaw,
-  IconPlus,
-  IconUser,
-  IconX,
-} from '@tabler/icons-react'
+import { IconChevronDown, IconChevronRight, IconMinus, IconPlus, IconX } from '@tabler/icons-react'
 import { Fragment, useId, useMemo, useState, type ReactNode } from 'react'
 import { itemEntries } from '../../dex/entrySources'
 import {
@@ -60,7 +51,7 @@ import {
   stepItem,
   stepWild,
 } from './pyramid'
-import { PYRAMID_CATEGORIES } from './pyramidData'
+import { PYRAMID_CATEGORIES, type PyramidCategory } from './pyramidData'
 import { trackerDocument } from './trackerStore'
 
 /**
@@ -99,7 +90,7 @@ export function PyramidAdd({ data, v }: { data: FrontierData; v: RunView }) {
   const category = categoryAt(v.run, v.battles, n, v.perSet)
   const [retiring, setRetiring] = useState(false)
   const edit = editorFor({ kind: 'open', runId: v.run.id })
-  const areas = ['head', 'strip', ...(brain ? ['brain'] : []), 'entries', 'actions']
+  const areas = ['head', 'cols', ...(brain ? ['brain'] : []), 'actions']
   const withNote = (o: OpenFloor, text: string): OpenFloor => {
     const next = { ...o }
     if (text) next.note = text
@@ -114,15 +105,37 @@ export function PyramidAdd({ data, v }: { data: FrontierData; v: RunView }) {
       data-layout="pyramid-add"
       data-testid="pyramid-add"
     >
-      <header className="bf-pyr-head" style={{ gridArea: 'head' }} data-layout="pyramid-head">
-        <p className="bf-sec">
+      {/* Next floor at the top, beside the floor it closes: never a scroll away. */}
+      <header
+        className="bf-pyr-head bf-pyr-head-next"
+        style={{ gridArea: 'head' }}
+        data-layout="pyramid-head"
+      >
+        <p className="bf-sec" style={{ gridArea: 'title' }}>
           Add to floor <span data-testid="pyramid-floor-n">{n}</span>
         </p>
-        <span className="bf-muted" data-testid="pyramid-floor-label">
+        <span className="bf-muted" style={{ gridArea: 'label' }} data-testid="pyramid-floor-label">
           {floorLabel(n, v.perSet)}
         </span>
+        <span className="bf-actions" style={{ gridArea: 'next' }}>
+          <button
+            type="button"
+            className="bf-ghost"
+            title={
+              brain
+                ? 'Floor cleared and the Brain beaten: the next floor opens'
+                : 'Floor cleared: the next floor opens'
+            }
+            data-testid="pyramid-next-floor"
+            onClick={() =>
+              trackerDocument.update((d) => closeFloor(d, data, v.run.id, 'W', today(), ids()))
+            }
+          >
+            Next floor
+          </button>
+        </span>
       </header>
-      <FloorStrip
+      <FloorColumns
         data={data}
         v={v}
         n={n}
@@ -135,7 +148,6 @@ export function PyramidAdd({ data, v }: { data: FrontierData; v: RunView }) {
         }
       />
       {brain && <BrainPick key={n} data={data} v={v} open={open} brain={brain} />}
-      <FloorEntries data={data} floor={open.pyramid} edit={edit} tid="pyramid-" />
       <div
         className="bf-pyr-actions"
         style={{ gridArea: 'actions' }}
@@ -154,23 +166,6 @@ export function PyramidAdd({ data, v }: { data: FrontierData; v: RunView }) {
             }}
           />
         </label>
-        <span className="bf-actions" style={{ gridArea: 'next' }}>
-          <button
-            type="button"
-            className="bf-ghost"
-            title={
-              brain
-                ? 'Floor cleared and the Brain beaten: the next floor opens'
-                : 'Floor cleared: the next floor opens'
-            }
-            data-testid="pyramid-next-floor"
-            onClick={() =>
-              trackerDocument.update((d) => closeFloor(d, data, v.run.id, 'W', today(), ids()))
-            }
-          >
-            Next floor
-          </button>
-        </span>
         <span className="bf-actions bf-retire bf-cap" style={{ gridArea: 'retire' }}>
           <button
             type="button"
@@ -252,16 +247,15 @@ function BrainPick({
   )
 }
 
-/* ------------------------------------------------------------------ the strip: Wild, Trainer, Item */
+/* ------------------------------------------------------------------ the columns: Wild, Trainer, Item */
 
-type Mode = 'wild' | 'trainer' | 'item'
-const MODES: { id: Mode; label: string; Icon: typeof IconPaw }[] = [
-  { id: 'wild', label: 'Wild', Icon: IconPaw },
-  { id: 'trainer', label: 'Trainer', Icon: IconUser },
-  { id: 'item', label: 'Item', Icon: IconBackpack },
-]
-
-function FloorStrip({
+/**
+ * The floor's three columns, side by side, no tabs: each its heading (with the
+ * count), its quick picks, its search and its list. One grid with shared rows,
+ * so the headings, the three searches and the three lists each sit on one line.
+ * The category chooser, while open, spans all three.
+ */
+function FloorColumns({
   data,
   v,
   n,
@@ -280,150 +274,55 @@ function FloorStrip({
   tid: string
   onLost?: (trainerIndex: number | null) => void
 }) {
-  const [mode, setMode] = useState<Mode>('wild')
-  // A mode the owner tapped (not the default): Trainer then opens its picker at once.
-  const [tapped, setTapped] = useState(false)
+  const [choosing, setChoosing] = useState(false)
+  const cat = categoryById(category)
+  const head = (col: string, label: string, count: number) => (
+    <p
+      className="bf-sec"
+      style={{ gridArea: `${col}-head` }}
+      data-layout={`pyramid-head-${col}`}
+      data-testid={`${tid}head-${col}`}
+    >
+      {label} <span className="bf-mono">{count}</span>
+    </p>
+  )
   return (
-    <div className="bf-pyr-strip" style={{ gridArea: 'strip' }} data-layout="pyramid-strip">
-      <div
-        className="bf-pyr-modes"
-        role="group"
-        aria-label={`Add to floor ${n}`}
-        data-layout="pyramid-modes"
-      >
-        {MODES.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className="bf-pyr-mode"
-            style={{ gridArea: id }}
-            aria-pressed={mode === id}
-            data-testid={`${tid}mode-${id}`}
-            onClick={() => {
-              setMode(id)
-              setTapped(true)
-            }}
-          >
-            <Icon size={24} stroke={1.5} aria-hidden />
-            {label}
-          </button>
-        ))}
-      </div>
-      {mode === 'wild' && <WildPane floor={floor} category={category} edit={edit} tid={tid} />}
-      {mode === 'item' && (
-        <ItemPane round={roundOf(n, v.perSet)} floor={floor} edit={edit} tid={tid} />
+    <div
+      className={`bf-pyr-cols${cat && !choosing ? '' : ' bf-pyr-cols-cats'}`}
+      style={{ gridArea: 'cols' }}
+      data-layout="pyramid-columns"
+      data-testid={`${tid}entries`}
+    >
+      {head(
+        'wild',
+        'Wild defeated',
+        floor.wild.reduce((s, w) => s + w.count, 0),
       )}
-      {mode === 'trainer' && (
-        <TrainerPane
-          data={data}
-          v={v}
-          n={n}
+      {head('trainer', 'Trainers', floor.trainers.length)}
+      {head(
+        'item',
+        'Items',
+        floor.items.reduce((s, x) => s + x.qty, 0),
+      )}
+      {cat && !choosing ? (
+        <WildPicks
+          cat={cat}
           floor={floor}
           edit={edit}
           tid={tid}
-          focus={tapped}
-          onLost={onLost}
+          onChange={() => setChoosing(true)}
+        />
+      ) : (
+        <CategoryChooser
+          category={category}
+          tid={tid}
+          onChoose={(id) => {
+            edit((f) => setCategory(f, id))
+            setChoosing(false)
+          }}
         />
       )}
-    </div>
-  )
-}
-
-function WildPane({
-  floor,
-  category,
-  edit,
-  tid,
-}: {
-  floor: PyramidFloor
-  category: number | undefined
-  edit: Edit
-  tid: string
-}) {
-  const [choosing, setChoosing] = useState(false)
-  const cat = categoryById(category)
-  return (
-    <div
-      className="bf-pyr-pane"
-      style={{ gridTemplateAreas: cat && !choosing ? "'cat' 'picks' 'search'" : "'cat' 'search'" }}
-      data-layout="pyramid-wild"
-    >
-      {cat && !choosing ? (
-        <p
-          className="bf-pyr-catline"
-          style={{ gridArea: 'cat' }}
-          data-layout="pyramid-category"
-          data-testid={`${tid}category`}
-        >
-          <span>{cat.hint[0]}</span> <Muted>· {cat.tactic}</Muted>{' '}
-          <span className="bf-cap">
-            <button
-              type="button"
-              className="bf-link"
-              data-testid={`${tid}category-change`}
-              onClick={() => setChoosing(true)}
-            >
-              Change
-            </button>
-          </span>
-        </p>
-      ) : (
-        <div style={{ gridArea: 'cat' }} data-layout="pyramid-category">
-          <p className="bf-cap">
-            The wild category: what the old man in the lobby said (kept for the whole round)
-          </p>
-          <div
-            className="bf-pyr-cats"
-            data-layout="pyramid-categories"
-            data-testid={`${tid}categories`}
-          >
-            {PYRAMID_CATEGORIES.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="bf-pyr-cat"
-                aria-pressed={c.id === category}
-                data-testid={`${tid}category-${c.id}`}
-                onClick={() => {
-                  edit((f) => setCategory(f, c.id))
-                  setChoosing(false)
-                }}
-              >
-                <span>{c.hint[0]}</span>
-                <span className="bf-cap">{c.tactic}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {cat && !choosing && (
-        <div
-          className="bf-pyr-picks"
-          style={{ gridArea: 'picks' }}
-          data-layout="pyramid-wild-picks"
-          data-testid={`${tid}wild-picks`}
-        >
-          {cat.species.map((id) => {
-            const count = floor.wild.find((w) => w.species === id)?.count
-            return (
-              <button
-                key={id}
-                type="button"
-                className="bf-pyr-pick"
-                title={`One more ${speciesName(id)} defeated`}
-                data-species-id={id}
-                data-testid={`${tid}wild-${id}`}
-                onClick={() => edit((f) => addWild(f, id))}
-              >
-                <MonSprite speciesId={id} />
-                <span>{speciesName(id)}</span>
-                {count ? <span className="bf-mono bf-muted">×{count}</span> : null}
-              </button>
-            )
-          })}
-        </div>
-      )}
-      <div style={{ gridArea: 'search' }} data-layout="pyramid-wild-search">
+      <div style={{ gridArea: 'wild-search' }} data-layout="pyramid-wild-search">
         <SpeciesPicker
           label="Another wild Pokémon (any Gen 3 species)"
           value={undefined}
@@ -432,11 +331,118 @@ function WildPane({
           onChange={(id) => edit((f) => addWild(f, id))}
         />
       </div>
+      <TrainerControls
+        data={data}
+        v={v}
+        n={n}
+        floor={floor}
+        edit={edit}
+        tid={tid}
+        onLost={onLost}
+      />
+      <ItemControls round={roundOf(n, v.perSet)} floor={floor} edit={edit} tid={tid} />
+      <FloorEntries data={data} floor={floor} edit={edit} tid={tid} />
     </div>
   )
 }
 
-function ItemPane({
+/** The round's category (its hint and tactic), then its species as one-tap sprite buttons. */
+function WildPicks({
+  cat,
+  floor,
+  edit,
+  tid,
+  onChange,
+}: {
+  cat: PyramidCategory
+  floor: PyramidFloor
+  edit: Edit
+  tid: string
+  onChange: () => void
+}) {
+  return (
+    <div className="bf-pyr-cell" style={{ gridArea: 'wild-picks' }} data-layout="pyramid-wild">
+      <p className="bf-pyr-catline" data-layout="pyramid-category" data-testid={`${tid}category`}>
+        <span>{cat.hint[0]}</span> <Muted>· {cat.tactic}</Muted>{' '}
+        <span className="bf-cap">
+          <button
+            type="button"
+            className="bf-link"
+            data-testid={`${tid}category-change`}
+            onClick={onChange}
+          >
+            Change
+          </button>
+        </span>
+      </p>
+      <div
+        className="bf-pyr-picks"
+        data-layout="pyramid-wild-picks"
+        data-testid={`${tid}wild-picks`}
+      >
+        {cat.species.map((id) => {
+          const count = floor.wild.find((w) => w.species === id)?.count
+          return (
+            <button
+              key={id}
+              type="button"
+              className="bf-pyr-pick"
+              title={`One more ${speciesName(id)} defeated`}
+              data-species-id={id}
+              data-testid={`${tid}wild-${id}`}
+              onClick={() => edit((f) => addWild(f, id))}
+            >
+              <MonSprite speciesId={id} />
+              <span>{speciesName(id)}</span>
+              {count ? <span className="bf-mono bf-muted">×{count}</span> : null}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** The 20 categories, across all three columns: what the old man in the lobby said. */
+function CategoryChooser({
+  category,
+  tid,
+  onChoose,
+}: {
+  category: number | undefined
+  tid: string
+  onChoose: (id: number) => void
+}) {
+  return (
+    <div style={{ gridArea: 'cats' }} data-layout="pyramid-category">
+      <p className="bf-cap">
+        The wild category: what the old man in the lobby said (kept for the whole round)
+      </p>
+      <div
+        className="bf-pyr-cats"
+        data-layout="pyramid-categories"
+        data-testid={`${tid}categories`}
+      >
+        {PYRAMID_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className="bf-pyr-cat"
+            aria-pressed={c.id === category}
+            data-testid={`${tid}category-${c.id}`}
+            onClick={() => onChoose(c.id)}
+          >
+            <span>{c.hint[0]}</span>
+            <span className="bf-cap">{c.tactic}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The round's items as one-tap buttons (none past round 40), then the search. */
+function ItemControls({
   round,
   floor,
   edit,
@@ -449,61 +455,61 @@ function ItemPane({
 }) {
   const list = roundItems(round)
   return (
-    <div
-      className="bf-pyr-pane"
-      style={{ gridTemplateAreas: "'picks' 'search'" }}
-      data-layout="pyramid-item"
-    >
-      {list.length ? (
-        <div
-          className="bf-pyr-picks"
-          style={{ gridArea: 'picks' }}
-          data-layout="pyramid-item-picks"
-          data-testid={`${tid}item-picks`}
-        >
-          {list.map((id) => {
-            const qty = floor.items.find((x) => x.itemId === id)?.qty
-            return (
-              <button
-                key={id}
-                type="button"
-                className="bf-pyr-pick"
-                title={`One more ${itemName(id)}`}
-                data-item-id={id}
-                data-testid={`${tid}item-${id}`}
-                onClick={() => edit((f) => addItem(f, id))}
-              >
-                <ItemSprite id={id} />
-                <span>{itemName(id)}</span>
-                {qty ? <span className="bf-mono bf-muted">×{qty}</span> : null}
-              </button>
-            )
-          })}
-        </div>
-      ) : (
-        <p className="bf-cap" style={{ gridArea: 'picks' }} data-testid={`${tid}item-none`}>
-          Round {round} has no item list: search for the item.
-        </p>
-      )}
-      <div style={{ gridArea: 'search' }} data-layout="pyramid-item-search">
+    <>
+      <div className="bf-pyr-cell" style={{ gridArea: 'item-picks' }} data-layout="pyramid-item">
+        {list.length ? (
+          <div
+            className="bf-pyr-picks"
+            data-layout="pyramid-item-picks"
+            data-testid={`${tid}item-picks`}
+          >
+            {list.map((id) => {
+              const qty = floor.items.find((x) => x.itemId === id)?.qty
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className="bf-pyr-pick"
+                  title={`One more ${itemName(id)}`}
+                  data-item-id={id}
+                  data-testid={`${tid}item-${id}`}
+                  onClick={() => edit((f) => addItem(f, id))}
+                >
+                  <ItemSprite id={id} />
+                  <span>{itemName(id)}</span>
+                  {qty ? <span className="bf-mono bf-muted">×{qty}</span> : null}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="bf-cap" data-testid={`${tid}item-none`}>
+            Round {round} has no item list: search for the item.
+          </p>
+        )}
+      </div>
+      <div style={{ gridArea: 'item-search' }} data-layout="pyramid-item-search">
         <ItemPicker
           label="Another item (any Gen 3 item)"
           testId={`${tid}item-search`}
           onPick={(id) => edit((f) => addItem(f, id))}
         />
       </div>
-    </div>
+    </>
   )
 }
 
-function TrainerPane({
+/**
+ * Lost and More on the quick-picks row, ABOVE the trainer picker (its open list
+ * would cover anything under it); the picker itself on the searches' row.
+ */
+function TrainerControls({
   data,
   v,
   n,
   floor,
   edit,
   tid,
-  focus,
   onLost,
 }: {
   data: FrontierData
@@ -512,7 +518,6 @@ function TrainerPane({
   floor: PyramidFloor
   edit: Edit
   tid: string
-  focus: boolean
   onLost?: (trainerIndex: number | null) => void
 }) {
   const [more, setMore] = useState(false)
@@ -527,129 +532,126 @@ function TrainerPane({
   const inRange = data.trainers().filter((x) => x.id >= range.from && x.id <= range.to)
   const lostTo = lastT && lastT.result === 'W' ? last : null
   return (
-    <div className="bf-pyr-pane bf-pyr-trainer" data-layout="pyramid-trainer">
-      <SpeciesPicker
-        label="A trainer’s Pokémon (one each; saved as defeated)"
-        area="pick"
-        value={undefined}
-        testId={`${tid}trainer-species`}
-        focusOnMount={focus}
-        additive
-        onChange={(id) => {
-          setWhich(null)
-          edit((f) => addTrainer(f, id))
-        }}
-      />
-      {/* Beside the picker, never under it: its open list would cover anything below. */}
-      <span className="bf-actions" style={{ gridArea: 'lost' }}>
-        {onLost && (
-          <button
-            type="button"
-            className="bf-ghost"
-            title="The run ends on this floor"
-            data-testid={`${tid}trainer-lost`}
-            onClick={() => onLost(lostTo)}
-          >
-            {lostTo != null && lastT ? `Lost to ${shown(lastT.species)}` : 'Lost'}
-          </button>
-        )}
-        {onLost && lostTo != null && (
-          <button
-            type="button"
-            className="bf-ghost"
-            title="A trainer whose Pokémon you did not see: the run ends on this floor"
-            data-testid={`${tid}trainer-lost-other`}
-            onClick={() => onLost(null)}
-          >
-            Lost to another
-          </button>
-        )}
-        <span className="bf-cap">
-          <button
-            type="button"
-            className="bf-link bf-pyr-disclose"
-            aria-expanded={more}
-            title="The trainer and the set (optional)"
-            data-testid={`${tid}trainer-more`}
-            onClick={() => setMore(!more)}
-          >
-            {more ? (
-              <IconChevronDown size={20} stroke={1.5} aria-hidden />
-            ) : (
-              <IconChevronRight size={20} stroke={1.5} aria-hidden />
-            )}
-            More{t ? ` for ${shown(t.species)}` : ''}
-          </button>
-        </span>
-      </span>
-      {more && (
-        <div
-          className="bf-pyr-more"
-          style={{ gridArea: 'more' }}
-          data-layout="pyramid-trainer-more"
-        >
-          {t ? (
-            <div
-              className={`bf-pyr-more-fields${floor.trainers.length > 1 ? ' bf-pyr-more-which' : ''}`}
-              data-layout="pyramid-trainer-more-fields"
+    <>
+      <div
+        className="bf-pyr-cell"
+        style={{ gridArea: 'trainer-acts' }}
+        data-layout="pyramid-trainer"
+      >
+        <span className="bf-actions bf-pyr-tacts">
+          {onLost && (
+            <button
+              type="button"
+              className="bf-ghost"
+              title="The run ends on this floor"
+              data-testid={`${tid}trainer-lost`}
+              onClick={() => onLost(lostTo)}
             >
-              {floor.trainers.length > 1 && (
-                <label className="bf-field" style={{ gridArea: 'which' }}>
-                  <span className="bf-cap">For</span>
+              {lostTo != null && lastT ? `Lost to ${shown(lastT.species)}` : 'Lost'}
+            </button>
+          )}
+          {onLost && lostTo != null && (
+            <button
+              type="button"
+              className="bf-ghost"
+              title="A trainer whose Pokémon you did not see: the run ends on this floor"
+              data-testid={`${tid}trainer-lost-other`}
+              onClick={() => onLost(null)}
+            >
+              Lost to another
+            </button>
+          )}
+          <span className="bf-cap">
+            <button
+              type="button"
+              className="bf-link bf-pyr-disclose"
+              aria-expanded={more}
+              title="The trainer and the set (optional)"
+              data-testid={`${tid}trainer-more`}
+              onClick={() => setMore(!more)}
+            >
+              {more ? (
+                <IconChevronDown size={20} stroke={1.5} aria-hidden />
+              ) : (
+                <IconChevronRight size={20} stroke={1.5} aria-hidden />
+              )}
+              More{t ? ` for ${shown(t.species)}` : ''}
+            </button>
+          </span>
+        </span>
+        {more && (
+          <div className="bf-pyr-more" data-layout="pyramid-trainer-more">
+            {t ? (
+              <div className="bf-pyr-more-fields" data-layout="pyramid-trainer-more-fields">
+                {floor.trainers.length > 1 && (
+                  <label className="bf-field">
+                    <span className="bf-cap">For</span>
+                    <select
+                      className="bf-uf"
+                      data-testid={`${tid}trainer-which`}
+                      value={i}
+                      onChange={(e) => setWhich(Number(e.target.value))}
+                    >
+                      {floor.trainers.map((x, k) => (
+                        <option key={k} value={k}>
+                          Trainer {k + 1} · {shown(x.species)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label className="bf-field">
+                  <span className="bf-cap">
+                    Trainer (optional): ids {range.from}–{range.to} on floor {n}
+                  </span>
                   <select
                     className="bf-uf"
-                    data-testid={`${tid}trainer-which`}
-                    value={i}
-                    onChange={(e) => setWhich(Number(e.target.value))}
+                    data-testid={`${tid}trainer-id`}
+                    value={t.trainerId ?? ''}
+                    onChange={(e) =>
+                      edit((f) =>
+                        setTrainer(f, i, {
+                          trainerId: e.target.value === '' ? undefined : Number(e.target.value),
+                        }),
+                      )
+                    }
                   >
-                    {floor.trainers.map((x, k) => (
-                      <option key={k} value={k}>
-                        Trainer {k + 1} · {shown(x.species)}
+                    <option value="">Not recorded</option>
+                    {inRange.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        #{x.id} · {trainerText(x)}
                       </option>
                     ))}
                   </select>
                 </label>
-              )}
-              <label className="bf-field" style={{ gridArea: 'trainer' }}>
-                <span className="bf-cap">
-                  Trainer (optional): ids {range.from}–{range.to} on floor {n}
-                </span>
-                <select
-                  className="bf-uf"
-                  data-testid={`${tid}trainer-id`}
-                  value={t.trainerId ?? ''}
-                  onChange={(e) =>
-                    edit((f) =>
-                      setTrainer(f, i, {
-                        trainerId: e.target.value === '' ? undefined : Number(e.target.value),
-                      }),
-                    )
-                  }
-                >
-                  <option value="">Not recorded</option>
-                  {inRange.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      #{x.id} · {trainerText(x)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <SetSelect
-                data={data}
-                area="set"
-                species={t.species ?? undefined}
-                levelMode={v.run.levelMode}
-                value={t.setIndex}
-                testId={`${tid}trainer-set`}
-                onChange={(s) => edit((f) => setTrainer(f, i, { setIndex: s }))}
-              />
-            </div>
-          ) : (
-            <p className="bf-cap">Add the trainer’s Pokémon first.</p>
-          )}
-        </div>
-      )}
-    </div>
+                <SetSelect
+                  data={data}
+                  species={t.species ?? undefined}
+                  levelMode={v.run.levelMode}
+                  value={t.setIndex}
+                  testId={`${tid}trainer-set`}
+                  onChange={(s) => edit((f) => setTrainer(f, i, { setIndex: s }))}
+                />
+              </div>
+            ) : (
+              <p className="bf-cap">Add the trainer’s Pokémon first.</p>
+            )}
+          </div>
+        )}
+      </div>
+      <div style={{ gridArea: 'trainer-search' }} data-layout="pyramid-trainer-search">
+        <SpeciesPicker
+          label="A trainer’s Pokémon (one each; saved as defeated)"
+          value={undefined}
+          testId={`${tid}trainer-species`}
+          additive
+          onChange={(id) => {
+            setWhich(null)
+            edit((f) => addTrainer(f, id))
+          }}
+        />
+      </div>
+    </>
   )
 }
 
@@ -789,17 +791,10 @@ function FloorEntries({
 }) {
   const trainers = data.trainers()
   const none = <p className="bf-cap">None yet</p>
+  // Each list at the foot of its column (FloorColumns); the column's heading carries its count.
   return (
-    <div
-      className="bf-pyr-entries"
-      style={{ gridArea: 'entries' }}
-      data-layout="pyramid-entries"
-      data-testid={`${tid}entries`}
-    >
-      <div style={{ gridArea: 'trainers' }} data-layout="pyramid-entries-trainers">
-        <p className="bf-sec">
-          Trainers <span className="bf-mono">{floor.trainers.length}</span>
-        </p>
+    <>
+      <div style={{ gridArea: 'trainer-list' }} data-layout="pyramid-entries-trainers">
         {floor.trainers.length ? (
           <ul className="bf-pyr-list">
             {floor.trainers.map((t, i) => (
@@ -830,11 +825,7 @@ function FloorEntries({
           none
         )}
       </div>
-      <div style={{ gridArea: 'wild' }} data-layout="pyramid-entries-wild">
-        <p className="bf-sec">
-          Wild defeated{' '}
-          <span className="bf-mono">{floor.wild.reduce((s, w) => s + w.count, 0)}</span>
-        </p>
+      <div style={{ gridArea: 'wild-list' }} data-layout="pyramid-entries-wild">
         {floor.wild.length ? (
           <ul className="bf-pyr-list">
             {floor.wild.map((w, i) => {
@@ -874,10 +865,7 @@ function FloorEntries({
           none
         )}
       </div>
-      <div style={{ gridArea: 'items' }} data-layout="pyramid-entries-items">
-        <p className="bf-sec">
-          Items <span className="bf-mono">{floor.items.reduce((s, x) => s + x.qty, 0)}</span>
-        </p>
+      <div style={{ gridArea: 'item-list' }} data-layout="pyramid-entries-items">
         {floor.items.length ? (
           <ul className="bf-pyr-list">
             {floor.items.map((x, i) => {
@@ -921,7 +909,7 @@ function FloorEntries({
           none
         )}
       </div>
-    </div>
+    </>
   )
 }
 
@@ -1124,7 +1112,7 @@ function FloorEditor({ data, v, b }: { data: FrontierData; v: RunView; b: Battle
   const name = data.brains().find((x) => x.facility === 'pyramid')?.name ?? 'The Brain'
   const save = (fn: (x: Battle) => Battle) =>
     trackerDocument.update((d) => editLoggedBattle(d, b.id, fn))
-  const areas = ['head', 'strip', ...(brain && reachedTop ? ['brain'] : []), 'entries', 'note']
+  const areas = ['head', 'cols', ...(brain && reachedTop ? ['brain'] : []), 'note']
   return (
     <div
       className="bf-pyr"
@@ -1138,7 +1126,7 @@ function FloorEditor({ data, v, b }: { data: FrontierData; v: RunView; b: Battle
           Each change saves at once; the floor stays {b.result === 'W' ? 'cleared' : 'lost'}.
         </span>
       </header>
-      <FloorStrip
+      <FloorColumns
         data={data}
         v={v}
         n={b.n}
@@ -1170,7 +1158,6 @@ function FloorEditor({ data, v, b }: { data: FrontierData; v: RunView; b: Battle
           ))}
         </div>
       )}
-      <FloorEntries data={data} floor={f} edit={edit} tid={tid} />
       <label className="bf-field" style={{ gridArea: 'note' }}>
         <span className="bf-cap">Floor note (optional)</span>
         <input
