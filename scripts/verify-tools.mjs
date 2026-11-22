@@ -165,7 +165,7 @@ try {
   await openIndex(page)
   // Named, not counted: the list grows as Gen 2+ tools land.
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
-  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests and the three Frontier tools are disabled', gen1Disabled === '12,16,17,18,19,2,20,21,22', gen1Disabled)
+  check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests and the four Frontier tools are disabled', gen1Disabled === '12,16,17,18,19,2,20,21,22,24', gen1Disabled)
 
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
@@ -1552,6 +1552,78 @@ try {
   const castle = await page.$eval('[data-testid="rnt-castle"]', (e) => e.textContent).catch(() => null)
   const ptFacility = await page.$('[data-testid="rnt-facility"]')
   check('on the page: Platinum says the Battle Castle has no rental Pokemon, and offers no tent', castle === 'The Battle Castle has no rental Pokémon: its rentals are held items, paid in Castle Points.' && ptFacility === null, `${castle}`)
+
+  // ------------------------------------------------------------------ #24
+  hr('#24 BATTLE PIKE -- battle_pike.c SetHintedRoom / GetNextRoomType / GetPikeQueenFightType / TryInflictRandomStatus')
+  /*
+    Hand-worked from pret/pokeemerald @ 9103e529 (src/battle_pike.c):
+      1. healing off (first hallway), all healthy, no Lucy: the lady's list is
+         [SINGLE, NPC, STATUS, WILD, 0, 0] (two unfilled = SINGLE) -> hinted
+         SINGLE 1/2, NPC 1/6, STATUS 1/6, WILD 1/6, HARD 0, DOUBLE 0.
+      2. same, hint SINGLE: an unhinted door is NPC/STATUS/WILD/HARD/DOUBLE, 1/5 each.
+      3. same, hint not known: P(SINGLE) = 1/6 (1/4 + 1/5 + 1/4) = 7/60.
+      4. healing on, 3 able, one healthy, hint STATUS: SINGLE, HEAL_FULL, NPC,
+         WILD, HARD, DOUBLE 1/6 each.
+      5. healing on, two fainted, the third poisoned: hinted NPC 3/8 (STATUS and
+         DOUBLE turn into NPC), SINGLE/HEAL_FULL/HEAL_PART/WILD/HARD 1/8; after
+         that NPC hint the other doors are those five, 1/5 each.
+      6. status room, one target, a pure Poison Pokémon: Toxic rerolls ->
+         Freeze 25/65, Paralysis 20/65, Sleep 10/65, Burn 10/65.
+      7. Lucy, no symbol: streak 26 at a hallway (s = 27 = 28 - 1) is her; 24 and 28 are not.
+  */
+  const pik = await page.evaluate(async () => {
+    const pm = await import('/pokeapp/src/modules/tools/pike/pikeMath.ts')
+    const off = { healingDisabled: true, aliveCount: 3, anyHealthy: true }
+    const on = { healingDisabled: false, aliveCount: 3, anyHealthy: true }
+    const low = { healingDisabled: false, aliveCount: 1, anyHealthy: false }
+    const none = { healthy: false, types: [] }
+    return {
+      hint: pm.hintOdds(off),
+      afterSingle: pm.otherDoorOdds('single', off),
+      anySingle: pm.unhintedDoorOdds(off).single,
+      afterStatus: pm.otherDoorOdds('status', on),
+      lowHint: pm.hintOdds(low),
+      lowAfterNpc: pm.otherDoorOdds('npc', low),
+      poison: pm.statusOdds([{ healthy: true, types: ['poison'] }, none, none], pm.statusTargets(1)),
+      lucy: [26, 24, 28].map((k) => pm.isLucyRoom(k, 0)),
+      targets: [1, 2, 3, 4, 5, 6, 7].map(pm.statusTargets).join(''),
+      problem: pm.stateProblem({ healingDisabled: true, aliveCount: 2, anyHealthy: true }),
+    }
+  })
+  const pikNear = (a, b) => Math.abs(a - b) < 1e-9
+  const odds = (o, want) => Object.entries(want).every(([k, v]) => pikNear(o[k], v)) && Object.keys(o).every((k) => k in want || o[k] === 0)
+  check('1. healing off, all healthy: hinted Single 1/2, Person, Status, Wild 1/6 each, Hard and Double never',
+    odds(pik.hint, { single: 1 / 2, npc: 1 / 6, status: 1 / 6, wild: 1 / 6 }), JSON.stringify(pik.hint))
+  check('2. same, hint Single: the other doors are Person, Status, Wild, Hard, Double, 1/5 each',
+    odds(pik.afterSingle, { npc: 1 / 5, status: 1 / 5, wild: 1 / 5, hard: 1 / 5, double: 1 / 5 }), JSON.stringify(pik.afterSingle))
+  check('3. same, hint not known: an unhinted door is a Single battle 7/60 of the time', pikNear(pik.anySingle, 7 / 60), String(pik.anySingle))
+  check('4. healing on, hint Status: Single, Full heal, Person, Wild, Hard, Double, 1/6 each',
+    odds(pik.afterStatus, { single: 1 / 6, 'heal-full': 1 / 6, npc: 1 / 6, wild: 1 / 6, hard: 1 / 6, double: 1 / 6 }), JSON.stringify(pik.afterStatus))
+  check('5. one able and poisoned: hinted Person 3/8, Single, Full heal, Heal one or two, Wild, Hard 1/8 each',
+    odds(pik.lowHint, { npc: 3 / 8, single: 1 / 8, 'heal-full': 1 / 8, 'heal-part': 1 / 8, wild: 1 / 8, hard: 1 / 8 }), JSON.stringify(pik.lowHint))
+  check('5. ... after a Person hint the other doors are those five, 1/5 each',
+    odds(pik.lowAfterNpc, { single: 1 / 5, 'heal-full': 1 / 5, 'heal-part': 1 / 5, wild: 1 / 5, hard: 1 / 5 }), JSON.stringify(pik.lowAfterNpc))
+  check('6. status room, one pure Poison target: Freeze 25/65, Paralysis 20/65, Sleep 10/65, Burn 10/65, no Toxic',
+    Boolean(pik.poison) && odds(pik.poison, { freeze: 25 / 65, paralysis: 20 / 65, sleep: 10 / 65, burn: 10 / 65 }), JSON.stringify(pik.poison))
+  check('7. Lucy, no symbol: streak 26 at a hallway is her, 24 and 28 are not', JSON.stringify(pik.lucy) === '[true,false,false]', JSON.stringify(pik.lucy))
+  check('the status room hits 1 Pokémon on doors 1-2, 2 on 3-4, 3 on 5-7', pik.targets === '1122333', pik.targets)
+  check('healing off with a Pokémon down is not a state the game can be in: the tool says why', typeof pik.problem === 'string' && pik.problem.startsWith('Healing rooms are off only'), pik.problem)
+
+  check('Lucy\'s Trainer Dex entry links to the Pike tool', await openBrain(3, 'emerald', 'Lucy'))
+  await page.click('[data-testid="trainerdex-tool-link"]')
+  await page.waitForSelector('[data-testid="pike-hinted"]', { timeout: 60000 })
+  const pikHinted = await page.$eval('[data-testid="pike-hinted-single"] td', (e) => Number(e.dataset.p))
+  const pikAny = await page.$eval('[data-testid="pike-any-single"]', (e) => Number(e.dataset.p))
+  const pikText = await page.$eval('[data-testid="pike-any-single"]', (e) => e.textContent)
+  check('on the page, first hallway: the hinted door is a Single battle 50%, an unhinted one 11.7% (7/60)',
+    pikHinted === 0.5 && pikNear(pikAny, 7 / 60) && pikText === '11.7%', `${pikHinted} / ${pikAny} "${pikText}"`)
+  await page.fill('[data-testid="pike-streak"]', '26')
+  const pikLucy = await page.$eval('[data-testid="pike-lucy"]', (e) => e.textContent).catch(() => '')
+  check('on the page: streak 26, no symbol -- "Lucy is behind every door"', pikLucy.includes('Lucy is behind every door'), pikLucy)
+  await page.screenshot({ path: shot('tool-24-pike.png') })
+  await selectGeneration(page, 4)
+  const pikGate = await page.$eval('[data-testid="tool-reason"]', (e) => e.textContent).catch(() => '')
+  check('under Gen 4 the page says why it cannot answer', pikGate === 'Not in Gen 4: this exists in Gen 3.', pikGate)
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
