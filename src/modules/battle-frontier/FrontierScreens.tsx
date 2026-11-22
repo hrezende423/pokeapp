@@ -3,7 +3,9 @@ import { Facilities } from './Facilities'
 import { Gen4Facilities, TrainerTowerFacilities } from './OtherFacilities'
 import { FrontierShell } from './parts'
 import { SetsTrainers } from './SetsTrainers'
-import { TRAINER_TOWER } from './reference/speed'
+import { SpeedFacilityView } from './SpeedFacilities'
+import { speedNotice } from './reference/games'
+import { TRAINER_HILL, TRAINER_TOWER } from './reference/speed'
 import './frontier.css'
 
 /**
@@ -43,5 +45,27 @@ export function SetsTrainersPage() {
     <FrontierShell page="sets" title="Sets & Trainers">
       {(data) => <SetsTrainers data={data} />}
     </FrontierShell>
+  )
+}
+
+/**
+ * Trainer Hill & Tower: Emerald's Trainer Hill, FireRed/LeafGreen's Trainer
+ * Tower, from the Trainer Dex partition (never the Frontier loader); any other
+ * game gets its notice.
+ */
+export function SpeedPage() {
+  return (
+    <FrontierShell
+      page="speed"
+      title="Trainer Hill & Tower"
+      gameText={speedNotice}
+      anyGame={(game) =>
+        game === 'emerald' ? (
+          <SpeedFacilityView key="hill" refData={TRAINER_HILL} />
+        ) : game === 'firered-leafgreen' ? (
+          <SpeedFacilityView key="tower" refData={TRAINER_TOWER} />
+        ) : null
+      }
+    />
   )
 }

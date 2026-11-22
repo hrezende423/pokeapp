@@ -127,6 +127,7 @@ export const NAV_TABS: readonly NavTab[] = [
       { id: 'frontier-brains', label: 'Brains' },
       { id: 'frontier-tracker', label: 'Challenge Tracker' },
       { id: 'frontier-sets', label: 'Sets & Trainers' },
+      { id: 'frontier-speed', label: 'Trainer Hill & Tower' },
     ],
   },
   {

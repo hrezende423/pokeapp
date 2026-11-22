@@ -58,3 +58,16 @@ export function gameNotice(game: string, screen: string): string {
     return `FireRed and LeafGreen have no Battle Frontier, so no ${screen}. Their Trainer Tower is under Facilities.`
   return `${screen} covers Emerald only.`
 }
+
+/** A game as a sentence's subject, with its verb ("Platinum has", "Diamond and Pearl have"). */
+const GAME_SUBJECT: Record<string, string> = {
+  'ruby-sapphire': 'Ruby and Sapphire have',
+  emerald: 'Emerald has',
+  'firered-leafgreen': 'FireRed and LeafGreen have',
+  'diamond-pearl': 'Diamond and Pearl have',
+  platinum: 'Platinum has',
+  'heartgold-soulsilver': 'HeartGold and SoulSilver have',
+}
+
+/** The Trainer Hill & Tower screen's notice: only Emerald (the Hill) and FireRed/LeafGreen (the Tower) have one. */
+export const speedNotice = (game: string): string => `${GAME_SUBJECT[game] ?? `${game} has`} no Trainer Hill or Trainer Tower.`

@@ -344,6 +344,112 @@ hr('5. SYNC ROW ROUTING (pure; no network)')
   check('any other failure on user_documents is an error', targets.syncErrorOutcome('notes', { status: 500, code: '' }) === 'error')
 }
 
+// ---------------------------------------------------------------------------
+hr('6. THE CHALLENGE TRACKER: v1 -> v2 (`games`), the committed v1 export, Hill/Tower round trip')
+{
+  // One bundle, so the tracker document and the store's import/export share one registry.
+  const { build } = await import('esbuild')
+  const { readFileSync } = await import('node:fs')
+  const out = await build({
+    stdin: {
+      contents: [
+        "export { trackerDocument } from './src/modules/battle-frontier/tracker/trackerStore.ts'",
+        "export * as M from './src/modules/battle-frontier/tracker/model.ts'",
+        "export { exportDocuments, importDocuments } from './src/store/documentStore.ts'",
+      ].join('\n'),
+      resolveDir: process.cwd(),
+      loader: 'ts',
+    },
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    write: false,
+    logLevel: 'silent',
+  })
+  const bf = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)
+  const { trackerDocument: tdoc, M } = bf
+  const TKEY = 'pokeapp:frontier-tracker:v1'
+  check('the tracker keeps its name and key, at version 2 with the one step 1 -> 2', tdoc.name === 'frontier-tracker' && tdoc.key === TKEY && tdoc.version === 2)
+
+  // A v1 document: one run, one battle, one ledger line, one symbol override.
+  const v1Tracker = {
+    schemaVersion: 1,
+    runs: [{ id: 'r1', facility: 'tower', format: 'singles', levelMode: 'lv50', startedAt: '2026-11-01', outcome: 'ongoing' }],
+    battles: [{ id: 'b1', runId: 'r1', n: 1, opponents: [25, null, 6], result: 'W' }],
+    symbols: { 'tower|singles|lv50': { silver: true } },
+    bp: { opening: 5, ledger: [{ id: 'l1', at: '2026-11-01', delta: 3, reason: 'Set 1', runId: 'r1', set: 1 }] },
+  }
+  const v2Expected =
+    '{"schemaVersion":2,"runs":[{"id":"r1","facility":"tower","format":"singles","levelMode":"lv50","startedAt":"2026-11-01","outcome":"ongoing"}],' +
+    '"battles":[{"id":"b1","runId":"r1","n":1,"opponents":[25,null,6],"result":"W"}],"symbols":{"tower|singles|lv50":{"silver":true}},' +
+    '"bp":{"opening":5,"ledger":[{"id":"l1","at":"2026-11-01","delta":3,"reason":"Set 1","runId":"r1","set":1}]},"games":{}}'
+  check('v1ToV2 is pure: the v1 fields untouched, schemaVersion 2, games {}', json(M.v1ToV2(v1Tracker)) === v2Expected && v1Tracker.schemaVersion === 1, json(M.v1ToV2(v1Tracker)))
+  ls.clear()
+  ls.setItem(TKEY, json(v1Tracker))
+  ls.writes.length = 0
+  tdoc.reset()
+  check('a stored v1 tracker reads as the literal v2 (same run, battle, symbol, BP; games {})', json(tdoc.read()) === v2Expected, json(tdoc.read()))
+  check('...stored v1, not newer; reading wrote nothing', json(tdoc.status()) === '{"storedVersion":1,"newer":false}' && ls.writes.length === 0 && ls.getItem(TKEY) === json(v1Tracker), json(tdoc.status()))
+
+  // The committed v1 export (the owner's import) still imports: migrated, not refused.
+  const committed = readFileSync('docs/fixtures/bf-tracker.import.json', 'utf8')
+  const fileData = JSON.parse(committed).documents['frontier-tracker'].data
+  ls.clear()
+  tdoc.reset()
+  const rep = bf.importDocuments(committed, { mode: 'replace' })
+  const got = tdoc.read()
+  check('docs/fixtures/bf-tracker.import.json (v1) imports: replaced, from version 1 to 2', json(rep) === '{"ok":true,"documents":[{"name":"frontier-tracker","result":"replaced","fromVersion":1,"toVersion":2}]}', json(rep))
+  check(
+    '...its runs, battles, symbols and BP deep-equal the file; schemaVersion 2, games {}',
+    json([got.runs, got.battles, got.symbols, got.bp]) === json([fileData.runs, fileData.battles, fileData.symbols, fileData.bp]) &&
+      got.runs.length === 6 && got.battles.length === 103 && got.bp.ledger.length === 16 && got.schemaVersion === 2 && json(got.games) === '{}',
+  )
+
+  // Hill and Tower attempts survive export -> import, byte for byte.
+  const hill = { Normal: { attempts: [{ id: 'a1', at: '2026-11-20', floors: 4, timeCs: 77999 }, { id: 'a2', at: '2026-11-21', floors: 2, timeCs: 30000 }] } }
+  const tower = { Single: { attempts: [{ id: 'a3', at: '2026-11-21', floors: 8, timeCs: 359998 }] } }
+  const withSpeed = { ...JSON.parse(v2Expected), games: { emerald: { hill }, 'firered-leafgreen': { tower } } }
+  ls.clear()
+  tdoc.reset()
+  tdoc.write(withSpeed)
+  const exported = bf.exportDocuments(['frontier-tracker'], { exportedAt: '2026-11-22T00:00:00.000Z' })
+  ls.clear()
+  tdoc.reset()
+  check('after clearing storage the tracker is empty', M.isTrackerEmpty(tdoc.read()))
+  bf.importDocuments(exported, { mode: 'replace' })
+  tdoc.reset()
+  check('export -> import with Hill and Tower attempts is lossless', json(tdoc.read()) === json(withSpeed) && JSON.parse(exported).documents['frontier-tracker'].version === 2, json(tdoc.read().games))
+  check('a tracker holding only a Hill attempt is not empty', !M.isTrackerEmpty({ ...M.EMPTY_TRACKER, games: { emerald: { hill } } }) && M.isTrackerEmpty(M.EMPTY_TRACKER))
+
+  // Merge: attempts joined by id, the base's first.
+  const added = { ...withSpeed, games: { emerald: { hill: { Normal: { attempts: [hill.Normal.attempts[0], { id: 'a4', at: '2026-11-22', floors: 4, timeCs: 70000 }] }, Expert: { attempts: [{ id: 'a5', at: '2026-11-22', floors: 1, timeCs: 9000 }] } } } } }
+  const merged = M.mergeTracker(withSpeed, added)
+  check(
+    'merge: a mode\'s attempts join by id (a1 once, then a2, a4); a mode only one side has comes whole; the Tower untouched',
+    json(merged.games.emerald.hill.Normal.attempts.map((a) => a.id)) === '["a1","a2","a4"]' &&
+      json(merged.games.emerald.hill.Expert.attempts.map((a) => a.id)) === '["a5"]' &&
+      json(merged.games['firered-leafgreen'].tower) === json(tower),
+    json(merged.games),
+  )
+  check('merge into itself changes nothing', json(M.mergeTracker(withSpeed, withSpeed)) === json(withSpeed))
+
+  // Normalise: bad attempts dropped, a newer client's fields and games kept.
+  const n = M.normaliseTracker({
+    ...withSpeed,
+    games: {
+      later: { kept: 1 },
+      emerald: { hill: { Normal: { note: 'x', attempts: [{ id: 'ok', at: '2026-11-22', floors: 4, timeCs: 359998, later: 2 }, { id: 'cap', at: '2026-11-22', floors: 4, timeCs: 360000 }, { id: 'neg', at: '2026-11-22', floors: -1, timeCs: 100 }, { id: 'ok', at: '2026-11-23', floors: 1, timeCs: 1 }] } } },
+      'firered-leafgreen': 'junk',
+    },
+  })
+  check(
+    'normalise: an attempt past 59:59.98, a negative floor and a duplicate id are dropped; unknown fields and games survive; a junk game goes',
+    json(n.games) === '{"later":{"kept":1},"emerald":{"hill":{"Normal":{"note":"x","attempts":[{"id":"ok","at":"2026-11-22","floors":4,"timeCs":359998,"later":2}]}}}}',
+    json(n.games),
+  )
+  check('normalise of a document without games gives games {}', json(M.normaliseTracker({ runs: [] }).games) === '{}')
+}
+
 hr(failures.length ? `FAILED: ${failures.length}` : 'ALL PASS')
 if (failures.length) {
   failures.forEach((f) => console.log(`  - ${f}`))

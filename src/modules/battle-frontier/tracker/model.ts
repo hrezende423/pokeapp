@@ -27,6 +27,7 @@ import type {
   TrainerPoolArgs,
 } from '../data'
 import { loaderStreak } from '../format'
+import { mergeModes, modesHaveAttempts, normaliseModes, type SpeedModes } from './speed'
 
 // ------------------------------------------------------------------ the document
 
@@ -149,22 +150,58 @@ export interface LedgerLine {
   brainBonus?: number
 }
 
+/**
+ * The games beyond Emerald's Frontier (schema v2): Emerald's Trainer Hill and
+ * FireRed/LeafGreen's Trainer Tower, per mode (speed.ts). The Emerald fields
+ * above (runs, battles, symbols, bp) are untouched by it.
+ */
+export interface TrackerGames {
+  emerald?: { hill?: SpeedModes }
+  'firered-leafgreen'?: { tower?: SpeedModes }
+}
+
 export interface TrackerDoc {
-  schemaVersion: 1
+  schemaVersion: 2
   runs: Run[]
   battles: Battle[]
   /** Manual symbol overrides, keyed facility|format|levelMode (`keyOf`). */
   symbols: Record<string, SymbolFlags>
   bp: { opening: number; ledger: LedgerLine[] }
+  games: TrackerGames
 }
 
-export const TRACKER_VERSION = 1
+export const TRACKER_VERSION = 2
 export const EMPTY_TRACKER: TrackerDoc = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   runs: [],
   battles: [],
   symbols: {},
   bp: { opening: 0, ledger: [] },
+  games: {},
+}
+
+/**
+ * v1 -> v2: the per-game record joins, empty. Pure; every Emerald field stays
+ * where it was, untouched (src/store/CLAUDE.md).
+ */
+export const v1ToV2 = (doc: unknown): unknown => ({ ...(doc as Record<string, unknown>), schemaVersion: 2, games: {} })
+
+/** A speed facility's mode logs: Trainer Hill in Emerald, Trainer Tower in FireRed/LeafGreen. */
+export function speedModesOf(doc: TrackerDoc, facility: 'trainer-hill' | 'trainer-tower'): SpeedModes {
+  return (facility === 'trainer-hill' ? doc.games?.emerald?.hill : doc.games?.['firered-leafgreen']?.tower) ?? {}
+}
+
+/** The document with one speed facility's mode logs rewritten by `fn`; every other field untouched. */
+export function updateSpeedModes(
+  doc: TrackerDoc,
+  facility: 'trainer-hill' | 'trainer-tower',
+  fn: (modes: SpeedModes) => SpeedModes,
+): TrackerDoc {
+  const games = doc.games ?? {}
+  const next = fn(speedModesOf(doc, facility))
+  return facility === 'trainer-hill'
+    ? { ...doc, games: { ...games, emerald: { ...games.emerald, hill: next } } }
+    : { ...doc, games: { ...games, 'firered-leafgreen': { ...games['firered-leafgreen'], tower: next } } }
 }
 
 // ------------------------------------------------------------------ normalise / merge
@@ -353,6 +390,44 @@ const uniqueById = <T extends { id: string }>(list: (T | null)[]): T[] => {
   return list.filter((x): x is T => x != null && !seen.has(x.id) && (seen.add(x.id), true))
 }
 
+/** The speed facilities' place in `games`: the game, then the facility's key. */
+const SPEED_GAMES = [
+  ['emerald', 'hill'],
+  ['firered-leafgreen', 'tower'],
+] as const
+
+/**
+ * The per-game record: a known game's logs are read (unreadable attempts
+ * dropped); a game or a field this client does not know is kept as stored.
+ */
+function normaliseGames(x: unknown): TrackerGames {
+  if (!isObj(x)) return {}
+  const out: Record<string, unknown> = { ...x }
+  for (const [game, facility] of SPEED_GAMES) {
+    const g = x[game]
+    if (!isObj(g)) {
+      delete out[game]
+      continue
+    }
+    const o = keep(g, [facility])
+    if (isObj(g[facility])) o[facility] = normaliseModes(g[facility])
+    out[game] = o
+  }
+  return out as TrackerGames
+}
+
+/** Games joined: a mode's attempts by id (speed.ts mergeModes); `base` wins any other field. */
+function mergeGames(base: TrackerGames, added: TrackerGames): TrackerGames {
+  const out: Record<string, unknown> = { ...added, ...base }
+  for (const [game, facility] of SPEED_GAMES) {
+    const b = base[game] as Record<string, SpeedModes | undefined> | undefined
+    const a = added[game] as Record<string, SpeedModes | undefined> | undefined
+    if (!b || !a || (!b[facility] && !a[facility])) continue
+    out[game] = { ...a, ...b, [facility]: mergeModes(b[facility] ?? {}, a[facility] ?? {}) }
+  }
+  return out as TrackerGames
+}
+
 /** Any stored value -> a TrackerDoc. Unreadable entries are dropped; fields this client does not know are kept. */
 export function normaliseTracker(raw: unknown): TrackerDoc {
   if (!isObj(raw)) return EMPTY_TRACKER
@@ -373,11 +448,12 @@ export function normaliseTracker(raw: unknown): TrackerDoc {
   const opening = int(bp.opening)
   return {
     ...raw,
-    schemaVersion: 1,
+    schemaVersion: 2,
     runs,
     battles,
     symbols,
     bp: { ...bp, opening: opening != null && opening >= 0 ? opening : 0, ledger: uniqueById(arr(bp.ledger).map(line)) },
+    games: normaliseGames(raw.games),
   }
 }
 
@@ -387,7 +463,8 @@ export function normaliseTracker(raw: unknown): TrackerDoc {
  * have is taken whole -- its battles, drafts, swaps and outcome -- from the side
  * that logged more of it (the base on a tie), so two copies of one battle never
  * meet. Ledger lines are joined by id; a merge never deletes, so a line deleted
- * on one device only comes back from the other.
+ * on one device only comes back from the other. The per-game logs (`games`)
+ * join the same way: attempts by id.
  */
 export function mergeTracker(base: TrackerDoc, added: TrackerDoc): TrackerDoc {
   const count = (d: TrackerDoc, runId: string) => d.battles.filter((b) => b.runId === runId).length
@@ -408,7 +485,7 @@ export function mergeTracker(base: TrackerDoc, added: TrackerDoc): TrackerDoc {
   return {
     ...added,
     ...base,
-    schemaVersion: 1,
+    schemaVersion: 2,
     runs,
     battles,
     symbols: { ...added.symbols, ...base.symbols },
@@ -417,11 +494,17 @@ export function mergeTracker(base: TrackerDoc, added: TrackerDoc): TrackerDoc {
       opening: base.bp.opening || added.bp.opening,
       ledger: [...base.bp.ledger, ...added.bp.ledger.filter((l) => !lineIds.has(l.id))],
     },
+    games: mergeGames(base.games ?? {}, added.games ?? {}),
   }
 }
 
 export const isTrackerEmpty = (d: TrackerDoc): boolean =>
-  d.runs.length === 0 && d.bp.ledger.length === 0 && d.bp.opening === 0 && Object.keys(d.symbols).length === 0
+  d.runs.length === 0 &&
+  d.bp.ledger.length === 0 &&
+  d.bp.opening === 0 &&
+  Object.keys(d.symbols).length === 0 &&
+  !modesHaveAttempts(d.games?.emerald?.hill) &&
+  !modesHaveAttempts(d.games?.['firered-leafgreen']?.tower)
 
 // ------------------------------------------------------------------ the loader boundary
 
