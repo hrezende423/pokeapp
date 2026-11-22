@@ -18,7 +18,7 @@
 
 import { get as httpGet } from 'node:http'
 import { chromium } from 'playwright'
-import { selectGame } from './lib/controls.mjs'
+import { selectGame, selectGeneration } from './lib/controls.mjs'
 import { startPreviewServer } from './lib/devServer.mjs'
 
 const PORT = 4178
@@ -657,6 +657,47 @@ try {
     `html=${s.bg} bar=${s.barBg}`,
   )
   await themeCtx.close()
+
+  // ==================================================================
+  // GENERATION — the app-wide selection survives a real reload
+  // ==================================================================
+  hr('GENERATION — persistence across reload')
+  {
+    const { ctx: genCtx, p: genPage } = await freshThemePage('light')
+    const genValue = () => genPage.$eval('[data-testid="gen-select"]', (el) => el.value)
+    const reloadGen = async () => {
+      await genPage.reload({ waitUntil: 'load' })
+      await genPage.waitForSelector('[data-testid="gen-select"]', { state: 'attached', timeout: 60000 })
+    }
+    const first = await genValue()
+    log(`  first visit: gen-select=${first}`)
+    check('first visit opens on Gen 4', first === '4')
+
+    await selectGeneration(genPage, 2)
+    await reloadGen()
+    let v = await genValue()
+    log(`  chose Gen 2, after a real reload: ${v}`)
+    check('A RELOAD PRESERVES the chosen generation', v === '2')
+
+    await selectGeneration(genPage, 'all')
+    await reloadGen()
+    v = await genValue()
+    log(`  chose All, after a real reload: ${v}`)
+    check('A RELOAD PRESERVES "All"', v === 'all')
+
+    const tab = await genCtx.newPage()
+    await tab.goto(APP_URL, { waitUntil: 'load' })
+    await tab.waitForSelector('[data-testid="gen-select"]', { state: 'attached', timeout: 60000 })
+    v = await tab.$eval('[data-testid="gen-select"]', (el) => el.value)
+    check('a new tab opens on the stored generation', v === 'all', v)
+    await tab.close()
+
+    await genPage.evaluate(() => localStorage.setItem('pokeapp:generation', 'garbage'))
+    await reloadGen()
+    v = await genValue()
+    check('an unreadable stored value falls back to Gen 4', v === '4', v)
+    await genCtx.close()
+  }
 
   hr('SUMMARY')
   if (failures.length === 0) log('  ALL CHECKS PASSED')
