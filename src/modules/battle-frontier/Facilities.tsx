@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import type { FacilityId, FrontierData, FrontierFormat, ShopClerk } from './data'
 import { FACILITY_ORDER, FORMAT_LABEL, partyText, SET_TEXT } from './format'
+import { SpeedFacilitySection } from './OtherFacilities'
 import { Appearance, Joined, Kv, Muted, Num, Range, Repeat, SpeciesLink } from './parts'
+import { TRAINER_HILL } from './reference/speed'
 
 /**
- * Facilities: the seven facility sections, then what they share (symbols, level
+ * Facilities: the seven facility sections, Trainer Hill, then what the Frontier shares (symbols, level
  * rules, banned species, Battle Points and the BP shop). Every value is the
  * loader's; the wording is the approved mockup's (frontier-facilities.html).
  */
@@ -14,6 +16,8 @@ export function Facilities({ data }: { data: FrontierData }) {
       {FACILITY_ORDER.map((id) => (
         <FacilitySection key={id} id={id} data={data} />
       ))}
+      {/* Emerald's other facility: not the Frontier's, so outside its shared rules. */}
+      <SpeedFacilitySection refData={TRAINER_HILL} area="hill" />
       <SharedSection data={data} />
     </div>
   )

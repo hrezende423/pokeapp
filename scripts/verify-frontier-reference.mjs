@@ -162,7 +162,7 @@ try {
 
   // ================================================================ 2. OTHER GENERATION
   hr('2. ANY OTHER GENERATION: the notice only, and no Frontier data fetched')
-  for (const gen of ['4', 'all']) {
+  for (const gen of ['2', 'all']) {
     await selectGeneration(page, gen)
     for (const [id, screen] of [['frontier-facilities', 'facilities'], ['frontier-brains', 'brains'], ['frontier-sets', 'sets']]) {
       await openEntry(page, id)
@@ -173,11 +173,108 @@ try {
         body: [...root.querySelector('.bf-page').children].map((c) => c.className),
         scope: root.querySelector('.bf-scope') != null,
       }))
-      check(`[gen ${gen}] ${screen}: only the head and the notice`, s.status === 'other-generation' && s.notice === 'Battle Frontier data covers Emerald (Gen 3).' && s.body.length === 2 && !s.scope, JSON.stringify(s))
+      const want = gen === 'all' ? 'Pick a generation in the account menu. This tab covers Emerald, FireRed and LeafGreen, Platinum, and HeartGold and SoulSilver.' : 'No Battle Frontier in Gen 2. This tab covers Emerald, FireRed and LeafGreen, Platinum, and HeartGold and SoulSilver.'
+      check(`[gen ${gen}] ${screen}: only the head and the notice`, s.status === 'other-generation' && s.notice === want && s.body.length === 2 && !s.scope, JSON.stringify(s))
     }
   }
-  check('no Frontier data was requested under Gen 4 or All', frontierRequests.length === 0, frontierRequests.join(', '))
+  check('no Frontier data was requested under Gen 2 or All', frontierRequests.length === 0, frontierRequests.join(', '))
   await page.screenshot({ path: shot('notice') })
+
+  // ================================================================ 2b. OTHER GAMES (feature/frontier-facility-reference)
+  hr('2b. OTHER GAMES: Trainer Tower, the Gen 4 Frontier, and "no Frontier" for Ruby/Sapphire and Diamond/Pearl')
+  const facState = () =>
+    page.$eval('[data-testid="frontier-facilities"]', (root) => ({
+      status: root.dataset.status,
+      game: root.dataset.game ?? null,
+      notice: root.querySelector('[data-testid="frontier-notice"]')?.textContent ?? null,
+      scope: root.querySelector('.bf-scope')?.textContent ?? null,
+      row: [...root.querySelectorAll('[data-testid="frontier-game-row"] button')].map((b) => b.dataset.testid.replace('frontier-game-row-', '')),
+      ids: [...root.querySelectorAll('[data-layout="facility"]')].map((e) => e.dataset.facility),
+    }))
+  const pickGame = async (vg) => {
+    await page.click(`[data-testid="frontier-game-row-${vg}"]`)
+    await page.waitForFunction((vg) => document.querySelector('.bf[data-game]')?.dataset.game === vg, vg)
+  }
+  const kvOf = (facility) =>
+    page.$$eval(`[data-facility="${facility}"] .bf-kv > div`, (rows) => Object.fromEntries(rows.map((r) => [r.querySelector('dt').textContent, r.querySelector('dd').textContent])))
+  await selectGeneration(page, 4)
+  await openEntry(page, 'frontier-facilities')
+  await ready(page, 'facilities')
+  let fs4 = await facState()
+  check('Gen 4: the game row offers Diamond/Pearl, Platinum, HeartGold/SoulSilver, and defaults to HeartGold/SoulSilver', JSON.stringify(fs4.row) === JSON.stringify(['diamond-pearl', 'platinum', 'heartgold-soulsilver']) && fs4.game === 'heartgold-soulsilver', JSON.stringify(fs4))
+  check('HGSS: the five Gen 4 facilities, in order', JSON.stringify(fs4.ids) === JSON.stringify(['tower', 'factory', 'hall', 'castle', 'arcade']), fs4.ids.join(','))
+  check('HGSS: the scope tag names the game', fs4.scope === 'HeartGold and SoulSilver · Gen 4', fs4.scope)
+  const flag = await page.$eval('[data-testid="frontier-hgss-flag"]', (e) => e.textContent).catch(() => null)
+  check('HGSS: the "reuses Platinum, unconfirmed" flag is shown', /rules are Platinum’s/.test(flag ?? '') && /unconfirmed/.test(flag ?? ''), flag)
+  const hgssBanned = await page.$eval('[data-layout="frontier-banned"]', (e) => ({ head: e.querySelector('.bf-sec').textContent, links: e.querySelectorAll('.bf-link').length, text: e.textContent }))
+  check('HGSS: 18 banned species plus Spiky-eared Pichu (pokeheartgold IsPokemonBannedFromBattleFrontier)', hgssBanned.head === 'Banned species (19)' && hgssBanned.links === 18 && hgssBanned.text.includes('Spiky-eared Pichu'), JSON.stringify(hgssBanned))
+  const tower4 = await kvOf('tower')
+  const hall4 = await kvOf('hall')
+  // Spot checks against pokeplatinum @ 485c400 (reference/gen4.ts header).
+  check('Tower: Palmer at battles 21 and 49, Single only (battle_tower_trainers.c)', tower4['Silver Print'] === 'battle 21' && tower4['Gold Print'] === 'battle 49' && tower4.Brain === 'Tower Tycoon Palmer · Single Battle streaks only', JSON.stringify(tower4))
+  check('Tower: party 3 / 4 / 2 / 3 by mode (BattleTower_GetPartySizeForChallengeMode)', tower4.Party === 'Single 3 · Double 4 · Multi 2 · Wi-Fi 3', tower4.Party)
+  check('Tower: Single BP 3,3,4,4,5,5,7 and 20 for Palmer’s set (BattleTower_GiveBattlePointsReward)', tower4['BP · Single'] === 'Sets 1–2 → 3 · 3–4 → 4 · 5–6 → 5 · 7 on → 7; the set that beats Palmer → 20', tower4['BP · Single'])
+  check('Hall: 10 battles per set, Argenta at 50 and 170 (HALL_BATTLES_PER_ROUND, HALL_STREAK_*)', hall4.Challenge.startsWith('10 battles per set') && hall4['Silver Print'] === 'battle 50' && hall4['Gold Print'] === 'battle 170', JSON.stringify(hall4))
+  const untraced = await page.$$eval('[data-layout="facility"] dd', (dds) => dds.filter((d) => /not traced/i.test(d.textContent)).length)
+  check('BP the disassembly was not traced for says so (never invented)', untraced >= 4, untraced)
+  check('Gen 4: no Emerald Frontier data requested', frontierRequests.length === 0, frontierRequests.join(', '))
+  await page.screenshot({ path: shot('s1-hgss-light'), fullPage: true })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s1-hgss-dark'), fullPage: true })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await pickGame('platinum')
+  fs4 = await facState()
+  const ptBanned = await page.$eval('[data-layout="frontier-banned"] .bf-sec', (e) => e.textContent)
+  check('Platinum: no HGSS flag, 18 banned species', (await page.$('[data-testid="frontier-hgss-flag"]')) == null && ptBanned === 'Banned species (18)' && fs4.scope === 'Platinum · Gen 4', `${ptBanned} ${fs4.scope}`)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(300)
+  const fit4 = await page.evaluate(() => {
+    const area = document.querySelector('[data-testid="frontier-scroll-area"]').getBoundingClientRect()
+    return [...document.querySelectorAll('[data-layout="facility"], [data-layout="frontier-shared"]')].filter((e) => e.getBoundingClientRect().right > area.right + 1).length
+  })
+  check('390 px Platinum: no facility section runs past the scroll area', fit4 === 0, fit4)
+  await page.screenshot({ path: shot('s1-platinum-narrow') })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await pickGame('diamond-pearl')
+  fs4 = await facState()
+  check('Diamond/Pearl: the explicit "no Frontier" notice, no sections', fs4.status === 'not-in-game' && fs4.notice === 'Diamond and Pearl have no Battle Frontier. Platinum added it.' && fs4.ids.length === 0, JSON.stringify(fs4))
+  await page.screenshot({ path: shot('s1-dp-notice') })
+  await pickGame('platinum')
+  for (const [id, screen, title] of [['frontier-brains', 'brains', 'Brains'], ['frontier-sets', 'sets', 'Sets & Trainers']]) {
+    await openEntry(page, id)
+    await page.waitForSelector(`[data-testid="frontier-${screen}"][data-game="platinum"]`)
+    const st = await page.$eval(`[data-testid="frontier-${screen}"]`, (r) => ({ status: r.dataset.status, notice: r.querySelector('[data-testid="frontier-notice"]')?.textContent }))
+    if (screen === 'sets') check(`Platinum ${screen}: a notice, not a blank`, st.status === 'not-in-game' && st.notice === `${title} covers Emerald only.`, JSON.stringify(st))
+    else check(`Platinum ${screen}: a screen or a notice, never a blank`, st.status === 'ready' || (st.status === 'not-in-game' && !!st.notice), JSON.stringify(st))
+  }
+  await selectGeneration(page, 3)
+  await openEntry(page, 'frontier-facilities')
+  await ready(page, 'facilities')
+  let fs3 = await facState()
+  check('Gen 3: the row offers Ruby/Sapphire, Emerald, FireRed/LeafGreen (no Colosseum/XD) and defaults to Emerald', JSON.stringify(fs3.row) === JSON.stringify(['ruby-sapphire', 'emerald', 'firered-leafgreen']) && fs3.game === 'emerald', JSON.stringify(fs3))
+  // Empty the Frontier loader's cache: a FireRed/LeafGreen screen that called it would fetch again.
+  await page.evaluate(async () => (await import('/pokeapp/src/modules/battle-frontier/data/index.ts')).__resetFrontierCache())
+  const requestsBeforeOtherGames = frontierRequests.filter((u) => u.includes('frontier/emerald')).length
+  await pickGame('ruby-sapphire')
+  fs3 = await facState()
+  check('Ruby/Sapphire: the explicit "no Frontier" notice', fs3.status === 'not-in-game' && fs3.notice === 'Ruby and Sapphire have no Battle Frontier. Emerald added it.', JSON.stringify(fs3))
+  await pickGame('firered-leafgreen')
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-facility="trainer-tower"] .bf-kv > div')].some((r) => r.querySelector('dt').textContent === 'Modes' && /floors/.test(r.querySelector('dd').textContent)))
+  fs3 = await facState()
+  const tt = await kvOf('trainer-tower')
+  check('FireRed/LeafGreen: the Trainer Tower section only', JSON.stringify(fs3.ids) === JSON.stringify(['trainer-tower']) && fs3.scope === 'FireRed and LeafGreen · Gen 3', JSON.stringify(fs3))
+  check('Trainer Tower modes from the Trainer Dex: 8 floors each, 63 trainers (Single 8, Double 16, Knockout 24, Mixed 15)', tt.Modes === 'Single (8 floors, 8 trainers) · Double (8 floors, 16 trainers) · Knockout (8 floors, 24 trainers) · Mixed (8 floors, 15 trainers)', tt.Modes)
+  check('Trainer Tower prizes (trainer_tower_sets.c): Up-Grade, Dragon Scale, Metal Coat, King’s Rock; time is a record only', tt.Single === 'Up-Grade' && tt.Double === 'Dragon Scale' && tt.Knockout === 'Metal Coat' && tt.Mixed === 'King’s Rock' && /record only/.test(tt.Prize), JSON.stringify(tt))
+  await page.screenshot({ path: shot('s1-frlg-light'), fullPage: true })
+  for (const [id, screen] of [['frontier-brains', 'brains'], ['frontier-sets', 'sets']]) {
+    await openEntry(page, id)
+    await page.waitForSelector(`[data-testid="frontier-${screen}"][data-game="firered-leafgreen"]`)
+    const st = await page.$eval(`[data-testid="frontier-${screen}"]`, (r) => ({ status: r.dataset.status, notice: r.querySelector('[data-testid="frontier-notice"]')?.textContent }))
+    check(`FireRed/LeafGreen ${screen}: "no Battle Frontier" notice pointing at the Trainer Tower`, st.status === 'not-in-game' && /no Battle Frontier/.test(st.notice) && /Trainer Tower/.test(st.notice), JSON.stringify(st))
+  }
+  check('Ruby/Sapphire and FireRed/LeafGreen: no Emerald Frontier data requested', frontierRequests.filter((u) => u.includes('frontier/emerald')).length === requestsBeforeOtherGames, frontierRequests.join(', '))
+  await openEntry(page, 'frontier-facilities')
+  await pickGame('emerald')
 
   await selectGeneration(page, 3)
 
@@ -188,10 +285,17 @@ try {
   check('Gen 3: Frontier data was fetched (rules + the Emerald partition)', frontierRequests.some((u) => u.includes('frontier/emerald')) && frontierRequests.some((u) => u.includes('trainers/emerald')), frontierRequests.length)
   await openMock('frontier-facilities.html')
   const facIds = await page.$$eval('[data-layout="facility"]', (els) => els.map((e) => e.dataset.facility))
-  check('7 facility sections, in the mockup order', JSON.stringify(facIds) === JSON.stringify(['tower', 'dome', 'factory', 'palace', 'arena', 'pike', 'pyramid']), facIds.join(','))
+  check('7 facility sections in the mockup order, then Trainer Hill', JSON.stringify(facIds) === JSON.stringify(['tower', 'dome', 'factory', 'palace', 'arena', 'pike', 'pyramid', 'trainer-hill']), facIds.join(','))
   const appFac = await appTexts(page, '[data-layout="facility"]')
   const mockFac = await mockTexts(mock, 2, '[data-layout="facility"]')
-  facIds.forEach((id, i) => same(`${id}: every fact as the mockup`, appFac[i], mockFac[i]))
+  facIds.slice(0, 7).forEach((id, i) => same(`${id}: every fact as the mockup`, appFac[i], mockFac[i]))
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-facility="trainer-hill"] .bf-kv > div')].some((r) => r.querySelector('dt').textContent === 'Modes' && /floors/.test(r.querySelector('dd').textContent)))
+  const hill = await page.$$eval('[data-facility="trainer-hill"] .bf-kv > div', (rows) => Object.fromEntries(rows.map((r) => [r.querySelector('dt').textContent, r.querySelector('dd').textContent])))
+  check('Trainer Hill modes from the Trainer Dex: Normal, Variety, Unique, Expert, 4 floors and 8 trainers each', hill.Modes === 'Normal (4 floors, 8 trainers) · Variety (4 floors, 8 trainers) · Unique (4 floors, 8 trainers) · Expert (4 floors, 8 trainers)', hill.Modes)
+  // pokeemerald src/trainer_hill.c GetPrizeItemId: minutes = timer / 3600.
+  check('Trainer Hill prizes by time: <12 grand prize, 12 Ether, 13 Max Potion, 14–15 Revive, 16–17 Fluffy Tail, 18+ Great Ball', hill['12 min'] === 'Ether' && hill['13 min'] === 'Max Potion' && hill['14–15 min'] === 'Revive' && hill['16–17 min'] === 'Fluffy Tail' && hill['18 min or more'] === 'Great Ball' && /grand prize/.test(hill['Under 12 min']), JSON.stringify(hill))
+  check('Trainer Hill: Double Battles against two trainers, timer stops at 59:59.98', hill.Format === 'Double Battle against two trainers' && hill.Timer === 'Stops at 59:59.98', JSON.stringify(hill))
+  await page.screenshot({ path: shot('s1-emerald-light'), fullPage: true })
   for (const region of ['frontier-symbols', 'frontier-levels', 'frontier-banned', 'frontier-bp-rules', 'frontier-bp-shop']) {
     same(`shared: ${region} as the mockup`, (await appTexts(page, `[data-layout="${region}"]`))[0], (await mockTexts(mock, 2, `[data-layout="${region}"]`))[0])
   }
@@ -527,7 +631,7 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1000 })
 
-  // ================================================================ 10. BACK TO GEN 4
+  // ================================================================ 10. BACK TO GEN 2
   hr('10. BACK TO ANOTHER GENERATION: the notice again, nothing new fetched')
   // Empty the loader's in-memory cache first, or a screen that ignored the
   // generation would still fetch nothing and this would prove nothing.
@@ -539,11 +643,11 @@ try {
   })
   check('the app’s loader cache (it held the data) is emptied first', reset.had && !reset.now, JSON.stringify(reset))
   const fetchedBefore = frontierRequests.length
-  await selectGeneration(page, 4)
+  await selectGeneration(page, 2)
   for (const [id, screen] of [['frontier-facilities', 'facilities'], ['frontier-brains', 'brains'], ['frontier-sets', 'sets']]) {
     await openEntry(page, id)
     const st = await page.$eval(`[data-testid="frontier-${screen}"]`, (r) => r.dataset.status)
-    check(`[gen 4 again] ${screen}: the notice`, st === 'other-generation', st)
+    check(`[gen 2 again] ${screen}: the notice`, st === 'other-generation', st)
   }
   check('no request after leaving Gen 3', frontierRequests.length === fetchedBefore, `${fetchedBefore} -> ${frontierRequests.length}`)
 
@@ -562,8 +666,9 @@ try {
   const moduleFiles = readdirSync(new URL('../src/modules/battle-frontier/', import.meta.url)).filter((f) => /\.(tsx?|css)$/.test(f))
   const moduleSrc = moduleFiles.map((f) => read(`src/modules/battle-frontier/${f}`)).join('\n')
   check(
-    `no generation or game selector of its own in any of the module's ${moduleFiles.length} files (no fifth exception)`,
-    moduleFiles.length >= 10 && !/setGeneration|gen-select|useGameInGeneration|GameRow|VersionGroupSelector|setVersionGroup/.test(moduleSrc),
+    // The game row is the Trainer Dex's in-generation pattern (root CLAUDE.md: not an exception): it picks a game, never a generation.
+    `no generation selector of its own in any of the module's ${moduleFiles.length} files (no fifth exception); the game row is useGameInGeneration's`,
+    moduleFiles.length >= 10 && !/setGeneration|gen-select|VersionGroupSelector/.test(moduleSrc) && /useGameInGeneration\('frontier'/.test(moduleSrc),
   )
 
   hr('CONSOLE')
