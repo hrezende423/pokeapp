@@ -48,7 +48,7 @@
 
 .bf-page {
   display: grid;
-  grid-template-areas: 'game' 'head' 'body';
+  grid-template-areas: 'head' 'body';
   gap: var(--space-8);
   padding: var(--space-6) 0;
   min-width: 0;
@@ -88,15 +88,17 @@
 .bf-game {
   grid-area: game;
 }
+/* Only a page that shows the row gets its track: an empty one would still take a gap. */
+.bf-page:has(> .bf-game) {
+  grid-template-areas: 'game' 'head' 'body';
+}
 /* The Challenge Tracker's screens own their page grid: the row sits above it. */
 .bf-game-out {
   padding-top: var(--space-6);
 }
-/* A flag on the data's provenance: muted prose, a hairline under it. */
+/* A flag on the data's provenance: muted prose (no hairline: it sits in gapped grids). */
 .bf-flag {
   color: var(--color-text-muted);
-  padding-bottom: var(--space-4);
-  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
 }
 
 /* ------------------------------------------------------------ type */

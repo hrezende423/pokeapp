@@ -18,7 +18,10 @@
  *   your highest level; TRAINER_TOWER_MAX_TIME 215999; GiveChallengePrize: the
  *   first floor's prize, once per data set; CheckFinalTime: time is a record,
  *   not a prize threshold); src/trainer_tower_sets.c (the prizes).
- * - Bulbapedia (prose): the entry requirements.
+ * - Bulbapedia (prose): the entry requirements; the Hill's "no healing between
+ *   floors". The Hill's own code comment says it cannot be entered before the
+ *   Hall of Fame; GetPrizeItemId's FLAG_SYS_GAME_CLEAR check serves the Japanese
+ *   release, which is not gated, and picks the prize list.
  */
 
 import type { Facility, FacilityTrainer } from '../../../data/trainers'

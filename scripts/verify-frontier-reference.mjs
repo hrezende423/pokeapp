@@ -175,6 +175,8 @@ try {
       }))
       const want = gen === 'all' ? 'Pick a generation in the account menu. This tab covers Emerald, FireRed and LeafGreen, Platinum, and HeartGold and SoulSilver.' : 'No Battle Frontier in Gen 2. This tab covers Emerald, FireRed and LeafGreen, Platinum, and HeartGold and SoulSilver.'
       check(`[gen ${gen}] ${screen}: only the head and the notice`, s.status === 'other-generation' && s.notice === want && s.body.length === 2 && !s.scope, JSON.stringify(s))
+      const areas = await page.$eval(`[data-testid="frontier-${screen}"] .bf-page`, (p) => getComputedStyle(p).gridTemplateAreas)
+      check(`[gen ${gen}] ${screen}: no empty game track above the head`, !/game/.test(areas), areas)
     }
   }
   check('no Frontier data was requested under Gen 2 or All', frontierRequests.length === 0, frontierRequests.join(', '))
@@ -213,10 +215,19 @@ try {
   // Spot checks against pokeplatinum @ 485c400 (reference/gen4.ts header).
   check('Tower: Palmer at battles 21 and 49, Single only (battle_tower_trainers.c)', tower4['Silver Print'] === 'battle 21' && tower4['Gold Print'] === 'battle 49' && tower4.Brain === 'Tower Tycoon Palmer · Single Battle streaks only', JSON.stringify(tower4))
   check('Tower: party 3 / 4 / 2 / 3 by mode (BattleTower_GetPartySizeForChallengeMode)', tower4.Party === 'Single 3 · Double 4 · Multi 2 · Wi-Fi 3', tower4.Party)
-  check('Tower: Single BP 3,3,4,4,5,5,7 and 20 for Palmer’s set (BattleTower_GiveBattlePointsReward)', tower4['BP · Single'] === 'Sets 1–2 → 3 · 3–4 → 4 · 5–6 → 5 · 7 on → 7; the set that beats Palmer → 20', tower4['BP · Single'])
+  check('Tower: BP 3,3,4,4,5,5,7 for Single, Double and NPC Multi; 20 for Palmer’s set (BattleTower_GiveBattlePointsReward)', tower4['BP · Single, Double, Multi'] === 'Sets 1–2 → 3 · 3–4 → 4 · 5–6 → 5 · 7 on → 7; the set that beats Palmer pays 20 instead (Single only)', tower4['BP · Single, Double, Multi'])
+  const factory4 = await kvOf('factory')
+  const arcade4 = await kvOf('arcade')
+  check('Factory: 5,5,5,5,7,7,8,9 (BattleFactory_GetEarnedBP), Thorton’s sets 20; Double party 3', factory4['BP · Single, Double'] === 'Sets 1–4 → 5 · 5–6 → 7 · 7 → 8 · 8 on → 9; sets 3 and 7 (Thorton) pay 20 instead (Single only)' && factory4.Party.startsWith('Single, Double: 3'), JSON.stringify(factory4))
+  check('Hall: Single/Double 18-entry table ending 12; link Multi always 12 (BattleHall_GetEarnedBP)', /^Sets 1–3 → 1 · 4–6 → 2 · 7–9 → 3 · 10–11 → 4 · 12–13 → 6 · 14–15 → 8 · 16–17 → 10 · 18 on → 12; sets 5 and 17/.test(hall4['BP · Single, Double']) && hall4['BP · Multi'] === 'Always 12', JSON.stringify(hall4))
+  check('Arcade: Multi 7,8,9,10,13,14,16,17 (BattleArcade_GetEarnedBP)', arcade4['BP · Multi'] === 'Sets 1 → 7 · 2 → 8 · 3 → 9 · 4 → 10 · 5 → 13 · 6 → 14 · 7 → 16 · 8 on → 17', arcade4['BP · Multi'])
   check('Hall: 10 battles per set, Argenta at 50 and 170 (HALL_BATTLES_PER_ROUND, HALL_STREAK_*)', hall4.Challenge.startsWith('10 battles per set') && hall4['Silver Print'] === 'battle 50' && hall4['Gold Print'] === 'battle 170', JSON.stringify(hall4))
+  const hallRule = await page.$eval('[data-facility="hall"] .bf-rule', (e) => e.textContent)
+  check('Hall: 17 type panels in Gen 4 (no Fairy): 17 × rank 10 = 170', /17 panels/.test(hallRule) && !/18/.test(hallRule), hallRule)
+  const gap = await page.$eval('.bf-page', (p) => getComputedStyle(p).gridTemplateAreas)
+  check('the page grid has a game track only when the row is shown', /game/.test(gap), gap)
   const untraced = await page.$$eval('[data-layout="facility"] dd', (dds) => dds.filter((d) => /not traced/i.test(d.textContent)).length)
-  check('BP the disassembly was not traced for says so (never invented)', untraced >= 4, untraced)
+  check('every Gen 4 BP table is traced: no "not traced" row left', untraced === 0, untraced)
   check('Gen 4: no Emerald Frontier data requested', frontierRequests.length === 0, frontierRequests.join(', '))
   await page.screenshot({ path: shot('s1-hgss-light'), fullPage: true })
   await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
@@ -253,7 +264,13 @@ try {
   let fs3 = await facState()
   check('Gen 3: the row offers Ruby/Sapphire, Emerald, FireRed/LeafGreen (no Colosseum/XD) and defaults to Emerald', JSON.stringify(fs3.row) === JSON.stringify(['ruby-sapphire', 'emerald', 'firered-leafgreen']) && fs3.game === 'emerald', JSON.stringify(fs3))
   // Empty the Frontier loader's cache: a FireRed/LeafGreen screen that called it would fetch again.
-  await page.evaluate(async () => (await import('/pokeapp/src/modules/battle-frontier/data/index.ts')).__resetFrontierCache())
+  const reset2b = await page.evaluate(async () => {
+    const m = await import('/pokeapp/src/modules/battle-frontier/data/index.ts')
+    const had = m.peekFrontierData(3) != null
+    m.__resetFrontierCache()
+    return { had, now: m.peekFrontierData(3) != null }
+  })
+  check('the app’s Frontier loader cache (it held Emerald’s data) is emptied before the other Gen 3 games', reset2b.had && !reset2b.now, JSON.stringify(reset2b))
   const requestsBeforeOtherGames = frontierRequests.filter((u) => u.includes('frontier/emerald')).length
   await pickGame('ruby-sapphire')
   fs3 = await facState()

@@ -25,11 +25,23 @@
  * - pokeheartgold @ 4e9563397ab4e5c407271472935f9e270ac6a804: src/pokemon.c
  *   IsPokemonBannedFromBattleFrontier (the same 18, plus Spiky-eared Pichu).
  * - Bulbapedia (CC; prose only, where the code did not settle it): the entry
- *   requirements, the Tower's level-50 rule, the Hall's type ranks and level
- *   scaling, Castle Points, Thorton's and Argenta's Pokémon.
+ *   requirements, the Tower's level-50 rule, the Factory's swap after a win, the
+ *   Hall's type ranks and level scaling (17 types in Gen 4: no Fairy, so
+ *   HALL_MAX_TYPE_RANK 10 × 17 = the Gold Print's battle 170), Castle Points,
+ *   Thorton's and Argenta's Pokémon.
  *
- * NOT TRACED, AND SAID SO ON SCREEN (never invented): Battle Points for the
- * Factory, Hall, Castle and Arcade, and for the Tower's Double and Multi.
+ * BATTLE POINTS (GEN4_BP): BattleTower_GiveBattlePointsReward (src/battle_tower.c
+ * L706-743: Double and the NPC Multi take the Single table); src/overlay104/
+ * battle_factory.c BattleFactory_GetEarnedBP L527-556 (Lv50 and Open pay the same),
+ * battle_hall.c BattleHall_GetEarnedBP L339-368, battle_castle.c
+ * BattleCastle_GetEarnedBP L706-735, battle_arcade.c BattleArcade_GetEarnedBP
+ * L1318-1347. The script raises the streak, then the round, then reads the table,
+ * so set k pays table[k - 1], repeating the last entry after. A Brain set (Single
+ * only, keyed on the streak) pays 20 INSTEAD. Double party: 3 in the Factory,
+ * Castle and Arcade (*_helpers.c GetPlayerPartySize: DOUBLE shares SINGLE's case).
+ *
+ * NOT TRACED: the Arcade board's free-BP amounts (the screen names its +1 and
+ * +3 squares only).
  *
  * HEARTGOLD/SOULSILVER: every value here is Platinum's. Only the banned list was
  * checked in pokeheartgold; the rest is the flagged "reuses Platinum,
@@ -59,7 +71,41 @@ export interface Gen4Facility {
   bp: [string, string][]
 }
 
-const NOT_TRACED = 'Not traced from the disassembly yet'
+/**
+ * A BP table as runs of equal awards: [3,3,4,4,5,5,7] -> "Sets 1–2 → 3 · 3–4 → 4 ·
+ * 5–6 → 5 · 7 on → 7". The games read `table[set - 1]` and repeat the last entry
+ * from the end of the table on (each GetEarnedBP clamps the round to the table).
+ */
+export function bpRuns(table: readonly number[]): string {
+  const runs: { from: number; to: number; v: number }[] = []
+  table.forEach((v, i) => {
+    const last = runs.at(-1)
+    if (last?.v === v) last.to = i + 1
+    else runs.push({ from: i + 1, to: i + 1, v })
+  })
+  return (
+    'Sets ' +
+    runs
+      .map((r, i) =>
+        i === runs.length - 1 ? `${r.from} on → ${r.v}` : r.from === r.to ? `${r.from} → ${r.v}` : `${r.from}–${r.to} → ${r.v}`,
+      )
+      .join(' · ')
+  )
+}
+
+/** The BP tables (pokeplatinum, per facility; see the header). */
+export const GEN4_BP = {
+  towerSolo: [3, 3, 4, 4, 5, 5, 7],
+  towerLinkMulti: [8, 9, 11, 12, 14, 15, 18],
+  factorySolo: [5, 5, 5, 5, 7, 7, 8, 9],
+  factoryMulti: [10, 11, 12, 13, 16, 17, 19, 21],
+  hallSolo: [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 6, 6, 8, 8, 10, 10, 12],
+  hallWifiMulti: [6, 6, 6, 8, 8, 8, 10, 10, 10, 12, 12, 14, 15, 17, 17, 20, 20, 23],
+  castleSolo: [3, 3, 4, 4, 5, 5, 7, 7],
+  castleMulti: [8, 9, 11, 12, 14, 15, 18, 18],
+  arcadeSolo: [2, 2, 2, 2, 4, 4, 5, 6],
+  arcadeMulti: [7, 8, 9, 10, 13, 14, 16, 17],
+} as const
 
 export const GEN4_FACILITY_ORDER: readonly Gen4FacilityId[] = ['tower', 'factory', 'hall', 'castle', 'arcade']
 
@@ -77,29 +123,32 @@ export const GEN4_FACILITIES: readonly Gen4Facility[] = [
     brainWhen: 'Single Battle streaks only',
     brainTeam: 'Fixed (see the Trainer Dex)',
     bp: [
-      ['BP · Single', 'Sets 1–2 → 3 · 3–4 → 4 · 5–6 → 5 · 7 on → 7; the set that beats Palmer → 20'],
-      ['BP · Link Multi', 'Sets 1 → 8 · 2 → 9 · 3 → 11 · 4 → 12 · 5 → 14 · 6 → 15 · 7 on → 18'],
+      ['BP · Single, Double, Multi', bpRuns(GEN4_BP.towerSolo) + '; the set that beats Palmer pays 20 instead (Single only)'],
+      ['BP · Link Multi', bpRuns(GEN4_BP.towerLinkMulti)],
       ['BP · Wi-Fi', 'By rank 1–10: 3 · 4 · 5 · 6 · 7 · 8 · 9 · 10 · 10 · 10'],
-      ['BP · Double, Multi', NOT_TRACED],
     ],
   },
   {
     id: 'factory',
     name: 'Battle Factory',
-    rule: 'Seven battles per set with rental Pokémon: pick three of six, and after each win you may swap one for one of the beaten trainer’s.',
-    party: '3 rentals of 6 offered · 2 each in Multi',
+    rule: 'Seven battles per set with rental Pokémon chosen from six offered; after each win you may swap one for one of the beaten trainer’s.',
+    party: 'Single, Double: 3 rentals of 6 offered · Multi: 2 each',
     challenge: '7 battles per set; the streak counts battles',
     level: 'Level 50 or Open Level',
     brain: { title: 'Factory Head', name: 'Thorton' },
     silver: 21,
     gold: 49,
     brainTeam: 'Rentals, drawn like yours: no fixed team',
-    bp: [['BP', NOT_TRACED]],
+    bp: [
+      ['BP · Single, Double', bpRuns(GEN4_BP.factorySolo) + '; sets 3 and 7 (Thorton) pay 20 instead (Single only)'],
+      ['BP · Multi', bpRuns(GEN4_BP.factoryMulti)],
+      ['Level 50, Open Level', 'Same award'],
+    ],
   },
   {
     id: 'hall',
     name: 'Battle Hall',
-    rule: 'One Pokémon of level 30 or higher against one opponent of a type you pick from 18 panels. Each type has its own rank, 1 to 10; a win raises it, and a type at rank 10 cannot be picked again.',
+    rule: 'One Pokémon of level 30 or higher against one opponent of a type you pick from 17 panels, one per type. Each type has its own rank, 1 to 10; a win raises it, and a type at rank 10 cannot be picked again (17 × 10 = the Gold Print’s 170).',
     party: '1 Pokémon, level 30 or higher',
     challenge: '10 battles per set; the streak counts battles',
     level: 'Opponents rise with the type’s rank and with how many types are at rank 2 or higher, up to your Pokémon’s level',
@@ -107,13 +156,17 @@ export const GEN4_FACILITIES: readonly Gen4Facility[] = [
     silver: 50,
     gold: 170,
     brainTeam: 'One Pokémon from your Pokémon’s base-stat group, at its level: no fixed team',
-    bp: [['BP', NOT_TRACED]],
+    bp: [
+      ['BP · Single, Double', bpRuns(GEN4_BP.hallSolo) + '; sets 5 and 17 (Argenta) pay 20 instead (Single only)'],
+      ['BP · Multi', 'Always 12'],
+      ['BP · Wi-Fi Multi', bpRuns(GEN4_BP.hallWifiMulti)],
+    ],
   },
   {
     id: 'castle',
     name: 'Battle Castle',
     rule: 'Seven battles per set with your own Pokémon, paid for in Castle Points: healing, rented held items, a look at the opponent and its level, all cost CP.',
-    party: '3 · 2 each in Multi',
+    party: 'Single, Double 3 · Multi 2 each',
     challenge: '7 battles per set; the streak counts battles',
     level: 'Level 50 cap',
     brain: { title: 'Castle Valet', name: 'Darach' },
@@ -124,13 +177,16 @@ export const GEN4_FACILITIES: readonly Gen4Facility[] = [
       'Castle Points',
       '10 CP when a streak starts; each win pays CP for the HP, PP and Pokémon left (up to 50). Spend them on healing, rented items, the opponent’s team, or its level ±5. Three ranks: healing, rentals, information.',
     ],
-    bp: [['BP', NOT_TRACED]],
+    bp: [
+      ['BP · Single, Double', bpRuns(GEN4_BP.castleSolo) + '; sets 3 and 7 (Darach) pay 20 instead (Single only)'],
+      ['BP · Multi', bpRuns(GEN4_BP.castleMulti)],
+    ],
   },
   {
     id: 'arcade',
     name: 'Battle Arcade',
     rule: 'Seven battles per set. Before each one a game board stops on one of 32 effects that changes the battle.',
-    party: '3 · 2 each in Multi',
+    party: 'Single, Double 3 · Multi 2 each',
     challenge: '7 battles per set; the streak counts battles',
     level: 'Level 50 cap',
     brain: { title: 'Arcade Star', name: 'Dahlia' },
@@ -141,7 +197,10 @@ export const GEN4_FACILITIES: readonly Gen4Facility[] = [
       'Game board',
       '32 effects in 4 groups: to either side (HP lowered, a status, a Berry or item, a level up); the field (sun, rain, sandstorm, hail, fog, Trick Room); and bonuses (cursor speed, a Pokémon swap, +1 or +3 BP, a skipped battle, or no event).',
     ],
-    bp: [['BP', 'The board’s +1 and +3 BP squares; the per-set award is not traced yet']],
+    bp: [
+      ['BP · Single, Double', bpRuns(GEN4_BP.arcadeSolo) + '; sets 3 and 7 (Dahlia) pay 20 instead (Single only)'],
+      ['BP · Multi', bpRuns(GEN4_BP.arcadeMulti)],
+    ],
   },
 ]
 
