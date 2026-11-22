@@ -127,9 +127,9 @@ function PikeBody() {
           options={[
             {
               value: 'off',
-              label: 'Off: first hallway, or party fully healed when you left the last room',
+              label: 'Off: first hallway or party full',
             },
-            { value: 'on', label: 'On: someone is hurt, has a status or is missing PP' },
+            { value: 'on', label: 'On: someone needs healing' },
           ]}
           value={healingOff ? 'off' : 'on'}
           data-testid="pike-healing"
