@@ -1,8 +1,8 @@
 # Result: Generation selection persists
 
-2026-11-18. Replaces the previous result; history is in git.
+2026-11-22. Replaces the previous result; history is in git.
 
-Branch `feature/persist-generation` (from `main`), not committed.
+Branch `feature/persist-generation`, PR #32. Published on the preview repo.
 
 ## What changed
 

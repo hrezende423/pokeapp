@@ -312,56 +312,42 @@
   align-items: baseline;
   column-gap: var(--space-4);
 }
-.bf-pyr-strip {
+/* The open floor's head: the floor, its round, and Next floor at the top (never a scroll away). */
+.bf-pyr-head.bf-pyr-head-next {
   display: grid;
-  grid-template-areas: 'modes' 'pane';
-  row-gap: var(--space-4);
+  grid-template-areas: 'title label next';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
 }
 
-/* Wild / Trainer / Item: three big ghost buttons; the chosen one carries a neutral underbar, never the accent. */
-.bf-pyr-modes {
-  grid-area: modes;
+/* Wild · Trainer · Item side by side, no tabs. One grid with shared rows, so each
+   column's heading, quick picks, search and list line up with the other two. */
+.bf-pyr-cols {
   display: grid;
-  grid-template-areas: 'wild trainer item';
+  grid-template-areas:
+    'wild-head trainer-head item-head'
+    'wild-picks trainer-acts item-picks'
+    'wild-search trainer-search item-search'
+    'wild-list trainer-list item-list';
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-width: calc(var(--space-16) * 8);
-  border-bottom: var(--border-width-thin) solid var(--color-border-hairline);
+  gap: var(--space-4) var(--space-8);
+  align-items: start;
 }
-.bf-pyr-mode {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  column-gap: var(--space-2);
-  min-height: var(--space-12);
-  padding: 0 var(--space-3);
-  font: inherit;
-  letter-spacing: inherit;
-  font-size: var(--font-style-label-size);
-  color: var(--color-text-muted);
-  background: none;
-  border: 0;
-  border-bottom: var(--border-width-thick) solid transparent;
-  margin-bottom: calc(-1 * var(--border-width-thin));
-  cursor: pointer;
+/* The category chooser, while open, spans all three columns. */
+.bf-pyr-cols.bf-pyr-cols-cats {
+  grid-template-areas:
+    'wild-head trainer-head item-head'
+    'cats cats cats'
+    'wild-picks trainer-acts item-picks'
+    'wild-search trainer-search item-search'
+    'wild-list trainer-list item-list';
 }
-.bf-pyr-mode:hover:not([aria-pressed='true']) {
-  color: var(--color-text-default);
-}
-.bf-pyr-mode[aria-pressed='true'] {
-  color: var(--color-text-default);
-  border-bottom-color: var(--color-text-default);
-}
-.bf-pyr-mode svg {
-  flex: none;
-}
-
-.bf-pyr-pane {
-  grid-area: pane;
-  display: grid;
-  row-gap: var(--space-4);
+.bf-pyr-cols > * {
   min-width: 0;
 }
-.bf-pyr-pane > * {
+.bf-pyr-cell {
+  display: grid;
+  row-gap: var(--space-2);
   min-width: 0;
 }
 .bf-pyr-catline {
@@ -394,10 +380,10 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* One-tap picks: a sprite, the name, the count so far. */
+/* One-tap picks: a sprite, the name, the count so far. At least two a row in a third of the floor. */
 .bf-pyr-picks {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-16) * 2 + var(--space-8)), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-16) * 2), 1fr));
   gap: var(--space-1) var(--space-4);
 }
 .bf-pyr-pick {
@@ -422,13 +408,18 @@
   flex: none;
 }
 
-.bf-pyr-trainer {
-  grid-template-areas:
-    'pick lost'
-    'more more';
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: var(--space-4);
-  align-items: end;
+/* Lost, Lost to another and More on one line, wrapping in a narrow column. */
+.bf-actions.bf-pyr-tacts {
+  grid-area: auto;
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
+}
+/* Text on the column's edges: Lost flush with the column's left, Next floor with the floor's right. */
+.bf-pyr-tacts > .bf-ghost:first-child {
+  padding-left: 0;
+}
+.bf-pyr-head-next .bf-ghost {
+  padding-right: 0;
 }
 .bf-pyr-more {
   display: grid;
@@ -439,15 +430,11 @@
   align-items: center;
   column-gap: var(--space-1);
 }
+/* For, Trainer, Set: stacked in source order, the column being a third of the floor. */
 .bf-pyr-more-fields {
   display: grid;
-  grid-template-areas: 'trainer set';
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: var(--space-4);
-}
-.bf-pyr-more-fields.bf-pyr-more-which {
-  grid-template-areas: 'which trainer set';
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--space-2);
 }
 .bf-pyr-more-fields > * {
   min-width: 0;
@@ -474,17 +461,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* The floor's entries: three lists; each row's hairline is its own, no row gap. */
-.bf-pyr-entries {
-  display: grid;
-  grid-template-areas: 'trainers wild items';
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: var(--space-8);
-  align-items: start;
-}
-.bf-pyr-entries > * {
-  min-width: 0;
-}
+/* The floor's entries, one list at the foot of each column; each row's hairline is its own, no row gap. */
 .bf-pyr-list {
   margin: 0;
   padding: 0;
@@ -520,9 +497,7 @@
 
 .bf-pyr-actions {
   display: grid;
-  grid-template-areas:
-    'note next'
-    'retire retire';
+  grid-template-areas: 'note retire';
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3) var(--space-4);
   align-items: end;
@@ -571,24 +546,23 @@
   .bf-run-head.bf-run-head-pyr {
     grid-template-areas: 'back' 'title' 'facts' 'totals';
   }
-  .bf-pyr-entries {
-    grid-template-areas: 'trainers' 'wild' 'items';
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-4);
+  .bf-pyr-head.bf-pyr-head-next {
+    grid-template-areas: 'title next' 'label label';
+    grid-template-columns: minmax(0, 1fr) auto;
   }
-  .bf-pyr-trainer {
-    grid-template-areas: 'pick' 'lost' 'more';
+  /* One column after another: Wild, then Trainer, then Item. */
+  .bf-pyr-cols {
+    grid-template-areas:
+      'wild-head' 'wild-picks' 'wild-search' 'wild-list'
+      'trainer-head' 'trainer-acts' 'trainer-search' 'trainer-list'
+      'item-head' 'item-picks' 'item-search' 'item-list';
     grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-2);
   }
-  .bf-pyr-more-fields {
-    grid-template-areas: 'trainer' 'set';
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-2);
-  }
-  .bf-pyr-more-fields.bf-pyr-more-which {
-    grid-template-areas: 'which' 'trainer' 'set';
-    grid-template-columns: minmax(0, 1fr);
+  .bf-pyr-cols.bf-pyr-cols-cats {
+    grid-template-areas:
+      'wild-head' 'cats' 'wild-picks' 'wild-search' 'wild-list'
+      'trainer-head' 'trainer-acts' 'trainer-search' 'trainer-list'
+      'item-head' 'item-picks' 'item-search' 'item-list';
   }
   .bf-pyr-brain {
     grid-template-areas: 'title' 's1' 's2' 's3' 'lost' 'cap';
@@ -599,7 +573,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .bf-pyr-actions {
-    grid-template-areas: 'note' 'next' 'retire';
+    grid-template-areas: 'note' 'retire';
     grid-template-columns: minmax(0, 1fr);
   }
   .bf-pyr-actions .bf-retire {
