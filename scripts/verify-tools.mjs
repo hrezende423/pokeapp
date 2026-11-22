@@ -1318,7 +1318,22 @@ try {
     const attackers = pm.palaceOdds('adamant', ['tackle', 'ember'].map(pmv), false)
     const bug = pm.palaceOdds('adamant', ['growl', 'leer', 'swords-dance'].map(pmv), false)
     const low = pm.palaceOdds('adamant', ['tackle', 'swords-dance', 'growl'].map(pmv), true)
+    // Rechecked against pokeemerald @ 9103e52 (2026-11-22).
+    const r6 = (x) => Math.round(x * 1e6) / 1e6
+    const fb = (o) => [...o.fallback].map(([k, v]) => `${d.getMove(k).name}:${r6(v)}`).sort().join(',')
+    const odds = (n, ms, lo) => {
+      const o = pm.palaceOdds(n, ms.map(pmv), lo)
+      return [o.groups.map((g) => g.chance).join(','), fb(o), r6(o.idle)]
+    }
     return {
+      recheck: {
+        a: odds('hasty', ['tackle', 'swords-dance'], true),
+        b: odds('bashful', ['tackle', 'ember', 'growl'], false),
+        c: odds('hardy', ['growl', 'leer'], false),
+        d: odds('lax', ['swords-dance', 'protect', 'tackle'], true),
+        e: odds('calm', ['tackle', 'ember', 'swords-dance', 'protect'], false),
+        f: [pm.palaceOdds('xyz', [pmv('tackle')], false), pm.palaceOdds('adamant', [], false)],
+      },
       api,
       groups: ['tackle', 'swords-dance', 'protect', 'growl', 'spikes', 'counter', 'earthquake', 'haze', 'curse'].map(grp).join(','),
       full: [full.groups.map((g) => g.chance).join(','), full.fallback.size, full.idle],
@@ -1333,6 +1348,13 @@ try {
   check('no Defense or Support move: those 62% fall back to the attacks, half of it idle', pal.attackers[0] === '0.155,0.155' && pal.attackers[1] === 0.31, JSON.stringify(pal.attackers))
   check('the Support-count bug: two Support moves are not preferred, so Swords Dance is in the fallback', pal.bug[0] === 'growl,leer,swords-dance' && pal.bug[1] === 0.19, JSON.stringify(pal.bug))
   check('at or below half HP the second pair applies (Adamant Attack 70)', pal.low === '0.7,0.15,0.15', pal.low)
+  const rc = pal.recheck
+  check('Hasty at low HP, Tackle + Swords Dance: 88/6/6; the empty Support 6% falls back to both, 1.5% each, 3% idle', JSON.stringify(rc.a) === '["0.88,0.06,0.06","swords-dance:0.015,tackle:0.015",0.03]', JSON.stringify(rc.a))
+  check('Bashful, two attacks + Growl: 30/58/12; two attacks make the fallback the attacks only, 14.5% each, 29% idle', JSON.stringify(rc.b) === '["0.3,0.58,0.12","ember:0.145,tackle:0.145",0.29]', JSON.stringify(rc.b))
+  check('Hardy, Growl + Leer only: Attack and Defense both empty, 17% each through the fallback, 34% idle', JSON.stringify(rc.c) === '["0.61,0.07,0.32","growl:0.17,leer:0.17",0.34]', JSON.stringify(rc.c))
+  check('Lax at low HP, two Defense moves + Tackle: the fallback is the Defense pair, 16.25% each, no Tackle, 32.5% idle', JSON.stringify(rc.d) === '["0.29,0.06,0.65","protect:0.1625,swords-dance:0.1625",0.325]', JSON.stringify(rc.d))
+  check('Calm, two attacks + two Defense moves: both pairs count, so all four fall back, 1.25% each, 5% idle', JSON.stringify(rc.e) === '["0.4,0.5,0.1","ember:0.0125,protect:0.0125,swords-dance:0.0125,tackle:0.0125",0.05]', JSON.stringify(rc.e))
+  check('an unknown nature or no moves gives no odds', rc.f[0] === null && rc.f[1] === null, JSON.stringify(rc.f))
 
   await selectGeneration(page, 3)
   await page.evaluate(() => document.querySelector('[data-testid="nav-trainerdex"]').click())
@@ -1368,7 +1390,21 @@ try {
     const draw = am.judge(same, same)
     const body = am.judge(side([], [], 2, 3), side([], [], 199, 300))
     const stopped = am.judge(side(['thunderbolt'], ['no-effect'], 100, 100, 1), side([], [], 100))
+    // Rechecked against pokeemerald @ 9103e52 (2026-11-22).
+    const j = (x) => [x.mind.join('/'), x.skill.join('/'), x.body.join('/'), x.total.join('-'), x.result]
     return {
+      recheck: {
+        g: j(am.judge(
+          side(['tackle', 'tackle', 'thunder-wave'], ['mixed', 'blocked', 'failed-status'], 50),
+          side(['detect', 'endure', 'fake-out'], ['protected-self', 'hit', 'resisted'], 50),
+        )),
+        h: j(am.judge(side([], [], 100, 201), side([], [], 1, 2))),
+        i: j(am.judge(side([null, null, null], ['no-effect', 'no-effect', 'no-effect'], 100), side([null], ['no-effect'], 100, 100, 1))),
+        j: j(am.judge(side(['tackle'], ['hit'], 100), side(['swords-dance'], ['hit'], 100))),
+        k: ['counter', 'mirror-coat', 'bide', 'thunder-wave', 'struggle'].map((n) => am.mindRating(id(n))).join(','),
+        help: am.STOPPED_HELP,
+        labels: [am.SKILL_LABEL.hit, am.SKILL_LABEL['no-effect']],
+      },
       counts: [entries.length, entries.filter((x) => x < 0).length],
       ratings: ['tackle', 'protect', 'detect', 'endure', 'fake-out', 'swords-dance', 'thunderbolt'].map((n) => am.mindRating(id(n))).join(','),
       win: [win.mind.join('/'), win.skill.join('/'), win.body.join('/'), win.total.join('-'), win.result],
@@ -1383,6 +1419,15 @@ try {
   check('identical turns are a draw, 3-3 -- both are knocked out', JSON.stringify(arn.draw) === '["3-3","draw"]', JSON.stringify(arn.draw))
   check('Body is a whole percentage: 2/3 and 199/300 are both 66, a tie', JSON.stringify(arn.body) === '["66/66","tie/tie"]', JSON.stringify(arn.body))
   check('a move stopped by an ability costs 3 on top of its result (-2 - 3)', arn.stopped === -5, String(arn.stopped))
+  const ac = arn.recheck
+  check('mixed / blocked / failed status against Detect / Endure / Fake Out: Mind 2/-3, Skill -1/0, Body tie, a 3-3 draw', JSON.stringify(ac.g) === '["2/-3","-1/0","50/50","3-3","draw"]', JSON.stringify(ac.g))
+  check('Body truncates: 100/201 is 49, 1/2 is 50, so the opponent wins 4-2', JSON.stringify(ac.h) === '["0/0","0/0","49/50","2-4","opponent"]', JSON.stringify(ac.h))
+  check('three misses (-6) lose Skill to one miss stopped by an ability (-2 - 3 = -5)', JSON.stringify(ac.i) === '["0/0","-6/-5","100/100","2-4","opponent"]', JSON.stringify(ac.i))
+  check('Tackle against Swords Dance, both working: Mind 1/0, Skill 1/1, 4-2', JSON.stringify(ac.j) === '["1/0","1/1","100/100","4-2","you"]', JSON.stringify(ac.j))
+  check('  Counter, Mirror Coat, Bide, Thunder Wave rate 0; Struggle 1', ac.k === '0,0,0,0,1', ac.k)
+  check('the stopped-by-an-ability help: Flash Fire is "Worked" and stopped; Levitate is only a miss', ac.labels[0].startsWith('Worked') && ac.labels[1] === 'Missed or had no effect'
+    && ac.help.includes('Flash Fire is “Worked” and stopped') && ac.help.includes('Levitate (“makes Ground moves miss”) is only a miss, not stopped')
+    && ac.help.includes('Volt Absorb or Water Absorb at full HP (“made it useless”) is “Missed or had no effect” and stopped'), ac.help)
 
   await selectGeneration(page, 3)
   await page.evaluate(() => document.querySelector('[data-testid="nav-trainerdex"]').click())
@@ -1402,6 +1447,8 @@ try {
   const arnResult = await page.$eval('[data-testid="arn-verdict"]', (e) => e.dataset.result)
   const arnMind = await page.$eval('[data-testid="arn-mind"] td', (e) => e.dataset.value)
   check('on the page: one super-effective Tackle and more HP left wins all three, 6-0', arnResult === 'you' && arnMind === '1', `${arnResult}, mind ${arnMind}`)
+  const arnHelp = await page.$eval('[data-testid="arn-stopped-help"]', (e) => e.textContent)
+  check('on the page: the stopped-by-an-ability help is shown', arnHelp === ac.help, arnHelp)
   await page.screenshot({ path: shot('tool-21-arena.png') })
 
   // ------------------------------------------------------------------ #22

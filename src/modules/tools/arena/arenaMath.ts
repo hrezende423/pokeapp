@@ -11,6 +11,7 @@
  *   - Body: HP left as a whole percentage of the HP at the matchup's start.
  * Each category: higher scores 2, a tie 1 each. Higher total wins; a tied total
  * knocks BOTH out (data/battle_scripts_1.s BattleScript_ArenaJudgmentDraw).
+ * Rechecked against pokeemerald @ 9103e529c2fbdd7add4a1ff3350c6c1f92112c42 (2026-11-22).
  */
 
 import { ARENA_MIND_RATING } from '../../../data/arenaMindRatings'
@@ -37,15 +38,25 @@ export const SKILL_POINTS: Record<SkillResult, number> = {
 }
 
 export const SKILL_LABEL: Record<SkillResult, string> = {
-  hit: 'Worked (normal hit, or a status move)',
+  hit: 'Worked (normal hit, a status move, or Endure)',
   super: 'Super effective',
   mixed: 'Super and not very effective at once',
   resisted: 'Not very effective',
   'no-effect': 'Missed or had no effect',
   blocked: 'Blocked by the target’s Protect or Detect',
-  'failed-status': 'Status move on a target already statused',
+  'failed-status': 'Status move failed (target already statused, Rest while asleep…)',
   'protected-self': 'Its own Protect / Detect worked',
 }
+
+/**
+ * How to enter a move an ability stopped. The -3 goes to the side whose move hit
+ * the ability's message (battle_arena.c BattleArena_DeductSkillPoints, l.630-648);
+ * the move's own result is entered as the game sets it.
+ */
+export const STOPPED_HELP =
+  'Stopped by an ability: Volt Absorb or Water Absorb at full HP (“made it useless”) is ' +
+  '“Missed or had no effect” and stopped; Flash Fire is “Worked” and stopped; ' +
+  'Levitate (“makes Ground moves miss”) is only a miss, not stopped.'
 
 export const mindRating = (moveId: number): number => ARENA_MIND_RATING[moveId] ?? 0
 
@@ -53,7 +64,11 @@ export interface Side {
   /** Moves used, one per turn; null = no move that turn. */
   moves: (number | null)[]
   skills: (SkillResult | null)[]
-  /** Times its move was stopped by a -3 message (e.g. Volt Absorb, Levitate's "made it useless"). */
+  /**
+   * Times its move was stopped by a -3 message (battle_arena.c l.630-648): e.g.
+   * Volt / Water Absorb at full HP, "made X useless". Levitate is NOT one: its
+   * "makes Ground moves miss" is not in that list, so it scores as a miss (-2).
+   */
   stopped: number
   hpStart: number
   hpEnd: number

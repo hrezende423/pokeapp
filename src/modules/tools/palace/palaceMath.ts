@@ -13,6 +13,7 @@
  *     the rest -- and then a 50% chance it does nothing ("unable to use the move").
  *     That fallback carries a bug the tool keeps: the check for "two or more
  *     Support moves" tests the Defense count, so it is never true.
+ * Rechecked against pokeemerald @ 9103e529c2fbdd7add4a1ff3350c6c1f92112c42 (2026-11-22).
  */
 
 /** [attack, defense] above half HP, then [attack, defense] at or below it; Support is the rest. */
