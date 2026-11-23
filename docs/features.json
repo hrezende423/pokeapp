@@ -407,14 +407,18 @@
     "priority": "Must",
     "category": "functional",
     "description": "Frontier completion: facility reference, challenge tracker, Tower/Hill, Castle pool, rental pool, rental-vs-your-team",
-    "doneWhen": null,
-    "notDoing": null,
+    "doneWhen": "Each Battle Frontier PRD row reachable from the Battle Frontier tab or Tools, gated by game/generation with an explicit empty state elsewhere; numbers match the pret source (>=3 spot checks per slice); Emerald tracker data and exports load unchanged; `npm run check -- --since main` passes; light/dark, narrow/wide screenshots in docs/status/frontier-<slice>/",
+    "notDoing": "New battle engine (#22 stays set-vs-set); a Diamond/Pearl Frontier; HGSS own pool (Platinum reuse stays flagged); signed-off Team Builder screens; phone layout; a fifth selector exception; refactors of working Emerald code; editing Notion",
     "steps": [
-      "TODO: acceptance checks are written when the slice is specced"
+      "verify:frontier-reference",
+      "verify:frontier-tracker",
+      "verify:frontier-data",
+      "verify:store",
+      "verify:tools"
     ],
-    "passes": false,
-    "evidence": null,
-    "notes": "The page gives no Done when for this row. HGSS rental stays flagged as unconfirmed (reuses Platinum)."
+    "passes": true,
+    "evidence": "Gates pass on the slice heads; PRs #33 (S1), #37 (S2), #38 (S3), #39 (S5) stacked on main, #34 (S4), #35 (S6), #36 (S7) stacked on main; not merged. Audit: docs/status/frontier-audit.md",
+    "notes": "HGSS rules, pools and Brain teams reuse Platinum (flagged unconfirmed). The Battle Castle has no rental Pokémon (its rentals are held items): the PRD row needs that correction. No mockups were made for the new screens; owner mark-up pending."
   },
   {
     "id": "W4-1",
