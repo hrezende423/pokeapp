@@ -184,7 +184,17 @@ export const EMPTY_TRACKER: TrackerDoc = {
  * v1 -> v2: the per-game record joins, empty. Pure; every Emerald field stays
  * where it was, untouched (src/store/CLAUDE.md).
  */
-export const v1ToV2 = (doc: unknown): unknown => ({ ...(doc as Record<string, unknown>), schemaVersion: 2, games: {} })
+/**
+ * v1 -> v2: adds `games`, every v1 field untouched. A v1-STAMPED doc may already
+ * carry `games`: a v1 client's mergeTracker stamps schemaVersion 1 and keeps the
+ * field through `...base` (first sync, merge import). Keep it; normaliseTracker
+ * cleans it after.
+ */
+export const v1ToV2 = (doc: unknown): unknown => {
+  const d = doc as Record<string, unknown>
+  const games = d.games != null && typeof d.games === 'object' && !Array.isArray(d.games) ? d.games : {}
+  return { ...d, schemaVersion: 2, games }
+}
 
 /** A speed facility's mode logs: Trainer Hill in Emerald, Trainer Tower in FireRed/LeafGreen. */
 export function speedModesOf(doc: TrackerDoc, facility: 'trainer-hill' | 'trainer-tower'): SpeedModes {

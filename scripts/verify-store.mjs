@@ -384,6 +384,10 @@ hr('6. THE CHALLENGE TRACKER: v1 -> v2 (`games`), the committed v1 export, Hill/
     '"battles":[{"id":"b1","runId":"r1","n":1,"opponents":[25,null,6],"result":"W"}],"symbols":{"tower|singles|lv50":{"silver":true}},' +
     '"bp":{"opening":5,"ledger":[{"id":"l1","at":"2026-11-01","delta":3,"reason":"Set 1","runId":"r1","set":1}]},"games":{}}'
   check('v1ToV2 is pure: the v1 fields untouched, schemaVersion 2, games {}', json(M.v1ToV2(v1Tracker)) === v2Expected && v1Tracker.schemaVersion === 1, json(M.v1ToV2(v1Tracker)))
+  // A v1-stamped doc that already carries games (a v1 client merged a v2 doc and stamped it 1): kept, never wiped.
+  const stampedV1 = { ...v1Tracker, games: { emerald: { hill: { Normal: { attempts: [{ id: 'a1', at: '2026-11-20', floors: 4, timeCs: 72345 }] } } } } }
+  check('v1ToV2 keeps a v1-stamped doc\'s games (literal)', json(M.v1ToV2(stampedV1)) === json({ ...v1Tracker, schemaVersion: 2, games: { emerald: { hill: { Normal: { attempts: [{ id: 'a1', at: '2026-11-20', floors: 4, timeCs: 72345 }] } } } } }), json(M.v1ToV2(stampedV1)))
+  check('v1ToV2 replaces a games that is not an object with {}', json(M.v1ToV2({ ...v1Tracker, games: [1] }).games) === '{}')
   ls.clear()
   ls.setItem(TKEY, json(v1Tracker))
   ls.writes.length = 0

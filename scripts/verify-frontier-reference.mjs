@@ -477,7 +477,9 @@ try {
   const perMode = Object.values(towerModes).map((m) => m.floors.reduce((n, f) => n + f.trainers.length, 0))
   check('... 63 trainers: Single 8, Double 16, Knockout 24, Mixed 15', JSON.stringify(perMode) === '[8,16,24,15]', JSON.stringify(perMode))
   const towerAll = allTrainers(towerModes)
-  check('... every Tower sprite is FireRed/LeafGreen\'s', towerAll.every((t) => t.sprites.length === t.species.length && t.sprites.every((s) => s.includes('/firered-leafgreen/'))), towerAll.find((t) => !t.sprites.every((s) => s.includes('/firered-leafgreen/')))?.sprites.join(','))
+  // FireRed/LeafGreen draw their own sprites for Kanto only (#1-151); the rest fall back, as in the Trainer Dex.
+  const kantoOk = (t) => t.sprites.length === t.species.length && t.species.every((id, k) => id > 151 || t.sprites[k].includes('/firered-leafgreen/'))
+  check('... every Tower Pokémon has a sprite, every Kanto one FireRed/LeafGreen\'s', towerAll.every(kantoOk), towerAll.find((t) => !kantoOk(t))?.sprites.join(','))
   spotCheck('Tower', towerModes, 'firered-leafgreen', 'trainer-tower', [
     ['Single-1-1', [160, 62, 115, 241, 55, 210]],
     ['Knockout-8-3', [230, 76, 149, 248, 181, 3]],
