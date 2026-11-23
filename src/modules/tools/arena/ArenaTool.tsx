@@ -8,6 +8,7 @@ import { ToolInputs, ToolResult, ToolShell } from '../ToolShell'
 import {
   SKILL_LABEL,
   SKILL_POINTS,
+  STOPPED_HELP,
   judge,
   mindRating,
   type Mark,
@@ -158,7 +159,8 @@ function ArenaBody({ game }: { game: string }) {
         ))}
         <p className="calc-result-note">
           Mind is each move’s own rating, in brackets: +1 for most attacks, −1 for Protect, Detect,
-          Endure and Fake Out, 0 for the rest. Each category won scores 2, a tie 1 each.
+          Endure and Fake Out, 0 for the rest. Each category won scores 2, a tie 1 each.{' '}
+          <span data-testid="arn-stopped-help">{STOPPED_HELP}</span>
         </p>
       </ToolInputs>
       <ToolResult reason={reason}>
