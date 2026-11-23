@@ -167,6 +167,41 @@ try {
   const gen1Disabled = await page.$$eval('[data-testid^="tool-link-"]:disabled', (els) => els.map((e) => e.dataset.testid.slice('tool-link-'.length)).sort().join(','))
   check('on Gen 1 only Hidden Power, the doubles guide, breeding, Pokérus, Pokéblocks, contests and the four Frontier tools are disabled', gen1Disabled === '12,16,17,18,19,2,20,21,22,24', gen1Disabled)
 
+  // The Battle Frontier group (owner, 2026-11-23: "can't be found from the index").
+  const frontierGroup = () =>
+    page.evaluate(() => {
+      const g = document.querySelector('[data-testid="tools-group-frontier"]')
+      if (!g) return null
+      g.scrollIntoView()
+      const r = g.getBoundingClientRect()
+      return {
+        heading: g.querySelector('h2')?.textContent,
+        shown: r.height > 0 && getComputedStyle(g).display !== 'none' && getComputedStyle(g).visibility !== 'hidden',
+        tools: [...g.querySelectorAll('[data-testid^="tool-link-"]')].map((b) => ({
+          key: b.dataset.testid.slice('tool-link-'.length),
+          open: !b.disabled,
+          reason: document.querySelector(`[data-testid="tool-reason-${b.dataset.testid.slice('tool-link-'.length)}"]`)?.textContent ?? null,
+        })),
+      }
+    })
+  for (const gen of [3, 4]) {
+    await selectGeneration(page, gen)
+    await openIndex(page)
+    const fg = await frontierGroup()
+    const keys = fg?.tools.map((t) => t.key).join(',')
+    check(`Gen ${gen}: the index draws the "Battle Frontier" group with Palace, Arena, Rental and Pike`, fg?.shown && fg.heading === 'Battle Frontier' && keys === '20,21,22,24', JSON.stringify(fg))
+    const open = fg?.tools.filter((t) => t.open).map((t) => t.key).join(',')
+    if (gen === 3) check('Gen 3: all four Frontier tools open from the group', open === '20,21,22,24', open)
+    else
+      check(
+        'Gen 4: Rental opens; Palace, Arena and Pike are disabled with "Not in Gen 4"',
+        open === '22' && fg.tools.filter((t) => !t.open).every((t) => t.reason === 'Not in Gen 4: this exists in Gen 3.'),
+        JSON.stringify(fg?.tools),
+      )
+    await page.click(`[data-testid="tool-link-${gen === 3 ? '24' : '22'}"]`)
+    check(`Gen ${gen}: ${gen === 3 ? 'Pike' : 'Rental'} opens from the group`, (await page.waitForSelector(`[data-testid="tool-page-${gen === 3 ? '24' : '22'}"]`, { timeout: 60000 }).catch(() => null)) != null)
+  }
+
   // ------------------------------------------------------------------ #1
   hr('#1 STAT CALCULATOR -- Bulbapedia "Stat" worked examples, every generation')
   /*
