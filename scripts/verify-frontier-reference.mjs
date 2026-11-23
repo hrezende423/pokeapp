@@ -292,6 +292,71 @@ try {
     if (screen === 'sets') check(`Platinum ${screen}: a notice, not a blank`, st.status === 'not-in-game' && st.notice === `${title} covers Emerald only.`, JSON.stringify(st))
     else check(`Platinum ${screen}: a screen or a notice, never a blank`, st.status === 'ready' || (st.status === 'not-in-game' && !!st.notice), JSON.stringify(st))
   }
+  // ================================================================ 2c. GEN 4 BRAINS (feature/frontier-brains-gen4)
+  hr('2c. GEN 4 BRAINS: Palmer, Thorton, Argenta, Darach, Dahlia, with their prints and the disassembly teams')
+  await selectGeneration(page, 4)
+  await openEntry(page, 'frontier-brains')
+  await page.waitForSelector('[data-testid="frontier-brains"][data-game="platinum"][data-status="ready"]')
+  await page.waitForSelector('[data-layout="brain-list"][data-game="platinum"]', { timeout: 60000 })
+  const b4 = await page.$$eval('[data-layout="brain"]', (els) =>
+    els.map((e) => ({
+      id: e.dataset.facility,
+      name: e.querySelector('.bf-name').textContent,
+      when: e.querySelector('[data-layout="brain-appearances"]').textContent,
+      prints: [...e.querySelectorAll('[data-layout="brain-print"]')].map((p) => [...p.querySelectorAll('[data-layout="brain-team"]')].map((t) => [...t.querySelectorAll('tbody tr')].map((r) => Number(r.dataset.speciesId)))),
+      generated: e.querySelector('[data-layout="brain-generated"]')?.textContent ?? null,
+    })),
+  )
+  const byId = Object.fromEntries(b4.map((b) => [b.id, b]))
+  check('Platinum: the five Brains in facility order', JSON.stringify(b4.map((b) => b.id)) === JSON.stringify(['tower', 'factory', 'hall', 'castle', 'arcade']), b4.map((b) => b.name).join(', '))
+  check('Palmer: Silver Print at battle 21, Gold at 49, Single only', byId.tower?.when === 'Silver Print at battle 21. Gold Print at battle 49. Single Battle streaks only.', byId.tower?.when)
+  check('Argenta: Silver Print at 50, Gold at 170 (HALL_STREAK_*)', byId.hall?.when === 'Silver Print at battle 50. Gold Print at battle 170.', byId.hall?.when)
+  // pokeplatinum frontier trainer data: T306 (Silver) and T307 (Gold), in the data's set order.
+  check('Palmer’s teams: Silver Rhyperior, Milotic, Dragonite; Gold Heatran, Cresselia, Regigigas', JSON.stringify(byId.tower?.prints) === JSON.stringify([[[464, 350, 149]], [[485, 488, 486]]]), JSON.stringify(byId.tower?.prints))
+  check('Darach: six sets per print, two per Pokémon (Silver Houndoom, Empoleon, Staraptor; Gold Entei, Empoleon, Gallade)', JSON.stringify(byId.castle?.prints.map((p) => p.map((t) => [...t].sort((a, b) => a - b)))) === JSON.stringify([[[229, 229, 395, 395, 398, 398]], [[244, 244, 395, 395, 475, 475]]]), JSON.stringify(byId.castle?.prints))
+  check('Dahlia’s teams: Silver Medicham, Ludicolo, Dusknoir; Gold Blaziken, Togekiss, Zapdos', JSON.stringify(byId.arcade?.prints) === JSON.stringify([[[308, 272, 477]], [[257, 468, 145]]]), JSON.stringify(byId.arcade?.prints))
+  check('Thorton and Argenta: no fixed team, said so', /no fixed team/.test(byId.factory?.generated ?? '') && /no fixed team/.test(byId.hall?.generated ?? '') && byId.factory.prints.length === 0 && byId.hall.prints.length === 0, JSON.stringify([byId.factory?.generated, byId.hall?.generated]))
+  // The disassembly's sets and the Trainer Dex's Bulbapedia teams agree, species and moves, team by team.
+  const agree = await page.evaluate(async () => {
+    const { gen4BrainTeams } = await import('/pokeapp/src/modules/battle-frontier/reference/gen4Brains.ts')
+    const p = await (await fetch('/pokeapp/data/trainers/platinum.json')).json()
+    const f = p.facilities.find((x) => x.id === 'battle-frontier')
+    const sig = (team) => team.map((m) => `${m.species_id}:${[...m.moves].sort((a, b) => a - b).join('.')}`).sort().join('|')
+    const wiki = (key) => sig(f.trainers.find((t) => t.key === key).party)
+    // Every Bulbapedia team of a print, pooled, is exactly that print's disassembly sets.
+    const wikiPool = (keys) => sig(keys.flatMap((key) => f.trainers.find((t) => t.key === key).party))
+    const out = []
+    for (const [id, silver, gold] of [
+      ['tower', ['brain-palmer-1'], ['brain-palmer-2']],
+      ['arcade', ['brain-dahlia-1'], ['brain-dahlia-2']],
+      ['castle', ['brain-darach-1-1', 'brain-darach-1-2'], ['brain-darach-2-1', 'brain-darach-2-2']],
+    ]) {
+      const t = gen4BrainTeams(f, id)
+      out.push([`${id} silver`, sig(t.silver) === wikiPool(silver)], [`${id} gold`, sig(t.gold) === wikiPool(gold)])
+    }
+    void wiki
+    return out
+  })
+  check('every print’s disassembly sets are exactly the Trainer Dex’s Bulbapedia team(s) for it (species and moves)', agree.length === 6 && agree.every(([, ok]) => ok), JSON.stringify(agree))
+  await page.screenshot({ path: shot('s5-platinum-brains-light') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s5-platinum-brains-dark') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await pickGame('heartgold-soulsilver')
+  await page.waitForSelector('[data-layout="brain-list"][data-game="heartgold-soulsilver"]', { timeout: 60000 })
+  const hgFlag = await page.$eval('[data-testid="frontier-brains"] [data-testid="frontier-hgss-flag"]', (e) => e.textContent).catch(() => null)
+  check('HGSS Brains: the same five, flagged as Platinum’s', (await page.$$('[data-layout="brain"]')).length === 5 && /Platinum’s/.test(hgFlag ?? ''), hgFlag)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(300)
+  const fit5 = await page.evaluate(() => {
+    const area = document.querySelector('[data-testid="frontier-scroll-area"]').getBoundingClientRect()
+    return [...document.querySelectorAll('[data-layout="brain"]')].filter((e) => e.getBoundingClientRect().right > area.right + 1).length
+  })
+  check('390 px HGSS Brains: no section runs past the scroll area', fit5 === 0, fit5)
+  await page.screenshot({ path: shot('s5-hgss-brains-narrow') })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await pickGame('platinum')
+
   await selectGeneration(page, 3)
   await openEntry(page, 'frontier-facilities')
   await ready(page, 'facilities')

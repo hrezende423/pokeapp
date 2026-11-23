@@ -266,6 +266,7 @@ export function MonSprite({
 }: {
   speciesId: number | undefined
   pokemonId?: number
+  /** The game whose sprite to draw (default Emerald's). */
   versionGroup?: string
 }) {
   if (speciesId == null) return <span className="bf-sprite" aria-hidden />
