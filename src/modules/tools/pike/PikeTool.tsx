@@ -97,6 +97,7 @@ function PikeBody() {
     healingDisabled: healingOff,
     aliveCount: slots.filter((s) => s.condition !== 'fainted').length,
     anyHealthy: slots.some((s) => s.condition === 'healthy'),
+    allHealthy: slots.every((s) => s.condition === 'healthy'),
   }
   const party: PikeSlot[] = slots.map((s) => ({
     healthy: s.condition === 'healthy',

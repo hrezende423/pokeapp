@@ -62,6 +62,8 @@ export interface PikeState {
   aliveCount: number
   /** At least one able to battle with no status. */
   anyHealthy: boolean
+  /** Every Pokémon able to battle and with no status (IsPartyFullHealed, HP and PP aside). Absent = not known. */
+  allHealthy?: boolean
 }
 
 export type RoomOdds = Record<PikeRoom, number>
@@ -72,7 +74,7 @@ const zero = (): RoomOdds => Object.fromEntries(ROOMS.map((r) => [r, 0])) as Roo
 export function stateProblem(s: PikeState): string | null {
   if (!Number.isInteger(s.aliveCount) || s.aliveCount < 1 || s.aliveCount > 3)
     return 'One to three Pokémon must be able to battle: with none the challenge is over.'
-  if (s.healingDisabled && (s.aliveCount < 3 || !s.anyHealthy))
+  if (s.healingDisabled && (s.aliveCount < 3 || !s.anyHealthy || s.allHealthy === false))
     return 'Healing rooms are off only when the whole party is fully healed: all three able to battle, none with a status.'
   return null
 }
@@ -190,9 +192,8 @@ export function nextLucy(streak: number, symbols: number): PikePlace | null {
 /** Is this a streak a hallway can have: a whole, even number (two per door choice)? */
 export function hallwayStreakProblem(streak: number): string | null {
   if (!Number.isInteger(streak) || streak < 0) return 'The win streak is a whole number, 0 or more.'
-  // pikeWinStreaks is a u16.
-  if (streak > 65534)
-    return 'The game keeps the win streak in 16 bits: at most 65,534 at a hallway.'
+  // SetBattlePikeData refuses a streak above MAX_STREAK (9999, include/constants/battle_frontier.h).
+  if (streak > 9998) return 'The game stops counting the win streak at 9,999 (MAX_STREAK).'
   if (streak % 2 !== 0)
     return 'At a hallway the win streak is even: each door choice adds two (the hallway and the room).'
   return null

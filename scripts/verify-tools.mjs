@@ -1586,6 +1586,10 @@ try {
       lowAfterNpc: pm.otherDoorOdds('npc', low),
       poison: pm.statusOdds([{ healthy: true, types: ['poison'] }, none, none], pm.statusTargets(1)),
       lucy: [26, 24, 28].map((k) => pm.isLucyRoom(k, 0)),
+      // GetPikeQueenFightType: s = streak + 1; 1 symbol: s 139 Gold; 2 symbols: s 27, 139, or s > 140 with (s - 139) % 56 == 0.
+      lucyFights: [[138, 1], [138, 0], [26, 2], [194, 2], [250, 2], [194, 1], [222, 2]].map(([k, sym]) => pm.lucyFight(k, sym)),
+      statusedOff: pm.stateProblem({ healingDisabled: true, aliveCount: 3, anyHealthy: true, allHealthy: false }),
+      cap: [pm.hallwayStreakProblem(9998), pm.hallwayStreakProblem(10000)],
       targets: [1, 2, 3, 4, 5, 6, 7].map(pm.statusTargets).join(''),
       problem: pm.stateProblem({ healingDisabled: true, aliveCount: 2, anyHealthy: true }),
     }
@@ -1597,6 +1601,10 @@ try {
   check('2. same, hint Single: the other doors are Person, Status, Wild, Hard, Double, 1/5 each',
     odds(pik.afterSingle, { npc: 1 / 5, status: 1 / 5, wild: 1 / 5, hard: 1 / 5, double: 1 / 5 }), JSON.stringify(pik.afterSingle))
   check('3. same, hint not known: an unhinted door is a Single battle 7/60 of the time', pikNear(pik.anySingle, 7 / 60), String(pik.anySingle))
+  check('Lucy: Gold at streak 138 with one symbol; rematches at 26, 194, 250 with two; none at 138/0, 194/1, 222/2',
+    JSON.stringify(pik.lucyFights) === JSON.stringify(['gold', null, 'rematch', 'rematch', 'rematch', null, null]), JSON.stringify(pik.lucyFights))
+  check('healing off with a Pokémon carrying a status cannot happen (IsPartyFullHealed): the tool says why', typeof pik.statusedOff === 'string' && pik.statusedOff.length > 0, pik.statusedOff)
+  check('streak cap is MAX_STREAK 9999: 9998 fine, 10000 refused', pik.cap[0] === null && typeof pik.cap[1] === 'string', JSON.stringify(pik.cap))
   check('4. healing on, hint Status: Single, Full heal, Person, Wild, Hard, Double, 1/6 each',
     odds(pik.afterStatus, { single: 1 / 6, 'heal-full': 1 / 6, npc: 1 / 6, wild: 1 / 6, hard: 1 / 6, double: 1 / 6 }), JSON.stringify(pik.afterStatus))
   check('5. one able and poisoned: hinted Person 3/8, Single, Full heal, Heal one or two, Wild, Hard 1/8 each',
