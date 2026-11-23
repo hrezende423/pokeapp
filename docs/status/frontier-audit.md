@@ -30,7 +30,7 @@ After S1–S7. The branches are not merged yet, so "Done" means done on the open
 
 | # | PRD row | Step 0 | Proposed | Where / evidence |
 |---|---|---|---|---|
-| 1 | Battle facility reference data | Partial | **Done** | S1 #33. Facilities for Emerald (+ Trainer Hill), FireRed/LeafGreen (Trainer Tower) and Platinum/HGSS (5 facilities, every BP table); "no Frontier" notices for RS and DP. `verify:frontier-reference` §2b. |
+| 1 | Battle facility reference data | Partial | **Done** | S1 #33. Facilities for Emerald (+ Trainer Hill), FireRed/LeafGreen (Trainer Tower) and Platinum/HGSS (5 facilities, every BP table). The game row offers only those four games (RS and DP not selectable, owner 2026-11-23). `verify:frontier-reference` §2b. |
 | 2 | Trainer Tower/Hill reference and tracking | Missing | **Done** | S2 #37. Trainer Hill & Tower page: modes, floors, fixed teams, and best clear / current run (mm:ss.cs, floors). §2c and `verify:store` §6. |
 | 3 | Personal challenge progress tracker | Partial | **Done** | S3 #38. Emerald (7 facilities, unchanged); Platinum/HGSS per facility with streak, best and Silver/Gold Prints; FRLG/Hill via S2. Document v2 with a migration fixture. |
 | 4 | Battle Palace move-selection odds | Done | **Done** | S6 #35. Rechecked against pokeemerald (no defect); 6 new assertions. Emerald only (no Palace in Gen 4). |
