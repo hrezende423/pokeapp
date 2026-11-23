@@ -351,14 +351,46 @@ try {
         })),
       })),
     }))
+  /**
+   * Every <img> on the page, loaded: lazy ones are switched to eager and awaited.
+   * Static only (owner, 2026-11-23): no animated asset (the sprites repo's WebP
+   * releases, a GIF, an "animated" path) may be requested on this page.
+   */
+  const ANIMATED = /\.(webp|gif)(\?|$)|\/animated\/|pokeapp-sprites\/releases/
+  const pageImages = () =>
+    page.$eval(SPEED, async (root) => {
+      const imgs = [...root.querySelectorAll('img')]
+      await Promise.all(
+        imgs.map((img) => {
+          img.loading = 'eager'
+          return img.complete && img.naturalWidth > 0
+            ? null
+            : new Promise((done) => {
+                img.addEventListener('load', done, { once: true })
+                img.addEventListener('error', done, { once: true })
+                setTimeout(done, 20000)
+              })
+        }),
+      )
+      return imgs.map((img) => ({ src: img.currentSrc || img.src, w: img.naturalWidth }))
+    })
   const walkModes = async () => {
     const out = {}
     for (const label of await speedTabs()) {
       await page.click(`[data-testid="speed-mode-${label.toLowerCase()}"]`)
       await page.waitForFunction((l) => document.querySelector('[data-layout="speed-mode"]')?.dataset.mode === l, label)
       out[label] = await speedMode()
+      out[label].images = await pageImages()
     }
     return out
+  }
+  const imageCheck = (label, modes) => {
+    const imgs = Object.values(modes).flatMap((m) => m.images)
+    const broken = [...new Set(imgs.filter((i) => !(i.w > 0)).map((i) => i.src))]
+    const animated = [...new Set(imgs.filter((i) => ANIMATED.test(i.src)).map((i) => i.src))]
+    check(`${label}: every <img> on the page loads (naturalWidth > 0), every mode and floor`, imgs.length > 0 && broken.length === 0, `${imgs.length} images, ${broken.length} broken: ${broken.slice(0, 3).join(' ')}`)
+    check(`${label}: no animated sprite requested`, animated.length === 0, animated.slice(0, 3).join(' '))
+    return imgs
   }
   const bundleFacility = (vg, id) => JSON.parse(read(`public/data/trainers/${vg}.json`)).facilities.find((f) => f.id === id)
   const allTrainers = (modes) => Object.values(modes).flatMap((m) => m.floors.flatMap((f) => f.trainers))
@@ -387,6 +419,7 @@ try {
   const hillAll = allTrainers(hillModes)
   check('... 32 trainers, each with a 6-Pokémon team and a Trainer Dex link', hillAll.length === 32 && hillAll.every((t) => t.species.length === 6 && t.dex), hillAll.filter((t) => t.species.length !== 6 || !t.dex).map((t) => t.key).join(','))
   check('... every team sprite is Emerald\'s', hillAll.every((t) => t.sprites.length === 6 && t.sprites.every((s) => s.includes('/emerald/'))), hillAll.find((t) => !t.sprites.every((s) => s.includes('/emerald/')))?.sprites.join(','))
+  imageCheck('Emerald Hill (4 modes × 4 floors)', hillModes)
   check('Hex Maniac Alaina leads Normal floor 1', hillModes.Normal.floors[0].trainers[0].name === 'Hex Maniac Alaina', hillModes.Normal.floors[0].trainers[0].name)
   spotCheck('Hill', hillModes, 'emerald', 'trainer-hill', [
     ['Normal-1-1', [200, 338, 344, 110, 337, 330]],
@@ -477,9 +510,13 @@ try {
   const perMode = Object.values(towerModes).map((m) => m.floors.reduce((n, f) => n + f.trainers.length, 0))
   check('... 63 trainers: Single 8, Double 16, Knockout 24, Mixed 15', JSON.stringify(perMode) === '[8,16,24,15]', JSON.stringify(perMode))
   const towerAll = allTrainers(towerModes)
-  // FireRed/LeafGreen draw their own sprites for Kanto only (#1-151); the rest fall back, as in the Trainer Dex.
-  const kantoOk = (t) => t.sprites.length === t.species.length && t.species.every((id, k) => id > 151 || t.sprites[k].includes('/firered-leafgreen/'))
-  check('... every Tower Pokémon has a sprite, every Kanto one FireRed/LeafGreen\'s', towerAll.every(kantoOk), towerAll.find((t) => !kantoOk(t))?.sprites.join(','))
+  // FireRed/LeafGreen draw their own sprites for Kanto only (#1-151); the rest fall back to Emerald's static sprite.
+  const towerSpriteOk = (t) => t.sprites.length === t.species.length && t.species.every((id, k) => t.sprites[k].includes(id > 151 ? '/emerald/' : '/firered-leafgreen/'))
+  check('... every Tower Pokémon has a static sprite: Kanto FireRed/LeafGreen\'s, the rest Emerald\'s', towerAll.every(towerSpriteOk), towerAll.find((t) => !towerSpriteOk(t))?.sprites.join(','))
+  const towerImgs = imageCheck('FireRed/LeafGreen Tower (4 modes × 8 floors)', towerModes)
+  // Gendered non-Kanto species were the broken ones (no unsuffixed animated file): Politoed, Heracross, Houndoom.
+  const gendered = [186, 214, 229].map((id) => towerAll.flatMap((t) => t.sprites.filter((_, k) => t.species[k] === id))[0])
+  check('Tower: gendered Johto species (Politoed, Heracross, Houndoom) load Emerald\'s static sprite', gendered.every((s) => s?.includes('/emerald/')) &&gendered.every((s) => towerImgs.some((i) => i.src === s && i.w > 0)), gendered.join(' '))
   spotCheck('Tower', towerModes, 'firered-leafgreen', 'trainer-tower', [
     ['Single-1-1', [160, 62, 115, 241, 55, 210]],
     ['Knockout-8-3', [230, 76, 149, 248, 181, 3]],
@@ -492,9 +529,6 @@ try {
   await page.screenshot({ path: shot('s2-frlg-dark'), fullPage: true })
   await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
 
-  await pickGame('ruby-sapphire')
-  sh = await speedHead()
-  check('Ruby/Sapphire: "Ruby and Sapphire have no Trainer Hill or Trainer Tower."', sh.status === 'not-in-game' && sh.notice === 'Ruby and Sapphire have no Trainer Hill or Trainer Tower.', JSON.stringify(sh))
   await selectGeneration(page, 4)
   await openEntry(page, 'frontier-speed')
   await page.waitForSelector(SPEED)

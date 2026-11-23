@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scrollKey } from '../../components/scrollMemory'
-import { getSpecies, getSpriteUrl, slotsFor, versionSpriteUrl } from '../../data'
+import { getSpecies, slotsFor, SPRITE_GAMES, versionSpriteUrl } from '../../data'
 import type { StatSpread } from '../../data/trainers'
 import { deepLink } from '../../lib/entities'
 import { followLink } from '../../lib/entities/appContext'
@@ -249,9 +249,15 @@ export function SpeciesLink({ id, generation }: { id: number | null | undefined;
 
 /**
  * The Emerald sprite, 32px, the way the Trainer Dex draws a party: the game's own
- * front sprite from the sprites repo (runtime-cached, never precached), the
- * animated artwork as the fallback. `versionGroup` draws another game's sprite
- * (FireRed/LeafGreen's Trainer Tower); default Emerald.
+ * front sprite from the sprites repo (runtime-cached, never precached).
+ * `versionGroup` draws another game's sprite (FireRed/LeafGreen's Trainer Tower);
+ * default Emerald.
+ *
+ * STATIC ONLY (owner, 2026-11-23). A game whose set lacks the species
+ * (FireRed/LeafGreen draw #1-151 only) falls back to the same generation's other
+ * games, newest first (Emerald, then Ruby/Sapphire), never to the animated
+ * artwork: that mixed animated and static on one page, and its unsuffixed file
+ * does not exist for a gendered species, so 18 Trainer Tower sprites were broken.
  */
 export function MonSprite({
   speciesId,
@@ -266,13 +272,26 @@ export function MonSprite({
   const species = getSpecies(speciesId)
   const variety =
     species?.varieties.find((v) => v.pokemon_id === pokemonId) ?? species?.varieties.find((v) => v.is_default)
-  const slots = variety ? slotsFor(variety, versionGroup) : []
-  const slot = slots.includes('front_transparent')
-    ? 'front_transparent'
-    : slots.includes('front_default')
-      ? 'front_default'
-      : null
-  const url = slot ? versionSpriteUrl(pokemonId ?? speciesId, versionGroup, slot) : getSpriteUrl(speciesId)
+  const generation = SPRITE_GAMES.find((g) => g.game === versionGroup)?.generation
+  const games = [
+    versionGroup,
+    ...SPRITE_GAMES.filter((g) => g.generation === generation && g.game !== versionGroup)
+      .map((g) => g.game)
+      .reverse(),
+  ]
+  let url: string | null = null
+  for (const game of variety ? games : []) {
+    const slots = slotsFor(variety!, game)
+    const slot = slots.includes('front_transparent')
+      ? 'front_transparent'
+      : slots.includes('front_default')
+        ? 'front_default'
+        : null
+    if (slot) {
+      url = versionSpriteUrl(pokemonId ?? speciesId, game, slot)
+      break
+    }
+  }
   return url ? (
     <img className="bf-sprite" src={url} alt="" width={32} height={32} loading="lazy" />
   ) : (
