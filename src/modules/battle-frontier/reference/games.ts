@@ -4,22 +4,23 @@
  *
  * GENERATION-SCOPED, NOT AN EXCEPTION. The app picks a generation; the tab's game
  * row (useGameInGeneration + GameRow, the Trainer Dex's pattern) picks a game
- * INSIDE it and cannot leave it. It offers only the games this tab speaks about:
- * Gen 3's Ruby/Sapphire (no Frontier), Emerald and FireRed/LeafGreen, and Gen 4's
- * Diamond/Pearl (no Frontier), Platinum and HeartGold/SoulSilver. Every other
- * generation has no row and one notice. Colosseum and XD are not offered.
+ * INSIDE it and cannot leave it. It offers only the games with something to
+ * show: Gen 3's Emerald and FireRed/LeafGreen, Gen 4's Platinum and
+ * HeartGold/SoulSilver. A game without a Frontier (Ruby/Sapphire, Diamond/Pearl)
+ * is not selectable (owner, 2026-11-23). Every other generation has no row and
+ * one notice. Colosseum and XD are not offered.
  *
  * Gen 3 defaults to Emerald and Gen 4 to HeartGold/SoulSilver
  * (`defaultGameOfGeneration`), so a reader who never touches the row sees
- * exactly what the tab showed before it had one in Gen 3.
+ * exactly what the tab showed before it had one in Gen 3. A pick outside the row
+ * falls back to that default (`useGameInGeneration` only honours a pick the row
+ * offers).
  */
 
 /** Games the tab's row offers, in no particular order (the row sorts by release). */
 export const FRONTIER_TAB_GAMES: readonly string[] = [
-  'ruby-sapphire',
   'emerald',
   'firered-leafgreen',
-  'diamond-pearl',
   'platinum',
   'heartgold-soulsilver',
 ]
@@ -51,15 +52,8 @@ export function generationNotice(generation: number | null): string {
   return `No Battle Frontier in Gen ${generation}. ${COVERS}`
 }
 
-/** The notice for a game with no Frontier at all. */
-export const NO_FRONTIER: Record<string, string> = {
-  'ruby-sapphire': 'Ruby and Sapphire have no Battle Frontier. Emerald added it.',
-  'diamond-pearl': 'Diamond and Pearl have no Battle Frontier. Platinum added it.',
-}
-
 /** A screen's notice for a game it has nothing for (e.g. Brains in FireRed and LeafGreen). */
 export function gameNotice(game: string, screen: string): string {
-  if (NO_FRONTIER[game]) return NO_FRONTIER[game]
   if (game === 'firered-leafgreen')
     return `FireRed and LeafGreen have no Battle Frontier, so no ${screen}. Their Trainer Tower is under Facilities.`
   return `${screen} covers Emerald only.`

@@ -31,8 +31,8 @@ export type ShellStatus = FrontierLoad['status'] | 'not-in-game'
 
 /**
  * The notice for a page with nothing to show: the generation's ("No Battle
- * Frontier in Gen 2") or the game's ("Diamond and Pearl have no Battle
- * Frontier"). Never a blank page.
+ * Frontier in Gen 2") or the game's ("FireRed and LeafGreen have no Battle
+ * Frontier, so no Brains"). Never a blank page.
  */
 export function FrontierNotice({ game, generation, screen }: { game: string | null; generation: number | null; screen: string }) {
   return (

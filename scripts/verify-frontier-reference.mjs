@@ -183,7 +183,7 @@ try {
   await page.screenshot({ path: shot('notice') })
 
   // ================================================================ 2b. OTHER GAMES (feature/frontier-facility-reference)
-  hr('2b. OTHER GAMES: Trainer Tower, the Gen 4 Frontier, and "no Frontier" for Ruby/Sapphire and Diamond/Pearl')
+  hr('2b. OTHER GAMES: Trainer Tower, the Gen 4 Frontier; Ruby/Sapphire and Diamond/Pearl are not offered')
   const facState = () =>
     page.$eval('[data-testid="frontier-facilities"]', (root) => ({
       status: root.dataset.status,
@@ -203,7 +203,18 @@ try {
   await openEntry(page, 'frontier-facilities')
   await ready(page, 'facilities')
   let fs4 = await facState()
-  check('Gen 4: the game row offers Diamond/Pearl, Platinum, HeartGold/SoulSilver, and defaults to HeartGold/SoulSilver', JSON.stringify(fs4.row) === JSON.stringify(['diamond-pearl', 'platinum', 'heartgold-soulsilver']) && fs4.game === 'heartgold-soulsilver', JSON.stringify(fs4))
+  check('Gen 4: the game row offers Platinum and HeartGold/SoulSilver only (no Diamond/Pearl), and defaults to HeartGold/SoulSilver', JSON.stringify(fs4.row) === JSON.stringify(['platinum', 'heartgold-soulsilver']) && fs4.game === 'heartgold-soulsilver', JSON.stringify(fs4))
+  const fallback = await page.evaluate(async () => {
+    const g = await import('/pokeapp/src/modules/battle-frontier/reference/games.ts')
+    const v = await import('/pokeapp/src/modules/version-group/games.ts')
+    return {
+      offered: ['ruby-sapphire', 'diamond-pearl'].filter(g.isFrontierTabGame),
+      gen3: v.defaultGameOfGeneration(3, g.isFrontierTabGame)?.name,
+      gen4: v.defaultGameOfGeneration(4, g.isFrontierTabGame)?.name,
+      exportsNotice: 'NO_FRONTIER' in g,
+    }
+  })
+  check('Ruby/Sapphire and Diamond/Pearl are never offered; their generation falls back to Emerald / HeartGold-SoulSilver; no dead "no Frontier" notice', fallback.offered.length === 0 && fallback.gen3 === 'emerald' && fallback.gen4 === 'heartgold-soulsilver' && !fallback.exportsNotice, JSON.stringify(fallback))
   check('HGSS: the five Gen 4 facilities, in order', JSON.stringify(fs4.ids) === JSON.stringify(['tower', 'factory', 'hall', 'castle', 'arcade']), fs4.ids.join(','))
   check('HGSS: the scope tag names the game', fs4.scope === 'HeartGold and SoulSilver · Gen 4', fs4.scope)
   const flag = await page.$eval('[data-testid="frontier-hgss-flag"]', (e) => e.textContent).catch(() => null)
@@ -247,10 +258,6 @@ try {
   check('390 px Platinum: no facility section runs past the scroll area', fit4 === 0, fit4)
   await page.screenshot({ path: shot('s1-platinum-narrow') })
   await page.setViewportSize({ width: 1440, height: 1000 })
-  await pickGame('diamond-pearl')
-  fs4 = await facState()
-  check('Diamond/Pearl: the explicit "no Frontier" notice, no sections', fs4.status === 'not-in-game' && fs4.notice === 'Diamond and Pearl have no Battle Frontier. Platinum added it.' && fs4.ids.length === 0, JSON.stringify(fs4))
-  await page.screenshot({ path: shot('s1-dp-notice') })
   await pickGame('platinum')
   for (const [id, screen, title] of [['frontier-brains', 'brains', 'Brains'], ['frontier-sets', 'sets', 'Sets & Trainers']]) {
     await openEntry(page, id)
@@ -263,7 +270,7 @@ try {
   await openEntry(page, 'frontier-facilities')
   await ready(page, 'facilities')
   let fs3 = await facState()
-  check('Gen 3: the row offers Ruby/Sapphire, Emerald, FireRed/LeafGreen (no Colosseum/XD) and defaults to Emerald', JSON.stringify(fs3.row) === JSON.stringify(['ruby-sapphire', 'emerald', 'firered-leafgreen']) && fs3.game === 'emerald', JSON.stringify(fs3))
+  check('Gen 3: the row offers Emerald and FireRed/LeafGreen only (no Ruby/Sapphire, no Colosseum/XD) and defaults to Emerald', JSON.stringify(fs3.row) === JSON.stringify(['emerald', 'firered-leafgreen']) && fs3.game === 'emerald', JSON.stringify(fs3))
   // Empty the Frontier loader's cache: a FireRed/LeafGreen screen that called it would fetch again.
   const reset2b = await page.evaluate(async () => {
     const m = await import('/pokeapp/src/modules/battle-frontier/data/index.ts')
@@ -273,9 +280,6 @@ try {
   })
   check('the app’s Frontier loader cache (it held Emerald’s data) is emptied before the other Gen 3 games', reset2b.had && !reset2b.now, JSON.stringify(reset2b))
   const requestsBeforeOtherGames = frontierRequests.filter((u) => u.includes('frontier/emerald')).length
-  await pickGame('ruby-sapphire')
-  fs3 = await facState()
-  check('Ruby/Sapphire: the explicit "no Frontier" notice', fs3.status === 'not-in-game' && fs3.notice === 'Ruby and Sapphire have no Battle Frontier. Emerald added it.', JSON.stringify(fs3))
   await pickGame('firered-leafgreen')
   await page.waitForFunction(() => [...document.querySelectorAll('[data-facility="trainer-tower"] .bf-kv > div')].some((r) => r.querySelector('dt').textContent === 'Modes' && /floors/.test(r.querySelector('dd').textContent)))
   fs3 = await facState()
@@ -290,7 +294,7 @@ try {
     const st = await page.$eval(`[data-testid="frontier-${screen}"]`, (r) => ({ status: r.dataset.status, notice: r.querySelector('[data-testid="frontier-notice"]')?.textContent }))
     check(`FireRed/LeafGreen ${screen}: "no Battle Frontier" notice pointing at the Trainer Tower`, st.status === 'not-in-game' && /no Battle Frontier/.test(st.notice) && /Trainer Tower/.test(st.notice), JSON.stringify(st))
   }
-  check('Ruby/Sapphire and FireRed/LeafGreen: no Emerald Frontier data requested', frontierRequests.filter((u) => u.includes('frontier/emerald')).length === requestsBeforeOtherGames, frontierRequests.join(', '))
+  check('FireRed/LeafGreen: no Emerald Frontier data requested', frontierRequests.filter((u) => u.includes('frontier/emerald')).length === requestsBeforeOtherGames, frontierRequests.join(', '))
   await openEntry(page, 'frontier-facilities')
   await pickGame('emerald')
 
