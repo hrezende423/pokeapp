@@ -112,6 +112,8 @@
   grid-template-areas:
     'inputs'
     'result';
+  /* One column no wider than the window: a wide table scrolls in its own wrapper (.tools-compare-scroll). */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-gap-xl);
 }
 
