@@ -292,8 +292,8 @@ try {
     if (screen === 'sets') check(`Platinum ${screen}: a notice, not a blank`, st.status === 'not-in-game' && st.notice === `${title} covers Emerald only.`, JSON.stringify(st))
     else check(`Platinum ${screen}: a screen or a notice, never a blank`, st.status === 'ready' || (st.status === 'not-in-game' && !!st.notice), JSON.stringify(st))
   }
-  // ================================================================ 2c. GEN 4 BRAINS (feature/frontier-brains-gen4)
-  hr('2c. GEN 4 BRAINS: Palmer, Thorton, Argenta, Darach, Dahlia, with their prints and the disassembly teams')
+  // ================================================================ 2d. GEN 4 BRAINS (feature/frontier-brains-gen4)
+  hr('2d. GEN 4 BRAINS: Palmer, Thorton, Argenta, Darach, Dahlia, with their prints and the disassembly teams')
   await selectGeneration(page, 4)
   await openEntry(page, 'frontier-brains')
   await page.waitForSelector('[data-testid="frontier-brains"][data-game="platinum"][data-status="ready"]')
