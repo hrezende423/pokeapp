@@ -101,6 +101,7 @@ const bundled = await build({
       "export { initDataLayer, getSpecies } from './src/data/index.ts'",
       "export * as model from './src/modules/battle-frontier/tracker/model.ts'",
       "export * as pyramid from './src/modules/battle-frontier/tracker/pyramid.ts'",
+      "export * as gen4 from './src/modules/battle-frontier/tracker/gen4.ts'",
       "export * as pyramidData from './src/modules/battle-frontier/tracker/pyramidData.ts'",
       "export { itemEntries, speciesEntries } from './src/modules/dex/entrySources.ts'",
       "export { trackerDocument } from './src/modules/battle-frontier/tracker/trackerStore.ts'",
@@ -419,6 +420,71 @@ RT = M.endRun(RT, 'pyr-rt', 'retired', at)
 check('retired mid-floor: that floor\'s entries still count in the totals and the insights', json(P.pyramidTotals(M.deriveTracker(RT, fd).runs.get('pyr-rt'))) === json({ floors: 0, trainers: 0, wild: 1, items: 1 }) && json(P.pyramidInsights(M.deriveTracker(RT, fd), { species: String, item: String }).wild) === json([[sp('pikachu'), 1]]))
 const noted = P.editLoggedBattle(BB, vB.battles.find((b) => b.n === 70).id, (b) => ({ ...b, note: 'top', opponents: [sp('arcanine'), null, null] }))
 check('a saved floor\'s note and Brandon\'s three can be edited later', noted.battles.find((b) => b.runId === 'pyr' && b.n === 70).note === 'top' && noted.battles.find((b) => b.runId === 'pyr' && b.n === 70).opponents[0] === sp('arcanine'))
+
+hr('A11. PLATINUM AND HEARTGOLD/SOULSILVER (feature/frontier-tracker-games): per facility, the next Brain, the document')
+{
+  const G = api.gen4
+  const next = (id, log) => G.nextBrainText(G.nextBrain(id, log))
+  // Silver and Gold battles: pokeplatinum @ 485c400 (reference/gen4.ts): 21 / 49, the Hall 50 / 170.
+  check('Tower, streak 15, no prints: "Palmer at battle 21, for the Silver Print"', next('tower', { streak: 15, best: 15 }) === 'Palmer at battle 21, for the Silver Print', next('tower', { streak: 15, best: 15 }))
+  check('Tower, streak 20: battle 21 is still ahead (Palmer at battle 21)', next('tower', { streak: 20, best: 20 }) === 'Palmer at battle 21, for the Silver Print')
+  check('Tower, streak 21 flips it: "Palmer at battle 49, for the Gold Print"', next('tower', { streak: 21, best: 21 }) === 'Palmer at battle 49, for the Gold Print', next('tower', { streak: 21, best: 21 }))
+  check('Tower, streak 15 with the Silver Print held: "Palmer at battle 21; Silver Print already held"', next('tower', { streak: 15, best: 30, silver: true }) === 'Palmer at battle 21; Silver Print already held')
+  check('Hall uses 50 / 170: streak 49 -> "Argenta at battle 50"; 50 -> "Argenta at battle 170"', next('hall', { streak: 49, best: 49 }) === 'Argenta at battle 50, for the Silver Print' && next('hall', { streak: 50, best: 50 }) === 'Argenta at battle 170, for the Gold Print')
+  check('past both: "No Brain left in this streak: Thorton was at battles 21 and 49."', next('factory', { streak: 49, best: 49 }) === 'No Brain left in this streak: Thorton was at battles 21 and 49.')
+  check('no log at all reads as streak 0: Darach at battle 21', next('castle', undefined) === 'Darach at battle 21, for the Silver Print')
+  let g = G.setStreak(undefined, 'tower', 15)
+  check('a streak of 15 raises the best to 15', json(g.facilities.tower) === '{"streak":15,"best":15}', json(g.facilities.tower))
+  g = G.setStreak(g, 'tower', 3)
+  check('a lower streak (a loss, then 3) keeps the best at 15', json(g.facilities.tower) === '{"streak":3,"best":15}', json(g.facilities.tower))
+  g = G.setBest(g, 'tower', 2)
+  check('a typed best below the streak reads as the streak (3)', g.facilities.tower.best === 3)
+  g = G.togglePrint(G.togglePrint(G.togglePrint(g, 'tower', 'silver'), 'hall', 'gold'), 'hall', 'gold')
+  check('prints toggle on and off', g.facilities.tower.silver === true && g.facilities.hall.gold === false)
+
+  // Merge: best = the higher, streak = the BASE's, prints OR-ed; a facility only one side has comes whole.
+  const base = { facilities: { tower: { streak: 5, best: 30 }, hall: { streak: 60, best: 60, gold: true } } }
+  const added = { facilities: { tower: { streak: 20, best: 40, silver: true }, arcade: { streak: 7, best: 7 } } }
+  const mg = G.mergeGen4Game(base, added)
+  check('merge: Tower best 40 (max), streak 5 (the base\'s), Silver held (OR); the Hall and the Arcade kept', json(mg.facilities.tower) === '{"streak":5,"best":40,"silver":true}' && json(mg.facilities.hall) === '{"streak":60,"best":60,"gold":true}' && json(mg.facilities.arcade) === '{"streak":7,"best":7}', json(mg.facilities))
+
+  // The document: Platinum and HeartGold/SoulSilver beside Emerald's log, which stays exactly as it was.
+  const P4 = { ...D, games: { platinum: { facilities: { tower: { streak: 21, best: 21, silver: true } } }, 'heartgold-soulsilver': { facilities: { hall: { streak: 3, best: 50 } } } } }
+  const N4 = M.normaliseTracker(P4)
+  check('normalise keeps the Gen 4 logs as written', json(N4.games) === json(P4.games), json(N4.games))
+  const junk = M.normaliseTracker({ ...D, games: { platinum: { later: 1, facilities: { tower: { streak: -1, best: 'x', silver: 'yes', later: 2 }, nope: { a: 1 }, hall: 5 } }, 'heartgold-soulsilver': 7 } })
+  check('normalise: a bad number reads 0, a non-boolean print goes, an unknown facility and field survive, a junk game goes', json(junk.games) === '{"platinum":{"later":1,"facilities":{"tower":{"streak":0,"best":0,"later":2},"nope":{"a":1}}}}', json(junk.games))
+  check('a tracker holding only a Platinum streak is not empty', !M.isTrackerEmpty({ ...M.EMPTY_TRACKER, games: { platinum: { facilities: { castle: { streak: 1, best: 1 } } } } }) && M.isTrackerEmpty({ ...M.EMPTY_TRACKER, games: { platinum: { facilities: { castle: { streak: 0, best: 0 } } } } }))
+  const MD = M.mergeTracker(P4, { ...M.EMPTY_TRACKER, games: { platinum: { facilities: { tower: { streak: 2, best: 60, gold: true } } } } })
+  check('mergeTracker merges the Gen 4 logs (Tower best 60, streak 21, both prints) and leaves the HGSS log', json(canon(MD.games.platinum.facilities.tower)) === '{"best":60,"gold":true,"silver":true,"streak":21}' && json(MD.games['heartgold-soulsilver']) === json(P4.games['heartgold-soulsilver']))
+  localStorage.clear()
+  doc.reset()
+  doc.write(P4)
+  const ex4 = api.exportDocuments(['frontier-tracker'])
+  localStorage.clear()
+  doc.reset()
+  api.importDocuments(ex4, { mode: 'replace' })
+  doc.reset()
+  check('export -> import with Platinum and HGSS data is lossless', json(doc.read()) === json(N4))
+  const r4 = doc.read()
+  check('the Emerald log is untouched beside it: runs, battles, symbols and BP deep-equal the imported file', json([r4.runs, r4.battles, r4.symbols, r4.bp]) === json([imported.runs, imported.battles, imported.symbols, imported.bp]))
+
+  // The Emerald document loads unchanged after S3: the committed v1 file and a fresh xlsx import.
+  localStorage.clear()
+  doc.reset()
+  const rv1 = api.importDocuments(committed, { mode: 'replace' })
+  doc.reset()
+  const e1 = doc.read()
+  check('the committed v1 file imports (migrated) and its runs, battles, symbols, BP are the file\'s exactly', rv1.ok && rv1.documents[0].result === 'replaced' && rv1.documents[0].fromVersion === 1 && json([e1.runs, e1.battles, e1.symbols, e1.bp]) === json([imported.runs, imported.battles, imported.symbols, imported.bp]) && json(e1.games) === '{}', json(rv1))
+  localStorage.clear()
+  doc.reset()
+  const rx = api.importDocuments(regenerated, { mode: 'replace' })
+  doc.reset()
+  const x1 = doc.read()
+  check('the xlsx import (re-run above) produces a loadable v2 document: replaced, 6 runs, 103 battles, 16 ledger lines', rx.ok && rx.documents[0].result === 'replaced' && rx.documents[0].fromVersion === 2 && x1.runs.length === 6 && x1.battles.length === 103 && x1.bp.ledger.length === 16, json(rx))
+  localStorage.clear()
+  doc.reset()
+}
 
 // ================================================================== PART B
 const TRIGGER = '[data-testid="nav-tab-battle-frontier"]'
@@ -1060,6 +1126,122 @@ try {
   const missingRegions = wantRegions.filter((r) => !seen.has(r))
   check('every new region is named for ?layout=1', missingRegions.length === 0, missingRegions.join(', '))
   await page.click('[data-testid="tracker-all-runs"]')
+
+  // ---------------------------------------------------------------- Gen 4 games (feature/frontier-tracker-games)
+  hr('B13. PLATINUM AND HEARTGOLD/SOULSILVER: one row per facility; FireRed/LeafGreen points to Trainer Hill & Tower')
+  const pickGame = async (vg) => {
+    await page.click(`[data-testid="frontier-game-row-${vg}"]`)
+    await page.waitForFunction((vg) => document.querySelector('[data-testid="frontier-tracker"]')?.dataset.game === vg, vg)
+  }
+  const g4 = () =>
+    page.$eval(ROOT_SEL, (root) => ({
+      status: root.dataset.status,
+      scope: root.querySelector('.bf-scope')?.textContent ?? null,
+      notice: root.querySelector('[data-testid="frontier-notice"]')?.textContent ?? null,
+      flag: root.querySelector('[data-testid="tracker-hgss-flag"]')?.textContent ?? null,
+      rows: [...root.querySelectorAll('[data-testid="tracker-gen4"] tbody tr')].map((tr) => ({
+        id: tr.dataset.facility,
+        name: tr.children[0].textContent,
+        streak: tr.querySelector('[data-testid^="g4-streak-"]').value,
+        best: tr.querySelector('[data-testid^="g4-best-"]').value,
+        silver: tr.querySelector('[data-testid^="g4-silver-"]').getAttribute('aria-pressed'),
+        gold: tr.querySelector('[data-testid^="g4-gold-"]').getAttribute('aria-pressed'),
+        next: tr.querySelector('[data-testid^="g4-next-"]').textContent,
+      })),
+    }))
+  const rowOf = async (id) => (await g4()).rows.find((r) => r.id === id)
+  await page.click('[data-testid="tracker-all-runs"]').catch(() => {})
+  await selectGeneration(page, 4)
+  await openTracker(page)
+  await page.waitForSelector(ROOT_SEL)
+  await pickGame('platinum')
+  await page.waitForSelector('[data-testid="tracker-gen4"]')
+  let s4 = await g4()
+  check('Platinum: the Gen 4 tracker, not the notice, scoped "Platinum · Gen 4", no HGSS flag', s4.status === 'ready' && s4.notice == null && s4.scope === 'Platinum · Gen 4' && s4.flag == null, json({ ...s4, rows: undefined }))
+  check('five rows: Battle Tower, Factory, Hall, Castle, Arcade', json(s4.rows.map((r) => r.name)) === '["Battle Tower","Battle Factory","Battle Hall","Battle Castle","Battle Arcade"]', json(s4.rows.map((r) => r.name)))
+  check('nothing logged: streak 0, best 0, no prints; Palmer at battle 21 (Single Battle streaks only)', s4.rows.every((r) => r.streak === '0' && r.best === '0' && r.silver === 'false' && r.gold === 'false') && s4.rows[0].next === 'Palmer at battle 21, for the Silver Print (Single Battle streaks only)', json(s4.rows[0]))
+  await page.fill('[data-testid="g4-streak-tower"]', '15')
+  let tw = await rowOf('tower')
+  check('typing a Tower streak of 15: "Palmer at battle 21, for the Silver Print"; the best follows to 15', tw.next.startsWith('Palmer at battle 21, for the Silver Print') && tw.best === '15', json(tw))
+  await page.fill('[data-testid="g4-streak-tower"]', '21')
+  tw = await rowOf('tower')
+  check('typing 21 flips it: "Palmer at battle 49, for the Gold Print"; best 21', tw.next.startsWith('Palmer at battle 49, for the Gold Print') && tw.best === '21', json(tw))
+  await page.fill('[data-testid="g4-streak-hall"]', '49')
+  const hall = await rowOf('hall')
+  check('the Hall counts to 50 and 170: streak 49 -> "Argenta at battle 50"', hall.next === 'Argenta at battle 50, for the Silver Print', hall.next)
+  await page.fill('[data-testid="g4-best-hall"]', '80')
+  await page.click('[data-testid="g4-silver-tower"]')
+  await page.click('[data-testid="g4-gold-castle"]')
+  await page.keyboard.press('Tab')
+  s4 = await g4()
+  check('prints toggle: Tower Silver and Castle Gold held, the rest not', s4.rows.find((r) => r.id === 'tower').silver === 'true' && s4.rows.find((r) => r.id === 'castle').gold === 'true' && s4.rows.filter((r) => r.silver === 'true' || r.gold === 'true').length === 2)
+  const stored4 = await page.evaluate(() => JSON.parse(localStorage.getItem('pokeapp:frontier-tracker:v1')).games?.platinum)
+  check('stored under games.platinum: Tower 21/21 with Silver, Hall 49/80, Castle Gold', json(stored4?.facilities?.tower) === '{"streak":21,"best":21,"silver":true}' && json(stored4?.facilities?.hall) === '{"streak":49,"best":80}' && stored4?.facilities?.castle?.gold === true, json(stored4))
+  const acc4 = await accentUses(page)
+  check('Platinum: accent within 2 uses', acc4.length <= 2, acc4.join(' | '))
+  const bs4 = await badgesAndShadows(page)
+  check('Platinum: no badge, no shadow', bs4.badges.length === 0 && bs4.shadows === 0, json(bs4))
+  await page.screenshot({ path: shot('s3-platinum-light') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s3-platinum-dark') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(300)
+  const fit4 = await page.evaluate(() => {
+    const sc = document.querySelector('[data-testid="frontier-scroll-area"]').getBoundingClientRect()
+    const over = []
+    for (const el of document.querySelectorAll('.bf-page *')) {
+      if (el.closest('.bf-tw') && !el.matches('.bf-tw')) continue // a wide table scrolls inside its wrapper
+      const r = el.getBoundingClientRect()
+      if (r.width && r.right > sc.right + 1) over.push(`${el.tagName.toLowerCase()}.${el.className}`.slice(0, 40))
+    }
+    return { page: document.documentElement.scrollWidth <= innerWidth, n: over.length, over: over.slice(0, 4) }
+  })
+  check('390 px Platinum: nothing runs past the scroll area', fit4.page && fit4.n === 0, json(fit4))
+  await page.screenshot({ path: shot('s3-platinum-390-light') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s3-platinum-390-dark') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await page.setViewportSize({ width: 1440, height: 1000 })
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector(TRIGGER, { timeout: 180000 })
+  await openTracker(page)
+  await page.waitForSelector(ROOT_SEL)
+  await pickGame('platinum')
+  await page.waitForSelector('[data-testid="tracker-gen4"]')
+  s4 = await g4()
+  const t4 = s4.rows.find((r) => r.id === 'tower')
+  check('after a reload: Tower streak 21, best 21, Silver held, next Palmer at 49; Castle Gold held', t4.streak === '21' && t4.best === '21' && t4.silver === 'true' && t4.next.startsWith('Palmer at battle 49') && s4.rows.find((r) => r.id === 'castle').gold === 'true', json(t4))
+
+  await pickGame('heartgold-soulsilver')
+  await page.waitForSelector('[data-testid="tracker-gen4"]')
+  s4 = await g4()
+  check('HeartGold/SoulSilver: its own tracker (Tower streak 0: Platinum\'s is separate) and the "reuses Platinum, unconfirmed" flag', s4.status === 'ready' && s4.scope === 'HeartGold and SoulSilver · Gen 4' && s4.rows.find((r) => r.id === 'tower').streak === '0' && /rules are Platinum’s/.test(s4.flag ?? '') && /unconfirmed/.test(s4.flag ?? ''), json({ ...s4, rows: undefined }))
+  await page.screenshot({ path: shot('s3-hgss-light') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s3-hgss-dark') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await pickGame('diamond-pearl')
+  s4 = await g4()
+  check('Diamond/Pearl: the "no Frontier" notice', s4.status === 'not-in-game' && s4.notice === 'Diamond and Pearl have no Battle Frontier. Platinum added it.', json(s4))
+
+  await selectGeneration(page, 3)
+  await openTracker(page)
+  await page.waitForSelector(ROOT_SEL)
+  await pickGame('firered-leafgreen')
+  s4 = await g4()
+  check('FireRed/LeafGreen: a notice pointing to Trainer Hill & Tower', s4.status === 'not-in-game' && s4.notice === 'FireRed and LeafGreen have no Battle Frontier. Log Trainer Tower climbs under Trainer Hill & Tower.', json(s4))
+  await page.screenshot({ path: shot('s3-frlg-notice-light') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s3-frlg-notice-dark') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await pickGame('ruby-sapphire')
+  s4 = await g4()
+  check('Ruby/Sapphire: the "no Frontier" notice', s4.status === 'not-in-game' && s4.notice === 'Ruby and Sapphire have no Battle Frontier. Emerald added it.', json(s4))
+  await pickGame('emerald')
+  await ready(page)
+  check('Emerald: the existing tracker, its runs unchanged', (await page.$('[data-testid="tracker-runs"]')) != null)
 
   // ---------------------------------------------------------------- themes
   hr('B10. BOTH THEMES: tokens only, accent within 2, no badge, no shadow')
