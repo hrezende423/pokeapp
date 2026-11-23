@@ -111,13 +111,15 @@ function StreakField({
       value={draft ?? String(value)}
       onChange={(e) => {
         const t = e.target.value.trim()
-        if (!/^\d{0,4}$/.test(t)) return
-        setDraft(t)
-        if (t !== '') onCommit(Number(t))
+        if (/^\d{0,4}$/.test(t)) setDraft(t)
       }}
+      // Committed on leaving the field or Enter, not per keystroke: a half-typed number never becomes a best.
       onBlur={() => {
-        if (draft === '') onCommit(0)
+        if (draft != null) onCommit(draft === '' ? 0 : Number(draft))
         setDraft(null)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
       }}
     />
   )
