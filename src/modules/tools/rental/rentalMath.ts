@@ -20,6 +20,27 @@
  *   HeartGold/SoulSilver: the bundle reuses Platinum's pool (its own is not
  *   extracted), and so does this -- said on the page.
  *
+ *   Slateport Battle Tent (Emerald; pokeemerald 9103e529c2fbdd7add4a1ff3350c6c1f92112c42):
+ *   the Factory-style tent (src/battle_tent.c header comment). Its
+ *   GenerateInitialRentalMons draws each of the six offered rentals as
+ *   `Random() % NUM_SLATEPORT_TENT_MONS` (70, include/constants/battle_tent_mons.h)
+ *   from gSlateportBattleTentMons: the whole pool, no rounds, no win-streak
+ *   ranges and no "better rentals". battle_factory_screen.c
+ *   CreateSlateportTentSelectableMons builds them at `level = TENT_MIN_LEVEL`
+ *   (30, include/constants/battle_tent.h) with `ivs = 0` for every stat, and
+ *   battle_factory.c SetPlayerAndOpponentParties rebuilds the party at
+ *   TENT_MIN_LEVEL with that stored IV. EVs: MAX_TOTAL_EVS split over the set's
+ *   evSpread flags, as the Factory's.
+ *
+ *   Battle Castle (Platinum, HGSS): no rental Pokémon at all. pokeplatinum
+ *   (485c400f9d7bad10d906d556ba23e5e46d5b3e5e) src/overlay104/battle_castle.c
+ *   BattleCastle_Init copies the player's own party (SaveData_GetParty, by
+ *   partySlots) and clears their held items; the Castle's "rental" is
+ *   BATTLE_CASTLE_RANK_RENTALS (include/constants/battle_frontier.h), whose
+ *   menu (src/applications/frontier/battle_castle/self_app.c RentItem,
+ *   sItemsForRent / sBerriesForRent) sets a held item, paid for with
+ *   BattleCastle_SpendCastlePoints.
+ *
  * Indexes here are positions in the bundle's `sets` (Emerald: the FRONTIER_MON_
  * order; Platinum: set ID - 1, frontier_pokemon.order without its dummy).
  */
@@ -155,3 +176,35 @@ export function rentalStats(
     }),
   )
 }
+
+/** A rental facility, by its bundle facility id. */
+export type RentalFacility = 'battle-frontier' | 'slateport-battle-tent'
+export const RENTAL_FACILITY_LABEL: Record<RentalFacility, string> = {
+  'battle-frontier': 'Battle Factory',
+  'slateport-battle-tent': 'Slateport Battle Tent',
+}
+
+/** The rental facilities a game has: the Slateport Battle Tent is Emerald's alone. */
+export function rentalFacilities(game: RentalGame): RentalFacility[] {
+  return game === 'emerald' ? ['battle-frontier', 'slateport-battle-tent'] : ['battle-frontier']
+}
+
+/** NUM_SLATEPORT_TENT_MONS, TENT_MIN_LEVEL and CreateSlateportTentSelectableMons' IV. */
+export const SLATEPORT_TENT = { sets: 70, level: 30, iv: 0 } as const
+
+/** The Slateport Battle Tent's pool: every set, every challenge, at level 30 and IV 0. */
+export function slateportTentPool(): RentalPool {
+  return {
+    from: 0,
+    to: SLATEPORT_TENT.sets - 1,
+    iv: SLATEPORT_TENT.iv,
+    level: SLATEPORT_TENT.level,
+  }
+}
+
+/** The games whose Frontier has a Battle Castle, which rents held items, not Pokémon. */
+export function hasBattleCastle(game: RentalGame): boolean {
+  return game === 'platinum' || game === 'heartgold-soulsilver'
+}
+export const BATTLE_CASTLE_NOTE =
+  'The Battle Castle has no rental Pokémon: its rentals are held items, paid in Castle Points.'

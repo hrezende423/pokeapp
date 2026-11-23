@@ -6,11 +6,18 @@ import { bestOf } from '../compare/compareMath'
 import { findTool } from '../registry'
 import { ToolInputs, ToolResult, ToolShell } from '../ToolShell'
 import {
+  BATTLE_CASTLE_NOTE,
   PLATINUM_UPGRADE_TRADES,
+  RENTAL_FACILITY_LABEL,
+  SLATEPORT_TENT,
   STAT_KEYS,
   canUpgrade,
+  hasBattleCastle,
+  rentalFacilities,
   rentalPool,
   rentalStats,
+  slateportTentPool,
+  type RentalFacility,
   type RentalGame,
 } from './rentalMath'
 
@@ -19,8 +26,9 @@ const MAX = 6
 const STAT_LABEL = ['HP', 'Attack', 'Defense', 'Sp. Atk', 'Sp. Def', 'Speed']
 
 /**
- * #22 Rental set comparator: the Battle Factory's rental pool for a round, and
- * up to six of its sets side by side at the stats you would rent them with.
+ * #22 Rental set comparator: the Battle Factory's rental pool for a round (or,
+ * in Emerald, the Slateport Battle Tent's whole pool), and up to six of its sets
+ * side by side at the stats you would rent them with.
  */
 export function RentalTool() {
   return (
@@ -34,9 +42,10 @@ export function RentalTool() {
   )
 }
 
-type Load = { game: string; sets: FacilitySet[] | null; error: string | null }
+type Load = { key: string; sets: FacilitySet[] | null; error: string | null }
 
-function useFrontierSets(game: string): Load {
+function useFacilitySets(game: string, facility: RentalFacility): Load {
+  const key = `${game}/${facility}`
   const [loaded, setLoaded] = useState<Load | null>(null)
   useEffect(() => {
     let alive = true
@@ -44,18 +53,18 @@ function useFrontierSets(game: string): Load {
       (p) =>
         alive &&
         setLoaded({
-          game,
-          sets: p.facilities?.find((f) => f.id === 'battle-frontier')?.sets ?? null,
+          key,
+          sets: p.facilities?.find((f) => f.id === facility)?.sets ?? null,
           error: null,
         }),
       (e: unknown) =>
-        alive && setLoaded({ game, sets: null, error: e instanceof Error ? e.message : String(e) }),
+        alive && setLoaded({ key, sets: null, error: e instanceof Error ? e.message : String(e) }),
     )
     return () => {
       alive = false
     }
-  }, [game])
-  return loaded?.game === game ? loaded : { game, sets: null, error: null }
+  }, [game, facility, key])
+  return loaded?.key === key ? loaded : { key, sets: null, error: null }
 }
 
 const setLabel = (s: FacilitySet, i: number) =>
@@ -64,13 +73,18 @@ const setLabel = (s: FacilitySet, i: number) =>
   } · #${i + 1}`
 
 function RentalBody({ game, generation }: { game: RentalGame; generation: number }) {
-  const load = useFrontierSets(game)
+  const facilities = rentalFacilities(game)
+  const [facility, setFacility] = useState<RentalFacility>('battle-frontier')
+  const tent = facility === 'slateport-battle-tent'
+  const load = useFacilitySets(game, facility)
   const [open, setOpen] = useState(false)
   const [round, setRound] = useState(1)
   const [upgraded, setUpgraded] = useState(false)
   const [picked, setPicked] = useState<(number | null)[]>([null, null])
 
-  const pool = rentalPool(game, open, round, upgraded && canUpgrade(game, open, round))
+  const pool = tent
+    ? slateportTentPool()
+    : rentalPool(game, open, round, upgraded && canUpgrade(game, open, round))
   const inPool = useMemo(
     () =>
       load.sets
@@ -107,9 +121,9 @@ function RentalBody({ game, generation }: { game: RentalGame; generation: number
   })
 
   const reason = load.error
-    ? `This game’s Frontier sets did not load: ${load.error}`
+    ? `This game’s ${RENTAL_FACILITY_LABEL[facility]} sets did not load: ${load.error}`
     : !load.sets
-      ? 'Loading the Frontier sets…'
+      ? `Loading the ${RENTAL_FACILITY_LABEL[facility]} sets…`
       : chosen.length < 2
         ? 'Pick at least two sets from the pool.'
         : null
@@ -117,60 +131,85 @@ function RentalBody({ game, generation }: { game: RentalGame; generation: number
   return (
     <>
       <ToolInputs>
-        <div className="calc-row">
+        {facilities.length > 1 && (
           <SelectField
-            label="Level"
+            label="Facility"
+            options={facilities.map((f) => ({ value: f, label: RENTAL_FACILITY_LABEL[f] }))}
+            value={facility}
+            data-testid="rnt-facility"
+            onChange={(e) => {
+              setFacility(e.target.value as RentalFacility)
+              // Set indexes belong to one facility's pool.
+              setPicked([null, null])
+            }}
+          />
+        )}
+        {!tent && (
+          <div className="calc-row">
+            <SelectField
+              label="Level"
+              options={[
+                { value: 'l50', label: 'Level 50' },
+                { value: 'open', label: 'Open Level (100)' },
+              ]}
+              value={open ? 'open' : 'l50'}
+              data-testid="rnt-level"
+              onChange={(e) => setOpen(e.target.value === 'open')}
+            />
+            <SelectField
+              label="Round"
+              options={Array.from({ length: 10 }, (_, k) => ({
+                value: String(k + 1),
+                label: `${k + 1} (battles ${k * 7 + 1}–${k * 7 + 7})`,
+              }))}
+              value={String(round)}
+              data-testid="rnt-round"
+              onChange={(e) => setRound(Number(e.target.value))}
+            />
+          </div>
+        )}
+        {!tent && (
+          <SelectField
+            label="Rentals"
             options={[
-              { value: 'l50', label: 'Level 50' },
-              { value: 'open', label: 'Open Level (100)' },
+              { value: 'standard', label: 'Standard' },
+              ...(canUpgrade(game, open, round)
+                ? [
+                    {
+                      value: 'upgraded',
+                      label:
+                        game === 'emerald'
+                          ? 'Better range (a long rental record)'
+                          : `Upgraded (more than ${PLATINUM_UPGRADE_TRADES[0]} trades)`,
+                    },
+                  ]
+                : []),
             ]}
-            value={open ? 'open' : 'l50'}
-            data-testid="rnt-level"
-            onChange={(e) => setOpen(e.target.value === 'open')}
+            value={upgraded && canUpgrade(game, open, round) ? 'upgraded' : 'standard'}
+            data-testid="rnt-upgraded"
+            onChange={(e) => setUpgraded(e.target.value === 'upgraded')}
           />
-          <SelectField
-            label="Round"
-            options={Array.from({ length: 10 }, (_, k) => ({
-              value: String(k + 1),
-              label: `${k + 1} (battles ${k * 7 + 1}–${k * 7 + 7})`,
-            }))}
-            value={String(round)}
-            data-testid="rnt-round"
-            onChange={(e) => setRound(Number(e.target.value))}
-          />
-        </div>
-        <SelectField
-          label="Rentals"
-          options={[
-            { value: 'standard', label: 'Standard' },
-            ...(canUpgrade(game, open, round)
-              ? [
-                  {
-                    value: 'upgraded',
-                    label:
-                      game === 'emerald'
-                        ? 'Better range (a long rental record)'
-                        : `Upgraded (more than ${PLATINUM_UPGRADE_TRADES[0]} trades)`,
-                  },
-                ]
-              : []),
-          ]}
-          value={upgraded && canUpgrade(game, open, round) ? 'upgraded' : 'standard'}
-          data-testid="rnt-upgraded"
-          onChange={(e) => setUpgraded(e.target.value === 'upgraded')}
-        />
+        )}
         <p
           className="calc-result-note"
           data-testid="rnt-pool"
           data-from={pool.from}
           data-to={pool.to}
           data-iv={pool.iv}
+          data-count={inPool.length}
         >
           Pool: sets {pool.from + 1}–{pool.to + 1} ({inPool.length} sets), level {pool.level}, every
           IV {pool.iv === 'random' ? 'random (the game reads past its IV table here)' : pool.iv}.
+          {tent &&
+            ` The tent offers six of all ${SLATEPORT_TENT.sets} sets at random every challenge: no rounds, no better rentals.`}
           {game === 'heartgold-soulsilver' &&
             ' HeartGold/SoulSilver: Platinum’s pool and rules — HGSS’s own are not extracted.'}
         </p>
+        {hasBattleCastle(game) && (
+          <p className="calc-result-note" data-testid="rnt-castle">
+            {BATTLE_CASTLE_NOTE}
+          </p>
+        )}
         <div className="calc-row">
           {picked.map((idx, k) => (
             <SelectField

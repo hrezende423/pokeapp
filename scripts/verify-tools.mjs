@@ -1425,7 +1425,27 @@ try {
     const base = Object.fromEntries(d.resolveStatsForGeneration(sp.varieties[0], 4).map((x) => [x.stat, x.base_stat]))
     const nat = d.getNature(b.nature_id)
     const stats = rm.rentalStats(base, b.evs, { increased: nat.increased_stat, decreased: nat.decreased_stat }, 50, 0)
+    // Slateport Battle Tent (pokeemerald battle_tent.c / battle_factory_screen.c): set 0 is
+    // SLATEPORT_TENT_MON_ZIGZAGOON_1, Jolly, 255 Atk / 255 Spe, at level 30, IV 0, by hand:
+    // HP (76 + 0 + 0) * 30/100 = 22 + 40 = 62; Atk (60 + 63) * .3 = 36 + 5 = 41; Def 82 * .3 = 24 + 5 = 29;
+    // SpA 60 * .3 = 18 + 5 = 23, x0.9 = 20; SpD 29; Spe (120 + 63) * .3 = 54 + 5 = 59, x1.1 = 64.
+    const tent = (await tr.loadTrainers('emerald')).facilities.find((f) => f.id === 'slateport-battle-tent').sets
+    const tp = rm.slateportTentPool()
+    const z = tent[0]
+    const zBase = Object.fromEntries(d.resolveStatsForGeneration(d.getSpecies(z.species_id).varieties[0], 3).map((x) => [x.stat, x.base_stat]))
+    const zNat = d.getNature(z.nature_id)
+    const zStats = rm.rentalStats(zBase, z.evs, { increased: zNat.increased_stat, decreased: zNat.decreased_stat }, tp.level, tp.iv)
     return {
+      tent: {
+        pool: `${tp.from}-${tp.to}/${tp.iv}/L${tp.level}`,
+        size: tent.slice(tp.from, tp.to + 1).length,
+        bundle: tent.length,
+        ends: [tent[0].key, tent[69].key],
+        nature: zNat.name,
+        stats: zStats.join(','),
+        facilities: [rm.rentalFacilities('emerald').join(','), rm.rentalFacilities('platinum').join(',')],
+        castle: [rm.hasBattleCastle('emerald'), rm.hasBattleCastle('platinum'), rm.hasBattleCastle('heartgold-soulsilver')],
+      },
       emKeys: [em[110].key, em[199].key, em[372].key, em.length],
       em: [p('emerald', false, 1, false), p('emerald', false, 1, true), p('emerald', true, 1, false), p('emerald', false, 8, false), p('emerald', false, 8, true), p('emerald', false, 9, false), p('emerald', false, 10, false)],
       pt: [p('platinum', false, 1, false), p('platinum', false, 1, true), p('platinum', true, 1, false), p('platinum', false, 8, true), p('platinum', false, 12, false)],
@@ -1442,6 +1462,10 @@ try {
   check('Platinum round 1: set IDs 1-150 at IV 0; upgraded = round 2\'s 151-250 at IV 4; Open starts at 351', JSON.stringify(rnt.pt.slice(0, 3)) === '["0-149/0/L50","150-249/4/L50","350-485/0/L100"]', rnt.pt.slice(0, 3).join(' '))
   check('Platinum round 8 (49+) is sets 351-950 at IV 31, not upgradable, and later rounds stay there', rnt.pt[3] === '350-949/31/L50' && rnt.pt[4] === '350-949/31/L50' && rnt.upgrade8 === false, `${rnt.pt[3]} ${rnt.pt[4]}`)
   check('Platinum set 1 (Bulbasaur, Modest, 255 SpA/SpD) at L50, IV 0: 105/48/54/111/101/50, by hand', rnt.ptKey === 'bulbasaur_1' && rnt.nature === 'modest' && rnt.stats === '105,48,54,111,101,50', `${rnt.ptKey} ${rnt.nature} ${rnt.stats}`)
+  check('Slateport Battle Tent: all 70 sets (no rounds), level 30 (TENT_MIN_LEVEL), every IV 0', rnt.tent.pool === '0-69/0/L30' && rnt.tent.size === 70 && rnt.tent.bundle === 70, `${rnt.tent.pool} ${rnt.tent.size}/${rnt.tent.bundle}`)
+  check('Slateport Battle Tent pool ends: #0 Zigzagoon 1, #69 Machoke', rnt.tent.ends[0] === 'SLATEPORT_TENT_MON_ZIGZAGOON_1' && rnt.tent.ends[1] === 'SLATEPORT_TENT_MON_MACHOKE', rnt.tent.ends.join(' '))
+  check('Tent set 0 (Zigzagoon, Jolly, 255 Atk/Spe) at L30, IV 0: 62/41/29/20/29/64, by hand', rnt.tent.nature === 'jolly' && rnt.tent.stats === '62,41,29,20,29,64', `${rnt.tent.nature} ${rnt.tent.stats}`)
+  check('the tent is Emerald\'s alone; the Castle (no rental Pokemon) is Platinum\'s and HGSS\'s', rnt.tent.facilities[0] === 'battle-frontier,slateport-battle-tent' && rnt.tent.facilities[1] === 'battle-frontier' && JSON.stringify(rnt.tent.castle) === '[false,true,true]', `${rnt.tent.facilities.join(' | ')} ${rnt.tent.castle}`)
 
   const openBrain = async (gen, game, name) => {
     await selectGeneration(page, gen)
@@ -1462,7 +1486,25 @@ try {
   const rntHp = await page.$$eval('[data-testid="rnt-stat-hp"] td', (els) => els.map((e) => e.dataset.value))
   check('on the page: two Emerald round-1 sets side by side with their stats', rntCols === 2 && rntHp.every((v) => Number(v) > 0), `${rntCols} cols, HP ${rntHp}`)
   await page.screenshot({ path: shot('tool-22-rental.png') })
+  check('Emerald shows no Battle Castle line', (await page.$('[data-testid="rnt-castle"]')) === null)
+  await page.selectOption('[data-testid="rnt-facility"]', 'slateport-battle-tent')
+  await page.waitForSelector('[data-testid="rnt-pool"][data-count="70"]', { timeout: 30000 })
+  const tentOpts = await page.$$eval('[data-testid="rnt-set-1"] option', (els) => els.length)
+  const tentRound = await page.$('[data-testid="rnt-round"]')
+  check('on the page: the Slateport Battle Tent offers all 70 sets (70 rows + the blank), no round picker', tentOpts === 71 && tentRound === null, `${tentOpts} options, round picker ${tentRound ? 'shown' : 'hidden'}`)
+  await page.selectOption('[data-testid="rnt-set-1"]', '0')
+  await page.selectOption('[data-testid="rnt-set-2"]', '69')
+  const tentHp = await page.$$eval('[data-testid="rnt-stat-hp"] td', (els) => els.map((e) => e.dataset.value))
+  const tentSpe = await page.$$eval('[data-testid="rnt-stat-speed"] td', (els) => els.map((e) => e.dataset.value))
+  check('on the page: tent Zigzagoon (set 1) at L30, IV 0 has 62 HP and 64 Speed', tentHp[0] === '62' && tentSpe[0] === '64', `HP ${tentHp} Spe ${tentSpe}`)
   check('Thorton\'s Trainer Dex entry links to it too (Platinum)', await openBrain(4, 'platinum', 'Thorton'))
+  await page.click('[data-testid="trainerdex-tool-link"]')
+  await page.waitForSelector('[data-testid="rnt-pool"]', { timeout: 60000 })
+  await page.click('[data-testid="tool-game-row-platinum"]')
+  await page.waitForSelector('[data-testid="tool-game-row-platinum"][data-active="true"]')
+  const castle = await page.$eval('[data-testid="rnt-castle"]', (e) => e.textContent).catch(() => null)
+  const ptFacility = await page.$('[data-testid="rnt-facility"]')
+  check('on the page: Platinum says the Battle Castle has no rental Pokemon, and offers no tent', castle === 'The Battle Castle has no rental Pokémon: its rentals are held items, paid in Castle Points.' && ptFacility === null, `${castle}`)
 
   // Both themes photographed (MODULE-PATTERNS §9), on Gen 4 so nothing is greyed.
   await selectGeneration(page, 4)
