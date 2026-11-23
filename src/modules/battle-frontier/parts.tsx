@@ -205,10 +205,10 @@ export function Kv({ rows, layout }: { rows: [string, ReactNode][]; layout?: str
  * engine (deepLink + followLink). A label you can click, not a button shape: no
  * line at rest, a hairline on hover.
  */
-export function SpeciesLink({ id }: { id: number | null | undefined }) {
+export function SpeciesLink({ id, generation }: { id: number | null | undefined; generation?: number }) {
   const nav = useNav()
   if (id == null) return <span className="bf-muted">Unknown</span>
-  const name = speciesName(id)
+  const name = speciesName(id, generation)
   const target = deepLink({ kind: 'species', id })
   return (
     <button

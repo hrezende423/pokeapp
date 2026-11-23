@@ -169,7 +169,7 @@ export function Gen4Facilities({ game }: { game: Gen4Game }) {
           <p className="bf-sec">Banned species ({GEN4_BANNED.length + (game === 'heartgold-soulsilver' ? 1 : 0)})</p>
           <p className="bf-banned">
             {GEN4_BANNED.map((id) => (
-              <SpeciesLink key={id} id={id} />
+              <SpeciesLink key={id} id={id} generation={4} />
             ))}
             {game === 'heartgold-soulsilver' && <span>{HGSS_EXTRA_BAN}</span>}
           </p>

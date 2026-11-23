@@ -5,9 +5,9 @@ import { FRONTIER_GENERATION } from './data'
 
 /** Names as the mockups print them: the eager bundle's display names. */
 
-/** A species' name through the entity-link engine, scoped to Gen 3. */
-export const speciesName = (id: number): string =>
-  label({ kind: 'species', id }, appContext, FRONTIER_GENERATION)
+/** A species' name through the entity-link engine, scoped to a generation (Emerald's Gen 3 by default). */
+export const speciesName = (id: number, generation: number = FRONTIER_GENERATION): string =>
+  label({ kind: 'species', id }, appContext, generation)
 
 export const moveNames = (ids: number[]): string =>
   ids.map((id) => getMove(id)?.display_name ?? `move ${id}`).join(' · ')
