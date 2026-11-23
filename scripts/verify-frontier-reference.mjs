@@ -308,6 +308,8 @@ try {
     })),
   )
   const byId = Object.fromEntries(b4.map((b) => [b.id, b]))
+  const b4Names = await page.$$eval('[data-layout="brain"][data-facility="tower"] tbody tr .bf-link', (els) => els.map((e) => e.textContent))
+  check('Gen 4 Brain Pokémon are named in Gen 4 (Rhyperior, Heatran), never "Species #"', b4Names.includes('Rhyperior') && b4Names.includes('Heatran') && !b4Names.some((n) => /#/.test(n)), b4Names.join(', '))
   check('Platinum: the five Brains in facility order', JSON.stringify(b4.map((b) => b.id)) === JSON.stringify(['tower', 'factory', 'hall', 'castle', 'arcade']), b4.map((b) => b.name).join(', '))
   check('Palmer: Silver Print at battle 21, Gold at 49, Single only', byId.tower?.when === 'Silver Print at battle 21. Gold Print at battle 49. Single Battle streaks only.', byId.tower?.when)
   check('Argenta: Silver Print at 50, Gold at 170 (HALL_STREAK_*)', byId.hall?.when === 'Silver Print at battle 50. Gold Print at battle 170.', byId.hall?.when)

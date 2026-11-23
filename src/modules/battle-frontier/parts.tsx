@@ -6,6 +6,7 @@ import type { StatSpread } from '../../data/trainers'
 import { deepLink } from '../../lib/entities'
 import { followLink } from '../../lib/entities/appContext'
 import { useNav } from '../nav/navContext'
+import { generationOfGame } from '../version-group/games'
 import { FRONTIER_VERSION_GROUP, type BrainAppearance, type FrontierBrain, type FrontierData } from './data'
 import { fmt, STATS } from './format'
 import { speciesName, speciesNameIn } from './names'
@@ -313,7 +314,7 @@ export function MonCell({
   return (
     <span className="bf-mon">
       <MonSprite speciesId={speciesId} pokemonId={pokemonId} versionGroup={versionGroup} />
-      <SpeciesLink id={speciesId} />
+      <SpeciesLink id={speciesId} generation={versionGroup ? (generationOfGame(versionGroup) ?? undefined) : undefined} />
     </span>
   )
 }
