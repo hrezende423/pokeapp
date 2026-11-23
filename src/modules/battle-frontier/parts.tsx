@@ -8,7 +8,7 @@ import { followLink } from '../../lib/entities/appContext'
 import { useNav } from '../nav/navContext'
 import { FRONTIER_VERSION_GROUP, type BrainAppearance, type FrontierBrain, type FrontierData } from './data'
 import { fmt, STATS } from './format'
-import { speciesName } from './names'
+import { speciesName, speciesNameIn } from './names'
 import { GameRow } from '../version-group/GameRow'
 import type { GameInGeneration } from '../version-group/gameInGeneration'
 import { GAME_SCOPE, gameNotice, generationNotice, isFrontierGame, type FrontierGame } from './reference/games'
@@ -208,7 +208,7 @@ export function Kv({ rows, layout }: { rows: [string, ReactNode][]; layout?: str
 export function SpeciesLink({ id, generation }: { id: number | null | undefined; generation?: number }) {
   const nav = useNav()
   if (id == null) return <span className="bf-muted">Unknown</span>
-  const name = speciesName(id, generation)
+  const name = generation == null ? speciesName(id) : speciesNameIn(id, generation)
   const target = deepLink({ kind: 'species', id })
   return (
     <button
