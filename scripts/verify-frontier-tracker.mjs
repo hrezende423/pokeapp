@@ -1245,9 +1245,9 @@ try {
   check('Ruby/Sapphire: the "no Frontier" notice', s4.status === 'not-in-game' && s4.notice === 'Ruby and Sapphire have no Battle Frontier. Emerald added it.', json(s4))
   await pickGame('emerald')
   await ready(page)
-  const emeraldRuns = await page.$$eval('[data-testid="tracker-runs"] tbody tr', (rows) => rows.length)
-  const storedRuns = await page.evaluate(() => JSON.parse(localStorage.getItem('pokeapp:frontier-tracker:v1') ?? '{}').runs?.length ?? -1)
-  check('Emerald: the existing tracker, one row per stored run', emeraldRuns > 0 && emeraldRuns === storedRuns, `${emeraldRuns} rows, ${storedRuns} runs`)
+  const emeraldRuns = await page.$$eval('[data-testid="tracker-runs"] tr[data-run-id]', (rows) => rows.map((r) => r.dataset.runId).sort())
+  const storedRuns = await page.evaluate(() => (JSON.parse(localStorage.getItem('pokeapp:frontier-tracker:v1') ?? '{}').runs ?? []).map((r) => r.id).sort())
+  check('Emerald: the existing tracker, one row per stored run (same ids)', emeraldRuns.length > 0 && JSON.stringify(emeraldRuns) === JSON.stringify(storedRuns), `${emeraldRuns.length} rows, ${storedRuns.length} runs`)
 
   // ---------------------------------------------------------------- themes
   hr('B10. BOTH THEMES: tokens only, accent within 2, no badge, no shadow')
