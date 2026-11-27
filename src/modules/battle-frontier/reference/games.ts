@@ -67,5 +67,11 @@ const GAME_SUBJECT: Record<string, string> = {
   'heartgold-soulsilver': 'HeartGold and SoulSilver have',
 }
 
+/** The Challenge Tracker's notice: FireRed/LeafGreen's climbs are logged under Trainer Hill & Tower. */
+export const trackerNotice = (game: string): string =>
+  game === 'firered-leafgreen'
+    ? 'FireRed and LeafGreen have no Battle Frontier. Log Trainer Tower climbs under Trainer Hill & Tower.'
+    : gameNotice(game, 'Challenge Tracker')
+
 /** The Trainer Hill & Tower screen's notice: only Emerald (the Hill) and FireRed/LeafGreen (the Tower) have one. */
 export const speedNotice = (game: string): string => `${GAME_SUBJECT[game] ?? `${game} has`} no Trainer Hill or Trainer Tower.`

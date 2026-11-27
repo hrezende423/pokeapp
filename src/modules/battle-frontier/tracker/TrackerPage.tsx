@@ -9,6 +9,8 @@ import { Appearance, FrontierGameRow, FrontierNotice, Joined, Kv, MonCell, Muted
 import { useFrontierGame } from '../useFrontierGame'
 import { StreakLookup } from '../StreakLookup'
 import { useFrontierData } from '../useFrontierData'
+import { trackerNotice } from '../reference/games'
+import { Gen4Tracker } from './Gen4Tracker'
 import {
   bpBalance,
   dateText,
@@ -52,8 +54,9 @@ import './tracker.css'
  * (public/mockups/frontier-tracker.html, scripts/mockups/frontier.mjs).
  *
  * Home, a run's detail and the new-run form are screens INSIDE the module
- * (local state), never back-stack steps. Under any generation but Gen 3 the page
- * is the one notice and nothing loads.
+ * (local state), never back-stack steps. Platinum and HeartGold/SoulSilver get
+ * their own per-facility tracker (Gen4Tracker.tsx); every other game and
+ * generation is the one notice, and nothing loads.
  */
 type Screen = { kind: 'home' } | { kind: 'new' } | { kind: 'run'; runId: string }
 type Go = (s: Screen) => void
@@ -64,8 +67,9 @@ const update: Update = (fn) => trackerDocument.update(fn)
 export function TrackerPage() {
   const { scope, game, generation } = useFrontierGame()
   const load = useFrontierData(game === 'emerald')
-  // Emerald's tracker, or the notice (the other games' trackers: S2/S3).
-  const status = game == null ? 'other-generation' : game === 'emerald' ? load.status : 'not-in-game'
+  // Emerald's tracker; Platinum's and HeartGold/SoulSilver's (Gen4Tracker); or the notice.
+  const gen4 = game === 'platinum' || game === 'heartgold-soulsilver' ? game : null
+  const status = game == null ? 'other-generation' : game === 'emerald' ? load.status : gen4 ? 'ready' : 'not-in-game'
   const [screen, setScreen] = useState<Screen>({ kind: 'home' })
   const where = screen.kind === 'run' ? `run-${screen.runId}` : screen.kind
   return (
@@ -81,6 +85,8 @@ export function TrackerPage() {
           <FrontierGameRow scope={scope} outside />
           {game === 'emerald' && load.status === 'ready' ? (
             <Tracker data={load.data} screen={screen} go={setScreen} />
+          ) : gen4 ? (
+            <Gen4Tracker game={gen4} />
           ) : (
             <div className="bf-page" data-layout="frontier-tracker">
               <header className="bf-head" data-layout="page-head">
@@ -88,7 +94,7 @@ export function TrackerPage() {
                 {game === 'emerald' && <span className="bf-scope">Emerald · Gen 3</span>}
               </header>
               {(status === 'other-generation' || status === 'not-in-game') && (
-                <FrontierNotice game={game} generation={generation} screen="Challenge Tracker" />
+                <FrontierNotice game={game} generation={generation} screen="Challenge Tracker" gameText={trackerNotice} />
               )}
               {status === 'loading' && <p className="bf-notice">Loading the Battle Frontier…</p>}
               {status === 'error' && load.status === 'error' && (

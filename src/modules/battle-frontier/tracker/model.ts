@@ -27,6 +27,7 @@ import type {
   TrainerPoolArgs,
 } from '../data'
 import { loaderStreak } from '../format'
+import { gen4HasData, mergeGen4Game, normaliseGen4Game, type Gen4GameLog } from './gen4'
 import { mergeModes, modesHaveAttempts, normaliseModes, type SpeedModes } from './speed'
 
 // ------------------------------------------------------------------ the document
@@ -152,13 +153,29 @@ export interface LedgerLine {
 
 /**
  * The games beyond Emerald's Frontier (schema v2): Emerald's Trainer Hill and
- * FireRed/LeafGreen's Trainer Tower, per mode (speed.ts). The Emerald fields
- * above (runs, battles, symbols, bp) are untouched by it.
+ * FireRed/LeafGreen's Trainer Tower, per mode (speed.ts); the Gen 4 Frontier
+ * per facility in Platinum and HeartGold/SoulSilver (gen4.ts; still v2, the
+ * record already existed). The Emerald fields above (runs, battles, symbols,
+ * bp) are untouched by it.
  */
 export interface TrackerGames {
   emerald?: { hill?: SpeedModes }
   'firered-leafgreen'?: { tower?: SpeedModes }
+  platinum?: Gen4GameLog
+  'heartgold-soulsilver'?: Gen4GameLog
 }
+
+export type Gen4TrackerGame = 'platinum' | 'heartgold-soulsilver'
+
+/** One Gen 4 game's facility log. */
+export const gen4GameOf = (doc: TrackerDoc, game: Gen4TrackerGame): Gen4GameLog | undefined => doc.games?.[game]
+
+/** The document with one Gen 4 game's log rewritten by `fn`; every other field untouched. */
+export const updateGen4Game = (
+  doc: TrackerDoc,
+  game: Gen4TrackerGame,
+  fn: (g: Gen4GameLog | undefined) => Gen4GameLog,
+): TrackerDoc => ({ ...doc, games: { ...doc.games, [game]: fn(gen4GameOf(doc, game)) } })
 
 export interface TrackerDoc {
   schemaVersion: 2
@@ -423,10 +440,21 @@ function normaliseGames(x: unknown): TrackerGames {
     if (isObj(g[facility])) o[facility] = normaliseModes(g[facility])
     out[game] = o
   }
+  for (const game of GEN4_GAMES) {
+    const g = normaliseGen4Game(x[game])
+    if (g) out[game] = g
+    else delete out[game]
+  }
   return out as TrackerGames
 }
 
-/** Games joined: a mode's attempts by id (speed.ts mergeModes); `base` wins any other field. */
+/** The Gen 4 games' place in `games` (gen4.ts). */
+const GEN4_GAMES: readonly Gen4TrackerGame[] = ['platinum', 'heartgold-soulsilver']
+
+/**
+ * Games joined: a mode's attempts by id (speed.ts mergeModes), a Gen 4
+ * facility by gen4.ts mergeGen4Game; `base` wins any other field.
+ */
 function mergeGames(base: TrackerGames, added: TrackerGames): TrackerGames {
   const out: Record<string, unknown> = { ...added, ...base }
   for (const [game, facility] of SPEED_GAMES) {
@@ -434,6 +462,11 @@ function mergeGames(base: TrackerGames, added: TrackerGames): TrackerGames {
     const a = added[game] as Record<string, SpeedModes | undefined> | undefined
     if (!b || !a || (!b[facility] && !a[facility])) continue
     out[game] = { ...a, ...b, [facility]: mergeModes(b[facility] ?? {}, a[facility] ?? {}) }
+  }
+  for (const game of GEN4_GAMES) {
+    const b = base[game]
+    const a = added[game]
+    if (b && a) out[game] = mergeGen4Game(b, a)
   }
   return out as TrackerGames
 }
@@ -514,7 +547,9 @@ export const isTrackerEmpty = (d: TrackerDoc): boolean =>
   d.bp.opening === 0 &&
   Object.keys(d.symbols).length === 0 &&
   !modesHaveAttempts(d.games?.emerald?.hill) &&
-  !modesHaveAttempts(d.games?.['firered-leafgreen']?.tower)
+  !modesHaveAttempts(d.games?.['firered-leafgreen']?.tower) &&
+  !gen4HasData(d.games?.platinum) &&
+  !gen4HasData(d.games?.['heartgold-soulsilver'])
 
 // ------------------------------------------------------------------ the loader boundary
 
