@@ -3,11 +3,13 @@ import type { ToolsPageId } from './pages'
 /**
  * The Frontier Brain whose facility a tool explains, by trainer class: the
  * Trainer Dex shows a link to the tool on that Brain's entry (docs/tools/PLAN.md:
- * #20 from Spenser, #21 from Greta, #22 from Noland and Thorton).
+ * #20 from Spenser, #21 from Greta, #22 from Noland and Thorton; the Pike
+ * room odds from Lucy).
  */
 export const BRAIN_TOOLS: Readonly<Record<string, { page: ToolsPageId; label: string }>> = {
   TRAINER_CLASS_PALACE_MAVEN: { page: 'tool-palace', label: 'Battle Palace odds' },
   TRAINER_CLASS_ARENA_TYCOON: { page: 'tool-arena', label: 'Battle Arena scoring' },
+  TRAINER_CLASS_PIKE_QUEEN: { page: 'tool-pike', label: 'Battle Pike room odds' },
   // Noland (Emerald) and Thorton (Platinum); HGSS spells the class without the underscore.
   TRAINER_CLASS_FACTORY_HEAD: { page: 'tool-rental', label: 'Rental set comparator' },
   TRAINERCLASS_FACTORY_HEAD: { page: 'tool-rental', label: 'Rental set comparator' },

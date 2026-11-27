@@ -255,6 +255,15 @@ export const TOOLS: readonly ToolEntry[] = [
     target: { kind: 'page', id: 'tool-rental' },
   },
   {
+    key: '24',
+    n: 24,
+    label: 'Battle Pike room odds',
+    group: 'frontier',
+    blurb: 'What each Battle Pike door can hold after the hint, when Lucy waits, and what the status room inflicts.',
+    gate: { gens: [3], games: ['emerald'] },
+    target: { kind: 'page', id: 'tool-pike' },
+  },
+  {
     key: 'experience',
     label: 'Experience',
     group: 'more',
