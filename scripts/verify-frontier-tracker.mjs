@@ -270,9 +270,9 @@ const fork = execFileSync('git', ['merge-base', base, 'HEAD'], { cwd: ROOT, enco
 const changed = execFileSync('git', ['diff', '--name-only', fork], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean)
 const frozen = changed.filter(
   (f) =>
+    // The reference screens left this freeze with the Frontier completion brief (2026-11-22):
+    // they grew the other games, and verify:frontier-reference guards them. The loader stays frozen.
     f.startsWith('src/modules/battle-frontier/data/') ||
-    /^src\/modules\/battle-frontier\/(Facilities|Brains|SetsTrainers|StreakLookup|FrontierScreens|parts|format|names|useFrontierData)\.tsx?$/.test(f) ||
-    /^src\/modules\/battle-frontier\/frontier\.css$/.test(f) ||
     /^src\/modules\/dex\/(Trainerdex|trainerdex|trainerEntries)/.test(f) ||
     f.startsWith('scripts/trainers/') ||
     f === 'src/data/trainers.ts' ||
@@ -280,7 +280,7 @@ const frozen = changed.filter(
     f === 'scripts/mockups/frontier.mjs' ||
     f.startsWith('public/mockups/'),
 )
-check(`git diff since ${base}: no change to the loader, the reference screens, the Trainer Dex, the mockup or Supabase`, frozen.length === 0, frozen.join(', '))
+check(`git diff since ${base}: no change to the loader, the Trainer Dex, the mockup or Supabase`, frozen.length === 0, frozen.join(', '))
 const css = read('src/modules/battle-frontier/tracker/tracker.css')
 check('tracker CSS: no hard-coded colour, no primitive token, no box-shadow', !/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i.test(css.replace(/\/\*[\s\S]*?\*\//g, '')) && !/--color-(accent|neutral)-\d/.test(css) && !/box-shadow/.test(css))
 check('tracker CSS: no accent at all (the nav tab is the screen\'s one use)', !/accent/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')))
@@ -524,13 +524,14 @@ try {
 
   // ---------------------------------------------------------------- nav + other generation
   hr('B1. THE TAB: Challenge Tracker is a real screen now; other generations get the notice')
-  await selectGeneration(page, 4)
+  await selectGeneration(page, 2)
   await openTracker(page)
   await page.waitForSelector(ROOT_SEL)
   check('the dropdown entry opens the tracker, not a stub', (await page.$('[data-testid="stub-frontier-tracker"]')) == null && (await page.$(ROOT_SEL)) != null)
-  check('Gen 4: the page is the one notice', (await page.$eval(ROOT_SEL, (r) => r.dataset.status)) === 'other-generation')
+  check('Gen 2: the page is the one notice', (await page.$eval(ROOT_SEL, (r) => r.dataset.status)) === 'other-generation')
   same('state 7 (other generation): page head', await appText(page, '[data-layout="page-head"]'), await mockText(mock, 7, '[data-layout="page-head"]'))
-  same('state 7: the notice', await appText(page, '[data-layout="frontier-notice"]'), await mockText(mock, 7, '[data-layout="frontier-notice"]'))
+  // The notice names the generation since the tab grew a game row (feature/frontier-facility-reference).
+  same('state 7: the notice', await appText(page, '[data-layout="frontier-notice"]'), 'No Battle Frontier in Gen 2. This tab covers Emerald, FireRed and LeafGreen, Platinum, and HeartGold and SoulSilver.')
   await page.screenshot({ path: shot('other-generation') })
 
   // ---------------------------------------------------------------- empty

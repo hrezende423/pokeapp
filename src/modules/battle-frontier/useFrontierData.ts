@@ -16,9 +16,10 @@ export type FrontierLoad =
   | { status: 'ready'; data: FrontierData }
   | { status: 'error'; message: string; retry: () => void }
 
-export function useFrontierData(): FrontierLoad {
+export function useFrontierData(enabled = true): FrontierLoad {
   const { selectedGeneration } = useVersionGroup()
-  const inScope = isFrontierGeneration(selectedGeneration)
+  // `enabled`: the tab's game is Emerald (another Gen 3 game loads nothing).
+  const inScope = enabled && isFrontierGeneration(selectedGeneration)
   const [attempt, setAttempt] = useState(0)
   // Leaving Gen 3 and coming back is a NEW request: a fresh key, so the previous
   // visit's error never shows while the new load runs (derived state, set in render).

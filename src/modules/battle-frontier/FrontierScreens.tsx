@@ -1,7 +1,9 @@
 import { Brains } from './Brains'
 import { Facilities } from './Facilities'
+import { Gen4Facilities, TrainerTowerFacilities } from './OtherFacilities'
 import { FrontierShell } from './parts'
 import { SetsTrainers } from './SetsTrainers'
+import { TRAINER_TOWER } from './reference/speed'
 import './frontier.css'
 
 /**
@@ -12,7 +14,17 @@ import './frontier.css'
 
 export function FacilitiesPage() {
   return (
-    <FrontierShell page="facilities" title="Facilities">
+    <FrontierShell
+      page="facilities"
+      title="Facilities"
+      other={(game) =>
+        game === 'firered-leafgreen' ? (
+          <TrainerTowerFacilities refData={TRAINER_TOWER} />
+        ) : game === 'emerald' ? null : (
+          <Gen4Facilities game={game} />
+        )
+      }
+    >
       {(data) => <Facilities data={data} />}
     </FrontierShell>
   )

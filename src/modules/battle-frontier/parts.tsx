@@ -8,43 +8,82 @@ import { followLink } from '../../lib/entities/appContext'
 import { useNav } from '../nav/navContext'
 import { FRONTIER_VERSION_GROUP, type BrainAppearance, type FrontierBrain, type FrontierData } from './data'
 import { fmt, STATS } from './format'
-import { speciesName } from './names'
-import { useFrontierData } from './useFrontierData'
+import { speciesName, speciesNameIn } from './names'
+import { GameRow } from '../version-group/GameRow'
+import type { GameInGeneration } from '../version-group/gameInGeneration'
+import { GAME_SCOPE, gameNotice, generationNotice, isFrontierGame, type FrontierGame } from './reference/games'
+import { useFrontierGame } from './useFrontierGame'
+import { useFrontierData, type FrontierLoad } from './useFrontierData'
 
 /* ------------------------------------------------------------------ the shell */
 
+/** The game row, in its own region; nothing at all when there is no choice to make. */
+export function FrontierGameRow({ scope, outside = false }: { scope: GameInGeneration; outside?: boolean }) {
+  if (scope.games.length < 2) return null
+  return (
+    <div className={outside ? 'bf-game bf-game-out' : 'bf-game'} data-layout="frontier-game">
+      <GameRow scope={scope} testId="frontier-game-row" />
+    </div>
+  )
+}
+
+export type ShellStatus = FrontierLoad['status'] | 'not-in-game'
+
 /**
- * Every Frontier screen: a page head and its body inside the module's ScrollArea
- * (nothing clips). Outside Gen 3 the body is the one notice and nothing loads.
- * Region names are the mockups' (`?layout=1`).
+ * The notice for a page with nothing to show: the generation's ("No Battle
+ * Frontier in Gen 2") or the game's ("FireRed and LeafGreen have no Battle
+ * Frontier, so no Brains"). Never a blank page.
+ */
+export function FrontierNotice({ game, generation, screen }: { game: string | null; generation: number | null; screen: string }) {
+  return (
+    <p className="bf-notice" data-layout="frontier-notice" data-testid="frontier-notice">
+      {game ? gameNotice(game, screen) : generationNotice(generation)}
+    </p>
+  )
+}
+
+/**
+ * Every Frontier screen: a page head, the game row, and the body inside the
+ * module's ScrollArea (nothing clips). Emerald's body is `children` (the
+ * Frontier loader, which loads only then); another game's is `other`, and a
+ * game `other` has nothing for gets the notice. Region names are the mockups'
+ * (`?layout=1`).
  */
 export function FrontierShell({
   page,
   title,
   children,
+  other,
 }: {
   /** The mockup's page region: frontier-facilities, frontier-brains, frontier-sets. */
   page: 'facilities' | 'brains' | 'sets'
   title: string
   children: (data: FrontierData) => ReactNode
+  /** A non-Emerald game's body; null (or absent) = the "not in this game" notice. */
+  other?: (game: FrontierGame) => ReactNode
 }) {
-  const load = useFrontierData()
+  const { scope, game, generation } = useFrontierGame()
+  const load = useFrontierData(game === 'emerald')
+  const otherBody = game !== 'emerald' && isFrontierGame(game) && other ? other(game) : null
+  const status: ShellStatus =
+    game == null ? 'other-generation' : game === 'emerald' ? load.status : otherBody != null ? 'ready' : 'not-in-game'
+  const scopeTag = status === 'other-generation' || status === 'not-in-game' || !isFrontierGame(game) ? null : GAME_SCOPE[game]
   return (
-    <div className="bf" data-testid={`frontier-${page}`} data-status={load.status}>
+    <div className="bf" data-testid={`frontier-${page}`} data-status={status} data-game={game ?? undefined}>
       <div className="bf-scroll" data-layout="frontier-scroll">
         <ScrollArea className="bf-scroll-area" testId="frontier-scroll-area" memoryKey={scrollKey('frontier', page)}>
           <div className="bf-page" data-layout={`frontier-${page}`}>
+            <FrontierGameRow scope={scope} />
             <header className="bf-head" data-layout="page-head">
               <h1 className="bf-title">{title}</h1>
-              {load.status !== 'other-generation' && <span className="bf-scope">Emerald · Gen 3</span>}
+              {scopeTag && <span className="bf-scope">{scopeTag}</span>}
             </header>
-            {load.status === 'other-generation' && (
-              <p className="bf-notice" data-layout="frontier-notice" data-testid="frontier-notice">
-                Battle Frontier data covers Emerald (Gen 3).
-              </p>
+            {(status === 'other-generation' || status === 'not-in-game') && (
+              <FrontierNotice game={game} generation={generation} screen={title} />
             )}
-            {load.status === 'loading' && <p className="bf-notice">Loading the Battle Frontier…</p>}
-            {load.status === 'error' && (
+            {game !== 'emerald' && otherBody}
+            {game === 'emerald' && load.status === 'loading' && <p className="bf-notice">Loading the Battle Frontier…</p>}
+            {game === 'emerald' && load.status === 'error' && (
               <p className="bf-notice" role="alert">
                 Could not load the Battle Frontier data: {load.message}.{' '}
                 <button type="button" className="bf-link" onClick={load.retry}>
@@ -52,7 +91,7 @@ export function FrontierShell({
                 </button>
               </p>
             )}
-            {load.status === 'ready' && children(load.data)}
+            {game === 'emerald' && load.status === 'ready' && children(load.data)}
           </div>
         </ScrollArea>
       </div>
@@ -166,10 +205,10 @@ export function Kv({ rows, layout }: { rows: [string, ReactNode][]; layout?: str
  * engine (deepLink + followLink). A label you can click, not a button shape: no
  * line at rest, a hairline on hover.
  */
-export function SpeciesLink({ id }: { id: number | null | undefined }) {
+export function SpeciesLink({ id, generation }: { id: number | null | undefined; generation?: number }) {
   const nav = useNav()
   if (id == null) return <span className="bf-muted">Unknown</span>
-  const name = speciesName(id)
+  const name = generation == null ? speciesName(id) : speciesNameIn(id, generation)
   const target = deepLink({ kind: 'species', id })
   return (
     <button

@@ -5,7 +5,8 @@ import { scrollKey } from '../../../components/scrollMemory'
 import type { FacilityId, FrontierData, FrontierFormat, LevelMode } from '../data'
 import { battleLabel, FACILITY_ORDER, FORMAT_LABEL, LEVEL_LABEL } from '../format'
 import { speciesName } from '../names'
-import { Appearance, Joined, Kv, MonCell, Muted, Num, SpeciesLink } from '../parts'
+import { Appearance, FrontierGameRow, FrontierNotice, Joined, Kv, MonCell, Muted, Num, SpeciesLink } from '../parts'
+import { useFrontierGame } from '../useFrontierGame'
 import { StreakLookup } from '../StreakLookup'
 import { useFrontierData } from '../useFrontierData'
 import {
@@ -61,11 +62,14 @@ type Update = (fn: (d: TrackerDoc) => TrackerDoc) => void
 const update: Update = (fn) => trackerDocument.update(fn)
 
 export function TrackerPage() {
-  const load = useFrontierData()
+  const { scope, game, generation } = useFrontierGame()
+  const load = useFrontierData(game === 'emerald')
+  // Emerald's tracker, or the notice (the other games' trackers: S2/S3).
+  const status = game == null ? 'other-generation' : game === 'emerald' ? load.status : 'not-in-game'
   const [screen, setScreen] = useState<Screen>({ kind: 'home' })
   const where = screen.kind === 'run' ? `run-${screen.runId}` : screen.kind
   return (
-    <div className="bf" data-testid="frontier-tracker" data-status={load.status} data-screen={screen.kind}>
+    <div className="bf" data-testid="frontier-tracker" data-status={status} data-game={game ?? undefined} data-screen={screen.kind}>
       <div className="bf-scroll" data-layout="frontier-scroll">
         {/* A new screen starts at its top: the scroller is keyed by it; home remembers its offset. */}
         <ScrollArea
@@ -74,21 +78,20 @@ export function TrackerPage() {
           testId="frontier-scroll-area"
           memoryKey={screen.kind === 'home' ? scrollKey('frontier', 'tracker') : undefined}
         >
-          {load.status === 'ready' ? (
+          <FrontierGameRow scope={scope} outside />
+          {game === 'emerald' && load.status === 'ready' ? (
             <Tracker data={load.data} screen={screen} go={setScreen} />
           ) : (
             <div className="bf-page" data-layout="frontier-tracker">
               <header className="bf-head" data-layout="page-head">
                 <h1 className="bf-title">Challenge Tracker</h1>
-                {load.status !== 'other-generation' && <span className="bf-scope">Emerald · Gen 3</span>}
+                {game === 'emerald' && <span className="bf-scope">Emerald · Gen 3</span>}
               </header>
-              {load.status === 'other-generation' && (
-                <p className="bf-notice" data-layout="frontier-notice" data-testid="frontier-notice">
-                  Battle Frontier data covers Emerald (Gen 3).
-                </p>
+              {(status === 'other-generation' || status === 'not-in-game') && (
+                <FrontierNotice game={game} generation={generation} screen="Challenge Tracker" />
               )}
-              {load.status === 'loading' && <p className="bf-notice">Loading the Battle Frontier…</p>}
-              {load.status === 'error' && (
+              {status === 'loading' && <p className="bf-notice">Loading the Battle Frontier…</p>}
+              {status === 'error' && load.status === 'error' && (
                 <p className="bf-notice" role="alert">
                   Could not load the Battle Frontier data: {load.message}.{' '}
                   <button type="button" className="bf-link" onClick={load.retry}>

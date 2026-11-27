@@ -81,8 +81,24 @@
   padding: var(--space-8) 0;
   color: var(--color-text-muted);
 }
-.bf-page > :not(.bf-head):not(.bf-notice) {
+.bf-page > :not(.bf-head):not(.bf-notice):not(.bf-game) {
   grid-area: body;
+}
+/* The game row (inside the app's generation; see reference/games.ts). */
+.bf-game {
+  grid-area: game;
+}
+/* Only a page that shows the row gets its track: an empty one would still take a gap. */
+.bf-page:has(> .bf-game) {
+  grid-template-areas: 'game' 'head' 'body';
+}
+/* The Challenge Tracker's screens own their page grid: the row sits above it. */
+.bf-game-out {
+  padding-top: var(--space-6);
+}
+/* A flag on the data's provenance: muted prose (no hairline: it sits in gapped grids). */
+.bf-flag {
+  color: var(--color-text-muted);
 }
 
 /* ------------------------------------------------------------ type */
@@ -340,10 +356,29 @@
     'tower dome'
     'factory palace'
     'arena pike'
-    'pyramid .'
+    'pyramid hill'
     'shared shared';
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-12) var(--space-8);
+}
+/* Platinum and HeartGold/SoulSilver: five facilities. */
+.bf-fac-grid-g4 {
+  grid-template-areas:
+    'flag flag'
+    'tower factory'
+    'hall castle'
+    'arcade .'
+    'shared shared';
+}
+/* FireRed/LeafGreen: the Trainer Tower alone. */
+.bf-fac-grid-one {
+  grid-template-areas: 'one .';
+}
+.panel .bf .bf-shared.bf-shared-g4 {
+  grid-template-areas:
+    'title title'
+    'symbols levels'
+    'banned banned';
 }
 .bf-fac {
   display: grid;
@@ -462,8 +497,17 @@
 /* Phone layout is parked: this only stacks the regions so nothing clips. */
 @container frontier (max-width: 900px) {
   .bf-fac-grid {
-    grid-template-areas: 'tower' 'dome' 'factory' 'palace' 'arena' 'pike' 'pyramid' 'shared';
+    grid-template-areas: 'tower' 'dome' 'factory' 'palace' 'arena' 'pike' 'pyramid' 'hill' 'shared';
     grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-fac-grid-g4 {
+    grid-template-areas: 'flag' 'tower' 'factory' 'hall' 'castle' 'arcade' 'shared';
+  }
+  .bf-fac-grid-one {
+    grid-template-areas: 'one';
+  }
+  .panel .bf .bf-shared.bf-shared-g4 {
+    grid-template-areas: 'title' 'symbols' 'levels' 'banned';
   }
   .panel .bf .bf-shared {
     grid-template-areas: 'title' 'symbols' 'levels' 'banned' 'bprules' 'shop';
