@@ -19,6 +19,12 @@
  *   node scripts/frontier/import-bf-xlsx.mjs [--date YYYY-MM-DD] [--out PATH]
  *
  * --date is the "import date" the imported runs carry (default: today).
+ *
+ * VERSION: the file is written at the document's CURRENT version (v2 since
+ * feature/frontier-speed: `games` joins, empty). The committed
+ * docs/fixtures/bf-tracker.import.json is the v1 file this script wrote on
+ * 2026-11-14 and stays so: the store migrates it on import, and
+ * verify:frontier-tracker A1 checks that a fresh run equals it migrated.
  */
 import { build } from 'esbuild'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -166,7 +172,7 @@ for (const run of runs.filter((r) => r.facility === 'factory')) {
 
 // ------------------------------------------------------------------ derived: Brains (checked) and BP
 
-let doc = { schemaVersion: 1, runs, battles, symbols: {}, bp: { opening: 0, ledger: [] } }
+let doc = { schemaVersion: model.TRACKER_VERSION, runs, battles, symbols: {}, bp: { opening: 0, ledger: [] }, games: {} }
 const view = model.deriveTracker(doc, fd)
 for (const b of battles) {
   const brain = view.runs.get(b.runId).brains.get(b.id)

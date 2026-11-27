@@ -1,7 +1,7 @@
 /**
  * The Battle Frontier tab's nav registration: the arrangement team-matchup/pages.ts
- * uses, three read-only reference screens and the Challenge Tracker under their
- * own tab.
+ * uses, three read-only reference screens, the Challenge Tracker and Trainer
+ * Hill & Tower (a speed facility's floors, teams and record) under their own tab.
  *
  * LAZY: nothing here imports the frontier loader. The screens and the loader load
  * on first open (FrontierLazy), so the entry chunk never carries
@@ -11,7 +11,13 @@
  */
 
 import type { ComponentType } from 'react'
-import { FrontierBrainsLazy, FrontierFacilitiesLazy, FrontierSetsLazy, FrontierTrackerLazy } from './FrontierLazy'
+import {
+  FrontierBrainsLazy,
+  FrontierFacilitiesLazy,
+  FrontierSetsLazy,
+  FrontierSpeedLazy,
+  FrontierTrackerLazy,
+} from './FrontierLazy'
 import './tracker/trackerStore'
 import './nav.css'
 
@@ -20,6 +26,7 @@ export const FRONTIER_PAGES = [
   { id: 'frontier-brains', label: 'Brains', Component: FrontierBrainsLazy },
   { id: 'frontier-tracker', label: 'Challenge Tracker', Component: FrontierTrackerLazy },
   { id: 'frontier-sets', label: 'Sets & Trainers', Component: FrontierSetsLazy },
+  { id: 'frontier-speed', label: 'Trainer Hill & Tower', Component: FrontierSpeedLazy },
 ] as const
 
 export type FrontierPageId = (typeof FRONTIER_PAGES)[number]['id']

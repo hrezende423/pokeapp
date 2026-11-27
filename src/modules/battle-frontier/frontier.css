@@ -536,3 +536,82 @@
     row-gap: var(--space-4);
   }
 }
+
+/* ------------------------------------------------------------ Trainer Hill & Tower */
+
+/* The rules beside your record; then one mode: its views, its log, its floors. */
+.bf-speed {
+  display: grid;
+  grid-template-areas:
+    'facts record'
+    'modes modes';
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12) var(--space-8);
+  min-width: 0;
+}
+.bf-speed > *,
+.bf-speed-mode > *,
+.bf-speed-log > *,
+.bf-speed-floors > *,
+.bf-speed-floor > *,
+.bf-speed-trainer > * {
+  min-width: 0;
+}
+.bf-speed-record {
+  display: grid;
+  align-content: start;
+}
+.bf-speed-mode {
+  grid-template-areas: 'views' 'log' 'floors';
+  row-gap: var(--space-8);
+}
+.bf-speed-log {
+  display: grid;
+  row-gap: var(--space-4);
+}
+.bf-speed-form {
+  display: grid;
+  grid-template-areas:
+    'floors time date act'
+    'msg msg msg msg';
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  column-gap: var(--space-6);
+  row-gap: var(--space-2);
+  align-items: end;
+}
+.bf-speed-form > * {
+  min-width: 0;
+}
+.bf-speed-floors {
+  display: grid;
+  row-gap: var(--space-8);
+}
+.bf-speed-floor {
+  display: grid;
+  row-gap: var(--space-4);
+}
+.bf-speed-trainer {
+  display: grid;
+  row-gap: var(--space-1);
+}
+.bf-speed-trainer-head {
+  display: grid;
+  grid-template-areas: 'name link';
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-4);
+  align-items: baseline;
+}
+.bf-speed-trainer-head .bf-link {
+  justify-self: start;
+}
+
+@container frontier (max-width: 900px) {
+  .bf-speed {
+    grid-template-areas: 'facts' 'record' 'modes';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-speed-form {
+    grid-template-areas: 'floors' 'time' 'date' 'act' 'msg';
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

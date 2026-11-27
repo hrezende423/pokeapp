@@ -64,10 +64,15 @@ const out = execFileSync(process.execPath, ['scripts/frontier/import-bf-xlsx.mjs
 const regenerated = readFileSync(tmp, 'utf8')
 rmSync(tmp, { force: true })
 const committed = read(FIXTURE)
-const lf = (t) => t.replace(/\r\n/g, '\n') // a checkout may turn the committed file's line ends to CRLF
-check('re-running the script reproduces the committed import file exactly (line ends aside)', lf(regenerated) === lf(committed), `${regenerated.length} vs ${committed.length} bytes`)
-log(out.trim().split('\n').map((l) => `      ${l}`).join('\n'))
+const lf = (t) => t.replace(/\r\n/g, '\n') // a checkout may turn a committed file's line ends to CRLF
 const file = JSON.parse(committed)
+// The committed file is the v1 export of 2026-11-14 and stays v1; the script now writes the
+// document's current version (v2, feature/frontier-speed): that file migrated, the same data
+// plus schemaVersion 2 and an empty `games`.
+const fileV1 = file.documents['frontier-tracker']
+const asV2 = { ...file, documents: { 'frontier-tracker': { version: 2, data: { ...fileV1.data, schemaVersion: 2, games: {} } } } }
+check('re-running the script gives the committed v1 import file migrated to v2: same runs, battles, symbols and BP, schemaVersion 2, games {}', json(JSON.parse(regenerated)) === json(asV2), `${regenerated.length} vs ${committed.length} bytes`)
+log(out.trim().split('\n').map((l) => `      ${l}`).join('\n'))
 check('an export file: app pokeapp, format 1, one document "frontier-tracker" at version 1', file.app === 'pokeapp' && file.format === 1 && json(Object.keys(file.documents)) === '["frontier-tracker"]' && file.documents['frontier-tracker'].version === 1)
 const imported = file.documents['frontier-tracker'].data
 const runsOf = (f) => imported.runs.filter((r) => r.facility === f)
@@ -225,7 +230,7 @@ kY = M.deriveTracker(Y, fd).keys.get('dome|singles|lv50')
 check('overriding a symbol the log earned (Dome Gold off): Silver only held, the log still flags its Brains', !kY.held.gold && kY.held.silver && kY.level === 1 && M.deriveTracker(Y, fd).runs.get('imp-dome-1').brains.size === 2)
 
 hr('A8. THE DOCUMENT: key, sync, export -> import lossless, merge, normalise')
-check('name "frontier-tracker", key pokeapp:frontier-tracker:v1, version 1, sync on', doc.name === 'frontier-tracker' && doc.key === 'pokeapp:frontier-tracker:v1' && doc.version === 1 && doc.sync === true)
+check('name "frontier-tracker", key pokeapp:frontier-tracker:v1, version 2 (feature/frontier-speed), sync on', doc.name === 'frontier-tracker' && doc.key === 'pokeapp:frontier-tracker:v1' && doc.version === 2 && doc.sync === true)
 check('sync with no schema change of its own: routed to the generic user_documents rows', json(api.syncTargetFor('frontier-tracker')) === '{"table":"user_documents","column":"data","named":true}')
 doc.reset()
 check('nothing stored reads as the empty tracker', json(doc.read()) === json(M.EMPTY_TRACKER))
@@ -406,8 +411,8 @@ const laterP = M.normaliseTracker({
 const lf1 = laterP.battles.find((b) => b.id === f1.id).pyramid
 const lo = laterP.runs.find((r) => r.id === 'pyr').openFloor
 check('fields a newer client adds to a floor, a trainer or the open floor survive (it syncs)', lo.later === 1 && lo.pyramid.later === 2 && lf1.later === 3 && lf1.trainers[0].later === 4)
-check('bf-tracker.import.json still loads unchanged: normalising it gives it back exactly', json(canon(M.normaliseTracker(imported))) === json(canon(imported)))
-check('the document stays version 1 (the change is additive)', doc.version === 1 && M.TRACKER_VERSION === 1)
+check('bf-tracker.import.json still loads unchanged: migrated and normalised, it is the file plus schemaVersion 2 and games {}', json(canon(M.normaliseTracker(M.v1ToV2(imported)))) === json(canon({ ...imported, schemaVersion: 2, games: {} })))
+check('the document is version 2 (feature/frontier-speed added `games`; the Pyramid was additive)', doc.version === 2 && M.TRACKER_VERSION === 2)
 let RT = M.startRun(M.EMPTY_TRACKER, PK, at, 'pyr-rt')
 RT = edOpen(RT, 'pyr-rt', (f) => P.addItem(P.addWild(f, sp('pikachu')), R1[0]))
 RT = M.endRun(RT, 'pyr-rt', 'retired', at)

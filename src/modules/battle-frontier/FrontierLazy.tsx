@@ -5,6 +5,7 @@ const load = () => import('./FrontierScreens')
 const Facilities = lazy(() => load().then((m) => ({ default: m.FacilitiesPage })))
 const Brains = lazy(() => load().then((m) => ({ default: m.BrainsPage })))
 const Sets = lazy(() => load().then((m) => ({ default: m.SetsTrainersPage })))
+const Speed = lazy(() => load().then((m) => ({ default: m.SpeedPage })))
 /* The Challenge Tracker: its own chunk (the loader and the parts are shared with the screens'). */
 const Tracker = lazy(() => import('./tracker/TrackerPage').then((m) => ({ default: m.TrackerPage })))
 
@@ -26,6 +27,11 @@ export const FrontierBrainsLazy = () => (
 export const FrontierSetsLazy = () => (
   <Wrap>
     <Sets />
+  </Wrap>
+)
+export const FrontierSpeedLazy = () => (
+  <Wrap>
+    <Speed />
   </Wrap>
 )
 export const FrontierTrackerLazy = () => (

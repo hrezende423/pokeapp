@@ -17,6 +17,7 @@ import { chromium } from 'playwright'
 import { CHROME } from './lib/browser.mjs'
 import { selectGeneration } from './lib/controls.mjs'
 import { startDevServer } from './lib/devServer.mjs'
+import { importTs } from './lib/tsModule.mjs'
 
 const PORT = 4206
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -109,6 +110,31 @@ const mockTexts = (page, n, sel) =>
   page.evaluate(([n, sel]) => [...document.querySelectorAll('section.state')[n - 1].querySelectorAll(sel)].map((e) => e.textContent), [n, sel])
 const appTexts = (page, sel) => page.evaluate((sel) => [...document.querySelectorAll(sel)].map((e) => e.textContent), sel)
 
+// ------------------------------------------------------------------ 0. browser-free (feature/frontier-speed)
+
+hr('0. TRAINER HILL & TOWER TIMES (tracker/speed.ts, in Node): parseTime, formatTime, bestOf')
+{
+  const S = await importTs('src/modules/battle-frontier/tracker/speed.ts')
+  const cs = (t) => S.parseTime(t).cs ?? null
+  check('"12:03.45" -> 72,345 cs; "2:03.45" (m:ss.cs) -> 12,345 cs', cs('12:03.45') === 72345 && cs('2:03.45') === 12345, JSON.stringify([S.parseTime('12:03.45'), S.parseTime('2:03.45')]))
+  check('"59:59.98" (the timer cap, 215,999 frames) -> 359,998 cs; "00:00.00" -> 0', cs('59:59.98') === 359998 && cs('00:00.00') === 0)
+  const rejected = ['60:00.00', '59:59.99', '12:60.00', '12:03.4', '12:03', '123:03.45', '12.03.45', '', 'abc', '-1:00.00']
+  const accepted = rejected.filter((t) => !('error' in S.parseTime(t)))
+  check('rejected with a message: 60:00.00, 59:59.99, 12:60.00, 12:03.4, 12:03, 123:03.45, 12.03.45, empty, abc, -1:00.00', accepted.length === 0 && typeof S.parseTime('60:00.00').error === 'string' && S.parseTime('60:00.00').error.length > 0, accepted.join(','))
+  check('formatTime: 72,345 -> "12:03.45"; 359,998 -> "59:59.98"; 5,000 -> "00:50.00"; 0 -> "00:00.00"', S.formatTime(72345) === '12:03.45' && S.formatTime(359998) === '59:59.98' && S.formatTime(5000) === '00:50.00' && S.formatTime(0) === '00:00.00')
+  const at = '2026-11-22'
+  const tries = [
+    { id: 'a', at, floors: 4, timeCs: 78000 }, // cleared, 13:00.00
+    { id: 'b', at, floors: 4, timeCs: 77999 }, // cleared, 12:59.99
+    { id: 'c', at, floors: 2, timeCs: 60000 }, // not cleared, 10:00.00
+  ]
+  const best = S.bestOf(tries, 4)
+  check('best of [cleared 13:00.00, cleared 12:59.99, not cleared 10:00.00] = 12:59.99', best?.kind === 'clear' && S.formatTime(best.attempt.timeCs) === '12:59.99' && best.attempt.id === 'b', JSON.stringify(best))
+  check('no full clear -> "furthest": the most floors any attempt cleared (3)', JSON.stringify(S.bestOf([{ id: 'x', at, floors: 1, timeCs: 1 }, { id: 'y', at, floors: 3, timeCs: 2 }], 4)) === '{"kind":"furthest","floors":3}')
+  check('no attempt -> null', S.bestOf([], 8) === null)
+  check('the current run is the latest attempt by date (the last logged on a tie)', S.latestOf([{ id: 'p', at: '2026-11-21', floors: 4, timeCs: 1 }, { id: 'q', at: '2026-11-22', floors: 1, timeCs: 2 }, { id: 'r', at: '2026-11-22', floors: 2, timeCs: 3 }, { id: 's', at: '2026-11-20', floors: 3, timeCs: 4 }]).id === 'r')
+}
+
 // ------------------------------------------------------------------ run
 
 const dev = await startDevServer({ port: PORT })
@@ -136,7 +162,7 @@ try {
   }
 
   // ================================================================ 1. NAV
-  hr('1. THE TAB: between Team Building and Tools, opens Facilities, four entries')
+  hr('1. THE TAB: between Team Building and Tools, opens Facilities, five entries')
   const triggers = await page.$$eval('.nav-trigger', (els) => els.map((e) => e.textContent.trim()))
   check('the tabs read Poképedia / Team Building / Battle Frontier / Tools', JSON.stringify(triggers) === JSON.stringify(['Poképedia', 'Team Building', 'Battle Frontier', 'Tools']), triggers.join(','))
   await page.click(TRIGGER)
@@ -147,7 +173,7 @@ try {
   const entries = await page.$$eval(`${DROPDOWN} .nav-item`, (els) =>
     els.map((e) => ({ label: e.textContent.trim(), current: e.getAttribute('aria-current'), weight: getComputedStyle(e).fontWeight, color: getComputedStyle(e).color })),
   )
-  check('the dropdown lists Facilities, Brains, Challenge Tracker, Sets & Trainers', JSON.stringify(entries.map((e) => e.label)) === JSON.stringify(['Facilities', 'Brains', 'Challenge Tracker', 'Sets & Trainers']), entries.map((e) => e.label).join(','))
+  check('the dropdown lists Facilities, Brains, Challenge Tracker, Sets & Trainers, Trainer Hill & Tower', JSON.stringify(entries.map((e) => e.label)) === JSON.stringify(['Facilities', 'Brains', 'Challenge Tracker', 'Sets & Trainers', 'Trainer Hill & Tower']), entries.map((e) => e.label).join(','))
   const cur = entries.find((e) => e.current === 'page')
   const others = entries.filter((e) => e.current !== 'page')
   check('the current entry (Facilities) is marked by weight', cur?.label === 'Facilities' && Number(cur.weight) >= 600 && others.every((e) => Number(e.weight) < 600), JSON.stringify(cur))
@@ -295,6 +321,228 @@ try {
     check(`FireRed/LeafGreen ${screen}: "no Battle Frontier" notice pointing at the Trainer Tower`, st.status === 'not-in-game' && /no Battle Frontier/.test(st.notice) && /Trainer Tower/.test(st.notice), JSON.stringify(st))
   }
   check('FireRed/LeafGreen: no Emerald Frontier data requested', frontierRequests.filter((u) => u.includes('frontier/emerald')).length === requestsBeforeOtherGames, frontierRequests.join(', '))
+  await openEntry(page, 'frontier-facilities')
+  await pickGame('emerald')
+
+  // ================================================================ 2c. TRAINER HILL & TOWER (feature/frontier-speed)
+  hr('2c. TRAINER HILL & TOWER: every mode\'s floors and fixed teams, the record, the notice elsewhere')
+  const SPEED = '[data-testid="frontier-speed"]'
+  const speedHead = () =>
+    page.$eval(SPEED, (root) => ({
+      status: root.dataset.status,
+      game: root.dataset.game ?? null,
+      title: root.querySelector('.bf-title')?.textContent ?? null,
+      scope: root.querySelector('.bf-scope')?.textContent ?? null,
+      notice: root.querySelector('[data-testid="frontier-notice"]')?.textContent ?? null,
+      facility: root.querySelector('[data-layout="facility"]')?.dataset.facility ?? null,
+    }))
+  const speedTabs = () => page.$$eval('[data-layout="speed-views"] [role="tab"]', (ts) => ts.map((t) => t.textContent))
+  const speedMode = () =>
+    page.$eval('[data-layout="speed-mode"]', (m) => ({
+      mode: m.dataset.mode,
+      floors: [...m.querySelectorAll('[data-layout="speed-floor"]')].map((f) => ({
+        floor: Number(f.dataset.floor),
+        trainers: [...f.querySelectorAll('[data-layout="speed-trainer"]')].map((t) => ({
+          key: t.dataset.trainerKey,
+          name: t.querySelector('[data-testid="speed-trainer-name"]')?.textContent,
+          species: [...t.querySelectorAll('tbody tr')].map((tr) => Number(tr.dataset.speciesId)),
+          sprites: [...t.querySelectorAll('tbody tr img.bf-sprite')].map((i) => i.getAttribute('src')),
+          dex: t.querySelector('[data-testid="speed-trainer-dex"]') != null,
+        })),
+      })),
+    }))
+  /**
+   * Every <img> on the page, loaded: lazy ones are switched to eager and awaited.
+   * Static only (owner, 2026-11-23): no animated asset (the sprites repo's WebP
+   * releases, a GIF, an "animated" path) may be requested on this page.
+   */
+  const ANIMATED = /\.(webp|gif)(\?|$)|\/animated\/|pokeapp-sprites\/releases/
+  const pageImages = () =>
+    page.$eval(SPEED, async (root) => {
+      const imgs = [...root.querySelectorAll('img')]
+      await Promise.all(
+        imgs.map((img) => {
+          img.loading = 'eager'
+          return img.complete && img.naturalWidth > 0
+            ? null
+            : new Promise((done) => {
+                img.addEventListener('load', done, { once: true })
+                img.addEventListener('error', done, { once: true })
+                setTimeout(done, 20000)
+              })
+        }),
+      )
+      return imgs.map((img) => ({ src: img.currentSrc || img.src, w: img.naturalWidth }))
+    })
+  const walkModes = async () => {
+    const out = {}
+    for (const label of await speedTabs()) {
+      await page.click(`[data-testid="speed-mode-${label.toLowerCase()}"]`)
+      await page.waitForFunction((l) => document.querySelector('[data-layout="speed-mode"]')?.dataset.mode === l, label)
+      out[label] = await speedMode()
+      out[label].images = await pageImages()
+    }
+    return out
+  }
+  const imageCheck = (label, modes) => {
+    const imgs = Object.values(modes).flatMap((m) => m.images)
+    const broken = [...new Set(imgs.filter((i) => !(i.w > 0)).map((i) => i.src))]
+    const animated = [...new Set(imgs.filter((i) => ANIMATED.test(i.src)).map((i) => i.src))]
+    check(`${label}: every <img> on the page loads (naturalWidth > 0), every mode and floor`, imgs.length > 0 && broken.length === 0, `${imgs.length} images, ${broken.length} broken: ${broken.slice(0, 3).join(' ')}`)
+    check(`${label}: no animated sprite requested`, animated.length === 0, animated.slice(0, 3).join(' '))
+    return imgs
+  }
+  const bundleFacility = (vg, id) => JSON.parse(read(`public/data/trainers/${vg}.json`)).facilities.find((f) => f.id === id)
+  const allTrainers = (modes) => Object.values(modes).flatMap((m) => m.floors.flatMap((f) => f.trainers))
+  /** Literal parties from the bundle (pokeemerald / pokefirered via the Trainer Dex build), checked twice: literal and live bundle. */
+  const spotCheck = (label, modes, vg, id, spots) => {
+    const fac = bundleFacility(vg, id)
+    const shown = new Map(allTrainers(modes).map((t) => [t.key, t]))
+    for (const [key, species] of spots) {
+      const inBundle = fac.trainers.find((t) => t.key === key)?.party.map((p) => p.species_id)
+      check(`${label} ${key}: team species ${species.join(',')} (the bundle's)`, JSON.stringify(shown.get(key)?.species) === JSON.stringify(species) && JSON.stringify(inBundle) === JSON.stringify(species), JSON.stringify(shown.get(key)?.species))
+    }
+    const wrong = fac.trainers.filter((t) => JSON.stringify(shown.get(t.key)?.species) !== JSON.stringify(t.party.map((p) => p.species_id))).map((t) => t.key)
+    check(`${label}: every trainer's team is the bundle's, in order`, wrong.length === 0, wrong.slice(0, 5).join(','))
+  }
+
+  await selectGeneration(page, 3)
+  await openEntry(page, 'frontier-speed')
+  await pickGame('emerald')
+  await page.waitForSelector('[data-layout="speed-floor"]', { timeout: 60000 })
+  let sh = await speedHead()
+  check('Emerald: "Trainer Hill & Tower", Emerald · Gen 3, the Trainer Hill rules section', sh.status === 'ready' && sh.title === 'Trainer Hill & Tower' && sh.scope === 'Emerald · Gen 3' && sh.facility === 'trainer-hill' && sh.notice == null, JSON.stringify(sh))
+  const hillModes = await walkModes()
+  check('Emerald: 4 Hill modes, Normal / Variety / Unique / Expert', JSON.stringify(Object.keys(hillModes)) === '["Normal","Variety","Unique","Expert"]', Object.keys(hillModes).join(','))
+  const hillShape = Object.values(hillModes).map((m) => m.floors.map((f) => `${f.floor}:${f.trainers.length}`).join(' '))
+  check('... each 4 floors × 2 trainers', hillShape.every((s) => s === '1:2 2:2 3:2 4:2'), hillShape.join(' | '))
+  const hillAll = allTrainers(hillModes)
+  check('... 32 trainers, each with a 6-Pokémon team and a Trainer Dex link', hillAll.length === 32 && hillAll.every((t) => t.species.length === 6 && t.dex), hillAll.filter((t) => t.species.length !== 6 || !t.dex).map((t) => t.key).join(','))
+  check('... every team sprite is Emerald\'s', hillAll.every((t) => t.sprites.length === 6 && t.sprites.every((s) => s.includes('/emerald/'))), hillAll.find((t) => !t.sprites.every((s) => s.includes('/emerald/')))?.sprites.join(','))
+  imageCheck('Emerald Hill (4 modes × 4 floors)', hillModes)
+  check('Hex Maniac Alaina leads Normal floor 1', hillModes.Normal.floors[0].trainers[0].name === 'Hex Maniac Alaina', hillModes.Normal.floors[0].trainers[0].name)
+  spotCheck('Hill', hillModes, 'emerald', 'trainer-hill', [
+    ['Normal-1-1', [200, 338, 344, 110, 337, 330]],
+    ['Unique-2-2', [120, 52, 257, 104, 15, 20]],
+    ['Expert-4-2', [373, 94, 130, 94, 356, 200]],
+  ])
+  const hillAccent = await accentUses(page)
+  check('Emerald Hill: accent within 2 uses (the nav tab and the selected mode)', hillAccent.length <= 2, hillAccent.join(' | '))
+
+  // The record: log three Normal attempts, then two bad times.
+  await page.click('[data-testid="speed-mode-normal"]')
+  const bestText = () => page.$eval('[data-testid="speed-record-normal"] [data-testid="speed-best"]', (e) => e.textContent.replace(/\s+/g, ' ').trim())
+  const currentText = () => page.$eval('[data-testid="speed-record-normal"] [data-testid="speed-current"]', (e) => e.textContent.replace(/\s+/g, ' ').trim())
+  check('before any attempt: "No attempt yet"', (await bestText()) === 'No attempt yet', await bestText())
+  const logAttempt = async (floors, time) => {
+    await page.fill('[data-testid="speed-floors"]', floors)
+    await page.fill('[data-testid="speed-time"]', time)
+    await page.click('[data-testid="speed-log-attempt"]')
+    await page.waitForTimeout(150)
+  }
+  await logAttempt('2', '10:00.00')
+  check('one attempt, 2 of 4 floors: best reads "Furthest: floor 2"', (await bestText()) === 'Furthest: floor 2', await bestText())
+  await logAttempt('4', '13:00.00')
+  await logAttempt('4', '12:59.99')
+  await logAttempt('3', '05:00.00')
+  const best = await bestText()
+  const curr = await currentText()
+  check('best of [cleared 13:00.00, cleared 12:59.99, not cleared 10:00.00 and 05:00.00] reads 12:59.99 with its date', /^12:59\.99 · \d{1,2} [A-Z][a-z]{2} \d{4}$/.test(best), best)
+  check('current run: the last logged, "3 of 4 floors · 05:00.00"', curr.startsWith('3 of 4 floors · 05:00.00'), curr)
+  const attempts = () => page.$$eval('[data-testid="speed-attempts"] tbody tr', (trs) => trs.length)
+  check('4 attempts listed', (await attempts()) === 4, await attempts())
+  await logAttempt('4', '60:00.00')
+  const capErr = await page.$eval('[data-testid="speed-error"]', (e) => e.textContent).catch(() => null)
+  check('"60:00.00" is refused with a message (the timer stops at 59:59.98), nothing logged', capErr === 'The timer stops at 59:59.98.' && (await attempts()) === 4, capErr)
+  await logAttempt('4', '12:3.45')
+  const fmtErr = await page.$eval('[data-testid="speed-error"]', (e) => e.textContent).catch(() => null)
+  check('"12:3.45" is refused with the format message, nothing logged', /m:ss\.cs or mm:ss\.cs/.test(fmtErr ?? '') && (await attempts()) === 4, fmtErr)
+  await logAttempt('5', '12:00.00')
+  check('5 floors of 4 is refused', /from 0 to 4/.test((await page.$eval('[data-testid="speed-error"]', (e) => e.textContent).catch(() => '')) ?? '') && (await attempts()) === 4)
+  await page.fill('[data-testid="speed-time"]', '')
+  const variety = await page.$eval('[data-testid="speed-record-variety"] [data-testid="speed-best"]', (e) => e.textContent.trim())
+  check('the other modes are untouched ("No attempt yet")', variety === 'No attempt yet', variety)
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('pokeapp:frontier-tracker:v1')))
+  check('stored in the Challenge Tracker document: games.emerald.hill.Normal, 4 attempts, schemaVersion 2', stored?.schemaVersion === 2 && stored?.games?.emerald?.hill?.Normal?.attempts?.length === 4 && JSON.stringify(stored.games.emerald.hill.Normal.attempts.map((a) => a.timeCs)) === '[60000,78000,77999,30000]', JSON.stringify(stored?.games))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector(TRIGGER, { timeout: 180000 })
+  await openEntry(page, 'frontier-speed')
+  await page.waitForSelector('[data-testid="speed-record-normal"]', { timeout: 60000 })
+  check('after a reload the record holds: best 12:59.99', (await bestText()).startsWith('12:59.99'), await bestText())
+  await page.screenshot({ path: shot('s2-emerald-light'), fullPage: true })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s2-emerald-dark'), fullPage: true })
+  const hillAccentDark = await accentUses(page)
+  check('[dark] Emerald Hill: accent within 2 uses', hillAccentDark.length <= 2, hillAccentDark.join(' | '))
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(300)
+  const fitSpeed = await page.evaluate(() => {
+    const sc = document.querySelector('[data-testid="frontier-scroll-area"]').getBoundingClientRect()
+    const over = []
+    for (const el of document.querySelectorAll('.bf-page *')) {
+      if (el.closest('.bf-tw') && !el.matches('.bf-tw')) continue // a wide table scrolls inside its wrapper
+      const r = el.getBoundingClientRect()
+      if (r.width && r.right > sc.right + 1) over.push(`${el.tagName.toLowerCase()}.${el.className}`.slice(0, 40))
+    }
+    return { page: document.documentElement.scrollWidth <= innerWidth, over: over.slice(0, 5), n: over.length }
+  })
+  check('390 px Hill: nothing runs past the scroll area', fitSpeed.page && fitSpeed.n === 0, JSON.stringify(fitSpeed))
+  await page.screenshot({ path: shot('s2-emerald-390-light') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s2-emerald-390-dark') })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+  await page.setViewportSize({ width: 1440, height: 1000 })
+
+  // The Trainer Dex link opens the Trainer Dex (the page: the engine cannot open a facility entry).
+  await page.click('[data-trainer-key="Normal-1-1"] [data-testid="speed-trainer-dex"]')
+  check('a trainer\'s "Trainer Dex" link opens the Trainer Dex', (await page.waitForSelector('[data-testid="trainerdex-count"], [data-testid="trainerdex-rows"]', { timeout: 60000 }).catch(() => null)) != null)
+  await page.goBack()
+  check('back returns to Trainer Hill & Tower', (await page.waitForSelector(SPEED, { timeout: 30000 }).catch(() => null)) != null)
+
+  await pickGame('firered-leafgreen')
+  await page.waitForSelector('[data-layout="speed-floor"]', { timeout: 60000 })
+  sh = await speedHead()
+  check('FireRed/LeafGreen: the Trainer Tower', sh.status === 'ready' && sh.scope === 'FireRed and LeafGreen · Gen 3' && sh.facility === 'trainer-tower', JSON.stringify(sh))
+  const towerModes = await walkModes()
+  check('FireRed/LeafGreen: 4 Tower modes, Single / Double / Knockout / Mixed', JSON.stringify(Object.keys(towerModes)) === '["Single","Double","Knockout","Mixed"]', Object.keys(towerModes).join(','))
+  check('... each 8 floors', Object.values(towerModes).every((m) => JSON.stringify(m.floors.map((f) => f.floor)) === '[1,2,3,4,5,6,7,8]'))
+  const perMode = Object.values(towerModes).map((m) => m.floors.reduce((n, f) => n + f.trainers.length, 0))
+  check('... 63 trainers: Single 8, Double 16, Knockout 24, Mixed 15', JSON.stringify(perMode) === '[8,16,24,15]', JSON.stringify(perMode))
+  const towerAll = allTrainers(towerModes)
+  // FireRed/LeafGreen draw their own sprites for Kanto only (#1-151); the rest fall back to Emerald's static sprite.
+  const towerSpriteOk = (t) => t.sprites.length === t.species.length && t.species.every((id, k) => t.sprites[k].includes(id > 151 ? '/emerald/' : '/firered-leafgreen/'))
+  check('... every Tower Pokémon has a static sprite: Kanto FireRed/LeafGreen\'s, the rest Emerald\'s', towerAll.every(towerSpriteOk), towerAll.find((t) => !towerSpriteOk(t))?.sprites.join(','))
+  const towerImgs = imageCheck('FireRed/LeafGreen Tower (4 modes × 8 floors)', towerModes)
+  // Gendered non-Kanto species were the broken ones (no unsuffixed animated file): Politoed, Heracross, Houndoom.
+  const gendered = [186, 214, 229].map((id) => towerAll.flatMap((t) => t.sprites.filter((_, k) => t.species[k] === id))[0])
+  check('Tower: gendered Johto species (Politoed, Heracross, Houndoom) load Emerald\'s static sprite', gendered.every((s) => s?.includes('/emerald/')) &&gendered.every((s) => towerImgs.some((i) => i.src === s && i.w > 0)), gendered.join(' '))
+  spotCheck('Tower', towerModes, 'firered-leafgreen', 'trainer-tower', [
+    ['Single-1-1', [160, 62, 115, 241, 55, 210]],
+    ['Knockout-8-3', [230, 76, 149, 248, 181, 3]],
+    ['Mixed-5-1', [215, 139, 87, 195, 222, 28]],
+  ])
+  const towerBest = await page.$eval('[data-testid="speed-record-single"] [data-testid="speed-best"]', (e) => e.textContent.trim())
+  check('the Tower\'s record is its own (no Hill attempt shows)', towerBest === 'No attempt yet', towerBest)
+  await page.screenshot({ path: shot('s2-frlg-light'), fullPage: true })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'))
+  await page.screenshot({ path: shot('s2-frlg-dark'), fullPage: true })
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'))
+
+  await selectGeneration(page, 4)
+  await openEntry(page, 'frontier-speed')
+  await page.waitForSelector(SPEED)
+  await pickGame('platinum')
+  sh = await speedHead()
+  check('Platinum: "Platinum has no Trainer Hill or Trainer Tower."', sh.status === 'not-in-game' && sh.notice === 'Platinum has no Trainer Hill or Trainer Tower.' && sh.facility == null, JSON.stringify(sh))
+  await page.screenshot({ path: shot('s2-platinum-notice') })
+  await selectGeneration(page, 2)
+  await openEntry(page, 'frontier-speed')
+  await page.waitForSelector(`${SPEED}[data-status="other-generation"]`)
+  sh = await speedHead()
+  check('Gen 2: the generation notice', sh.notice === 'No Battle Frontier in Gen 2. This tab covers Emerald, FireRed and LeafGreen, Platinum, and HeartGold and SoulSilver.', JSON.stringify(sh))
+  // Leave Gen 3 on Emerald for the sections below.
+  await selectGeneration(page, 3)
   await openEntry(page, 'frontier-facilities')
   await pickGame('emerald')
 
