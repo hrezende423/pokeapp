@@ -26,4 +26,16 @@ the Emerald Frontier, Brains and the tracker hold.
 
 ## Proposed Notion "Build status" (not written to Notion)
 
-Filled in at the end of the slices: see the table below once S1–S7 land.
+After S1–S7. The branches are not merged yet, so "Done" means done on the open PRs.
+
+| # | PRD row | Step 0 | Proposed | Where / evidence |
+|---|---|---|---|---|
+| 1 | Battle facility reference data | Partial | **Done** | S1 #33. Facilities for Emerald (+ Trainer Hill), FireRed/LeafGreen (Trainer Tower) and Platinum/HGSS (5 facilities, every BP table). The game row offers only those four games (RS and DP not selectable, owner 2026-11-23). `verify:frontier-reference` §2b. |
+| 2 | Trainer Tower/Hill reference and tracking | Missing | **Done** | S2 #37. Trainer Hill & Tower page: modes, floors, fixed teams, and best clear / current run (mm:ss.cs, floors). §2c and `verify:store` §6. |
+| 3 | Personal challenge progress tracker | Partial | **Done** | S3 #38. Emerald (7 facilities, unchanged); Platinum/HGSS per facility with streak, best and Silver/Gold Prints; FRLG/Hill via S2. Document v2 with a migration fixture. |
+| 4 | Battle Palace move-selection odds | Done | **Done** | S6 #35. Rechecked against pokeemerald (no defect); 6 new assertions. Emerald only (no Palace in Gen 4). |
+| 5 | Battle Arena scoring simulator | Done* | **Done** | S6 #35. Maths correct; two label defects fixed (Levitate, Flash Fire); 5 new assertions. |
+| 6 | Frontier Brain trainer data | Partial | **Done** | S5 #39. Brains screen for Platinum/HGSS with prints and the disassembly's teams; the Trainer Dex already lists them. §2d. |
+| 7 | Rental pool data (Trainerdex extension) | Partial | **Done** (PRD wording to fix) | S4 #34. Slateport Battle Tent pool (70 sets, Lv 30, IV 0). The Battle Castle has no rental Pokémon (its rentals are held items), so that half of the row describes nothing in the game. |
+| 8 | Rental set preview/comparator | Partial | **Done** | S4 #34. The comparator covers the Factory and the Slateport Tent. It is set-vs-set by owner decision (2026-11-06), so the row's "against your own team / damage calculator" wording is superseded. |
+| 9 | Battle Pike/Pyramid simulation tools | Partial | **Done for the assumed scope** (Status stays "To discuss" until the owner confirms the scope) | S7 #36. Tool #24 Battle Pike room odds (hint, other doors, Lucy, status room); Pyramid already covered by the floor log. |

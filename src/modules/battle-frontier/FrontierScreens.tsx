@@ -1,5 +1,6 @@
 import { Brains } from './Brains'
 import { Facilities } from './Facilities'
+import { Gen4Brains } from './Gen4Brains'
 import { Gen4Facilities, TrainerTowerFacilities } from './OtherFacilities'
 import { FrontierShell } from './parts'
 import { SetsTrainers } from './SetsTrainers'
@@ -34,7 +35,11 @@ export function FacilitiesPage() {
 
 export function BrainsPage() {
   return (
-    <FrontierShell page="brains" title="Brains">
+    <FrontierShell
+      page="brains"
+      title="Brains"
+      other={(game) => (game === 'platinum' || game === 'heartgold-soulsilver' ? <Gen4Brains game={game} /> : null)}
+    >
       {(data) => <Brains data={data} />}
     </FrontierShell>
   )
